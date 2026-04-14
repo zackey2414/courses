@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML/CSS 初級コース</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const T = {
+  htmlTags: { h:["タグ","用途","例"], r:[
+    ["h1〜h6","見出し（レベル1〜6）","<h1>タイトル</h1>"],
+    ["p","段落テキスト","<p>説明文</p>"],
+    ["a","ハイパーリンク","<a href=\"url\">テキスト</a>"],
+    ["img","画像の埋め込み","<img src=\"photo.jpg\" alt=\"説明\">"],
+    ["ul / ol","箇条書き / 番号付きリスト","<ul><li>項目</li></ul>"],
+    ["div / span","汎用コンテナ（ブロック / インライン）","<div class=\"box\">...</div>"],
+  ], cap:"HTMLの主要タグ一覧" },
+  semanticTags: { h:["要素","役割","対応するPythonの概念"], r:[
+    ["<header>","ページ・セクションのヘッダー","ファイルの先頭メタデータ"],
+    ["<nav>","ナビゲーションリンク群","メニュー構造"],
+    ["<main>","ページのメインコンテンツ","本処理のメインロジック"],
+    ["<section>","テーマ的なひとまとまり","関数・クラスのひとかたまり"],
+    ["<article>","独立した記事・投稿","独自に完結するオブジェクト"],
+    ["<aside>","補足・サイドバー","コメント・補足情報"],
+    ["<footer>","ページ・セクションのフッター","後処理・クローズ処理"],
+  ], cap:"セマンティック要素の一覧" },
+  formElements: { h:["要素","type属性など","用途"], r:[
+    ["<input>","text / email / password","一行テキスト入力"],
+    ["<input>","number / date / range","数値・日付・スライダー"],
+    ["<input>","checkbox / radio","複数選択 / 単一選択"],
+    ["<textarea>","（なし）","複数行テキスト入力"],
+    ["<select> + <option>","（なし）","ドロップダウン選択"],
+    ["<button>","submit / button / reset","送信・汎用ボタン・リセット"],
+    ["<label>","for属性でinputに紐付け","アクセシビリティ向上"],
+  ], cap:"フォーム関連要素" },
+  selectors: { h:["セレクタ","書き方","例"], r:[
+    ["要素セレクタ","タグ名","p { color: red; }"],
+    ["クラスセレクタ",".クラス名",".card { ... }"],
+    ["IDセレクタ","#ID名","#header { ... }"],
+    ["子孫セレクタ","A B","nav a { ... }"],
+    ["子セレクタ","A > B","ul > li { ... }"],
+    ["疑似クラス","A:state","a:hover { ... }"],
+    ["疑似要素","A::part","p::first-line { ... }"],
+  ], cap:"CSSセレクタの種類" },
+  boxModel: { h:["領域","説明","CSSプロパティ"], r:[
+    ["content","テキスト・画像などの実内容","width / height"],
+    ["padding","content と border の間の内側余白","padding / padding-top など"],
+    ["border","要素を囲む枠線","border / border-width など"],
+    ["margin","他要素との外側余白","margin / margin-top など"],
+  ], cap:"CSSボックスモデルの4層構造" },
+  flexProps: { h:["プロパティ","値の例","効果"], r:[
+    ["display","flex","フレックスコンテナを作る"],
+    ["flex-direction","row / column","主軸の方向（横 / 縦）"],
+    ["justify-content","flex-start / center / space-between","主軸方向の配置"],
+    ["align-items","stretch / center / flex-end","交差軸方向の配置"],
+    ["gap","8px / 1rem","アイテム間の隙間"],
+    ["flex-wrap","wrap / nowrap","折り返しの有無"],
+    ["flex","1 / 0 1 auto","伸縮比率の指定"],
+  ], cap:"Flexboxの主要プロパティ" },
+  gridProps: { h:["プロパティ","値の例","効果"], r:[
+    ["display","grid","グリッドコンテナを作る"],
+    ["grid-template-columns","repeat(3,1fr) / 200px 1fr","列の定義"],
+    ["grid-template-rows","auto / 100px 1fr","行の定義"],
+    ["gap","16px","行・列の隙間"],
+    ["grid-column","1 / 3 / span 2","アイテムの列配置"],
+    ["grid-row","1 / 2","アイテムの行配置"],
+    ["auto-fill / auto-fit","repeat(auto-fill, minmax(200px,1fr))","レスポンシブグリッド"],
+  ], cap:"CSS Gridの主要プロパティ" },
+  mediaQuery: { h:["用途","書き方","説明"], r:[
+    ["画面幅（最小）","@media (min-width: 768px)","768px以上に適用"],
+    ["画面幅（最大）","@media (max-width: 767px)","767px以下に適用"],
+    ["ダークモード","@media (prefers-color-scheme: dark)","ダーク設定時に適用"],
+    ["印刷","@media print","印刷時に適用"],
+    ["高解像度","@media (-webkit-min-device-pixel-ratio: 2)","Retina等"],
+  ], cap:"メディアクエリの種類" },
+  transitionProps: { h:["プロパティ","値の例","説明"], r:[
+    ["transition-property","all / color / transform","変化させるプロパティ"],
+    ["transition-duration","0.3s / 200ms","アニメーション時間"],
+    ["transition-timing-function","ease / ease-in-out / linear","変化の速度曲線"],
+    ["transition-delay","0.1s","開始までの待ち時間"],
+    ["transition（一括）","color 0.3s ease","省略形"],
+  ], cap:"transitionプロパティ" },
+};
+
+const EX = {
+ch1:[
+  {diff:1,q:"以下のHTMLに不足している必須タグをすべて補い、正しい文書構造を完成させよ。ブラウザで開いたとき「ポートフォリオ」とタブに表示されること。",
+code:`<!-- 不完全なHTML。修正せよ -->
+<html>
+  <h1>私のポートフォリオ</h1>
+  <p>Webエンジニアを目指しています。</p>
+</html>`,
+answer:`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ポートフォリオ</title>
+</head>
+<body>
+  <h1>私のポートフォリオ</h1>
+  <p>Webエンジニアを目指しています。</p>
+</body>
+</html>`},
+  {diff:2,q:"スキル一覧をul/liで、自己紹介をp/strong/emを使ってマークアップせよ。aタグでGitHubへのリンク（target=\"_blank\"）も作ること。",
+code:`<!-- 以下の内容をHTMLで書け
+スキル: Python, HTML, CSS
+自己紹介: 「Webを学んでいます。楽しく、丁寧に。」
+GitHubリンク: https://github.com/yourname
+-->`,
+answer:`<ul>
+  <li>Python</li>
+  <li>HTML</li>
+  <li>CSS</li>
+</ul>
+<p>Webを<strong>学んでいます</strong>。<em>楽しく</em>、丁寧に。</p>
+<a href="https://github.com/yourname" target="_blank" rel="noopener noreferrer">
+  GitHubプロフィール
+</a>`},
+],
+ch2:[
+  {diff:1,q:"お問い合わせフォームを作れ。名前（required）・メール（email, required）・メッセージ（textarea）・送信ボタンを含めること。各inputにlabelを紐付けること。",
+code:`<!-- お問い合わせフォームを作れ -->
+<form action="/contact" method="post">
+  <!-- ここを書く -->
+</form>`,
+answer:`<form action="/contact" method="post">
+  <label for="name">名前</label>
+  <input type="text" id="name" name="name" required>
+
+  <label for="email">メールアドレス</label>
+  <input type="email" id="email" name="email" required>
+
+  <label for="message">メッセージ</label>
+  <textarea id="message" name="message" rows="5"></textarea>
+
+  <button type="submit">送信</button>
+</form>`},
+  {diff:2,q:"ポートフォリオサイトのheader/nav/main/footer を使ったセマンティックHTMLの骨格を完成させよ。navには3つのリンク（About/Works/Contact）を含めること。",
+code:`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ポートフォリオ</title>
+</head>
+<body>
+  <!-- header, nav, main, footer を書け -->
+</body>
+</html>`,
+answer:`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ポートフォリオ</title>
+</head>
+<body>
+  <header>
+    <h1>My Portfolio</h1>
+    <nav>
+      <a href="#about">About</a>
+      <a href="#works">Works</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+  <main>
+    <section id="about"><h2>About</h2></section>
+    <section id="works"><h2>Works</h2></section>
+    <section id="contact"><h2>Contact</h2></section>
+  </main>
+  <footer>
+    <p>&copy; 2026 My Portfolio</p>
+  </footer>
+</body>
+</html>`},
+],
+ch3:[
+  {diff:1,q:"外部CSSファイル（style.css）をHTMLに読み込み、h1を紫色（#6366f1）・フォントサイズ32px、bodyの背景を#f8f7f4に設定せよ。",
+code:`/* style.css */
+/* ここにCSSを書く */
+
+/* index.html の head タグ内で読み込む */`,
+answer:`/* style.css */
+body {
+  background: #f8f7f4;
+  font-family: sans-serif;
+}
+
+h1 {
+  color: #6366f1;
+  font-size: 32px;
+}
+
+/* index.html */
+/* <link rel="stylesheet" href="style.css"> */`},
+  {diff:2,q:"以下のHTMLに対し、.card クラスのdivは背景白・角丸10px・影付き、.card h2 は文字色#1e1b4b・18px、.card p は#6b7280・14pxになるようCSSを書け。",
+code:`<div class="card">
+  <h2>タイトル</h2>
+  <p>説明テキストです。</p>
+</div>`,
+answer:`.card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  padding: 20px;
+}
+
+.card h2 {
+  color: #1e1b4b;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.card p {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.7;
+}`},
+],
+ch4:[
+  {diff:1,q:"box-sizing: border-boxの効果を確認せよ。width: 200px・padding: 20px・border: 2px solid black のdivが、border-boxと初期値（content-box）でそれぞれ何pxの幅になるか答え、CSSでborder-boxを全体に適用するコードを書け。",
+code:`/* border-box と content-box の違いを示すCSS */
+/* 全要素に border-box を適用するコードも書け */`,
+answer:`/* content-box（デフォルト）: 200 + 20*2 + 2*2 = 244px */
+/* border-box: 幅は常に200px（padding・borderが内側に収まる）*/
+
+/* 全要素に border-box を適用（推奨）*/
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+.box {
+  width: 200px;
+  padding: 20px;
+  border: 2px solid black;
+  /* border-box なら合計幅は200px */
+}`},
+  {diff:2,q:"display: block / inline / inline-block の違いを示すCSSとHTMLを書け。spanをinline-blockにしてwidth/heightを指定した例を含めること。",
+code:`<!-- block / inline / inline-block の違いを示せ -->`,
+answer:`<style>
+  .block-el  { display: block;        background: #dbeafe; margin: 4px 0; }
+  .inline-el { display: inline;       background: #fef9c3; padding: 2px 6px; }
+  .ib-el     { display: inline-block; background: #dcfce7;
+               width: 80px; height: 40px; line-height: 40px;
+               text-align: center; }
+</style>
+
+<div class="block-el">ブロック要素（幅いっぱい）</div>
+<span class="inline-el">インライン</span>
+<span class="inline-el">並んで表示</span>
+<br>
+<span class="ib-el">IB-1</span>
+<span class="ib-el">IB-2</span>
+<!-- inline-block はwidth/heightが効き、横に並ぶ -->`},
+],
+ch5:[
+  {diff:1,q:"Flexboxを使って、3枚のカード（.card）を横並びにし、カード同士の間隔を16px、カードを中央揃えにするCSSを書け。",
+code:`<div class="card-grid">
+  <div class="card">Card 1</div>
+  <div class="card">Card 2</div>
+  <div class="card">Card 3</div>
+</div>`,
+answer:`.card-grid {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  flex: 1;
+  min-width: 200px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}`},
+  {diff:2,q:"Flexboxでポートフォリオのナビゲーションバーを作れ。左にロゴ、右にリンク3つ（About/Works/Contact）が配置されるようにせよ。",
+code:`<header class="site-header">
+  <span class="logo">MyPortfolio</span>
+  <nav class="site-nav">
+    <a href="#about">About</a>
+    <a href="#works">Works</a>
+    <a href="#contact">Contact</a>
+  </nav>
+</header>`,
+answer:`.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  height: 60px;
+  background: #1e1b4b;
+}
+
+.logo {
+  color: #fff;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.site-nav {
+  display: flex;
+  gap: 24px;
+}
+
+.site-nav a {
+  color: #c4b5fd;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.site-nav a:hover {
+  color: #fff;
+}`},
+],
+ch6:[
+  {diff:1,q:"CSS Gridで、画面幅に応じて自動的に列数が変わる作品ギャラリーを実装せよ。各カードは最小200px、fr単位で均等に広がること。",
+code:`<div class="gallery">
+  <div class="work-card">作品1</div>
+  <div class="work-card">作品2</div>
+  <div class="work-card">作品3</div>
+  <div class="work-card">作品4</div>
+</div>`,
+answer:`.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+.work-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  min-height: 150px;
+}`},
+  {diff:2,q:"CSS Gridで12カラムグリッドを使ったレイアウトを作れ。ヘッダーは12列全体、サイドバーは3列、メインコンテンツは9列、フッターは12列全体を占めること。",
+code:`<div class="layout">
+  <header class="l-header">ヘッダー</header>
+  <aside class="l-sidebar">サイドバー</aside>
+  <main class="l-main">メインコンテンツ</main>
+  <footer class="l-footer">フッター</footer>
+</div>`,
+answer:`.layout {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: auto 1fr auto;
+  gap: 16px;
+  min-height: 100vh;
+}
+
+.l-header  { grid-column: 1 / -1; background: #1e1b4b; color: #fff; padding: 16px; }
+.l-sidebar { grid-column: 1 / 4;  background: #eef2ff; padding: 16px; }
+.l-main    { grid-column: 4 / -1; background: #fff;    padding: 16px; }
+.l-footer  { grid-column: 1 / -1; background: #374151; color: #fff; padding: 16px; }`},
+],
+ch7:[
+  {diff:1,q:"モバイルファースト設計で、スマートフォン（デフォルト）では1カラム、768px以上では2カラム、1024px以上では3カラムになるカードグリッドを書け。",
+code:`<div class="responsive-grid">
+  <div class="card">カード1</div>
+  <div class="card">カード2</div>
+  <div class="card">カード3</div>
+</div>`,
+answer:`.responsive-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* スマホ: 1カラム */
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .responsive-grid {
+    grid-template-columns: repeat(2, 1fr); /* タブレット: 2カラム */
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-grid {
+    grid-template-columns: repeat(3, 1fr); /* デスクトップ: 3カラム */
+  }
+}
+
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}`},
+  {diff:2,q:"clamp()とrem単位を使って、スマホで16px・デスクトップで24pxの間を流動的に変化するフォントサイズと、vw/vh単位を使ったヒーローセクションを書け。",
+code:`/* clamp() と rem / vw / vh を使った流動的なデザイン */`,
+answer:`/* 流動的なフォントサイズ */
+:root {
+  font-size: 16px; /* 1rem = 16px */
+}
+
+h1 {
+  font-size: clamp(1rem, 2.5vw, 1.5rem);
+  /* 最小16px, 流動2.5vw, 最大24px */
+}
+
+/* ヒーローセクション */
+.hero {
+  width: 100%;
+  min-height: 100vh;         /* ビューポートの高さ全体 */
+  padding: 0 5vw;            /* 左右に5vwのパディング */
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #1e1b4b, #4c1d95);
+  color: #fff;
+}
+
+.hero h1 {
+  font-size: clamp(1.5rem, 5vw, 3rem);
+  line-height: 1.2;
+}`},
+],
+ch8:[
+  {diff:1,q:"CSS変数（カスタムプロパティ）を使ってサイトカラーを管理せよ。--color-primary / --color-bg / --color-text を:rootで定義し、それをcardとbodyで使うこと。",
+code:`/* CSS変数でカラーを管理する */
+:root {
+  /* 変数をここで定義 */
+}`,
+answer:`:root {
+  --color-primary: #6366f1;
+  --color-bg: #f8f7f4;
+  --color-text: #1e1b4b;
+  --color-muted: #6b7280;
+  --radius: 10px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}`},
+  {diff:2,q:"transitionと@keyframesを使ってボタンにホバーエフェクトと、カードの「フェードインスライドアップ」アニメーションを実装せよ。",
+code:`<button class="btn">ホバーしてね</button>
+<div class="animated-card">アニメーションカード</div>`,
+answer:`.btn {
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99,102,241,0.4);
+  background: #4f46e5;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animated-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  animation: fadeInUp 0.5s ease forwards;
+}`},
+],
+};
+
+const chapters = [
+{id:"ch1",num:1,title:"HTMLとWebの基礎",est:"45分",
+goal:"HTMLドキュメントの正しい構造（DOCTYPE/head/body）を理解し、主要タグ（h1〜h6/p/a/img/ul/li）を使ってポートフォリオの骨格ページを作れる。",
+sections:[
+{title:"ブラウザとHTMLの関係",
+body:`WebブラウザはHTMLファイルを読み込み、内容を解析してユーザーに画面として表示するプログラムです。Pythonのprint()が端末に文字を出力するように、HTMLはブラウザに「何を」「どう」見せるかを宣言します。ただしPythonが処理の順序を記述する「手続き型」なのに対し、HTMLは「この内容はh1（見出し）である」のように構造を宣言する「宣言型」という大きな違いがあります。
+
+HTTPリクエストを受け取ったブラウザは、HTMLを解析してDOMツリー（Document Object Model）を構築し、CSSを当ててレイアウトを計算し、画面に描画します。この一連の流れを理解することが、後のCSS・JavaScriptの動作理解の土台になります。`,
+code:`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <!-- ブラウザへのメタ情報 -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>タブに表示されるタイトル</title>
+</head>
+<body>
+  <!-- ユーザーに見える内容 -->
+  <h1>最大の見出し</h1>
+  <p>段落テキスト。<a href="https://example.com">リンク</a></p>
+  <img src="photo.jpg" alt="写真の説明（アクセシビリティのため必須）">
+</body>
+</html>`,
+afterCode:`DOCTYPE宣言はHTML5であることをブラウザに伝えます。これがないと「後方互換モード（Quirks Mode）」で動作し、CSSの計算が変わる場合があります。lang="ja"は検索エンジンや読み上げソフトが言語を判断するために使います。`},
+{title:"テキストとリストの基本タグ",
+body:`HTMLのタグは意味（セマンティクス）を持ちます。h1〜h6は見出しレベルを表し、検索エンジン（SEO）にとってページ構造のヒントになります。h1はページ内に1つだけ使うのが基本です。Pythonのコメントに相当する「このコードは何をしているか」を説明する役割を、HTMLタグが構造に対して担っていると考えると理解しやすいです。
+
+リストはul（unordered list / 箇条書き）とol（ordered list / 番号付き）の2種類があり、どちらも内部にliを置きます。aタグのhref属性は絶対URL・相対パス・ページ内アンカー（#id名）が使えます。imgのalt属性は画像が読み込めないときのテキストであり、視覚障害者向けのスクリーンリーダーにも読まれるためアクセシビリティの観点から必ず記述します。`,
+table:T.htmlTags,
+afterTable:`strongタグは「重要性」を、emタグは「強調」を意味します。見た目（太字・斜体）のためだけに使う場合はCSS（font-weight: bold）で対処するのが正しいアプローチです。意味と見た目を分けることがHTML/CSSの基本原則です。`},
+]},
+{id:"ch2",num:2,title:"セマンティックHTMLとフォーム",est:"50分",
+goal:"header/main/section/footerなどのセマンティック要素を使ってアクセシブルなページ構造を組める。form/input/select/buttonを使った入力フォームを実装できる。",
+sections:[
+{title:"セマンティック要素で意味のある構造を作る",
+body:`HTML5以前は<div id="header">のようにdivに名前を付けて構造を表していましたが、現在はheader/main/section/footerといったセマンティック（意味的）な要素を使います。これらを使うことで、検索エンジンのクローラーがページの構造を理解しやすくなり、スクリーンリーダー（視覚障害者向け読み上げ装置）が正しくナビゲートできるようになります。
+
+Pythonで関数・クラス・モジュールに意味のある名前を付けるのと同じ感覚です。コードを読む人間（そしてブラウザやbot）が意図を読み取れるよう、適切なタグを選ぶことが保守性とアクセシビリティに直結します。`,
+table:T.semanticTags,
+afterTable:`navタグは必ずしもheader内になくてもかまいません。サイドバーのナビゲーションにもnavを使えます。一方、単なる装飾目的のグループ化にはdivを、文中の一部を装飾するにはspanを使います。`},
+{title:"フォーム要素とアクセシビリティ",
+body:`フォームはユーザーからサーバーへデータを送る仕組みです。formタグのaction属性が送信先URL、method属性がHTTPメソッド（get/post）を指定します。inputのtype属性は入力値の種類を定義し、ブラウザがスマートフォンのキーボード表示やバリデーション（required / min / pattern）を自動で行います。
+
+Pythonで引数の型チェックをするように、HTMLのtype属性とrequired属性がフロントエンド側の第一防御線になります。ただしサーバー側のバリデーションも必ず必要です（フロントの検証はユーザーが簡単に回避できます）。labelとinputをfor属性で紐付けると、ラベルをクリックしてもフォームにフォーカスが当たるため、入力しやすくなります。`,
+table:T.formElements,
+afterTable:`<input type="email">は送信前にブラウザが自動でメール形式を検証します。スマートフォンではメール専用キーボードが表示されます。type="number"はスマートフォンで数字キーパッドを呼び出します。こうしたUXの改善がtype属性の大きな価値です。`},
+]},
+{id:"ch3",num:3,title:"CSSの基礎",est:"50分",
+goal:"インライン・内部・外部スタイルシートの違いを理解し、要素/クラス/IDセレクタとカスケード・詳細度の仕組みを使って基本的なスタイリングができる。",
+sections:[
+{title:"CSSの3種類の記述方法とセレクタ",
+body:`CSSはHTML要素に視覚的なスタイル（色・サイズ・レイアウト等）を当てる言語です。記述方法は3つあり、インラインスタイル（style属性）・内部スタイルシート（headタグ内のstyleタグ）・外部スタイルシート（linkタグで読み込む.cssファイル）です。実務では保守性の観点から外部スタイルシートがほぼ必須です。Pythonで設定値をコードに直書き（ハードコード）せず設定ファイルに分離するのと同じ理由です。
+
+セレクタは「どの要素にスタイルを当てるか」を指定するパターンです。Pythonのリスト内包表記の条件式に似て、CSSのセレクタも柔軟な絞り込みが書けます。特にクラスセレクタ（.クラス名）は再利用性が高く、コンポーネント指向の設計に向いています。`,
+table:T.selectors,
+afterTable:`疑似クラスのa:hoverはマウスを重ねたときのスタイルです。:focus（フォーカス時）・:first-child・:nth-child(n)等も頻繁に使います。疑似要素のp::before・p::afterはCSSでHTML要素の前後にコンテンツを挿入できる仕組みです。`},
+{title:"カスケードと詳細度",
+body:`「カスケード」はCSSの中心概念で、複数のスタイルが競合したとき、どのルールが優先されるかを決める仕組みです。優先順位は「詳細度（Specificity）」と「記述順」で決まります。詳細度の高さはインラインスタイル > ID > クラス/疑似クラス > 要素 の順です。Pythonで変数スコープ（ローカル > グローバル）が優先されるのと似た概念です。
+
+!importantはすべてのルールを上書きできますが、保守性を大きく損なうため原則として使用を避けます。代わりに詳細度を適切に管理するか、クラス名を工夫します。CSSの問題の多くはこの詳細度の競合に起因するため、早めに理解しておくことが重要です。`,
+code:`/* 詳細度の例 */
+p          { color: black; }   /* 詳細度: 0,0,1 */
+.text      { color: blue;  }   /* 詳細度: 0,1,0 */
+#intro     { color: green; }   /* 詳細度: 1,0,0 */
+p.text     { color: red;   }   /* 詳細度: 0,1,1 */
+
+/* 記述順: 同詳細度なら後勝ち */
+p { color: #333; }
+p { color: #666; } /* こちらが適用される */
+
+/* 継承: 親要素のfont-familyは子に引き継がれる */
+body { font-family: sans-serif; } /* 全要素に適用 */`,
+afterCode:`CSSのcascadeはスタイルが「滝のように」流れ落ちてくるイメージです。specifishityという可視化ツールを使うと詳細度の値を直感的に把握できます。実務ではIDセレクタはCSSでほとんど使わず、クラスに統一するプロジェクトも多いです。`},
+]},
+{id:"ch4",num:4,title:"ボックスモデル",est:"50分",
+goal:"CSSボックスモデルの4層構造（content/padding/border/margin）を理解し、box-sizing: border-boxとdisplayプロパティを使ってレイアウトを正確に制御できる。",
+sections:[
+{title:"ボックスモデルの4層構造",
+body:`HTMLのすべての要素は「箱（ボックス）」として扱われます。箱の内側から content（実際の内容） → padding（内側の余白） → border（枠線） → margin（外側の余白）の4層で構成されます。Pythonでオブジェクトが属性を持つように、すべての要素がこの4つの寸法を持っています。
+
+初期値では width プロパティは content 部分の幅だけを指定し、padding と border が加算されます（content-box）。しかし box-sizing: border-box に変更すると、width が content+padding+border の合計幅になり、計算が直感的になります。現代のCSSでは全要素に border-box を指定するのがほぼ標準的なリセットです。`,
+table:T.boxModel,
+afterTable:`margin: 0 auto は「上下0・左右自動」を意味し、ブロック要素を水平方向に中央揃えする古典的な手法です。marginの相殺（margin collapsing）は2つの垂直marginが隣接するとき大きい方だけ適用される仕組みで、想定外の余白になりやすいため注意が必要です。`},
+{title:"display プロパティ：ブロックとインライン",
+body:`displayプロパティは要素がどう振る舞うかを決定します。block（div/p/h1など）は幅いっぱいに広がり前後に改行が入ります。inline（span/a/strongなど）はテキストの流れに沿って配置され、width/heightは効きません。inline-blockはinlineのように横に並びつつ、blockのようにwidth/heightが指定できます。
+
+Pythonの型がオブジェクトの振る舞いを決めるように、displayが要素のレイアウト上の振る舞いを決めます。なお display: none は要素を非表示にし、レイアウトからも消えます。visibility: hidden は見えないがスペースは保持されます。この違いは後のJavaScriptアニメーションで重要になります。`,
+code:`/* block: 幅いっぱい、前後改行あり */
+div { display: block; width: 50%; }
+
+/* inline: 幅高さ指定不可、横に並ぶ */
+span { display: inline; }
+
+/* inline-block: 横に並び、幅高さも指定可 */
+.badge {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  text-align: center;
+  border-radius: 50%;
+  background: #6366f1;
+  color: #fff;
+}
+
+/* none: 非表示でスペースも消える */
+.hidden { display: none; }`,
+afterCode:`display: flex と display: grid は次の章で詳しく扱いますが、どちらもブロックコンテナを作るという点では displayの拡張です。これらを理解する前にblock/inline/inline-blockを体感しておくことで、Flexbox・Gridの動作原理が腑に落ちやすくなります。`},
+]},
+{id:"ch5",num:5,title:"Flexbox",est:"55分",
+goal:"display: flexを使いjustify-content/align-items/flex-direction/gapでナビゲーションバーやカードグリッドの横並びレイアウトを実装できる。",
+sections:[
+{title:"Flexboxの仕組みと主要プロパティ",
+body:`Flexboxはコンテナ内のアイテムを1次元（横一列または縦一列）に並べるためのレイアウトシステムです。display: flexを指定した要素がフレックスコンテナになり、直下の子要素がフレックスアイテムになります。Pythonのリストが要素を一方向に並べるように、Flexboxは子要素を主軸（flex-direction）に沿って並べます。
+
+justify-contentは主軸方向（デフォルトでは水平方向）の配置を、align-itemsは交差軸方向（デフォルトでは垂直方向）の配置を制御します。この2つで「中央揃え」「均等配置」「端揃え」など多様なレイアウトが実現できます。gap（旧grid-gap）でアイテム間の隙間を指定できるため、margin計算が不要になりコードが簡潔になります。`,
+table:T.flexProps,
+afterTable:`flex: 1 は flex-grow: 1 / flex-shrink: 1 / flex-basis: 0 の省略形です。コンテナの余白をアイテム間で均等に分配します。一方 flex-wrap: wrap を指定しないと、アイテムが多くても折り返さず画面外にはみ出します。`},
+{title:"Flexboxによるナビゲーションとカードレイアウト",
+body:`ナビゲーションバーは「左にロゴ、右にリンク群」という典型的なレイアウトで、Flexboxのjustify-content: space-betweenで2行のCSSで実現できます。かつてはfloatを使って実装していましたが、Flexboxの登場で格段に簡潔になりました。
+
+カードをグリッド状に並べるには、コンテナにdisplay: flex / flex-wrap: wrap / gapを指定し、各カードにflex: 1 / min-width（最小幅）を設定します。画面幅が狭くなると自動で折り返し、レスポンシブに近い動作が得られます。完全なレスポンシブ対応には次の章のGridとメディアクエリを組み合わせます。`,
+code:`/* ナビゲーションバー */
+.site-header {
+  display: flex;
+  justify-content: space-between; /* 左右に分ける */
+  align-items: center;            /* 垂直方向に中央揃え */
+  padding: 0 24px;
+  height: 64px;
+  background: #1e1b4b;
+}
+
+/* カードグリッド */
+.card-grid {
+  display: flex;
+  flex-wrap: wrap;  /* 折り返しあり */
+  gap: 16px;
+  padding: 16px;
+}
+
+.card {
+  flex: 1;          /* 余白を均等に分配 */
+  min-width: 240px; /* これ以下になると折り返す */
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+}`,
+afterCode:`Flexboxは1次元のレイアウトに最適です。「横一列のナビ」「縦並びのサイドバーメニュー」「アイコン+テキストの横並び」など、局所的な配置にはFlexboxが使いやすいです。ページ全体の2次元レイアウト（行と列を同時に制御）にはGridが向いています。`},
+]},
+{id:"ch6",num:6,title:"CSS Grid",est:"55分",
+goal:"display: gridでgrid-template-columns/rowsとfr単位を使い、作品ギャラリーや2カラムレイアウトを実装できる。FlexboxとGridの使い分けの判断基準を理解できる。",
+sections:[
+{title:"CSS Gridの基本概念",
+body:`CSS Gridは2次元（行と列）を同時に制御できるレイアウトシステムです。Flexboxが1次元（行または列のどちらか）を扱うのに対し、Gridはスプレッドシートのような格子状のレイアウトを直接定義できます。Pythonの2次元リスト（リストのリスト）がセルを行列で管理するように、Gridも行（row）と列（column）で空間を定義します。
+
+fr（fraction）単位は利用可能なスペースの割合を指定します。grid-template-columns: 1fr 2fr とすると、左列が1/3・右列が2/3の幅になります。repeat()関数は繰り返しを省略でき、repeat(3, 1fr) は 1fr 1fr 1fr と同じです。auto-fillとauto-fitを使うと、カラム数をブラウザが自動計算するレスポンシブグリッドが1行で書けます。`,
+table:T.gridProps,
+afterTable:`grid-column: 1 / -1 は「1列目から最後の列まで」を意味します。-1は末尾を表すPythonのスライス記法に似た便利な表記です。grid-template-areas プロパティを使うと、領域に名前を付けてASCIIアート風にレイアウトを記述できます。`},
+{title:"FlexboxとGridの使い分け",
+body:`「FlexboxかGridかどちらを使うべきか」は頻繁に議論されます。基本原則は「コンテンツ主導（content-out）ならFlex、レイアウト主導（layout-in）ならGrid」です。Flexboxはアイテムのサイズに応じてレイアウトが決まり、Gridは先に格子を定義してそこにアイテムを配置します。
+
+実際には両者を組み合わせて使います。例えばページ全体のマクロレイアウト（ヘッダー/サイドバー/メイン/フッター）にGridを使い、ナビバー内のアイコン+テキストの配置にFlexboxを使う、というパターンが一般的です。どちらか一方に固執せず、目的に応じて使い分けることが重要です。`,
+code:`/* auto-fill: レスポンシブギャラリー */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+/* 名前付きエリア：直感的なレイアウト定義 */
+.page-layout {
+  display: grid;
+  grid-template-areas:
+    "header  header"
+    "sidebar main"
+    "footer  footer";
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+  gap: 0;
+}
+
+.page-header  { grid-area: header;  }
+.page-sidebar { grid-area: sidebar; }
+.page-main    { grid-area: main;    }
+.page-footer  { grid-area: footer;  }`,
+afterCode:`minmax(200px, 1fr) は「最小200px、最大1fr」を意味します。auto-fillは列数を自動計算し、コンテナに収まる最大数の列を作ります。auto-fitはauto-fillと似ていますが、空のトラックを折りたたむため少ないアイテムでも列が広がります。`},
+]},
+{id:"ch7",num:7,title:"レスポンシブデザイン",est:"55分",
+goal:"viewport metaタグとメディアクエリ（@media）でモバイルファースト設計を実装できる。clamp()と相対単位（rem/em/%/vw/vh）を使って流動的なレイアウトが書ける。",
+sections:[
+{title:"viewport metaタグとメディアクエリ",
+body:`スマートフォンのブラウザはデフォルトでページを980px幅で仮想的に描画し縮小表示します。これを防ぐためにviewport metaタグ（<meta name="viewport" content="width=device-width, initial-scale=1.0">）が必要です。このタグがないとメディアクエリが意図通りに動作しません。
+
+メディアクエリは画面幅・解像度・カラースキームなどの条件に応じてCSSを切り替えます。モバイルファーストとは「まずスマートフォン向けのスタイルを書き、min-widthで画面が広くなるにつれてスタイルを追加していく」設計思想です。逆のmax-width（デスクトップファースト）より、後から追加するスタイルが少なく済むため保守性が高いとされています。`,
+table:T.mediaQuery,
+afterTable:`ブレークポイントは一般的にスマートフォン（〜767px）・タブレット（768px〜1023px）・デスクトップ（1024px〜）の3段階が基本です。ただし特定の解像度に固執せず、「コンテンツが崩れ始めたタイミング」でブレークポイントを設けるアプローチが実務では推奨されます。`},
+{title:"相対単位とclamp()による流動的なデザイン",
+body:`pxは絶対単位で画面サイズに依存しませんが、remやemは相対単位です。rem（root em）は:rootのfont-size（デフォルト16px）を基準にします。em は親要素のfont-sizeを基準にするため、コンポーネント内部での相対的なサイズ指定に向いています。%は親要素に対する割合、vw/vhはビューポートの幅/高さに対する割合です。
+
+clamp(最小値, 推奨値, 最大値)関数は3つの値の間でCSSプロパティを流動的に変化させます。clamp(1rem, 2.5vw, 2rem)とすると、画面幅に応じて16px〜32pxの間でフォントサイズが変わり、メディアクエリなしでレスポンシブなタイポグラフィが実現できます。`,
+code:`/* 相対単位の使い分け */
+:root { font-size: 16px; } /* 1rem = 16px */
+
+body {
+  font-size: 1rem;          /* 16px */
+  line-height: 1.7;         /* emで相対指定 */
+}
+
+h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
+/* 最小24px / 流動 / 最大40px */
+
+.container {
+  width: min(100% - 32px, 1100px);
+  /* 100%-32pxかつ最大1100px */
+  margin: 0 auto;
+}
+
+.hero {
+  height: 100svh;    /* スマホのブラウザバーを除外する svh */
+  padding: 0 5vw;
+}`,
+afterCode:`svh（small viewport height）はモバイルブラウザのアドレスバーが表示されているときのビューポート高さです。100vhがアドレスバーを含む高さになる問題を回避できます。min()・max()・clamp()の数学関数はCSS Valuesレベル4仕様で定義され、現代ブラウザでは全て対応済みです。`},
+]},
+{id:"ch8",num:8,title:"アニメーションとCSS変数",est:"50分",
+goal:"transitionとtransform、@keyframesを使ってインタラクティブなUIアニメーションを実装できる。CSS変数（カスタムプロパティ）でデザイントークンを管理してテーマ切り替えを実装できる。",
+sections:[
+{title:"transitionとtransform",
+body:`transitionはCSSプロパティが変化するときのアニメーションを指定します。たとえば button:hover { background: blue; } だけだと瞬時に変わりますが、transitionを追加すると滑らかに変化します。duration（所要時間）・timing-function（速度曲線）・delay（開始遅延）の3要素で動きを制御します。
+
+transformはDOM上の位置を変えずに要素を視覚的に移動（translate）・回転（rotate）・拡大縮小（scale）します。GPUで処理されるため、topやleftのアニメーションよりもtranslateのほうがパフォーマンスが高くなります。ホバーエフェクトでtranslateY(-2px)（少し上に浮く）やscale(1.05)（少し拡大）を組み合わせると質感の高いUIになります。`,
+table:T.transitionProps,
+afterTable:`will-change: transformをあらかじめ指定すると、ブラウザがGPUレイヤーを事前に確保しアニメーションをより滑らかにできます。ただし多用すると逆にメモリを消費するため、アニメーションが必要な要素にのみ使います。`},
+{title:"@keyframesとCSS変数",
+body:`@keyframesはより複雑なアニメーションを定義します。from（0%）とto（100%）、または任意のパーセンテージでキーフレームを指定し、animationプロパティで要素に適用します。Pythonのジェネレータがステップごとに値を生成するように、キーフレームはアニメーションの各段階の状態を定義します。
+
+CSS変数（カスタムプロパティ）は--変数名: 値 で定義し、var(--変数名) で参照します。:rootに定義するとグローバル変数として全要素から参照できます。色・フォントサイズ・余白など「デザイントークン」を変数化することで、テーマ切り替えや変更が1箇所で完結します。JavaScriptからもelement.style.setProperty('--color-primary', '#new')で動的に変更できます。`,
+code:`/* CSS変数によるデザイントークン */
+:root {
+  --color-primary: #6366f1;
+  --color-bg: #f8f7f4;
+  --color-text: #1e1b4b;
+  --radius-md: 10px;
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* @keyframesアニメーション */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.05); }
+}
+
+.card {
+  background: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  animation: fadeInUp 0.4s ease forwards;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}`,
+afterCode:`prefers-reduced-motionメディアクエリに対応することで、前庭感覚障害や動きに敏感なユーザー向けにアニメーションを無効化できます。@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }をリセットに加えることがアクセシビリティのベストプラクティスです。`},
+]},
+];
+
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, React.createElement("thead", null, React.createElement("tr", null, data.h.map((h, i) => React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), React.createElement("tbody", null, data.r.map((row, ri) => React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "⭐ 基本" : d === 2 ? "⭐⭐ 応用" : "⭐⭐⭐ 発展";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "問", idx + 1), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "🙈 解答を隠す" : "👀 解答例を見る"), showAnswer && React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "✅ 解答例"), React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "›")), open && React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+
+/* ─── Main App ─── */
+function HTMLCSSBeginnerCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, React.createElement("div", {
+    style: {
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "🌐"), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Pythonエンジニアのための"), React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "HTML/CSS 初級コース"), React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問 ・ 難易度⭐〜⭐⭐"), React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "HTML/CSSの基礎からFlexbox・Grid・レスポンシブデザインまでを実践的に習得し、ポートフォリオWebサイトを一から構築できるようになります。Pythonとの類比を交えながら、Web フロントエンドの「なぜ」を体系的に学びます。"), React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "▲" : "▼")), menuOpen && React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "問"))))), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "目安: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : ""))), chapter.goal && React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "🎯 この章のゴール"), React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => React.createElement(Section, {
+    key: ch + "-" + i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "🏋️ 演習問題"), React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "易しい順に", exercises.length, "問")), exercises.map((ex, i) => React.createElement(Exercise, {
+    key: ch + "-" + i,
+    ex: ex,
+    idx: i
+  }))), React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "← Ch.", chapters[ch - 1].num) : React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " →") : React.createElement("a", {
+    href: "../index.html",
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, "🎉 コース完了！")), React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "developer.mozilla.org ・ HTML Living Standard / CSS 2024 時点")));
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(HTMLCSSBeginnerCourse));
+  </script>
+</body>
+</html>
