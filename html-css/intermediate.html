@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML/CSS 中級コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのHTML/CSS中級コース。CSS設計からアクセシビリティ・パフォーマンスまで全8章。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+/* ── Table definitions ── */
+const T = {
+  bemNaming: {
+    h: ["要素", "BEM記法", "意味"],
+    r: [
+      ["Block", ".card", "独立したコンポーネント（カード）"],
+      ["Element", ".card__title", "Blockの構成要素（カードのタイトル）"],
+      ["Modifier", ".card--featured", "BlockやElementのバリエーション（注目カード）"],
+      ["Element+Modifier", ".card__title--large", "要素の特定バリエーション"]
+    ]
+  },
+  cssMethodologies: {
+    h: ["手法", "特徴", "向いているケース"],
+    r: [
+      ["BEM", "Block__Element--Modifier の命名規則。詳細度をフラットに保つ", "中〜大規模プロジェクト、チーム開発"],
+      ["SMACSS", "Base/Layout/Module/State/Themeの5カテゴリに分類", "大規模サイト、既存CSSの整理"],
+      ["Utility-First", "クラスを小さな機能単位に分割（Tailwind等）", "プロトタイプ、コンポーネント指向開発"],
+      ["CSS Modules", "ファイル単位でスコープを限定（React等で使用）", "SPAフレームワーク使用時"]
+    ]
+  },
+  scssFeatures: {
+    h: ["機能", "SCSS構文", "コンパイル後のCSS"],
+    r: [
+      ["変数", "$primary: #6366f1;", "--（CSS変数とは別物）"],
+      ["ネスト", ".card { &:hover { } }", ".card:hover { }"],
+      ["Mixin", "@mixin flex-center { }", "呼び出し元にスタイルをインライン展開"],
+      ["Extend", "@extend .btn;", "セレクタをグループ化して共通化"],
+      ["@use", "@use 'colors';", "colors.$primaryのように名前空間付きで参照"]
+    ]
+  },
+  tailwindPhilosophy: {
+    h: ["概念", "説明", "例"],
+    r: [
+      ["Utility class", "1つのCSSプロパティ=1クラス", "text-center → text-align: center"],
+      ["Responsive prefix", "ブレークポイントプレフィックス", "md:flex → @media(min-width:768px){display:flex}"],
+      ["State variant", "状態プレフィックス", "hover:bg-blue-500 → :hover { background: ... }"],
+      ["@apply", "ユーティリティをCSSクラスにまとめる", ".btn { @apply px-4 py-2 rounded; }"]
+    ]
+  },
+  modernSelectors: {
+    h: ["セレクタ", "意味", "詳細度"],
+    r: [
+      [":is(h1, h2, h3)", "複数セレクタをまとめる。内部の最高詳細度を引き継ぐ", "引数の最高詳細度"],
+      [":where(h1, h2)", ":isと同じだが詳細度は常に(0,0,0)", "(0,0,0)"],
+      [":has(.child)", "特定の子孫を持つ親を選択（親セレクタ）", "(0,1,0)+内部"],
+      [":not(.excluded)", "条件を満たさない要素", "引数の詳細度を含む"]
+    ]
+  },
+  cssFunctions: {
+    h: ["関数", "構文", "用途"],
+    r: [
+      ["calc()", "calc(100% - 20px)", "異なる単位の計算"],
+      ["min()", "min(50vw, 400px)", "小さい方の値を採用"],
+      ["max()", "max(200px, 50%)", "大きい方の値を採用"],
+      ["clamp()", "clamp(1rem, 2.5vw, 2rem)", "最小〜推奨〜最大の範囲で値を制限"]
+    ]
+  },
+  logicalProps: {
+    h: ["物理プロパティ", "論理プロパティ", "意味"],
+    r: [
+      ["margin-left", "margin-inline-start", "インライン方向の開始側の余白"],
+      ["margin-right", "margin-inline-end", "インライン方向の終了側の余白"],
+      ["margin-top", "margin-block-start", "ブロック方向の開始側の余白"],
+      ["width", "inline-size", "インライン方向のサイズ"],
+      ["height", "block-size", "ブロック方向のサイズ"]
+    ]
+  },
+  containerQueryTypes: {
+    h: ["container-type値", "クエリできる軸", "典型的な用途"],
+    r: [
+      ["inline-size", "幅のみ", "横幅に応じたレイアウト変更（最も一般的）"],
+      ["size", "幅と高さ両方", "幅・高さ両方に応じた変更（高さが固定の場合）"],
+      ["normal", "なし（スタイルクエリ用）", "CSS変数の値に応じた条件分岐"]
+    ]
+  },
+  viewportUnits: {
+    h: ["単位", "説明", "推奨用途"],
+    r: [
+      ["vh", "ビューポート高さの1%（アドレスバーを含まない場合あり）", "デスクトップのみ"],
+      ["dvh", "動的ビューポート高さ（アドレスバー表示/非表示に追従）", "モバイル対応の全画面要素"],
+      ["svh", "小さいビューポート高さ（アドレスバー表示時）", "最小保証高さが必要な場合"],
+      ["lvh", "大きいビューポート高さ（アドレスバー非表示時）", "最大高さが必要な場合"],
+      ["dvw", "動的ビューポート幅", "横幅基準のレイアウト"]
+    ]
+  },
+  darkModeApproach: {
+    h: ["手法", "切り替えトリガー", "メリット"],
+    r: [
+      ["prefers-color-scheme", "OSの設定", "ユーザー設定に自動対応。実装が最もシンプル"],
+      ["data-theme属性", "JavaScriptで切り替え", "ボタン操作で切り替え可能。LocalStorageと組み合わせ"],
+      ["color-scheme プロパティ", "OSに対してフォームUI等の配色を通知", "ブラウザ組み込みUIもダーク化"],
+      ["light-dark()関数", "color-schemeに追従", "1行でライト/ダーク両方の値を指定"]
+    ]
+  },
+  wcagLevels: {
+    h: ["レベル", "要件の厳しさ", "実務上の目安"],
+    r: [
+      ["Level A", "最低限の要件。これを満たさないと一部ユーザーがアクセス不能", "必須"],
+      ["Level AA", "一般的な達成目標。多くの法規制・ガイドラインで要求", "実務の標準"],
+      ["Level AAA", "最高レベル。全コンテンツでの達成は困難", "特定のコンテンツのみ"]
+    ]
+  },
+  ariaRoles: {
+    h: ["ARIAロール/属性", "用途", "例"],
+    r: [
+      ["role=\"button\"", "ボタン的な要素であることを宣言", "divをボタンとして使う時"],
+      ["aria-label", "視覚的ラベルのない要素に名前を付ける", "アイコンボタンの説明"],
+      ["aria-expanded", "展開/折りたたみ状態を伝える", "アコーディオンの開閉"],
+      ["aria-live", "動的に更新される領域を宣言", "通知・エラーメッセージ"],
+      ["aria-hidden", "スクリーンリーダーから非表示にする", "装飾的なアイコン"]
+    ]
+  },
+  contrastRatios: {
+    h: ["コントラスト比", "要件", "テキストサイズ"],
+    r: [
+      ["4.5:1以上", "WCAG AA 通常テキスト", "18px未満 or 14px未満の太字"],
+      ["3:1以上", "WCAG AA 大きいテキスト", "18px以上 or 14px以上の太字"],
+      ["3:1以上", "WCAG AA UIコンポーネント", "ボタン枠線、フォームの枠など"],
+      ["7:1以上", "WCAG AAA 通常テキスト", "最高レベルの読みやすさ"]
+    ]
+  },
+  performanceMetrics: {
+    h: ["指標", "略称", "説明", "良好な目安"],
+    r: [
+      ["Largest Contentful Paint", "LCP", "最大のコンテンツが表示されるまでの時間", "2.5秒以内"],
+      ["Cumulative Layout Shift", "CLS", "予期しないレイアウトシフトの累積スコア", "0.1以下"],
+      ["Interaction to Next Paint", "INP", "インタラクションから次の描画までの時間", "200ms以内"]
+    ]
+  },
+  renderPipeline: {
+    h: ["ステージ", "処理内容", "CSSとの関係"],
+    r: [
+      ["Style", "CSSルールを各要素に適用", "セレクタの複雑さが影響"],
+      ["Layout（Reflow）", "各要素のサイズと位置を計算", "width/height/marginの変更でトリガー"],
+      ["Paint", "ピクセルに色を塗る", "color/background等の変更でトリガー"],
+      ["Composite", "レイヤーを合成して表示", "transform/opacityはここだけで完結（高速）"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "以下のHTMLコンポーネントにBEM命名規則を適用してください。\nブロック名: product-card\n要素: 画像、タイトル、価格、購入ボタン\nモディファイア: 売り切れ状態のカード、割引価格",
+    code: `<!-- BEM命名前 -->
+<div class="card">
+  <img class="image" src="product.jpg" alt="商品">
+  <h3 class="title">商品名</h3>
+  <p class="price">¥1,000</p>
+  <button class="btn">購入</button>
+</div>`,
+    answer: `<!-- BEM命名後 -->
+<div class="product-card product-card--sold-out">
+  <img class="product-card__image" src="product.jpg" alt="商品">
+  <h3 class="product-card__title">商品名</h3>
+  <p class="product-card__price product-card__price--discounted">¥800</p>
+  <button class="product-card__btn" disabled>売り切れ</button>
+</div>
+
+/* CSS */
+.product-card { border: 1px solid #e5e7eb; border-radius: 12px; }
+.product-card--sold-out { opacity: 0.6; }
+.product-card__image { width: 100%; aspect-ratio: 4/3; object-fit: cover; }
+.product-card__title { font-weight: 700; margin: 12px 12px 4px; }
+.product-card__price { margin: 0 12px 12px; color: #6b7280; }
+.product-card__price--discounted { color: #dc2626; font-weight: 700; }
+.product-card__btn { width: calc(100% - 24px); margin: 0 12px 12px; }`
+  }, {
+    diff: 2,
+    q: "Utility-Firstアプローチで以下のコンポーネントのスタイルを設計してください。\n通知バナー（情報・成功・警告・エラー）の4種類を、ユーティリティクラスの組み合わせで表現し、共通部分は @apply でまとめてください。",
+    code: `/* ユーティリティクラスを定義し、.alertに@applyでまとめる */
+/* 4種類: .alert-info / .alert-success / .alert-warning / .alert-error */`,
+    answer: `/* ユーティリティクラス定義 */
+.flex { display: flex; }
+.items-center { align-items: center; }
+.gap-3 { gap: 12px; }
+.p-4 { padding: 16px; }
+.rounded-lg { border-radius: 8px; }
+.font-medium { font-weight: 500; }
+.border-l-4 { border-left-width: 4px; }
+
+/* @applyで共通スタイルをまとめる */
+.alert {
+  @apply flex items-center gap-3 p-4 rounded-lg font-medium border-l-4;
+}
+
+/* バリエーション */
+.alert-info    { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+.alert-success { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+.alert-warning { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+.alert-error   { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+
+/* HTML使用例 */
+/* <div class="alert alert-success">✓ 保存しました</div> */`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "SCSSで以下の要件を実装してください。\n・$primary, $secondary, $radius 変数を定義\n・flex-center mixin（display:flex, align-items:center, justify-content:center）\n・.card コンポーネントを変数とmixinを使って書く",
+    code: `// SCSS で実装してください
+// variables.scss と components.scss を @use で分離する想定`,
+    answer: `// _variables.scss
+$primary: #6366f1;
+$secondary: #8b5cf6;
+$radius: 12px;
+$shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+
+// _mixins.scss
+@use 'variables' as v;
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin card-base {
+  background: #fff;
+  border-radius: v.$radius;
+  box-shadow: v.$shadow;
+  overflow: hidden;
+}
+
+// components.scss
+@use 'variables' as v;
+@use 'mixins' as m;
+
+.card {
+  @include m.card-base;
+  padding: 20px;
+
+  &__header {
+    @include m.flex-center;
+    gap: 10px;
+    margin-bottom: 16px;
+    color: v.$primary;
+  }
+
+  &__title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e1b4b;
+  }
+
+  &--highlighted {
+    border: 2px solid v.$primary;
+  }
+}`
+  }, {
+    diff: 2,
+    q: "@use と @forward を使ってSCSSのモジュールシステムを設計してください。\nindex.scss が唯一のエントリポイントとなるよう、variables, mixins, utilities を @forward でまとめてください。",
+    code: `// ファイル構成:
+// scss/
+//   _variables.scss
+//   _mixins.scss
+//   _utilities.scss
+//   index.scss  ← エントリポイント
+//   main.scss   ← アプリで読み込むファイル`,
+    answer: `// _variables.scss
+$color-primary: #6366f1;
+$color-text: #1e1b4b;
+$font-base: 'Noto Sans JP', sans-serif;
+
+// _mixins.scss
+@use 'variables' as v;
+@mixin respond-to($bp) {
+  @if $bp == 'md' { @media (min-width: 768px) { @content; } }
+  @if $bp == 'lg' { @media (min-width: 1024px) { @content; } }
+}
+
+// _utilities.scss
+.u-text-center { text-align: center; }
+.u-hidden { display: none; }
+.u-mt-4 { margin-top: 16px; }
+
+// index.scss — 全てを @forward でまとめる
+@forward 'variables';
+@forward 'mixins';
+@forward 'utilities';
+
+// main.scss — アプリ側は index.scss だけ @use すれば良い
+@use 'index' as *;  // * でネームスペースなしにする
+
+.hero {
+  color: $color-primary;  // variablesの変数が使える
+  @include respond-to('md') { font-size: 2rem; }
+}`
+  }],
+  ch3: [{
+    diff: 1,
+    q: "Tailwind CSSのユーティリティクラスを使って、以下のプロフィールカードを実装してください。\n・アバター画像（円形、64×64px）\n・名前（太字、大きめ）\n・役職（グレーテキスト）\n・フォローボタン（紫、白文字、角丸）",
+    code: `<!-- Tailwindユーティリティクラスで実装 -->
+<div class="???">
+  <img class="???" src="avatar.jpg" alt="Avatar">
+  <div>
+    <p class="???">田中 太郎</p>
+    <p class="???">フロントエンドエンジニア</p>
+  </div>
+  <button class="???">フォロー</button>
+</div>`,
+    answer: `<div class="flex items-center gap-4 p-6 bg-white rounded-2xl shadow-md">
+  <img
+    class="w-16 h-16 rounded-full object-cover ring-2 ring-indigo-300"
+    src="avatar.jpg" alt="Avatar"
+  >
+  <div class="flex-1">
+    <p class="text-lg font-bold text-gray-900">田中 太郎</p>
+    <p class="text-sm text-gray-500">フロントエンドエンジニア</p>
+  </div>
+  <button class="px-4 py-2 bg-indigo-500 hover:bg-indigo-600
+                 text-white text-sm font-semibold rounded-lg
+                 transition-colors duration-200">
+    フォロー
+  </button>
+</div>
+
+<!-- レスポンシブ対応版（スマホで縦並び） -->
+<div class="flex flex-col sm:flex-row items-center gap-4 p-6 bg-white rounded-2xl shadow-md">
+  ...
+</div>`
+  }, {
+    diff: 2,
+    q: "tailwind.config.js でカスタムテーマを拡張してください。\n・カラー: brand-primary, brand-secondary を追加\n・フォント: 'Noto Sans JP' を sans-serif に追加\n・ブレークポイント: xs (480px) を追加\n・カスタムシャドウ: card-shadow を追加",
+    code: `// tailwind.config.js を完成させてください`,
+    answer: `// tailwind.config.js
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ['./src/**/*.{html,js,jsx,ts,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        brand: {
+          primary: '#6366f1',
+          secondary: '#8b5cf6',
+          light: '#eef2ff',
+        }
+      },
+      fontFamily: {
+        sans: [
+          'Noto Sans JP',
+          'Hiragino Sans',
+          'Yu Gothic',
+          'sans-serif',
+        ],
+      },
+      screens: {
+        xs: '480px',
+        // sm: 640px（デフォルト）
+        // md: 768px（デフォルト）
+      },
+      boxShadow: {
+        'card': '0 4px 20px rgba(99, 102, 241, 0.12)',
+        'card-hover': '0 8px 40px rgba(99, 102, 241, 0.2)',
+      },
+    },
+  },
+  plugins: [],
+};
+
+/* 使用例:
+   <div class="text-brand-primary shadow-card hover:shadow-card-hover">
+   <p class="xs:text-lg md:text-2xl">レスポンシブテキスト</p> */`
+  }],
+  ch4: [{
+    diff: 1,
+    q: "以下のCSS関数を使って、レスポンシブなタイポグラフィシステムを作成してください。\n・見出し(h1): clamp() でビューポート幅に応じて1.5rem〜3rem\n・コンテナ幅: min() で最大1100px、それ以外は100%\n・余白: calc() で画面幅の5%だが最低20px",
+    code: `/* CSS関数を使ったタイポグラフィとレイアウト */`,
+    answer: `/* clamp(最小値, 推奨値, 最大値) */
+h1 {
+  font-size: clamp(1.5rem, 4vw, 3rem);
+  /* スマホ(375px): 1.5rem
+     タブレット(768px): ~1.9rem (4vw=30.7px)
+     デスクトップ(1440px): 3rem (上限) */
+}
+
+h2 { font-size: clamp(1.2rem, 3vw, 2rem); }
+h3 { font-size: clamp(1rem, 2.5vw, 1.5rem); }
+p  { font-size: clamp(0.9rem, 1.5vw, 1.1rem); }
+
+/* min() — 小さい方の値を採用 */
+.container {
+  width: min(1100px, 100%);
+  /* = min(1100px, 100vw) → 画面が1100px未満なら100% */
+  margin-inline: auto;
+}
+
+/* calc() — 異なる単位の計算 */
+.section-padding {
+  padding-inline: max(20px, 5vw);
+  /* = max(20px, 5vw) → 5vwが20pxを下回る場合は20pxを保証 */
+}
+
+/* 組み合わせ例 */
+.hero-height {
+  height: clamp(400px, 60vh, 800px);
+}`
+  }, {
+    diff: 2,
+    q: ":is()、:where()、:has() を使って以下のスタイルを実装してください。\n1. h1〜h4の全ての見出しに共通スタイルを適用（詳細度を低く保つ）\n2. フォーカスされたinputを含むフォームグループを強調\n3. チェックされたcheckboxを持つlabelを緑にする",
+    code: `/* :is() / :where() / :has() を使い分けてください */`,
+    answer: `/* 1. :where() — 詳細度(0,0,0)で全見出しに共通スタイル */
+:where(h1, h2, h3, h4) {
+  font-family: 'Noto Sans JP', sans-serif;
+  line-height: 1.4;
+  color: #1e1b4b;
+}
+/* :is(h1, h2, h3, h4) だと内部の最高詳細度(0,0,1)になる */
+/* :where() はゼロ詳細度なので他のルールで上書きしやすい */
+
+/* 2. :has() — フォーカスされたinputを含むグループを強調 */
+.form-group:has(input:focus),
+.form-group:has(textarea:focus) {
+  background: #f5f3ff;
+  border-radius: 8px;
+  padding: 8px;
+  outline: 2px solid #6366f1;
+}
+
+/* 3. :has() — チェック済みcheckboxを持つlabelを緑に */
+label:has(input[type="checkbox"]:checked) {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+/* :is() の便利な使い方 — 複数コンテキストへの適用 */
+:is(article, section, aside) :is(h2, h3) {
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}`
+  }],
+  ch5: [{
+    diff: 1,
+    q: "@container クエリを使って、カードコンポーネントを実装してください。\n・コンテナ幅 < 350px: 縦並び（画像上、テキスト下）\n・コンテナ幅 350px〜: 横並び（画像左200px、テキスト右）\n・コンテナ幅 600px〜: 横並び＋バッジ表示",
+    code: `/* container-type, container-name, @container */`,
+    answer: `.card-wrapper {
+  container-type: inline-size;
+  container-name: article-card;
+}
+
+.article-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.article-card__image {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+}
+
+.article-card__badge {
+  display: none; /* デフォルトは非表示 */
+}
+
+.article-card__body { padding: 16px; }
+
+/* 350px以上: 横並び */
+@container article-card (min-width: 350px) {
+  .article-card {
+    grid-template-columns: 200px 1fr;
+  }
+  .article-card__image {
+    aspect-ratio: auto;
+    height: 100%;
+  }
+}
+
+/* 600px以上: バッジを表示 */
+@container article-card (min-width: 600px) {
+  .article-card__badge {
+    display: inline-block;
+    background: #6366f1;
+    color: #fff;
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+  }
+}`
+  }, {
+    diff: 2,
+    q: "dvh/svh/lvhの違いを踏まえて、モバイルで正しく全画面表示されるヒーローセクションを実装してください。\nまた、prefers-reduced-motionを考慮したアニメーションも付けてください。",
+    code: `/* dvh/svh/lvh + prefers-reduced-motion */`,
+    answer: `/* モバイルでアドレスバーが隠れる/現れるに追従するdvh */
+.hero {
+  /* フォールバック: 古いブラウザ向け */
+  height: 100vh;
+  /* dvh: アドレスバーの表示/非表示に追従 */
+  height: 100dvh;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1e1b4b, #4c1d95);
+  color: #fff;
+  padding: clamp(16px, 5vw, 48px);
+}
+
+/* アニメーション付き見出し */
+@keyframes heroFadeIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hero__title {
+  font-size: clamp(2rem, 6vw, 4rem);
+  font-weight: 900;
+  animation: heroFadeIn 0.8s ease-out forwards;
+}
+
+.hero__sub {
+  animation: heroFadeIn 0.8s 0.2s ease-out forwards;
+  opacity: 0; /* animation-fill-mode: forwardsで最終状態を維持 */
+}
+
+/* アニメーション軽減設定を尊重 */
+@media (prefers-reduced-motion: reduce) {
+  .hero__title,
+  .hero__sub {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* svh: アドレスバー表示時でもコンテンツが隠れないミニマム保証 */
+.modal-overlay {
+  min-height: 100svh;
+}`
+  }],
+  ch6: [{
+    diff: 1,
+    q: "prefers-color-scheme と CSS変数を使って、ライト/ダークモードに対応したUIを実装してください。\n・:root にライトモードの変数を定義\n・@media (prefers-color-scheme: dark) でダークモードの値に上書き\n・コンポーネントは変数だけ参照する",
+    code: `/* CSS変数によるダークモード対応 */`,
+    answer: `/* ── ライトモード（デフォルト） ── */
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #f9fafb;
+  --color-border: #e5e7eb;
+  --color-text-primary: #1e1b4b;
+  --color-text-secondary: #6b7280;
+  --color-primary: #6366f1;
+  --color-primary-light: #eef2ff;
+  color-scheme: light;
+}
+
+/* ── ダークモード（OSの設定に追従） ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f0e1a;
+    --color-surface: #1a1928;
+    --color-border: #2d2b45;
+    --color-text-primary: #e5e7eb;
+    --color-text-secondary: #9ca3af;
+    --color-primary: #818cf8;
+    --color-primary-light: #1e1b4b;
+    color-scheme: dark;
+  }
+}
+
+/* コンポーネントは変数だけ参照（モード切替に自動対応） */
+body {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  transition: background 0.3s, color 0.3s;
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 10px 24px;
+  border-radius: 8px;
+  border: none;
+}`
+  }, {
+    diff: 2,
+    q: "JavaScriptのボタンクリックでダーク/ライトを切り替えるUIを実装してください。\ndata-theme属性とCSS変数を組み合わせ、LocalStorageで設定を保存してください。\nさらに light-dark() 関数も使ってください。",
+    code: `<!-- HTML/CSS/JSを組み合わせて実装 -->`,
+    answer: `<!-- HTML -->
+<button id="theme-toggle" aria-label="テーマ切り替え">🌙</button>
+
+<style>
+/* light-dark()関数: color-schemeに連動して自動で色を選ぶ */
+:root {
+  color-scheme: light;
+  --color-bg: light-dark(#ffffff, #0f0e1a);
+  --color-text: light-dark(#1e1b4b, #e5e7eb);
+  --color-surface: light-dark(#f9fafb, #1a1928);
+  --color-primary: light-dark(#6366f1, #818cf8);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: background 0.3s, color 0.3s;
+}
+</style>
+
+<script>
+// ページ読み込み時に保存済みテーマを復元
+const saved = localStorage.getItem('theme');
+if (saved) document.documentElement.setAttribute('data-theme', saved);
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  // ボタンのアイコン更新
+  event.target.textContent = next === 'dark' ? '☀️' : '🌙';
+});
+<\/script>`
+  }],
+  ch7: [{
+    diff: 1,
+    q: "以下のモーダルダイアログにWAI-ARIAを正しく適用してください。\n・role, aria-modal, aria-labelledby, aria-describedby を付与\n・フォーカストラップを実装（モーダル内だけにフォーカスを閉じ込める）\n・Escキーで閉じる",
+    code: `<!-- アクセシブルなモーダルダイアログ -->
+<div class="modal">
+  <h2>確認</h2>
+  <p>この操作を実行してもよいですか？</p>
+  <button>キャンセル</button>
+  <button>実行</button>
+</div>`,
+    answer: `<!-- HTML -->
+<div
+  id="confirm-modal"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-title"
+  aria-describedby="modal-desc"
+  class="modal"
+  tabindex="-1"
+>
+  <h2 id="modal-title">確認</h2>
+  <p id="modal-desc">この操作を実行してもよいですか？</p>
+  <div class="modal__actions">
+    <button id="modal-cancel">キャンセル</button>
+    <button id="modal-confirm">実行</button>
+  </div>
+</div>
+
+<script>
+function openModal(modal) {
+  modal.removeAttribute('hidden');
+  modal.focus(); // モーダル自体にフォーカス
+
+  // フォーカストラップ
+  const focusable = modal.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal(modal);
+    if (e.key === 'Tab') {
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    }
+  });
+}
+
+function closeModal(modal) {
+  modal.setAttribute('hidden', '');
+  // 開く前にフォーカスしていた要素に戻す
+  document.getElementById('open-btn').focus();
+}
+<\/script>`
+  }, {
+    diff: 2,
+    q: "以下のフォームをWCAG 2.1 Level AAに準拠させてください。\n・コントラスト比を確保（背景色・文字色・ボーダー色）\n・エラーメッセージをスクリーンリーダーに伝える\n・必須フィールドをaria-requiredで明示\n・prefers-reduced-motionに対応",
+    code: `<form>
+  <input type="email" placeholder="メールアドレス">
+  <span style="color: #999;">※必須</span>
+  <div style="color: red;">エラー: 正しいメールアドレスを入力してください</div>
+  <button style="background: #aaa; color: #ccc;">送信</button>
+</form>`,
+    answer: `<form novalidate>
+  <div class="field">
+    <label for="email">
+      メールアドレス
+      <span aria-hidden="true" class="required-mark">*</span>
+      <span class="sr-only">（必須）</span>
+    </label>
+    <input
+      type="email"
+      id="email"
+      name="email"
+      aria-required="true"
+      aria-describedby="email-error"
+      aria-invalid="true"
+      class="input input--error"
+    >
+    <!-- aria-live="polite" でエラーが動的に現れても読み上げ -->
+    <span
+      id="email-error"
+      role="alert"
+      aria-live="polite"
+      class="error-msg"
+    >
+      正しいメールアドレスを入力してください
+    </span>
+  </div>
+  <button type="submit" class="btn-submit">送信</button>
+</form>
+
+<style>
+/* コントラスト比を確保したスタイル */
+.input {
+  border: 2px solid #6b7280; /* 背景白(#fff)との比: 3.73:1 (AA大テキスト✓) */
+  color: #1f2937;            /* 白背景との比: 15.3:1 (AAA✓) */
+  background: #fff;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 1rem;
+  width: 100%;
+}
+.input--error {
+  border-color: #b91c1c; /* 白背景との比: 5.91:1 (AA✓) */
+}
+.error-msg {
+  color: #991b1b; /* 白背景との比: 7.04:1 (AAA✓) */
+  font-size: 0.875rem;
+  margin-top: 4px;
+  display: block;
+}
+.btn-submit {
+  background: #4338ca; /* 白文字との比: 7.28:1 (AAA✓) */
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+/* sr-only: 視覚的に非表示だがスクリーンリーダーには読まれる */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-submit { transition: none; }
+}
+</style>`
+  }],
+  ch8: [{
+    diff: 1,
+    q: "content-visibility と contain-intrinsic-size を使って、長いリストのレンダリングパフォーマンスを最適化してください。\nまた、will-change を適切に使用したアニメーションも実装してください。",
+    code: `/* content-visibility, contain-intrinsic-size, will-change */`,
+    answer: `/* content-visibility: auto — スクロールで見えない要素のレンダリングをスキップ */
+.article-item {
+  content-visibility: auto;
+  /* contain-intrinsic-size: スキップ時にレイアウトスペースを確保 */
+  contain-intrinsic-size: auto 200px;
+  /* 200pxはコンテンツの平均高さの概算。CLSを防ぐために設定 */
+}
+
+/* will-change: ブラウザに「このプロパティが変化する予定」を事前通知 */
+.animated-card {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  /* ホバー前にGPUレイヤーを作成させる */
+  will-change: transform, opacity;
+}
+
+.animated-card:hover {
+  transform: translateY(-4px);
+  opacity: 0.9;
+}
+
+/* 注意: will-changeはアニメーション直前に付けて終了後に削除するのが理想 */
+/* CSSだけで完結する場合は :hover セレクタに移動する方法も有効 */
+.lazy-hover:hover {
+  will-change: transform; /* ホバー中だけ有効 */
+  transform: scale(1.02);
+}
+
+/* content-visibility でパフォーマンス改善される場面:
+   - 数百〜数千のリストアイテム
+   - 無限スクロールのフィード
+   - 長い記事ページ（オフスクリーン部分の描画を省略） */`
+  }, {
+    diff: 2,
+    q: "Critical CSS の概念を理解し、CLSを最小化するための実装を行ってください。\n・画像のアスペクト比を固定してレイアウトシフトを防止\n・Webフォントのロード中にレイアウトシフトを防ぐ\n・Critical CSS のインライン化パターンを示してください。",
+    code: `/* CLS最小化のためのCSS実装パターン */`,
+    answer: `<!-- Critical CSS: <head>にインライン記述（レンダリングブロックを最小化） -->
+<head>
+  <style>
+    /* Above-the-fold（スクロールなしで見える部分）に必要なCSSのみ */
+    *,*::before,*::after { box-sizing: border-box; margin: 0; }
+    body { font-family: system-ui, sans-serif; background: #fff; color: #1e1b4b; }
+    .header { height: 56px; background: #fff; border-bottom: 1px solid #e5e7eb; }
+    .hero { min-height: 400px; background: linear-gradient(135deg,#1e1b4b,#4c1d95); }
+  </style>
+  <!-- 残りのCSSは非同期ロード（rel="preload"でブロック回避） -->
+  <link rel="preload" href="main.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="main.css"></noscript>
+</head>
+
+<style>
+/* 画像のCLS対策: アスペクト比を固定してスペースを事前確保 */
+.responsive-image-wrapper {
+  aspect-ratio: 16 / 9; /* 比率を固定 */
+  background: #f3f4f6;  /* 読み込み前のプレースホルダー */
+  overflow: hidden;
+}
+.responsive-image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* img に直接width/heightを書くのも効果的（ブラウザが比率を計算） */
+/* <img src="..." width="800" height="450" loading="lazy"> */
+
+/* Webフォントのレイアウトシフト対策 */
+@font-face {
+  font-family: 'Noto Sans JP';
+  font-display: swap; /* フォールバックフォントで即表示、ロード後に置き換え */
+  src: url('NotoSansJP.woff2') format('woff2');
+}
+body {
+  /* フォールバックフォントとサイズを揃えてCLSを最小化 */
+  font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  font-size-adjust: 0.5; /* フォント切り替え時のサイズ差を緩和 */
+}
+</style>`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "CSS設計方法論",
+  est: "50分",
+  goal: "BEMの命名規則を正確に使い、Block / Element / Modifier の概念でCSSクラスを設計できるようになる。また、Utility-FirstとBEMの違いと使い分けの判断基準を説明できる状態がゴール。「なぜ命名規則が必要か」を詳細度の問題と保守性の観点から説明できること。",
+  sections: [{
+    title: "なぜCSS設計が必要か",
+    body: "CSSはPythonと違い、スコープがグローバルです。どのファイルで書いたスタイルも全ページに影響し、クラス名が被れば意図しない上書きが発生します。Pythonでグローバル変数を乱用すると可読性が破綻するのと同じ問題がCSSでも起きます。\n\n中規模以上のプロジェクトでは、「このクラスを変えると何が壊れるか分からない」という状況が頻発します。CSS設計方法論は、命名規則や構造のルールを設けることでこの問題を解決します。Pythonで型ヒントやdocstringを書くのと同様に、CSSにも「ルールを持って書く」文化が重要です。",
+    table: T.cssMethodologies,
+    afterTable: "どの手法が「正解」というわけではありません。チームの規模・フレームワーク・プロジェクト性質によって最適解が異なります。大規模チームにはBEM、React等のコンポーネント設計にはCSS ModulesやTailwindが向きます。"
+  }, {
+    title: "BEM（Block Element Modifier）",
+    body: "BEMはGoogleやYandexが提唱したCSS命名規則で、コンポーネントを Block（独立した部品）・Element（Blockの構成要素）・Modifier（バリエーション）の3階層で表現します。命名規則は「block__element--modifier」で、2つのアンダースコアと2つのハイフンが区切り文字です。\n\nBEMの最大の利点は詳細度をフラットに保てることです。全てのクラスが1クラスセレクタ（詳細度 0,1,0）で書けるため、詳細度の衝突が起きません。Pythonのflat is better than nestedの思想に近く、深いネストより明示的な命名を好みます。",
+    table: T.bemNaming,
+    code: `/* BEM実装例: ナビゲーションコンポーネント */
+.nav { display: flex; align-items: center; background: #1e1b4b; }
+.nav__logo { font-weight: 900; color: #fff; font-size: 18px; }
+.nav__menu { display: flex; gap: 16px; list-style: none; }
+.nav__item { }
+.nav__link { color: #c4b5fd; text-decoration: none; }
+.nav__link--active { color: #fff; border-bottom: 2px solid #818cf8; }
+.nav__link:hover { color: #fff; }
+
+/* Modifier: テーマのバリエーション */
+.nav--transparent { background: transparent; }
+.nav--sticky { position: sticky; top: 0; z-index: 100; }`,
+    afterCode: "BEMでよく混乱するのは「これはElementかBlockか」という判断です。原則として「単体で他のページに移植できるか」で判断します。移植できれば独立したBlock、そうでなければ親BlockのElementです。"
+  }, {
+    title: "Utility-First アプローチ",
+    body: "Utility-Firstは「1つのクラスが1つのCSS宣言を担う」考え方で、Tailwind CSSが代表格です。BEMが「コンポーネント名で意味を表現する」のに対し、Utility-Firstは「実際のスタイルをそのまま書く」アプローチです。\n\nPythonで言えば、BEMが「関数に意味のある名前を付ける」のに対し、Utility-Firstは「lambda x: x*2のようにインラインで書く」感覚に近いです。小さなコンポーネントや素早いプロトタイピングには優れますが、同じクラス群が繰り返し出現する場合は@applyでまとめる必要があります。",
+    code: `<!-- Utility-First の例（Tailwind風） -->
+<button class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600
+               text-white font-bold rounded-lg
+               transition-colors duration-200 shadow-md">
+  送信する
+</button>
+
+<!-- BEM的な書き方との比較 -->
+<button class="btn btn--primary">送信する</button>
+
+/* @apply でユーティリティをセマンティクスにまとめる */
+.btn--primary {
+  @apply px-6 py-3 bg-indigo-500 hover:bg-indigo-600
+         text-white font-bold rounded-lg transition-colors;
+}`,
+    afterCode: "両者は対立するものではなく、共存も可能です。コンポーネントの枠組みはBEM的に、細部のスタイルはUtility-Firstで書く「ハイブリッドアプローチ」を採用するプロジェクトも多くあります。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "Sass/SCSS",
+  est: "55分",
+  goal: "SCSSの変数・ネスト・mixin・extendを正しく使い分けられるようになる。@use/@forwardによるモジュールシステムで複数ファイルに分割したSCSSを管理でき、npxコマンドでコンパイルできる状態がゴール。古い@importとの違いを説明できること。",
+  sections: [{
+    title: "SCSSの基礎：変数とネスト",
+    body: "SCSSはCSSのスーパーセット（拡張版）で、拡張子は.scssです。変数・ネスト・mixin等の機能を持ち、最終的に通常のCSSにコンパイルされます。Pythonでいうと「より書きやすい構文でPythonバイトコードを生成する、型ヒントやデコレータのような存在」とイメージしてください。\n\n変数は$で始まり、色・フォント・間隔などの繰り返し使う値を1か所で管理できます。Pythonの定数（UPPER_CASE）と同じ発想で、デザイントークン（ブランドカラー等）をSCSS変数で管理するとテーマ変更が容易になります。ネストはHTMLの構造に合わせてCSSを書けるため、関係するルールをまとめて見通しが良くなります。",
+    code: `// SCSS
+$primary: #6366f1;
+$radius-lg: 12px;
+
+.card {
+  border-radius: $radius-lg;
+  border: 1px solid #e5e7eb;
+
+  &:hover {     // .card:hover
+    box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+  }
+
+  &__title {    // .card__title (BEMとの組み合わせ)
+    color: $primary;
+    font-size: 1.1rem;
+  }
+
+  &--featured { // .card--featured
+    border-color: $primary;
+    border-width: 2px;
+  }
+}`,
+    afterCode: "SCSSのネストをコンパイルすると通常のCSSセレクタに展開されます。深すぎるネスト（4階層以上）は展開後のCSSが複雑になるため、最大3階層程度にとどめましょう。"
+  }, {
+    title: "Mixin と Extend",
+    body: "mixinは「スタイルのテンプレート」で、引数を受け取って複数の宣言を一度に展開できます。Pythonの関数と同じで、繰り返し書くスタイルのかたまりを1か所にまとめ、引数で細部を調整します。@includeで呼び出します。\n\n@extendは「このセレクタのスタイルを継承する」という機能ですが、extendを多用するとコンパイル後のCSSでセレクタが意図しない形で結合され、デバッグが困難になります。実務では@extendよりmixinを優先し、extendは%プレースホルダーと組み合わせる場合のみ使うという方針が多数派です。",
+    table: T.scssFeatures,
+    code: `// mixin: 引数付きのスタイルテンプレート
+@mixin button($bg: #6366f1, $color: #fff) {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 24px;
+  background: $bg;
+  color: $color;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.2s;
+
+  &:hover { filter: brightness(0.9); }
+}
+
+.btn-primary { @include button(); }
+.btn-danger  { @include button(#dc2626); }
+.btn-ghost   { @include button(transparent, #6366f1); }
+
+// %プレースホルダーとextend（実体化しないルール）
+%visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+}
+.sr-only { @extend %visually-hidden; }`,
+    afterCode: "mixinとextendの使い分け: 引数が必要ならmixin、引数なしで単純な継承ならextend（ただしplaceholderと一緒に使う）、というのが基本方針です。"
+  }, {
+    title: "@use と @forward モジュールシステム",
+    body: "SCSSには古い@importと新しい@use/@forwardがあります。@importはグローバルに全てを読み込むためNamespaceの衝突が起きやすく、現在は非推奨です。@useは「名前空間付きのインポート」で、colors.$primaryのようにファイル名をprefixとして使います。\n\n@forwardは「このファイルを経由して他のファイルの内容を公開する」機能で、Pythonの__init__.pyに相当します。index.scssという1つのエントリポイントを作り、そこから全モジュールを@forwardすることで、使う側は@use 'index'だけで全てにアクセスできます。\n\nコンパイルはnpx sassコマンドで実行できます。npx sass scss/main.scss css/main.cssでコンパイルし、--watchオプションで変更を監視できます。",
+    code: `// コンパイルコマンド
+// npx sass scss/main.scss css/main.css
+// npx sass --watch scss/:css/   (ディレクトリ監視)
+
+// _colors.scss
+$indigo-500: #6366f1;
+$indigo-900: #1e1b4b;
+
+// _spacing.scss
+$space-4: 16px;
+$space-8: 32px;
+
+// index.scss (エントリポイント)
+@forward 'colors';
+@forward 'spacing';
+
+// component.scss (利用側)
+@use 'index' as t;  // t = tokens の略
+.hero {
+  background: t.$indigo-900;
+  padding: t.$space-8;
+}`,
+    afterCode: "Viteなどのモダンなビルドツールを使う場合はSCSS処理が自動化されます。素のHTMLファイルの場合はnpx sassコマンドをpackage.jsonのscriptsに登録しておくと便利です。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "Tailwind CSS",
+  est: "55分",
+  goal: "Tailwind CSSのユーティリティクラス哲学を理解し、レスポンシブプレフィックスや状態バリアントを使いこなせるようになる。PostCSS経由のインストール手順を把握し、tailwind.config.jsでカスタムテーマを拡張できる状態がゴール。",
+  sections: [{
+    title: "ユーティリティクラス哲学とインストール",
+    body: "Tailwind CSSは「1クラス=1プロパティ」を徹底したフレームワークです。Bootstrap等の「.btn, .card のような用途別クラス」とは対照的に、text-lg, font-bold, rounded-xl のように実際のCSSプロパティに近い名前のクラスを組み合わせます。\n\nPythonでいえば、Bootstrapがライブラリの関数を呼び出す感覚なら、Tailwindはリスト内包表記でコンパクトに書く感覚に近いです。HTMLを見るだけでスタイルがわかり、CSSファイルを行き来する手間がなくなります。インストールはPostCSS経由が推奨で、npm install -D tailwindcss postcss autoprefixer の後、npx tailwindcss init でtailwind.config.jsを生成します。",
+    table: T.tailwindPhilosophy,
+    code: `/* インストール手順 */
+// 1. npm install -D tailwindcss postcss autoprefixer
+// 2. npx tailwindcss init -p
+
+// tailwind.config.js (最低限)
+module.exports = {
+  content: ['./**/*.html', './src/**/*.js'],
+  theme: { extend: {} },
+  plugins: [],
+};
+
+/* input.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ビルドコマンド */
+// npx tailwindcss -i ./input.css -o ./dist/output.css --watch`,
+    afterCode: "Tailwindの本番ビルドではPurgeCSSが自動的に未使用のクラスを削除し、CSSのサイズを数KB〜数十KBに抑えます。content配列に全てのHTMLファイルのパスを正しく設定することが重要です。"
+  }, {
+    title: "レスポンシブ・状態バリアント",
+    body: "Tailwindのレスポンシブ対応は、クラスにプレフィックスを付けるだけです。sm:flex はスマホサイズ以上でdisplay:flexになります。これはモバイルファーストで設計されており、プレフィックスなしがモバイル、sm:以降がブレークポイントに対応します。\n\n状態バリアント（hover:, focus:, disabled:等）も同様にプレフィックスで書けます。hover:bg-indigo-600 はホバー時に背景色を変える1クラスで、従来のCSS中で.btn:hoverセレクタを別に書く必要がありません。この一元管理がTailwindの大きな利点です。",
+    code: `<!-- レスポンシブ + 状態バリアントの組み合わせ -->
+<div class="
+  grid grid-cols-1
+  sm:grid-cols-2
+  lg:grid-cols-3
+  gap-4 p-4
+">
+  <!-- カード: ホバーエフェクト付き -->
+  <div class="
+    bg-white rounded-xl shadow
+    hover:shadow-lg hover:-translate-y-1
+    transition-all duration-200
+    p-6
+  ">
+    <h3 class="text-lg font-bold text-indigo-900 mb-2">カードタイトル</h3>
+    <p class="text-gray-500 text-sm leading-relaxed">説明文が入ります。</p>
+    <button class="
+      mt-4 w-full py-2 rounded-lg
+      bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700
+      text-white font-semibold text-sm
+      transition-colors duration-150
+      focus:outline-none focus:ring-2 focus:ring-indigo-300
+      disabled:opacity-50 disabled:cursor-not-allowed
+    ">詳しく見る</button>
+  </div>
+</div>`,
+    afterCode: "focus:ring-* はキーボードナビゲーション時のフォーカスリングです。Tailwindはデフォルトでoutlineをリセットするため、必ずfocus:ring-*かfocus:outline-*を設定してアクセシビリティを確保してください。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "高度なセレクタとCSS関数",
+  est: "50分",
+  goal: ":is()/:where()/:has()の違いと詳細度への影響を説明できるようになる。calc()/min()/max()/clamp()を使ったレスポンシブな値の計算ができ、論理プロパティ（margin-inline等）でi18n対応レイアウトを設計できる状態がゴール。",
+  sections: [{
+    title: ":is() / :where() / :has() セレクタ",
+    body: ":is()と:where()はどちらも「複数のセレクタをまとめる」機能ですが、詳細度の扱いが異なります。:is(h1, .title, #heading)は内部セレクタの中で最も高い詳細度を引き継ぎます。一方:where()は常に詳細度ゼロです。Pythonで言うとどちらも「条件の or」ですが、優先度の計算方法が違うイメージです。\n\n:has()は「親セレクタ」とも呼ばれ、2024年に全モダンブラウザで対応が完了しました。従来CSSは子から親を選択できませんでしたが、:has()により「チェックされたcheckboxを含むlabel」「画像を持つカード」などの表現が可能になりました。",
+    table: T.modernSelectors,
+    code: `/* :where() — 詳細度ゼロで共通スタイル。上書きが容易 */
+:where(article, section, aside) h2 {
+  font-size: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+/* :is() — セレクタの省略（内部の最高詳細度を継承） */
+:is(h1, h2, h3):hover {
+  color: #6366f1;
+}
+
+/* :has() — 親セレクタ。子の状態で親をスタイリング */
+.form-group:has(:focus) { outline: 2px solid #6366f1; border-radius: 8px; }
+.card:has(> img:first-child) { padding-top: 0; }
+nav:has(> .active) { border-bottom: 2px solid #6366f1; }`,
+    afterCode: ":has()の注意点: :has(:focus-within)と:has(:focus)は異なります。:focus-withinは子孫全体、:has(:focus)は直下のfocusを検出します。目的に合わせて使い分けましょう。"
+  }, {
+    title: "CSS関数：calc / min / max / clamp",
+    body: "CSSの数学関数は「レスポンシブな値の計算」を可能にします。calc()は加減乗除と単位の混在をサポートします。Pythonのmax(200, value)と同じ感覚でmin()/max()が使えますが、CSSでのmin()は「小さい方を選ぶ」（数学のmin関数と同じ）です。\n\nclamp()はresp(min, preferred, max)の形で「範囲内で値を制限する」関数です。clamp(1rem, 2.5vw, 2rem)はビューポート幅に応じてフォントサイズが変わりますが、最小1rem・最大2remの範囲内に収まります。メディアクエリなしで流動的なタイポグラフィを実現できる、モダンCSSの重要機能です。",
+    table: T.cssFunctions,
+    code: `/* clamp() — 流動的なタイポグラフィ */
+:root {
+  --font-size-h1: clamp(1.8rem, 4vw + 1rem, 3.5rem);
+  --font-size-body: clamp(0.95rem, 1vw + 0.5rem, 1.1rem);
+}
+
+/* calc() — 単位の混在計算 */
+.sidebar-layout {
+  display: grid;
+  grid-template-columns: 240px calc(100% - 240px - 32px);
+  gap: 32px;
+}
+
+/* min() — コンテナの最大幅制御 */
+.container {
+  width: min(100% - 32px, 1100px);
+  margin-inline: auto;
+  /* = max-width: 1100px + 左右padding 16px の代替 */
+}
+
+/* 組み合わせ例 */
+.hero-text {
+  font-size: clamp(1.5rem, 2.5vw + 1rem, 4rem);
+  padding: clamp(20px, 5vw, 80px);
+  max-width: min(800px, 90vw);
+}`,
+    afterCode: "clamp()のpreferred値にvwを使う場合、計算式の形 clamp(min, n*vw + offset, max) が滑らかな変化を生みます。min/maxを固定のremで設定しておくと、極端な画面サイズでも読みやすさが保証されます。"
+  }, {
+    title: "論理プロパティ",
+    body: "論理プロパティは「書字方向（横書き・縦書き・RTL）に依存しない」CSSプロパティです。日本語のWebサイトや多言語サイト、RTL（right-to-left）言語（アラビア語・ヘブライ語等）を扱う場合に特に重要になります。\n\nmargin-leftの代わりにmargin-inline-startを使うと、RTL言語では自動的に右側の余白になります。Pythonのi18n（国際化）対応でテキストの方向を考慮するのと同じく、CSSも方向に依存しない書き方が国際化の第一歩です。",
+    table: T.logicalProps,
+    code: `/* 物理プロパティ（書字方向に依存）vs 論理プロパティ */
+
+/* 物理: 左右が固定 */
+.old-style {
+  margin-left: 16px;
+  margin-right: 16px;
+  padding-top: 20px;
+  width: 300px;
+}
+
+/* 論理: 書字方向に追従 */
+.new-style {
+  margin-inline: 16px;         /* = margin-left + margin-right */
+  padding-block-start: 20px;   /* = padding-top (横書き時) */
+  inline-size: 300px;          /* = width (横書き時) */
+}
+
+/* RTL対応の実例 */
+.chat-bubble {
+  margin-inline-start: auto; /* LTRなら右寄せ、RTLなら左寄せ */
+  border-radius: 12px 12px 4px 12px; /* 物理的な角丸はそのまま */
+}`,
+    afterCode: "論理プロパティはChrome/Firefox/Safariで全て対応済みです。新規プロジェクトでは最初から論理プロパティを使う習慣を付けると、将来の多言語対応が容易になります。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "コンテナクエリとビューポート単位",
+  est: "50分",
+  goal: "@containerクエリを使ってコンポーネント単位のレスポンシブデザインを実装できるようになる。dvh/svh/lvhの違いを理解してモバイルで正確な全画面表示を実現でき、container-typeの種類と使い分けを説明できる状態がゴール。",
+  sections: [{
+    title: "@container クエリ",
+    body: "メディアクエリはビューポート（画面全体）の幅を基準にしますが、コンテナクエリは「親要素の幅」を基準にします。この違いは大きく、同じコンポーネントをサイドバーに置いた場合とメインコンテンツに置いた場合とで、自動的に最適なレイアウトを選べます。\n\nPythonのクラスで例えると、メディアクエリは「グローバル変数を見て動作を変える」のに対し、コンテナクエリは「selfのcontextを見て動作を変える」のに近い概念です。コンポーネントの独立性・再利用性が大幅に高まります。",
+    table: T.containerQueryTypes,
+    code: `/* コンテナの登録 */
+.card-wrapper {
+  container-type: inline-size;  /* 幅を追跡 */
+  container-name: product-card; /* オプション: 名前付き */
+}
+
+/* デフォルト: モバイル（縦並び） */
+.product-card {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+/* コンテナが 380px 以上: 横並び */
+@container product-card (min-width: 380px) {
+  .product-card {
+    grid-template-columns: 140px 1fr;
+    align-items: center;
+  }
+}
+
+/* コンテナが 600px 以上: 価格とボタンを横並び */
+@container product-card (min-width: 600px) {
+  .product-card__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+}`,
+    afterCode: "container-nameは省略可能ですが、コンポーネントが入れ子になる場合（カード内にカード）は、どの祖先コンテナに対するクエリかを明示するために名前を付けることが推奨されます。"
+  }, {
+    title: "新しいビューポート単位：dvh / svh / lvh",
+    body: "モバイルブラウザのアドレスバーは、スクロール操作によって表示/非表示が切り替わります。従来の100vhはこれを考慮せず、iOS Safariでは100vhが実際の表示高さより大きくなり、コンテンツが隠れるという問題がありました。\n\n2023年以降、この問題を解決する新しいビューポート単位が全モダンブラウザで利用可能になりました。dvh（Dynamic Viewport Height）はアドレスバーの状態に動的に追従し、svh（Small）はアドレスバー表示時、lvh（Large）はアドレスバー非表示時の高さを基準にします。モバイル対応の全画面セクションには100dvhを使うのが現在の推奨です。",
+    table: T.viewportUnits,
+    code: `/* 従来のvhの問題と新単位での解決 */
+
+/* 問題: iOS Safariでコンテンツがアドレスバーにはみでる */
+.hero-old { height: 100vh; }
+
+/* 解決: dvhでアドレスバーに追従 */
+.hero {
+  height: 100vh;      /* フォールバック */
+  height: 100dvh;     /* 対応ブラウザではdvhを使用 */
+}
+
+/* ナビゲーション: svhで最小高さを保証 */
+.mobile-nav {
+  min-height: 100svh;
+  /* アドレスバーが表示されていても全画面をカバー */
+}
+
+/* スクロールなしで収まるセクション */
+.full-screen-section {
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* dvwも同様: 横スクロールバーが出ても対応 */
+.full-width { width: 100dvw; }`,
+    afterCode: "dvh/svh/lvhはChrome 108+、Safari 15.4+、Firefox 101+で対応済みです。対応していないブラウザへのフォールバックとして100vhを先に書き、後にdvhを書くと対応ブラウザでは新単位が使われます（CSSのカスケードを利用）。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "ダークモードとテーマ",
+  est: "50分",
+  goal: "prefers-color-schemeとCSS変数を組み合わせてOSのダーク/ライト設定に自動対応できるようになる。JavaScriptを使ったユーザー操作による手動切り替えも実装でき、light-dark()関数の使い方を理解している状態がゴール。",
+  sections: [{
+    title: "prefers-color-scheme とCSS変数",
+    body: "ダークモード対応はユーザー体験の重要な要素です。特に夜間や屋内での使用時に眼への負担を減らせます。実装の基本は、:rootにCSS変数でテーマカラーを定義し、@media (prefers-color-scheme: dark)内でその変数の値を書き換えることです。\n\nコンポーネントはvar()で変数を参照するだけなので、メディアクエリが発動した瞬間に全コンポーネントが自動的にダーク配色に切り替わります。Pythonの設定ファイル（config.py）を切り替えるとアプリ全体の動作が変わるのと同じ仕組みです。",
+    table: T.darkModeApproach,
+    code: `/* ライトモードの変数定義 */
+:root {
+  --bg: #ffffff;
+  --surface: #f9fafb;
+  --text: #1e1b4b;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #6366f1;
+  color-scheme: light;
+}
+
+/* ダークモード: OSの設定に追従 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0e1a;
+    --surface: #1a1928;
+    --text: #f1f0ff;
+    --text-muted: #9ca3af;
+    --border: #2d2b45;
+    --primary: #818cf8;
+    color-scheme: dark;
+  }
+}
+
+/* コンポーネントはvar()で参照するだけ */
+body { background: var(--bg); color: var(--text); }
+.card { background: var(--surface); border: 1px solid var(--border); }
+.label { color: var(--text-muted); }`,
+    afterCode: "color-scheme: light darkを指定すると、スクロールバー・フォーム要素・ブラウザデフォルトUIもOSのテーマに合わせて切り替わります。CSSで定義するカラーだけでなく、ブラウザのネイティブUIも自動対応できます。"
+  }, {
+    title: "light-dark()関数と手動切り替え",
+    body: "CSS Color Level 5で追加されたlight-dark()関数を使うと、color-schemeの値に応じてライト時とダーク時の色を1行で指定できます。light-dark(#fff, #1a1928)と書くだけで、ライトモードなら#fff、ダークモードなら#1a1928が使われます。\n\n手動切り替えはdata-theme属性とJavaScriptを組み合わせます。html要素にdata-theme=\"dark\"を付けると、対応するCSSセレクタでダーク変数が適用されます。LocalStorageにユーザーの選択を保存し、次回訪問時に復元するのが一般的なパターンです。",
+    code: `/* light-dark()関数 */
+:root {
+  color-scheme: light; /* light | dark | light dark */
+  --bg: light-dark(#ffffff, #0f0e1a);
+  --text: light-dark(#1e1b4b, #f1f0ff);
+  --card: light-dark(#f9fafb, #1a1928);
+}
+
+/* data-theme属性による手動切り替え */
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* 切り替えボタンのCSS */
+.theme-toggle {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 20px;
+  padding: 6px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+}`,
+    afterCode: "OS設定とユーザー操作の両方に対応する場合は、(1) LocalStorageに保存された値があればそれを優先、(2) なければprefers-color-schemeに従う、という優先順位で実装します。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "アクセシビリティ",
+  est: "55分",
+  goal: "WCAG 2.1 Level AAの主要な達成基準を理解し、WAI-ARIAを正しく使えるようになる。フォーカス管理・コントラスト比・prefers-reduced-motionを実装に反映でき、スクリーンリーダーで問題なく操作できるUIを設計できる状態がゴール。",
+  sections: [{
+    title: "WCAG 2.1 と WAI-ARIA",
+    body: "WCAG（Web Content Accessibility Guidelines）はW3Cが定めるWebアクセシビリティの国際標準です。日本でも障害者差別解消法により、公共性の高いWebサービスではアクセシビリティ対応が実質的に求められています。Level AAが実務上の標準目標です。\n\nWAI-ARIAはHTMLの意味論だけでは表現できないインタラクティブなUI（モーダル、タブ、ドロップダウン等）の役割・状態・プロパティをスクリーンリーダーに伝えるための属性集です。Pythonの型ヒントが「コードを読む人間とツール」のためにあるように、ARIAは「スクリーンリーダー」のための意味情報です。",
+    table: T.wcagLevels,
+    code: `/* フォーカスの可視化 — キーボードユーザーに不可欠 */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* マウス操作ではフォーカスリングを非表示（:focus-visibleで自動判定） */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* スキップリンク: キーボードでページ冒頭からメインへジャンプ */
+.skip-to-main {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: #6366f1;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 0 0 8px 0;
+  font-weight: 700;
+  text-decoration: none;
+  z-index: 9999;
+}
+.skip-to-main:focus { left: 0; }`,
+    afterCode: ":focus-visibleはキーボード操作時のみフォーカスリングを表示します（マウスクリックでは非表示）。これによりマウスユーザーの見た目を損なわずにキーボードユーザーの利便性を確保できます。"
+  }, {
+    title: "ARIA属性とロール",
+    body: "ARIA（Accessible Rich Internet Applications）の第一原則は「ネイティブHTMLで表現できるならARIAを使わない」です。buttonタグにrole=\"button\"は不要です。ARIAが必要なのはdivでボタンを作る場合や、JavaScriptで作るカスタムコンポーネント（アコーディオン、タブ等）です。\n\naria-live領域は動的に変わるコンテンツ（通知・フォームエラー・チャット）をスクリーンリーダーに伝える仕組みです。politiでは他の読み上げを妨げずに次のタイミングで読み上げ、assertiveは割り込んで即座に読み上げます。エラーメッセージはpolite、緊急のアラートはassertiveを使います。",
+    table: T.ariaRoles,
+    code: `<!-- アコーディオンのARIA実装 -->
+<div class="accordion">
+  <h3>
+    <button
+      aria-expanded="false"
+      aria-controls="panel-1"
+      id="btn-1"
+    >
+      セクション1
+      <span aria-hidden="true">›</span>
+    </button>
+  </h3>
+  <div
+    id="panel-1"
+    role="region"
+    aria-labelledby="btn-1"
+    hidden
+  >
+    <p>アコーディオンの内容</p>
+  </div>
+</div>
+
+<!-- 動的なエラーメッセージ -->
+<div aria-live="polite" aria-atomic="true" class="sr-only" id="status"></div>
+
+<!-- ローディング状態 -->
+<button aria-busy="true" aria-label="送信中...">
+  <span aria-hidden="true">⏳</span>
+</button>`,
+    afterCode: "aria-hiddenは要素をスクリーンリーダーから隠しますが、フォーカス可能な要素（aやbutton）に付けるとキーボードでフォーカスができても読まれない矛盾が生じます。aria-hiddenはインタラクティブな要素に使わないでください。"
+  }, {
+    title: "コントラスト比と prefers-reduced-motion",
+    body: "WCAG 2.1 Level AAでは通常テキストのコントラスト比が4.5:1以上、大きいテキスト（18px以上）は3:1以上を求めています。コントラスト比は前景色と背景色の相対輝度の比で、Colour Contrast Analyser等のツールで確認できます。\n\nprefers-reduced-motionは、前庭障害（視覚刺激で平衡感覚が乱れる症状）を持つユーザーやアニメーションに敏感なユーザーへの配慮です。Windowsの「アニメーションを減らす」、macOSの「視差効果を減らす」設定がオンの場合にtrueになります。全てのアニメーション・トランジションに対してprefers-reduced-motionのクエリを書くのが理想です。",
+    table: T.contrastRatios,
+    code: `/* コントラスト比を確保した配色設計 */
+:root {
+  /* 白(#fff)背景: 各色のコントラスト比 */
+  --color-text: #1e1b4b;      /* 19.2:1 (AAA) */
+  --color-muted: #4b5563;     /* 7.32:1 (AAA) */
+  --color-placeholder: #6b7280; /* 4.54:1 (AA) */
+  --color-error: #b91c1c;     /* 5.91:1 (AA) */
+  --color-success: #166534;   /* 7.39:1 (AAA) */
+}
+
+/* prefers-reduced-motion: アニメーション軽減 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* または個別対応（アニメーションが本質的な場合） */
+.loader {
+  animation: spin 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .loader { animation: none; opacity: 0.5; }
+}`,
+    afterCode: "コントラスト比の確認ツール: Chrome DevToolsのAccessibilityパネル、WebAIM Contrast Checker（オンライン）、Figmaプラグイン（Stark等）を活用してください。デザイン段階でコントラストを確認するのが最も効率的です。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "パフォーマンス最適化",
+  est: "55分",
+  goal: "Critical CSSの概念を理解してファーストビューの表示速度を改善できるようになる。content-visibilityとwill-changeを適切に使い、CLS（レイアウトシフト）を最小化する実装ができる状態がゴール。Core Web Vitals（LCP/CLS/INP）のそれぞれに対応するCSS最適化手法を説明できること。",
+  sections: [{
+    title: "レンダリングパイプラインとCore Web Vitals",
+    body: "ブラウザがWebページを表示するまでのプロセスは「HTML解析→CSS解析→スタイル計算→レイアウト→ペイント→コンポジット」という流れです。このパイプラインを理解することで、どのCSSがどのステージに影響するかがわかります。Pythonのプロファイリング（cProfile）でボトルネックを特定するのと同じ発想です。\n\nCore Web VitalsはGoogleがWebパフォーマンスを測定する3つの主要指標で、LCP（最大コンテンツ表示）、CLS（レイアウトシフト）、INP（インタラクション応答）で構成されます。CSSはLCPとCLSに直接影響します。",
+    table: T.renderPipeline,
+    code: `/* パフォーマンスに影響するCSSプロパティの分類 */
+
+/* Compositeのみ (GPU、最速) */
+.smooth { transform: translateX(100px); opacity: 0.5; }
+
+/* Paint + Composite (やや遅い) */
+.repaint { color: red; background: blue; }
+
+/* Layout + Paint + Composite (最も重い: リフロー発生) */
+.reflow { width: 300px; height: 200px; margin: 20px; }
+
+/* CSSカウンターでLCP要素を特定しやすくする */
+.lcp-candidate {
+  /* 大きな画像やテキストブロックにはloading="eager"を */
+  /* <img loading="eager" fetchpriority="high"> */
+}
+
+/* contain: 描画スコープをコンポーネント内に限定 */
+.isolated-component {
+  contain: layout paint style;
+  /* このコンポーネントの変更が外部に影響しないことをブラウザに伝える */
+}`,
+    afterCode: "Chrome DevToolsのPerformanceパネルでLCPとCLSを確認できます。Lighthouseで定期的にスコアを計測し、問題のある指標を特定してから最適化を行うのが効率的です。"
+  }, {
+    title: "Critical CSS と content-visibility",
+    body: "Critical CSSとは「ファーストビュー（スクロールなしで見える部分）の表示に必要なCSSだけをHTMLにインライン記述し、残りを非同期ロードする」手法です。通常CSSは「レンダリングブロックリソース」として全て読み込まれるまでページが表示されません。Critical CSSを分離することでFCP（First Contentful Paint）とLCPを改善できます。\n\ncontent-visibility: autoはオフスクリーン（画面外）の要素のレンダリングをスキップするプロパティです。長いリストや記事ページで劇的な初期描画の高速化が期待できます。Pythonのジェネレータで必要な時だけ値を生成するlazy evaluationに近い概念です。",
+    table: T.performanceMetrics,
+    code: `<!-- Critical CSS のインライン化パターン -->
+<head>
+  <!-- Critical CSS: ファーストビューに必要な最小限のスタイル -->
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; }
+    body { font-family: system-ui, sans-serif; }
+    .header { height: 56px; position: sticky; top: 0; background: #fff; }
+    .hero { min-height: 60dvh; background: #1e1b4b; color: #fff; }
+    /* ... ファーストビューに必要なスタイルのみ ... */
+  </style>
+
+  <!-- 残りのCSSは非同期ロード -->
+  <link rel="preload" as="style" href="main.css"
+        onload="this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="main.css"></noscript>
+</head>
+
+/* content-visibility: 画面外要素のレンダリングをスキップ */
+.post-list-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px; /* 高さの概算を指定してCLSを防ぐ */
+}
+
+/* CLS防止: 画像サイズを事前に確保 */
+.article-cover {
+  aspect-ratio: 16 / 9;
+  background: #f3f4f6; /* プレースホルダー */
+}
+.article-cover img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}`,
+    afterCode: "content-visibilityを使う際のcontain-intrinsic-sizeは「概算でOK」です。実際の高さと多少違っていても、画面外ではCLSに影響しません。重要なのはスクロール時にレイアウトシフトが最小になることです。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({ data }) {
+  return React.createElement("div", {
+    style: { overflowX: "auto", margin: "12px 0", borderRadius: 10, border: "1px solid #d1d5db", background: "#fff" }
+  }, React.createElement("table", {
+    style: { width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }
+  }, React.createElement("thead", null, React.createElement("tr", null,
+    data.h.map((h, i) => React.createElement("th", {
+      key: i,
+      style: {
+        background: "linear-gradient(180deg,#eef2ff,#e0e7ff)", color: "#312e81",
+        fontWeight: 800, fontSize: 12.5, padding: "10px 14px", textAlign: "left",
+        borderBottom: "2px solid #a5b4fc",
+        borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+      }
+    }, h))
+  )), React.createElement("tbody", null,
+    data.r.map((row, ri) => React.createElement("tr", { key: ri },
+      row.map((cell, ci) => React.createElement("td", {
+        key: ci,
+        style: {
+          padding: "9px 14px",
+          borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+          borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+          color: ci === 0 ? "#1e1b4b" : "#374151",
+          fontWeight: ci === 0 ? 700 : 400,
+          fontSize: 13, lineHeight: 1.65, verticalAlign: "top",
+          whiteSpace: "pre-line",
+          background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+        }
+      }, cell))
+    ))
+  )),
+  data.cap && React.createElement("div", {
+    style: { padding: "8px 14px", fontSize: 12, color: "#6b7280", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }
+  }, data.cap));
+}
+
+function Code({ code, hl }) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a", color: "#d0d0f0",
+      padding: "14px 16px", borderRadius: 10, fontSize: 12, lineHeight: 1.65,
+      overflowX: "auto", margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap", wordBreak: "break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+
+const diffLabel = d => d === 1 ? "⭐ 基本" : d === 2 ? "⭐⭐ 応用" : "⭐⭐⭐ 発展";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+
+function Exercise({ ex, idx }) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: { borderRadius: 12, border: "2px solid #f59e0b", overflow: "hidden", background: "#fff", marginBottom: 8 }
+  },
+    React.createElement("div", { style: { padding: "12px 16px", background: "linear-gradient(135deg,#fffbeb,#fef3c7)" } },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } },
+        React.createElement("span", { style: { background: "#f59e0b", color: "#fff", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 6 } }, "問", idx + 1),
+        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: diffColor(ex.diff) } }, diffLabel(ex.diff))
+      ),
+      React.createElement("p", { style: { margin: 0, fontSize: 13.5, lineHeight: 1.8, color: "#92400e", whiteSpace: "pre-line" } }, ex.q)
+    ),
+    React.createElement("div", { style: { padding: "0 16px 12px" } }, React.createElement(Code, { code: ex.code, hl: true })),
+    React.createElement("div", { style: { borderTop: "1px dashed #fcd34d", padding: "10px 16px" } },
+      React.createElement("button", {
+        onClick: () => setShowAnswer(!showAnswer),
+        style: {
+          background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+          color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px",
+          fontSize: 13, fontWeight: 700, cursor: "pointer", width: "100%"
+        }
+      }, showAnswer ? "🙈 解答を隠す" : "👀 解答例を見る"),
+      showAnswer && React.createElement("div", { style: { marginTop: 10 } },
+        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 } }, "✅ 解答例"),
+        React.createElement(Code, { code: ex.answer })
+      )
+    )
+  );
+}
+
+function Section({ section, idx, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: { borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", background: "#fff" }
+  },
+    React.createElement("button", {
+      onClick: () => setOpen(!open),
+      style: {
+        width: "100%", display: "flex", alignItems: "center", gap: 10,
+        padding: "12px 16px", border: "none", background: "#fafafa",
+        cursor: "pointer", textAlign: "left", fontSize: 14, fontWeight: 700, color: "#1e1b4b"
+      }
+    },
+      React.createElement("span", { style: { flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: "#6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 } }, idx + 1),
+      React.createElement("span", { style: { flex: 1 } }, section.title),
+      React.createElement("span", { style: { fontSize: 18, color: "#9ca3af", transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0)" } }, "›")
+    ),
+    open && React.createElement("div", { style: { padding: "12px 16px 16px" } },
+      section.body && React.createElement("p", { style: { margin: "0 0 8px", fontSize: 13.5, lineHeight: 1.85, color: "#374151", whiteSpace: "pre-line" } }, section.body),
+      section.table && React.createElement(DataTable, { data: section.table }),
+      section.afterTable && React.createElement("p", { style: { margin: "8px 0", fontSize: 13.5, lineHeight: 1.85, color: "#374151", whiteSpace: "pre-line" } }, section.afterTable),
+      section.code && React.createElement(Code, { code: section.code }),
+      section.afterCode && React.createElement("p", { style: { margin: "10px 0 0", fontSize: 13, lineHeight: 1.8, color: "#555", whiteSpace: "pre-line", background: "#f9fafb", padding: "10px 14px", borderRadius: 8, border: "1px solid #e5e7eb" } }, section.afterCode)
+    )
+  );
+}
+
+/* ─── Main App ─── */
+function HTMLCSSIntermediateCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+
+  return React.createElement("div", {
+    style: { minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif" }
+  },
+    React.createElement("div", { style: { maxWidth: 1100, margin: "0 auto", padding: "20px 14px" } },
+
+      /* ヒーロー */
+      React.createElement("div", {
+        style: { background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)", borderRadius: 16, padding: "24px 20px", marginBottom: 16, position: "relative", overflow: "hidden" }
+      },
+        React.createElement("div", { style: { position: "absolute", top: -30, right: -10, fontSize: 140, opacity: 0.05 } }, "🎨"),
+        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 } }, "Python開発者のための"),
+        React.createElement("h1", { style: { margin: 0, fontSize: 22, fontWeight: 900, color: "#fff" } }, "HTML/CSS 中級コース"),
+        React.createElement("p", { style: { margin: "6px 0 0", fontSize: 12.5, color: "#c4b5fd" } },
+          "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問 ・ 難易度⭐〜⭐⭐⭐"
+        ),
+        React.createElement("p", { style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 } },
+          "CSS設計方法論（BEM・Utility-First）からSass/SCSS・Tailwind CSS・モダンセレクタ・コンテナクエリ・ダークモード・アクセシビリティ・パフォーマンス最適化まで、実務で差がつく中級知識を体系的に習得します。入門コースで学んだHTML/CSSの基礎を前提に、より大規模・高品質なWebサイトを構築できる技術者を目指します。"
+        ),
+        React.createElement("div", { style: { marginTop: 14, display: "flex", gap: 3 } },
+          chapters.map((_, i) => React.createElement("div", {
+            key: i,
+            onClick: () => { setCh(i); setMenuOpen(false); },
+            style: { flex: 1, height: 5, borderRadius: 3, background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)", cursor: "pointer" }
+          }))
+        )
+      ),
+
+      /* チャプターメニュー */
+      React.createElement("div", { style: { marginBottom: 14 } },
+        React.createElement("button", {
+          onClick: () => setMenuOpen(!menuOpen),
+          style: { width: "100%", padding: "10px 16px", border: "1px solid #d1d5db", borderRadius: 10, background: "#fff", fontSize: 14, fontWeight: 700, color: "#1e1b4b", cursor: "pointer", display: "flex", justifyContent: "space-between" }
+        },
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", { style: { fontSize: 12, color: "#9ca3af" } }, menuOpen ? "▲" : "▼")
+        ),
+        menuOpen && React.createElement("div", {
+          style: { marginTop: 4, border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#fff", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }
+        },
+          chapters.map((c, i) => React.createElement("button", {
+            key: c.id,
+            onClick: () => { setCh(i); setMenuOpen(false); },
+            style: {
+              width: "100%", padding: "10px 16px", border: "none",
+              borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+              background: i === ch ? "#eef2ff" : "#fff",
+              fontSize: 13, fontWeight: i === ch ? 700 : 500,
+              color: i === ch ? "#4338ca" : "#374151",
+              cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10
+            }
+          },
+            React.createElement("span", {
+              style: { width: 22, height: 22, borderRadius: "50%", background: i === ch ? "#6366f1" : "#e5e7eb", color: i === ch ? "#fff" : "#6b7280", fontWeight: 800, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+            }, c.num),
+            React.createElement("span", { style: { flex: 1 } }, c.title),
+            EX[c.id] && React.createElement("span", { style: { fontSize: 11, color: "#f59e0b", fontWeight: 700 } }, EX[c.id].length, "問")
+          ))
+        )
+      ),
+
+      /* 章ヘッダー */
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } },
+        React.createElement("span", {
+          style: { width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontWeight: 900, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }
+        }, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontWeight: 800, fontSize: 18, color: "#1e1b4b" } }, chapter.title),
+          React.createElement("div", { style: { fontSize: 12, color: "#6b7280" } }, "目安: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : "")
+        )
+      ),
+
+      /* ゴールブロック */
+      chapter.goal && React.createElement("div", {
+        style: { background: "linear-gradient(135deg,#eef2ff,#f5f3ff)", border: "1px solid #c7d2fe", borderLeft: "4px solid #6366f1", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }
+      },
+        React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 } }, "🎯 この章のゴール"),
+        React.createElement("div", { style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" } }, chapter.goal)
+      ),
+
+      /* セクション一覧 */
+      React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+        chapter.sections.map((sec, i) => React.createElement(Section, { key: ch + "-" + i, section: sec, idx: i, defaultOpen: false }))
+      ),
+
+      /* 演習問題 */
+      exercises.length > 0 && React.createElement("div", { style: { marginTop: 20 } },
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
+          React.createElement("span", { style: { background: "#f59e0b", color: "#fff", fontWeight: 800, fontSize: 13, padding: "4px 14px", borderRadius: 8 } }, "🏋️ 演習問題"),
+          React.createElement("span", { style: { fontSize: 13, color: "#92400e" } }, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex, i) => React.createElement(Exercise, { key: ch + "-ex-" + i, ex: ex, idx: i }))
+      ),
+
+      /* 前後ナビゲーション */
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 20, gap: 10 } },
+        ch > 0
+          ? React.createElement("button", {
+              onClick: () => { setCh(ch - 1); window.scrollTo(0, 0); },
+              style: { flex: 1, padding: "12px 16px", border: "1px solid #d1d5db", borderRadius: 10, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#6b7280" }
+            }, "← Ch.", chapters[ch - 1].num)
+          : React.createElement("div", { style: { flex: 1 } }),
+        ch < chapters.length - 1
+          ? React.createElement("button", {
+              onClick: () => { setCh(ch + 1); window.scrollTo(0, 0); },
+              style: { flex: 1, padding: "12px 16px", border: "none", borderRadius: 10, background: "linear-gradient(135deg,#6366f1,#8b5cf6)", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#fff" }
+            }, "Ch.", chapters[ch + 1].num, " →")
+          : React.createElement("a", {
+              href: "../index.html",
+              style: { flex: 1, padding: "12px 16px", borderRadius: 10, background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", fontWeight: 700, fontSize: 13, textAlign: "center", textDecoration: "none" }
+            }, "🎉 コース完了！")
+      ),
+
+      /* フッター */
+      React.createElement("p", {
+        style: { textAlign: "center", fontSize: 11, color: "#9ca3af", marginTop: 20 }
+      }, "developer.mozilla.org ・ CSS 2024 時点")
+    )
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(HTMLCSSIntermediateCourse));
+  </script>
+</body>
+</html>
