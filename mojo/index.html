@@ -704,100 +704,118 @@ const chapters = [{
   num: 1,
   title: "はじめに — Mojoの全体像",
   est: "20分",
+  goal: "Mojo がなぜ速いのかを「コンパイル言語だから」という一言で説明でき、手元に環境を用意して最初の Hello, Mojo! をビルド・実行できる状態になる。Python との実行モデルの違い（インタプリタ vs JIT/AOT）を理解し、なぜ main() が必須なのかを自分の言葉で言えるようにする。",
   sections: [{
     title: "そもそも「コンパイル」って何？",
-    body: "Pythonは「インタプリタ」、Mojoは「コンパイル言語」です。",
+    body: "Python を日常的に触っていると意識しませんが、Python は「ソースを一行ずつ読みながら実行する」インタプリタ言語です。これに対して Mojo は事前に機械語へ変換してから実行する「コンパイル言語」です。\n\nコンパイルが挟まる代わりに、型情報を使った最適化・デッドコードの除去・SIMD 化などの余地が生まれ、Python 比で桁違いの速さが出ます。Python のような書き味のまま、C++/Rust 相当の実行速度を狙えるのが Mojo の最大の売りです。",
     table: T.compile,
-    afterTable: "Mojoは JIT と AOT の両方をサポートしています。"
+    afterTable: "Mojo は JIT（開発時にその場でコンパイル）と AOT（事前にバイナリを生成）の両方をサポートします。インタプリタ方式は一切用意されていないので、mojo コマンド無しでスクリプトを直接走らせることはできません。"
   }, {
     title: "2つの実行モード",
-    body: "同じコードを2通りで実行できます。",
+    body: "Mojo には実行モードが 2 つあり、どちらも同じソースから作れます。開発中は JIT、配布するときは AOT という使い分けが基本です。JIT でも一度コンパイルは走るため、起動には Python より少し時間がかかります。その代わり実行は圧倒的に速く、AOT で事前ビルドすればさらに起動コストもゼロになります。",
     table: T.runMode,
-    code: `# JIT（開発用）
+    code: `# JIT（開発用）: コンパイル→即実行。バイナリは残らない
 mojo run hello.mojo
 
-# AOT（配布用）
+# AOT（配布用）: バイナリを生成して残す
 mojo build hello.mojo
-./hello`
+./hello`,
+    afterCode: "ポイント: AOT で生成したバイナリは Mojo ランタイム不要で単体実行できるため、Docker イメージやサーバへの配布に向きます。"
   }, {
     title: "環境構築",
-    body: "pip でインストール可能（Linux/macOS、Windowsは WSL2）。",
-    code: `pip install mojo
-mojo --version
-mojo   # REPL起動`
+    body: "Mojo は Modular 社が配布しており、Python のパッケージマネージャ経由で入ります。2026 年 4 月時点では Linux / macOS がネイティブ対応、Windows は WSL2 経由が公式推奨です。環境構築でつまずいた時は、まず mojo --version が通ること、次に REPL（対話モード）が起動することの 2 点を確認してください。",
+    code: `pip install mojo         # インストール
+mojo --version            # バージョン確認
+mojo                      # REPL起動（Ctrl+Dで終了）`,
+    afterCode: "REPL は式単位で試せるので、新しい構文を覚えるときのスクラッチパッドとして便利です。ただし REPL 内でも def main() を書かない形では書けない制約があるため、本格的な試行はファイルを作って mojo run するのが確実です。"
   }, {
     title: "main() の必須ルール",
-    body: "Mojoではトップレベルにコードを書けません。必ず def main() の中に書きます。\n\nなぜ？ → コンパイラが実行開始点（エントリポイント）を知る必要があるためです。",
-    code: `# ❌ エラー
+    body: "Python なら print(\"hello\") をファイルの一番上に書けばそのまま動きますが、Mojo ではこれがコンパイルエラーになります。Mojo はトップレベル（ファイル直下）に実行文を書くことができません。必ず def main(): の中にロジックを置きます。\n\nこれはコンパイラが「プログラムはここから始まる」というエントリポイントを静的に確定させたいためで、C/C++/Rust の main() と同じ発想です。ライブラリとして import されるファイルには main() は不要で、関数や struct だけを書けば OK です。",
+    code: `# ❌ コンパイルエラー: トップレベル実行文は不可
 # print("hello")
 
-# ✅ 正しい
+# ✅ 正しい: main() の中に書く
 def main():
-    print("Hello, Mojo! 🔥")`
+    print("Hello, Mojo! 🔥")`,
+    afterCode: "ミニ演習: このコードを hello.mojo に保存して mojo run hello.mojo を実行してみましょう。絵文字がそのまま出力されるはずです（Mojo の String は UTF-8）。"
   }]
 }, {
   id: "ch2",
   num: 2,
   title: "変数 — 宣言・型・スコープ",
   est: "35分",
+  goal: "Mojo の静的型付けが Python とどう違うのかを理解し、暗黙宣言 / var / alias の 3 つの宣言方法を状況に応じて使い分けられるようになる。型一覧と命名規則を押さえ、暗黙変換できるケース / 明示変換が必須なケースを自分で判断できる状態がゴール。",
   sections: [{
     title: "静的型付け",
-    body: "Pythonは動的型付け（型が自由に変わる）。Mojoは静的型付け（一度決まると変更不可）。\n\nメリット: バグの早期発見、高速化、意図が明確。",
-    code: `# Mojo
-def main():
+    body: "Python は実行時に型が決まる動的型付けなので、同じ変数に int を入れた後から文字列を代入することもできます。Mojo では最初に型が決まったら、その変数にはその型の値しか入れられません（静的型付け）。\n\n制約に見えますが、実際のメリットは大きく 3 つです:\n・バグをコンパイル時に検出できる（実行前に弾ける）\n・型が確定しているので機械語に落とすときに最適化が効き、速い\n・「この関数は何を受け取って何を返すのか」をシグネチャから即座に読み取れる",
+    code: `def main():
     x = 10
-    # x = "hello"  # ❌ コンパイルエラー！`
+    # x = "hello"  # ❌ コンパイルエラー: x は Int として確定済み
+
+    # 型注釈を付けて明示することもできる
+    var name: String = "Alice"
+    print(x, name)`,
+    afterCode: "型推論が効くので、初めて代入するときに型を書くのは任意です。ただし意図を明確にしたい時や、後述の遅延初期化をする時は型注釈が必要になります。"
   }, {
     title: "変数宣言の3つの方法",
+    body: "Mojo の変数宣言は一見複雑ですが、使い分けのルールはシンプルです。日常のローカル変数は暗黙宣言、if / for などのブロック内だけで使いたい変数や遅延初期化は var、コンパイル時定数（配列サイズなど）は alias、と覚えておけば十分です。",
     table: T.varDecl,
     code: `def main():
-    name = "Alice"           # ① 暗黙宣言
-    var score: Float64 = 95.5 # ② var 明示宣言
-    alias PI = 3.14159       # ③ alias 定数`
+    name = "Alice"            # ① 暗黙宣言: 関数スコープ
+    var score: Float64 = 95.5 # ② var 明示: ブロックスコープ
+    alias PI = 3.14159        # ③ alias: コンパイル時定数`,
+    afterCode: "alias はコンパイル時に値が確定している必要があるので、実行時に計算される値（例: 入力された数値）は入れられません。その場合は var を使います。"
   }, {
     title: "スコープの違い",
-    body: "暗黙宣言 = 関数スコープ（if内外で同じ変数）\nvar = ブロックスコープ（if内のvarは外と別物）",
+    body: "暗黙宣言と var は見た目が似ていますがスコープ規則が異なります。暗黙宣言は関数スコープ（関数全体で同じ変数）、var はブロックスコープ（if / for の内側で宣言したら外では見えない）です。\n\nこの差は地味に見えて、ループ内の一時変数が外に漏れるかどうかを左右するため、関数が長くなってくるほど重要になります。「外で使いたいなら暗黙宣言、ブロック内で閉じたいなら var」と覚えましょう。",
     code: `def main():
+    # 暗黙宣言: if の中でも外でも同じ x
     x = 10
     if True:
-        x = 20         # 同じ x
+        x = 20
     print(x)           # → 20
 
+    # var: ブロック内の a は外の a とは別物
     var a = 10
     if True:
-        var a = 20     # 別の a
+        var a = 20     # 別の変数（シャドウ）
     print(a)           # → 10（変わらない）`
   }, {
     title: "遅延初期化",
-    body: "「型だけ宣言して値は後から」が可能。初期化前に使うとコンパイルエラー（安全）。",
+    body: "「型だけ先に決めて値は条件分岐の後に入れる」という書き方が var ならできます。Mojo のコンパイラは「この変数は必ず初期化されるか」をフロー解析で追跡しており、初期化前に使おうとするとエラーになります。\n\nこれにより「未初期化の変数を読んでしまう」典型的なバグが言語レベルで防がれます。C++ の未定義動作とも Python の NameError とも違う、静的に安全なアプローチです。",
     code: `def main():
-    var grade: String    # 型だけ宣言
+    var grade: String    # 型だけ宣言（値は未定）
     var score = 85
     if score >= 70:
         grade = "合格"
     else:
         grade = "不合格"
-    print(grade)         # 必ず初期化済み`
+    print(grade)         # ✅ どの経路でも初期化済みなので OK`,
+    afterCode: "もし else ブロックを消すと、「score < 70 のときに grade が未初期化のまま print される可能性がある」とコンパイラが気付いてエラーを出します。"
   }, {
     title: "型の一覧と命名規則",
-    body: "型名は全て先頭大文字。言語組み込みの型はなく、全てstructで定義されています。",
-    table: T.types
+    body: "Mojo の型名はすべて先頭大文字です（Int, Float64, String, Bool …）。Python の小文字型名（int, float, str）とは 1 文字違いで混乱しがちですが、「Mojo の型は全部 struct なので、普通の型と同じ命名ルール（PascalCase）が適用されている」と考えると腹落ちします。\n\n言語組み込みの特殊な型は存在しません。Int ですら標準ライブラリで struct として定義されており、その仕組みのおかげで後述のオーバーロードやジェネリクスが自然に働きます。",
+    table: T.types,
+    afterTable: "数値型は Int / UInt / Float64 が基本。幅を明示したい場合（ファイル I/O、バイナリ、SIMD）だけ Int8〜Int64 / Float16 / Float32 などの固定幅型を使います。"
   }, {
     title: "型変換ルール",
-    body: "暗黙変換（自動）と明示変換（手動）の2種類。",
+    body: "Mojo は「情報が失われない変換だけ暗黙的に行う」という保守的な方針を取っています。Int→Float64 は精度が増えるだけなので暗黙 OK、Float64→Int は小数部が消えるので明示必須、という具合です。\n\nPython とは Bool の扱いが少し違います。Python では if count: のように 0 以外を真とみなす truthy 判定が効きますが、Mojo では Int→Bool の暗黙変換は無く、明示的に条件式を書く必要があります（後述の Ch.4 で深掘り）。",
     table: T.conv,
     code: `def main():
-    var temp: Float64 = 99     # Int→Float64 は暗黙OK
-    var n: Int = Int(3.14)     # Float64→Int は明示が必要
-    var s: String = String(42) # Int→String も明示`
+    var temp: Float64 = 99     # Int → Float64 は暗黙 OK（安全）
+    var n: Int = Int(3.14)     # Float64 → Int は明示（小数部が消える）
+    var s: String = String(42) # Int → String も明示`,
+    afterCode: "コンストラクタ呼び出し風の明示変換（Int(...), String(...)）に統一されているので、型ごとに変換関数名を覚える必要はありません。"
   }]
 }, {
   id: "ch3",
   num: 3,
   title: "関数 — def, fn, 引数規約",
   est: "40分",
+  goal: "def と fn の使い分けを「例外を投げる可能性があるか」という観点で判断できるようになる。全引数の型注釈・戻り値型の必須化を体に染み込ませ、Python にはない read / mut / var / owned の 4 つの引数規約をコードを見て判別できる状態を目指す。オーバーロードやデフォルト引数も含め、関数シグネチャを読み書きできるようになるのがゴール。",
   sections: [{
     title: "def と fn",
+    body: "Mojo の関数キーワードは 2 種類あります。def は Python と同じで暗黙的に raises（例外送出可）扱い、fn はデフォルトで raises なし（例外を投げないことをコンパイラが検証）です。\n\n「なぜ 2 種類あるのか」は速度と安全性のトレードオフが背景です。例外を投げうる関数は呼び出し側で巻き戻しコードが必要になり、最適化の機会が減ります。fn にしておくと「この関数は絶対に例外を投げない」という保証が型レベルで付き、呼び出し側のコードがよりアグレッシブに最適化されます。ライブラリ提供関数やホットパスは fn、スクリプト的なコードは def、が基本の使い分けです。",
     table: T.defFn,
     code: `def parse(s: String) -> Int:     # raises暗黙
     return Int(s)
@@ -806,20 +824,22 @@ fn add(a: Int, b: Int) -> Int:   # raisesなし
     return a + b
 
 fn parse2(s: String) raises -> Int: # raises明示
-    return Int(s)`
+    return Int(s)`,
+    afterCode: "ポイント: fn から def を呼ぶときは try / except で囲む必要があります。fn 同士・def 同士なら制約は緩く、混ぜて使うときだけ注意が必要です。"
   }, {
     title: "引数の型宣言",
-    body: "全引数に型が必須。戻り値がある場合は戻り値型も必須。",
+    body: "Python では引数の型注釈は任意（書かなくても動く）ですが、Mojo では全ての引数に型が必須です。戻り値を返す関数には戻り値型も必須で、省略すると「-> None（値を返さない）」扱いになります。\n\n最初は窮屈に感じますが、型があることで IDE の補完が効き、関数の役割がシグネチャだけで読めるようになります。「この引数の型は何だっけ？」と実装を追い読みする手間がなくなるのが最大のメリットです。",
     code: `# 戻り値なし（-> None 省略可）
 def greet(name: String):
     print("Hello,", name)
 
 # 戻り値あり（-> 型 必須）
 fn add(a: Int, b: Int) -> Int:
-    return a + b`
+    return a + b`,
+    afterCode: "ミニ演習: fn add から戻り値型 -> Int を消すとコンパイラに怒られます。どんなメッセージが出るか確認しておくと、後でエラーに遭遇したときに原因を特定しやすくなります。"
   }, {
     title: "引数規約 read / mut / var",
-    body: "Pythonにはない概念。関数が引数をどう扱うかの約束事。",
+    body: "これは Python には無い、Mojo 独自の最重要概念です。関数の引数がどう渡されるか（読み取り専用 / 書き換え可能 / 所有権を受け取る）を関数側で宣言します。\n\nread はデフォルト（省略可能）で「参照だけ受け取って変更しない」という約束、mut は「元の値を書き換えてよい」、owned は「所有権ごと譲り受ける」という意味です。この規約のおかげで、呼び出し側は関数を呼ぶだけで「この変数が書き換わるか / 使い続けられるか」をコンパイラに保証してもらえます。Rust に馴染みがある人は &T / &mut T / T と対応付けると直感的です。",
     table: T.argConv,
     code: `fn show(value: Int):          # read（省略）
     print(value)
@@ -831,9 +851,11 @@ def main():
     var x = 5
     show(x)       # → 5
     double_it(x)
-    show(x)       # → 10`
+    show(x)       # → 10`,
+    afterCode: "ポイント: read の場合、受け手側で value = ... と再代入しようとするとコンパイルエラー。mut にすると OK になります。引数規約はそのまま「関数がこの値をどう扱うかの契約」を表しています。"
   }, {
     title: "デフォルト引数・可変長引数",
+    body: "Python と同じ感覚で デフォルト引数 / キーワード引数 / 可変長引数 (*args) を使えます。構文もほぼ同じなので、新しく覚えることは型注釈が必須になることだけです。\n\n可変長引数の型は *values: Int のように単一型で揃える必要があり、Python の **kwargs のように任意型を束ねることはできません（型の静的保証があるため）。",
     code: `fn power(base: Int, exp: Int = 2) -> Int:
     return base ** exp
 
@@ -846,10 +868,11 @@ fn total(*values: Int) -> Int:
 def main():
     print(power(3))            # → 9
     print(power(exp=3, base=5))  # → 125
-    print(total(1, 2, 3, 4))    # → 10`
+    print(total(1, 2, 3, 4))    # → 10`,
+    afterCode: "キーワード引数の順序は Python と同じく自由。省略した引数にはデフォルト値が入ります。"
   }, {
     title: "オーバーロード",
-    body: "引数の型が異なれば同名の関数を複数定義可能。",
+    body: "同じ名前の関数を引数の型違いで複数定義できます。これは Python には無い機能で、C++ / Rust / Swift などと同じ考え方です。\n\n呼び出し側は型に応じて自動的に正しい実装に振り分けられるので、型ごとに add_int / add_float / add_string のように名前を分ける必要がありません。Mojo の標準ライブラリの Int や Float64 も、内部では大量のオーバーロードで演算子を実装しています。",
     code: `fn describe(v: Int):     print("整数:", v)
 fn describe(v: Float64): print("小数:", v)
 fn describe(v: String):  print("文字列:", v)
@@ -857,50 +880,60 @@ fn describe(v: String):  print("文字列:", v)
 def main():
     describe(42)       # → 整数: 42
     describe(3.14)     # → 小数: 3.14
-    describe("hello")  # → 文字列: hello`
+    describe("hello")  # → 文字列: hello`,
+    afterCode: "注意: 引数の型だけでなく引数の数が違ってもオーバーロードできます。戻り値型だけが違う場合は区別できないので、オーバーロード不可です。"
   }]
 }, {
   id: "ch4",
   num: 4,
   title: "制御構文とPythonとの違い",
   est: "25分",
+  goal: "if / for / while の構文は Python とほぼ同じでありながら、truthy / falsy の暗黙変換が無いこと、リスト内包表記や match が無いことなど、制御フロー周りでの Mojo 固有の制限を把握する。『書ける Python 構文』と『書けない Python 構文』を即座に見分けられる状態がゴール。",
   sections: [{
     title: "truthy/falsy が使えない",
-    body: "条件式は必ず Bool 型を返す必要があります。",
+    body: "Python では if name:（空文字列なら False）や if nums:（空リストなら False）のように、0 / 空 / None を暗黙で False として扱う文化があります。Mojo では条件式に必ず Bool 型を渡す必要があり、こうした暗黙変換は全て禁止されています。\n\n最初は冗長に感じますが、真偽の判断基準が明示されるためコードレビューで意図がブレず、「空白文字のみの文字列を False 扱いにしたいかどうか」といった暗黙の仕様に悩まされることがなくなります。",
     table: T.truthy,
     code: `def main():
     var name = "Alice"
     if len(name) > 0:   # ✅
-        print("名前あり")`
+        print("名前あり")`,
+    afterCode: "ポイント: len(x) > 0 / x != 0 / x is not None といった形で明示的に Bool に落とすのが Mojo の流儀です。"
   }, {
     title: "for / while ループ",
+    body: "for・while は Python とほぼ同じです。range() の使い方（範囲・ステップ）もそのまま使えます。ただし List[Int] のようなコレクションを for で回す際は、インデックスアクセスベースで書くのが現状（2026 年 4 月時点）は無難です。イテレータプロトコルは進化中で、コレクションによって直接 for 可能なものと不可なものが混在しています。",
     code: `def main():
     for i in range(5):       print(i)
     for i in range(0,10,2):  print(i)
 
     var nums = List[Int](10, 20, 30)
     for i in range(len(nums)):
-        print(nums[i])`
+        print(nums[i])`,
+    afterCode: "while も Python と同様で break / continue / else 節まで同じ動きをします。無限ループ防止のため必ず終了条件を意識しましょう。"
   }, {
     title: "未サポートのPython構文",
+    body: "Python の便利構文のうち、いくつかは Mojo にまだ実装されていません。リスト内包表記（[x*2 for x in ...]）、ジェネレータ式、with 文、match 文、try/except の一部などです。\n\nほとんどの機能は等価な for ループや if / elif で書けるので致命的ではありませんが、「つい書いてしまって怒られる」ポイントでもあります。まず一度未サポート表を眺めておくと、後で迷子にならずに済みます。",
     table: T.unsup,
     code: `# リスト内包表記の代替
 def main():
     var sq = List[Int]()
     for x in range(10):
-        sq.append(x ** 2)`
+        sq.append(x ** 2)`,
+    afterCode: "ミニ演習: Python で [x**2 for x in range(10) if x % 2 == 0] を Mojo で書き換えてみましょう。append + if だけで素直に書けます。"
   }]
 }, {
   id: "ch5",
   num: 5,
   title: "struct — classに代わるもの",
   est: "45分",
+  goal: "Python の class の代わりに Mojo ではなぜ struct が使われるのか、メモリレイアウトと速度の観点で理解する。struct を定義し、コンストラクタ / メソッド / self 規約 / 演算子オーバーロード / コピー・ムーブの挙動までひととおり書けるようになることがゴール。",
   sections: [{
     title: "class vs struct",
+    body: "Python の class は全インスタンスがヒープ上に散らばって確保され、フィールドアクセスのたびにポインタを追います。これは柔軟な反面、キャッシュ効率が悪く速度のボトルネックになりがちです。\n\nMojo の struct は C++ の struct / class と同じで、フィールドがメモリ上に連続配置されます。配列に詰めれば全要素が連続メモリに並び、CPU キャッシュに乗りやすく、SIMD 化もしやすくなります。「Mojo で class を使うな」とまでは言いませんが、性能を取りに行くなら struct がデフォルト、という考え方を覚えておきましょう。",
     table: T.clsVsStr,
-    afterTable: "Python class: ポインタを何度も辿る（遅い）\nMojo struct: メモリ上に連続配置（直接アクセス・高速）"
+    afterTable: "Python class: ポインタを何度も辿る（遅い）\nMojo struct: メモリ上に連続配置（直接アクセス・高速）\n\n補足: class もサポートされていますが、動的ディスパッチが必要な場面に限定するのが実務的です。"
   }, {
     title: "structの定義",
+    body: "struct の定義は class とほぼ同じ構文です。フィールドは var で宣言し、型を明示します。__init__ は Python と同じで初期化処理を書きますが、self の前に out 規約が付く点だけが異なります（「これから初期化するので書き込み OK」の意味）。\n\n毎回 __init__ で「引数をフィールドに代入するだけ」のボイラープレートを書くのが面倒な場合、@fieldwise_init デコレータを付けると自動でコンストラクタを生成してくれます（Rust の #[derive(new)] に相当）。",
     code: `struct Point:
     var x: Float64
     var y: Float64
@@ -913,10 +946,11 @@ def main():
 struct Color:
     var r: UInt8
     var g: UInt8
-    var b: UInt8`
+    var b: UInt8`,
+    afterCode: "ポイント: フィールドの順序がそのままメモリ上の並びになります。UInt8 を 3 つ並べれば 3 バイト（パディング次第）にぴったり収まります。"
   }, {
     title: "selfの規約",
-    body: "メソッドのselfにも規約があります。",
+    body: "メソッドの self にも、関数の引数規約と同じく 3 種類の規約（read / mut / out）が付きます。read self はデフォルト（省略可能）で「このメソッド内では self を書き換えない」、mut self は「書き換える」、out self は「self をこれから初期化する」（__init__ 専用）です。\n\nこの規約のおかげで、getter と setter の違いがシグネチャだけでわかります。「この fn は self を書き換えるだろうか？」を実装を読まずに判別できるのは大きな価値です。",
     table: T.selfConv,
     code: `struct BankAccount:
     var balance: Float64
@@ -925,10 +959,11 @@ struct Color:
     fn get(self) -> Float64:                # read self
         return self.balance
     fn deposit(mut self, amt: Float64):     # mut self
-        self.balance += amt`
+        self.balance += amt`,
+    afterCode: "ミニ演習: get メソッドの中で self.balance += 1 と書くと、read self なのでコンパイルエラーになります。実際に確かめてエラーメッセージに慣れておきましょう。"
   }, {
     title: "演算子オーバーロード",
-    body: "__add__, __eq__, __str__ 等でPythonと同様に演算子を定義。",
+    body: "Python と同じく __add__, __sub__, __eq__, __str__ などのダンダーメソッドを実装することで演算子や関数の挙動を定義できます。Vec2 + Vec2 のように書けるようにしたければ __add__ を、print(vec) でうまく表示したければ __str__ を実装する、というだけです。\n\nMojo の標準ライブラリの Int や Float64 もこの仕組みを使って実装されています。つまり Int + Int は「Int struct の __add__ メソッドの呼び出し」にすぎません。",
     code: `struct Vec2:
     var x: Float64; var y: Float64
     def __init__(out self, x: Float64, y: Float64):
@@ -936,23 +971,26 @@ struct Color:
     fn __add__(self, o: Vec2) -> Vec2:
         return Vec2(self.x + o.x, self.y + o.y)
     fn __str__(self) -> String:
-        return "(" + String(self.x) + "," + String(self.y) + ")"`
+        return "(" + String(self.x) + "," + String(self.y) + ")"`,
+    afterCode: "ポイント: Python の __repr__ に相当するものや __hash__ も同様の流儀で実装できます。必要になってから足していけば十分です。"
   }, {
     title: "コピーとムーブ",
-    body: "デフォルトはコピーもムーブも不可。\nコピー → __copyinit__ 実装\nムーブ → __moveinit__ 実装、^ 演算子で所有権移動",
+    body: "Mojo の struct はデフォルトでコピーもムーブもできません。代入した瞬間にコピーが走って遅くなる Python とは真逆の設計で、「コピーを明示的に許可する」というスタンスです。\n\nコピー可能にしたければ __copyinit__ を、ムーブ可能にしたければ __moveinit__ を実装します。値を明示的にムーブするときは ^ 演算子を使い、ムーブ後の元変数はコンパイラレベルでアクセス禁止になります。これが後述の所有権モデルのベースです。",
     code: `def main():
     var a = MyData(42)
     var b = a       # コピー（両方使える）
-    var c = a^      # ムーブ（a は使えなくなる）`
+    var c = a^      # ムーブ（a は使えなくなる）`,
+    afterCode: "ポイント: 実務では @value や @fieldwise_init などのデコレータで __copyinit__ / __moveinit__ を自動生成させるのが定番です。全部手書きする場面は少ないので安心してください。"
   }]
 }, {
   id: "ch6",
   num: 6,
   title: "トレイト — 継承のない世界",
   est: "25分",
+  goal: "Mojo には class 継承が（ほぼ）無く、代わりに trait で型間の共通インターフェースを定義することを理解する。trait の宣言・実装、ジェネリック関数への型パラメータ制約の付け方、そして標準ライブラリが提供する組み込み trait の一覧を押さえ、多態を必要とするコードを trait ベースで設計できるようになるのがゴール。",
   sections: [{
     title: "traitとは",
-    body: "継承の代わりに「型が持つべきメソッド仕様」を定義。",
+    body: "trait は「この型はこれらのメソッドを実装していなければならない」という契約を定義します。Rust の trait、Swift の protocol、Java の interface に相当する概念で、Python で言えば abc.ABCMeta / Protocol のイメージです。\n\n継承によって実装を引き継ぐ Python の class とは違って、trait は「仕様だけ」を表します。実装は各 struct が個別に書きます。「is-a の階層」を作る代わりに「has-capability の集合」として型を扱う、というのがポイントです。",
     table: T.traitAbc,
     code: `trait Shape:
     fn area(self) -> Float64: ...
@@ -961,75 +999,93 @@ struct Circle(Shape):
     var radius: Float64
     def __init__(out self, r: Float64): self.radius = r
     fn area(self) -> Float64:
-        return 3.14159 * self.radius * self.radius`
+        return 3.14159 * self.radius * self.radius`,
+    afterCode: "ポイント: struct Circle(Shape) と書くことで「Circle は Shape を実装する」と宣言しています。area を実装し忘れるとコンパイル時点でエラーになります。"
   }, {
     title: "ジェネリック関数",
+    body: "trait を使うと「型は何でも良いが、この trait を実装していること」という制約付きのジェネリック関数が書けます。fn print_info[T: Describable](item: T) の [T: Describable] がその制約です。\n\n静的ディスパッチなので呼び出しコストはゼロに近く、C++ のテンプレートや Rust のジェネリクスと同じ発想です。Python の duck typing（「とにかく .describe() が呼べれば動く」）の静的版と思うとイメージしやすいでしょう。",
     code: `fn print_info[T: Describable](item: T):
     print(item.describe())
-# T はDescribableを実装する任意の型`
+# T はDescribableを実装する任意の型`,
+    afterCode: "ポイント: 複数制約を付けたい場合は [T: Describable & Copyable] のように & で繋ぎます。制約が多いほど関数内でできることが増えます。"
   }, {
     title: "組み込みトレイト",
+    body: "標準ライブラリには頻出の trait があらかじめ用意されています。Copyable / Movable / Stringable / EqualityComparable / Hashable などで、名前の通りそのまま「コピーできる型」「文字列化できる型」といった制約として使えます。\n\n自分の struct にこれらを実装しておくと、コレクション（List など）に入れたり print したりが自然にできるようになります。",
     table: T.traits
   }]
 }, {
   id: "ch7",
   num: 7,
   title: "所有権とメモリ管理",
-  est: "20min",
+  est: "20分",
+  goal: "Mojo の所有権モデル（Rust 由来）を理解し、「値には必ず一人の所有者がいる」「所有者がスコープを抜けたら自動で破棄される」という基本を内面化する。ムーブ演算子 ^ とデストラクタ __del__ を書けるようになり、GC レスでもメモリリークせず安全に扱えるコードを書けるのがゴール。",
   sections: [{
     title: "所有権の3ルール",
-    body: "1. 値の所有者は1つだけ\n2. 所有者のスコープ終了で自動破棄\n3. 参照がある間は寿命延長"
+    body: "Python は GC（ガベージコレクタ）が不要になったオブジェクトを回収してくれますが、Mojo は GC を持ちません。代わりに「所有権」という概念でメモリの生死を静的に管理します。ルールは 3 つだけです:\n\n1. 値の所有者は 1 つだけ\n2. 所有者のスコープ終了で自動破棄（__del__ が呼ばれる）\n3. 参照がある間は寿命が延長される（借用）\n\nこれにより、GC のポーズ無しで、しかも C のように手動 free する必要もなく、安全かつ高速なメモリ管理が実現されます。Rust の所有権モデルとほぼ同じ考え方です。",
+    afterTable: "メリット: GC のオーバーヘッドがなく、リアルタイム性が必要な用途（ゲーム・組み込み・GPU カーネル）でも使えます。"
   }, {
     title: "ムーブ演算子 ^",
+    body: "変数の所有権を別の変数に明示的に移したいときは ^ を使います。var b = a^ と書くと「a の所有権を b に移す」という意味で、これ以降 a は使用禁止になります（使うとコンパイルエラー）。\n\nPython にはこの概念が無く、var b = a は普通の代入（参照コピー）です。Mojo で ^ を使う主な場面は「大きな構造体を関数に渡したいがコピーコストを避けたい」「リソースを別の所有者に明け渡したい」といったケースです。",
     code: `def main():
     var a = String("data")
     var b = a^      # 所有権移動
     print(b)        # ✅
-    # print(a)      # ❌ エラー`
+    # print(a)      # ❌ エラー`,
+    afterCode: "ポイント: コピー可能な型（@value などが付いている型）なら ^ を使わずに var b = a と書けばコピーが走って両方使えます。用途に応じて使い分けてください。"
   }, {
     title: "デストラクタ __del__",
+    body: "所有者がスコープを抜けた瞬間、自動的に __del__ メソッドが呼ばれます。ここに「リソースの解放処理」を書くのが定石で、ファイルクローズ・ソケット切断・メモリ解放・ロックの解放などを入れます。Python の with 文 / RAII に相当する仕組みです。\n\n自分で __del__ を書かなければ、フィールドが自動的に破棄される（再帰的に __del__ が呼ばれる）だけの単純な挙動です。明示的に書くのはリソースを持っている型に限られます。",
     code: `struct Conn:
     var host: String
     def __init__(out self, h: String):
         self.host = h; print("接続:", h)
     fn __del__(owned self):
-        print("切断:", self.host)`
+        print("切断:", self.host)`,
+    afterCode: "ポイント: __del__ の self は owned（所有権を受け取る）規約です。破棄する瞬間の処理なので、自然とそうなります。"
   }]
 }, {
   id: "ch8",
   num: 8,
   title: "Python連携",
   est: "15分",
+  goal: "Mojo から既存の Python エコシステム（numpy, pandas, pytorch など）をそのまま呼び出せることを理解する。PythonObject 型と Mojo の静的型との境目で何が起きているのかを把握し、連携時のパフォーマンス特性まで意識できる状態を目指す。",
   sections: [{
     title: "Pythonライブラリを使う",
+    body: "Mojo の強みの 1 つは、既存の Python ライブラリをほぼそのまま使えることです。numpy / pandas / matplotlib / pytorch などをインポートして、Python で書いたときと同じ API で呼び出せます。\n\n仕組みとしては、Mojo ランタイムが Python インタプリタを内部で起動し、Python オブジェクトと Mojo オブジェクトの間でやりとりしています。そのため純粋な Mojo 型の処理よりはオーバーヘッドがありますが、「既存資産を活かしながら、ホットスポットだけ Mojo に書き換える」というインクリメンタルな移行が可能です。",
     code: `from python import Python
 def main():
     var np = Python.import_module("numpy")
     var arr = np.array([1, 2, 3])
-    print(arr.mean())`
+    print(arr.mean())`,
+    afterCode: "ポイント: Python.import_module() は Python 側の import numpy と等価です。事前に pip install で Python 側のパッケージを入れておく必要があります。"
   }, {
     title: "PythonObject型",
+    body: "Python から返ってきた値はすべて PythonObject 型になります。これは Python の「何でも入る動的な型」を Mojo 側で表す特別な型で、演算子や属性アクセスは Python 側に透過的に転送されます。\n\nただし Mojo の静的な型（Float64 や Int）と混ぜて使うには明示的な変換が必要です。これは「Python のどの型から来たか」をコンパイラが追いきれないためで、意図しない暗黙変換を防ぐ安全装置として機能します。",
     code: `from python import Python, PythonObject
 def main():
     var np = Python.import_module("numpy")
     var py_v: PythonObject = np.float64(3.14)
-    var mojo_v: Float64 = Float64(py_v)  # 明示変換`
+    var mojo_v: Float64 = Float64(py_v)  # 明示変換`,
+    afterCode: "ポイント: 連携の境目ではオーバーヘッドが発生するので、タイトなループの中で毎回 Python に行って戻ってを繰り返すと遅くなります。Python 側でまとめて計算してから結果だけ Mojo に戻す、という設計が定石です。"
   }]
 }, {
   id: "ch9",
   num: 9,
   title: "SIMD — 高速数値計算",
-  est: "20min",
+  est: "20分",
+  goal: "Mojo が「Python のような見た目で C++ 級の速度が出る」最大の理由である SIMD を理解する。1 命令で複数要素を同時処理する仕組みを体感し、SIMD[DType.float32, 4] のような型を書けるようになること、そして Mojo の Int / Float64 が実は裏で SIMD で実装されていることを知るのがゴール。",
   sections: [{
     title: "SIMDとは",
-    body: "1命令で複数データを同時処理するCPU機能。Int, Float64 も内部的には SIMD[DType,1]。",
+    body: "SIMD（Single Instruction Multiple Data）は、CPU が持つ「1 命令で複数の値をまとめて処理する」機能です。たとえば 4 つの float32 を 1 回の加算命令で同時に足し算できるため、スカラー処理の約 4 倍（実測ではもう少し低い）の速度が出ます。\n\n驚くべきことに、Mojo の Int や Float64 は裏側では SIMD[DType.int64, 1] / SIMD[DType.float64, 1] という「要素数 1 の SIMD」として定義されています。つまり Mojo の数値型は最初から SIMD を前提に設計されており、要素数を増やすだけでベクトル化が自然に行えます。",
     code: `def main():
     var a = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)
     var b = SIMD[DType.float32, 4](5.0, 6.0, 7.0, 8.0)
     print(a + b)    # [6.0, 8.0, 10.0, 12.0]
-    print(a * b)    # [5.0, 12.0, 21.0, 32.0]`
+    print(a * b)    # [5.0, 12.0, 21.0, 32.0]`,
+    afterCode: "ポイント: 要素数は CPU のベクトルレジスタ幅に合わせて 2 / 4 / 8 / 16 などを選びます。simdwidthof[DType.float32]() を使えば実行 CPU に最適な値が取れます。"
   }, {
     title: "DType一覧",
+    body: "SIMD 型は [データ型, 要素数] の 2 つのパラメータで表します。データ型には DType.int8 から DType.float64 まで様々な幅が用意されていて、精度と速度のトレードオフで選びます。\n\n数値演算の速度が本当に重要な場面（行列演算・信号処理・画像処理）では float32 や int32 を、精度が必要な場面では float64 を使うのが基本です。",
     table: T.dtypes
   }]
 }, {
@@ -1037,9 +1093,11 @@ def main():
   num: 10,
   title: "総合演習 — Python→Mojo移植",
   est: "35分",
+  goal: "ここまで学んだ全要素（型・関数・struct・trait・所有権・SIMD）を総動員して、Python コードを Mojo へ移植できることを確認する。「移植する過程でどの知識が必要だったか」を自分で説明できる状態になれば、入門コースとしては十分なゴールです。",
   sections: [{
     title: "演習の進め方",
-    body: "ここまでの全知識を使って、PythonコードをMojoに移植します。\n段階的に難しくなる3問を用意しました。\nまず自分で書いてから解答を確認してください。"
+    body: "ここまでの全知識を使って、Python コードを Mojo に移植します。段階的に難しくなる 3 問を用意しました。\n\nまずは解答を見ずに、自分で Python→Mojo の置き換えを考えてみてください。型注釈をどう付けるか、def / fn のどちらを選ぶか、self 規約はどうするか、といった判断を自分でできれば、次の「初級コース」にスムーズに進めます。うまく書けなかった箇所は、該当する章に戻って復習しましょう。",
+    afterCode: "コース完了後に習得できる状態: Mojo の基本文法を読み書きでき、Python との差分を具体例で説明でき、公式ドキュメントを読みながら小さな Mojo プログラムを書ける。"
   }]
 }];
 
@@ -1364,7 +1422,9 @@ function MojoCourse() {
       fontSize: 12.5,
       color: "#c4b5fd"
     }
-  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), /*#__PURE__*/React.createElement("div", {
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), /*#__PURE__*/React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "Mojo の言語仕様を Python との差分を軸に俯瞰します。コンパイラが何をするのか、静的型付け・struct・所有権・SIMD がなぜ速さにつながるのかを一通り触り、「次に何を学べばよいか」の地図を手に入れることがゴールです。"), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 14,
       display: "flex",
@@ -1492,7 +1552,20 @@ function MojoCourse() {
       fontSize: 12,
       color: "#6b7280"
     }
-  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : ""))), /*#__PURE__*/React.createElement("div", {
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : ""))), chapter.goal && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "🎯 この章のゴール"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
