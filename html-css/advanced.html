@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML/CSS 上級コース</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const T = {
+  renderPipeline: { h:["フェーズ","説明","パフォーマンス影響"], r:[
+    ["Style","CSSOMと要素を照合しスタイルを計算","セレクタ複雑度が影響"],
+    ["Layout","各要素のサイズと位置を計算","width/height/top変更で発生"],
+    ["Paint","ピクセルをレイヤーに描画","color/background変更で発生"],
+    ["Composite","レイヤーをGPUで合成","transform/opacityのみで済む"],
+  ], cap:"ブラウザレンダリングパイプライン" },
+  layerPromotion: { h:["プロパティ/状況","レイヤー昇格","備考"], r:[
+    ["transform: translateZ(0)","昇格","ハックとして使われてきた"],
+    ["will-change: transform","昇格（推奨）","使いすぎるとメモリ増加"],
+    ["position: fixed","昇格","スクロール最適化"],
+    ["opacity < 1","昇格","透過レイヤー"],
+    ["video / canvas","昇格","メディア要素は自動"],
+  ], cap:"GPUレイヤー昇格の条件" },
+  houdiniAPIs: { h:["API","用途","ブラウザ対応"], r:[
+    ["CSS.paintWorklet","カスタム背景・ボーダー描画","Chrome/Edge (2019+)"],
+    ["CSS.layoutWorklet","カスタムレイアウトアルゴリズム","Chrome (実験的)"],
+    ["AnimationWorklet","スクロール同期アニメーション","Chrome (実験的)"],
+    ["Typed OM (CSSStyleValue)","CSS値を型安全に操作","Chrome/Edge/Safari"],
+    ["CSS Properties & Values API","@propertyでカスタムプロパティ型付け","Chrome/Edge/Safari"],
+  ], cap:"CSS Houdini API一覧" },
+  cascadeLayers: { h:["概念","説明","用途"], r:[
+    ["@layer reset","最低優先度レイヤー","normalize/reset CSS"],
+    ["@layer base","基礎スタイル","タイポグラフィ・色変数"],
+    ["@layer components","コンポーネント","ボタン・カード等"],
+    ["@layer utilities","ユーティリティ","Tailwindクラス等"],
+    ["un-layered styles","最高優先度","レイヤー外は常に勝つ"],
+  ], cap:"@layer カスケード優先度（下ほど高い）" },
+  containerQuery: { h:["構文","説明","例"], r:[
+    ["container-type: inline-size","インライン方向サイズクエリ有効化","最も一般的"],
+    ["container-type: size","縦横両方のサイズクエリ","ブロックも計測"],
+    ["container-name: card","名前付きコンテナ","ネスト時の特定"],
+    ["@container (min-width: 400px)","コンテナ幅400px以上","サイズクエリ"],
+    ["@container style(--theme: dark)","カスタムプロパティ値","スタイルクエリ"],
+  ], cap:"コンテナクエリの構文" },
+  webAnimationsAPI: { h:["メソッド/プロパティ","説明","対応"], r:[
+    ["element.animate(keyframes, options)","アニメーション開始","全モダンブラウザ"],
+    ["animation.pause() / .play()","停止/再生","全モダンブラウザ"],
+    ["animation.currentTime","再生位置を取得/設定","全モダンブラウザ"],
+    ["animation.finished","Promiseで完了を待機","全モダンブラウザ"],
+    ["document.timeline","デフォルトタイムライン","全モダンブラウザ"],
+  ], cap:"Web Animations API 主要メソッド" },
+  webComponents: { h:["技術","説明","ポイント"], r:[
+    ["Custom Elements","独自HTML要素を定義","customElements.define()"],
+    ["Shadow DOM","スタイル・DOM隔離","attachShadow({mode:'open'})"],
+    ["HTML Templates","再利用可能なDOMの雛形","<template>/<slot>要素"],
+    ["Form-Associated","フォームと連携できるカスタム要素","formAssociated=true"],
+    ["CSS Parts","Shadow DOM外からスタイル指定","::part()セレクタ"],
+  ], cap:"Web Components の4つの技術" },
+  coreWebVitals: { h:["指標","説明","良い値"], r:[
+    ["LCP (Largest Contentful Paint)","最大コンテンツの描画時間","≤ 2.5s"],
+    ["CLS (Cumulative Layout Shift)","累積レイアウトシフト","≤ 0.1"],
+    ["INP (Interaction to Next Paint)","操作から次の描画までの時間","≤ 200ms"],
+    ["FCP (First Contentful Paint)","最初のコンテンツ描画","≤ 1.8s"],
+    ["TTFB (Time to First Byte)","最初のバイト受信まで","≤ 800ms"],
+  ], cap:"Core Web Vitals と目標値" },
+  cssInJS: { h:["ツール","特徴","バンドルサイズ"], r:[
+    ["CSS Modules","ビルド時クラス名スコープ","ゼロランタイム"],
+    ["Vanilla Extract","TypeScript型付きCSS・ゼロランタイム","ゼロランタイム"],
+    ["StyleX (Meta)","アトミックCSS・衝突なし","ゼロランタイム"],
+    ["Lightning CSS","Rustベース高速トランスフォーム","ゼロランタイム（変換のみ）"],
+    ["PostCSS","プラグインでCSS変換","ゼロランタイム"],
+  ], cap:"CSS in JS / CSS ツール比較" },
+};
+
+const EX = {
+ch1:[
+  {diff:1,q:"will-changeを使ってスムーズなtransformアニメーションを実現し、レイヤー昇格のメリット・デメリットをコメントで説明するCSSを書け。",
+  code:`/* will-change を活用するCSS */
+.card {
+  /* ここに書く */
+}
+.card:hover {
+  transform: translateY(-4px);
+}`,
+  answer:`/* will-change: GPUレイヤーを事前に確保し、transform変更時のPaintをスキップ */
+.card {
+  will-change: transform;
+  /* メリット: hover時のアニメーションがCompositeのみで完結し滑らか */
+  /* デメリット: 常にGPUメモリを消費。多用するとメモリ不足の原因になる */
+  transition: transform 0.2s ease;
+}
+.card:hover {
+  transform: translateY(-4px);
+}
+/* ホバー時のみ昇格させる方が理想的な場合はJSで動的に付与 */`},
+  {diff:2,q:"PerformanceObserverでLCPとCLSを観測してコンソールに出力するJavaScriptを書け。",
+  code:`// PerformanceObserver でCore Web Vitalsを観測
+// LCP と CLS を出力するコードを書け`,
+  answer:`// LCP観測
+new PerformanceObserver((list) => {
+  const entries = list.getEntries();
+  const lcp = entries[entries.length - 1];
+  console.log('LCP:', lcp.startTime.toFixed(0), 'ms', lcp.element);
+}).observe({ type: 'largest-contentful-paint', buffered: true });
+
+// CLS観測
+let clsScore = 0;
+new PerformanceObserver((list) => {
+  for (const entry of list.getEntries()) {
+    if (!entry.hadRecentInput) clsScore += entry.value;
+  }
+  console.log('CLS:', clsScore.toFixed(4));
+}).observe({ type: 'layout-shift', buffered: true });`},
+],
+ch2:[
+  {diff:2,q:"CSS Houdini Paint APIを使って市松模様を描くPaintWorkletを書け。CSS.paintWorklet.addModuleで登録し、background: paint(checkerboard)で使用する想定。",
+  code:`// checkerboard.js (Worklet内で実行)
+registerPaint('checkerboard', class {
+  // paint メソッドを実装
+});`,
+  answer:`// checkerboard.js
+registerPaint('checkerboard', class {
+  static get inputProperties() { return ['--checker-size', '--checker-color']; }
+
+  paint(ctx, geom, props) {
+    const size = parseInt(props.get('--checker-size')) || 20;
+    const color = props.get('--checker-color').toString().trim() || '#6366f1';
+
+    for (let y = 0; y < geom.height; y += size) {
+      for (let x = 0; x < geom.width; x += size) {
+        ctx.fillStyle = ((x / size + y / size) % 2 === 0) ? color : 'transparent';
+        ctx.fillRect(x, y, size, size);
+      }
+    }
+  }
+});
+
+// メインスレッド側:
+// CSS.paintWorklet.addModule('checkerboard.js');
+// .element { background: paint(checkerboard); --checker-size: 30; }`},
+  {diff:1,q:"CSS Properties & Values API（@property）を使ってアニメーション可能なカスタムプロパティ--hue-rotateを定義し、グラデーションをアニメーションさせるCSSを書け。",
+  code:`/* @property でカスタムプロパティを型付けし
+   グラデーションをtransitionでアニメーション */`,
+  answer:`@property --hue-rotate {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.gradient-box {
+  background: linear-gradient(
+    var(--hue-rotate),
+    #6366f1, #8b5cf6, #ec4899
+  );
+  transition: --hue-rotate 0.6s ease;
+  padding: 2rem;
+  border-radius: 12px;
+}
+
+.gradient-box:hover {
+  --hue-rotate: 180deg;
+}
+/* @propertyなしではグラデーションのtransitionは動作しない */`},
+],
+ch3:[
+  {diff:1,q:"@layerを使ってreset・base・components・utilitiesの4層を定義し、コンポーネントのbuttonスタイルがutilityクラスで上書きできる構成を書け。",
+  code:`/* @layer を使ったCSS アーキテクチャ */
+/* reset, base, components, utilities の順に定義 */`,
+  answer:`/* レイヤー順序を宣言（後ろほど優先度高） */
+@layer reset, base, components, utilities;
+
+@layer reset {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  button { font: inherit; cursor: pointer; }
+}
+
+@layer base {
+  body { font-family: system-ui, sans-serif; line-height: 1.6; color: #1e1b4b; }
+  h1, h2, h3 { line-height: 1.2; }
+}
+
+@layer components {
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 1.25rem; border-radius: 8px;
+    background: #6366f1; color: #fff; border: none;
+    font-weight: 600; transition: background 0.15s;
+  }
+  .btn:hover { background: #4f46e5; }
+}
+
+@layer utilities {
+  .bg-red { background: #ef4444 !important; }
+  .text-sm { font-size: 0.875rem; }
+  .rounded-full { border-radius: 9999px; }
+}
+/* utilitiesレイヤーが最優先なので .btn.bg-red は赤くなる */`},
+  {diff:2,q:"@scopeを使って.card内のリンクだけ専用スタイルを当て、.card外のリンクに影響しない構成を書け。また:where()で詳細度ゼロのリセットを書け。",
+  code:`/* @scope と :where() の活用例 */`,
+  answer:`/* @scope: .cardの範囲内のaだけにスタイルを適用 */
+@scope (.card) {
+  a {
+    color: #6366f1;
+    text-decoration: underline dotted;
+    font-weight: 500;
+  }
+  a:hover { text-decoration: underline solid; }
+}
+
+/* :where() は詳細度ゼロ → 後から何でも上書きできるリセットに最適 */
+:where(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+:where(ul, ol) {
+  list-style: none;
+  padding: 0;
+}
+
+/* 詳細度ゼロなので .article ul { list-style: disc; } で簡単に上書き可能 */`},
+],
+ch4:[
+  {diff:1,q:"@containerクエリを使ってカードコンポーネントが狭いコンテナでは縦積み、広いコンテナでは横並びになるCSSを書け。",
+  code:`/* コンテナクエリを使ったレスポンシブカード */
+.card-wrapper {
+  /* コンテナとして登録 */
+}
+.card {
+  /* デフォルト: 縦積み */
+}
+/* 400px以上で横並び */`,
+  answer:`.card-wrapper {
+  container-type: inline-size;
+  container-name: card;
+}
+
+.card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.card__image { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; }
+
+@container card (min-width: 400px) {
+  .card {
+    grid-template-columns: 200px 1fr;
+    grid-template-rows: auto;
+  }
+  .card__image { width: 200px; aspect-ratio: 1; }
+}
+/* ビューポートではなくコンテナ幅でレイアウトが変わるのがポイント */`},
+  {diff:2,q:"CSS Subgridを使って、グリッドの親のカラム定義を子要素に継承させ、複数カードのラベルと本文を縦方向に揃えるCSSを書け。",
+  code:`/* Subgrid でカードのアイテムをグリッド軸に揃える */
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.card {
+  /* subgridを使って親のカラム定義を継承 */
+}`,
+  answer:`.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto; /* 行方向でsubgridを使う */
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* 各カードが親のrow定義を継承 */
+.card {
+  display: grid;
+  grid-row: span 3; /* label, title, body の3行 */
+  grid-template-rows: subgrid;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.card__label { font-size: 0.75rem; font-weight: 700; color: #6366f1; text-transform: uppercase; }
+.card__title { font-size: 1.125rem; font-weight: 700; }
+.card__body  { font-size: 0.9rem; color: #6b7280; }
+/* subgridにより3枚のカードのlabel/title/bodyが縦方向に自動整列される */`},
+],
+ch5:[
+  {diff:1,q:"Web Animations APIを使ってボタンをクリックした際にバウンスアニメーションを実行し、終了後にPromiseで後処理するコードを書け。",
+  code:`const btn = document.querySelector('.btn');
+btn.addEventListener('click', async () => {
+  // element.animate() でバウンスを実行
+  // animation.finished を await して後処理
+});`,
+  answer:`const btn = document.querySelector('.btn');
+btn.addEventListener('click', async () => {
+  const animation = btn.animate(
+    [
+      { transform: 'scale(1)' },
+      { transform: 'scale(0.92)' },
+      { transform: 'scale(1.08)' },
+      { transform: 'scale(1)' },
+    ],
+    { duration: 400, easing: 'ease-out', fill: 'none' }
+  );
+  await animation.finished;
+  console.log('bounce complete');
+  // 後処理: フォーム送信・ページ遷移など
+});`},
+  {diff:2,q:"Scroll-driven Animationsを使ってスクロールに連動して要素がフェードインするCSSを書け（animation-timelineとview()を使用）。",
+  code:`/* Scroll-driven Animations で要素をスクロール連動フェードイン */
+.reveal {
+  /* animation-timeline と view() を使う */
+}`,
+  answer:`.reveal {
+  animation: fade-in-up linear both;
+  animation-timeline: view();
+  /* ビューポートに入り始めてから出るまでをタイムラインに */
+  animation-range: entry 0% entry 40%;
+  /* entry 0%=要素が画面下端に差しかかった瞬間 */
+  /* entry 40%=要素の40%が見えた時点でアニメーション完了 */
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* @supports で非対応ブラウザへのフォールバック */
+@supports not (animation-timeline: view()) {
+  .reveal { opacity: 1; transform: none; }
+}`},
+],
+ch6:[
+  {diff:1,q:"Custom ElementsとShadow DOMを使ってmy-alertというウェブコンポーネントを実装せよ。typeアトリビュート（info/warning/error）に応じて色が変わる。",
+  code:`// my-alert カスタム要素
+// <my-alert type="warning">メッセージ</my-alert>
+class MyAlert extends HTMLElement {
+  // connectedCallback, Shadow DOM を実装
+}
+customElements.define('my-alert', MyAlert);`,
+  answer:`class MyAlert extends HTMLElement {
+  static observedAttributes = ['type'];
+
+  connectedCallback() { this.#render(); }
+  attributeChangedCallback() { this.#render(); }
+
+  #render() {
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    const type = this.getAttribute('type') || 'info';
+    const colors = { info: '#dbeafe', warning: '#fef9c3', error: '#fee2e2' };
+    const borderColors = { info: '#3b82f6', warning: '#eab308', error: '#ef4444' };
+    this.shadowRoot.innerHTML = \`
+      <style>
+        :host { display: block; }
+        .alert {
+          padding: 0.75rem 1rem;
+          border-left: 4px solid \${borderColors[type]};
+          background: \${colors[type]};
+          border-radius: 4px;
+          font-family: system-ui, sans-serif;
+        }
+      </style>
+      <div class="alert"><slot></slot></div>
+    \`;
+  }
+}
+customElements.define('my-alert', MyAlert);`},
+  {diff:2,q:"Form-Associated Custom ElementsでカスタムのStarRatingコンポーネントを実装せよ。フォーム送信時に選択した星の数（1〜5）が値として送信される。",
+  code:`// フォームに統合できる星評価ウィジェット
+// <star-rating name="rating"></star-rating>
+class StarRating extends HTMLElement {
+  static formAssociated = true;
+  // ここに実装
+}`,
+  answer:`class StarRating extends HTMLElement {
+  static formAssociated = true;
+  #internals; #value = 0;
+
+  constructor() {
+    super();
+    this.#internals = this.attachInternals();
+    this.attachShadow({ mode: 'open' });
+  }
+
+  connectedCallback() { this.#render(); }
+
+  #render() {
+    this.shadowRoot.innerHTML = \`
+      <style>
+        :host { display: inline-flex; gap: 4px; cursor: pointer; }
+        span { font-size: 1.5rem; color: #d1d5db; transition: color 0.1s; }
+        span.filled { color: #f59e0b; }
+      </style>
+      \${[1,2,3,4,5].map(i => \`<span data-v="\${i}" class="\${i<=this.#value?'filled':''}">★</span>\`).join('')}
+    \`;
+    this.shadowRoot.querySelectorAll('span').forEach(el => {
+      el.addEventListener('click', () => {
+        this.#value = +el.dataset.v;
+        this.#internals.setFormValue(String(this.#value));
+        this.#render();
+      });
+    });
+  }
+}
+customElements.define('star-rating', StarRating);`},
+],
+ch7:[
+  {diff:1,q:"content-visibilityとcontain-intrinsic-sizeを使ってオフスクリーンのカードリストのレンダリングをスキップし、ページのLCPを改善するCSSを書け。",
+  code:`/* content-visibility で画面外要素をスキップ */
+.card-list-item {
+  /* content-visibility と contain-intrinsic-size を設定 */
+}`,
+  answer:`.card-list-item {
+  /* auto: ビューポート外はレンダリングをスキップ、スクロール時に再レンダリング */
+  content-visibility: auto;
+
+  /* ブラウザがスキップ中でもスクロールバー位置を正確に計算するためのヒント */
+  /* 実際のカードの概算の高さを指定する */
+  contain-intrinsic-size: 0 200px;
+
+  /* contain: sizeとlayoutは自動的に適用されるが、paintは明示的に書くことで確実に */
+  /* contain: layout paint; */
+}
+
+/* フォールバック: content-visibilityが未対応のブラウザでも問題ない */
+@supports not (content-visibility: auto) {
+  .card-list-item { /* 通常のスタイルのまま */ }
+}`},
+  {diff:2,q:"PerformanceObserverでINP（Interaction to Next Paint）を計測し、200ms超のインタラクションを警告としてコンソールに出力するJavaScriptを書け。",
+  code:`// INP を PerformanceObserver で観測
+// 200ms 超のインタラクションを警告
+const observer = new PerformanceObserver((list) => {
+  // ここに書く
+});
+observer.observe({ type: 'event', buffered: true, durationThreshold: 16 });`,
+  answer:`const observer = new PerformanceObserver((list) => {
+  for (const entry of list.getEntries()) {
+    const inp = entry.duration;
+    const type = entry.name; // click, keydown 等
+
+    if (inp > 200) {
+      console.warn(\`[INP Warning] \${type}: \${inp.toFixed(0)}ms (target: ≤200ms)\`, {
+        target: entry.target,
+        startTime: entry.startTime.toFixed(0) + 'ms',
+      });
+    } else if (inp > 100) {
+      console.info(\`[INP Notice] \${type}: \${inp.toFixed(0)}ms\`);
+    }
+  }
+});
+observer.observe({ type: 'event', buffered: true, durationThreshold: 16 });
+
+// INPはページセッション中の最悪値が最終スコアになる
+// 長時間タスクをsettimeout/scheduler.postTaskで分割するのが対策の基本`},
+],
+ch8:[
+  {diff:1,q:"PostCSSプラグインを作成して、CSSファイル中のtodo:というコメントを見つけてコンソールに警告を出力するプラグインを書け。",
+  code:`// postcss-warn-todo.js
+// CSSコメント中の "todo:" を検出して警告するPostCSSプラグイン
+const plugin = (opts = {}) => {
+  return {
+    postcssPlugin: 'postcss-warn-todo',
+    // ここに実装
+  };
+};`,
+  answer:`// postcss-warn-todo.js
+const plugin = (opts = {}) => {
+  return {
+    postcssPlugin: 'postcss-warn-todo',
+    Comment(comment, { result }) {
+      if (/todo:/i.test(comment.text)) {
+        comment.warn(result, \`TODO found: "\${comment.text.trim()}"\`, {
+          word: 'todo',
+          index: 0,
+        });
+      }
+    },
+  };
+};
+plugin.postcss = true;
+module.exports = plugin;
+
+// postcss.config.js での使い方:
+// module.exports = { plugins: [require('./postcss-warn-todo')] };
+
+// 実行: npx postcss src/*.css --config .
+// ターミナルにWARNING: TODO found: "todo: ダークモード対応" が出力される`},
+  {diff:2,q:"Vanilla ExtractでButtonコンポーネントのスタイルを定義し、TypeScript型安全なvariantを実現するコードを書け。",
+  code:`// button.css.ts (Vanilla Extract)
+import { style, styleVariants } from '@vanilla-extract/css';
+
+// base, variants (primary/secondary/danger) を定義`,
+  answer:`// button.css.ts
+import { style, styleVariants } from '@vanilla-extract/css';
+
+export const base = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  padding: '0.5rem 1.25rem',
+  borderRadius: '8px',
+  border: 'none',
+  fontWeight: 600,
+  cursor: 'pointer',
+  transition: 'background 0.15s',
+  fontFamily: 'inherit',
+});
+
+export const variants = styleVariants({
+  primary: [base, {
+    background: '#6366f1',
+    color: '#fff',
+    ':hover': { background: '#4f46e5' },
+  }],
+  secondary: [base, {
+    background: '#f3f4f6',
+    color: '#1e1b4b',
+    ':hover': { background: '#e5e7eb' },
+  }],
+  danger: [base, {
+    background: '#ef4444',
+    color: '#fff',
+    ':hover': { background: '#dc2626' },
+  }],
+});
+
+// Button.tsx側:
+// import { variants } from './button.css';
+// <button className={variants[variant]}>...
+// TypeScriptが variant: 'primary'|'secondary'|'danger' を強制`},
+],
+};
+
+const chapters = [
+{id:"ch1",num:1,title:"ブラウザレンダリングエンジン",est:"65分",
+goal:"DOM/CSSOMの構築からCompositeまでのパイプラインを説明できる。Layoutを引き起こすプロパティとCompositeで完結するプロパティを区別し、パフォーマンス上の設計判断ができる。",
+sections:[
+{title:"レンダリングパイプラインの全体像",
+body:`ブラウザはHTMLを受け取ってから画面にピクセルを描くまでに、Style計算 → Layout → Paint → Compositeという4段階のパイプラインを実行します。このうちLayoutはすべての要素のサイズと位置を再計算するため最もコストが高く、width・height・top・left等のプロパティ変更で必ず発生します。Paintはcolor・background等のビジュアル変化で発生し、Compositeはtransform・opacityの変更だけで完結できます。
+
+Pythonでいえば、CSSのプロパティ変更は「どのレイヤーのキャッシュを無効化するか」の問題です。高頻度で変化するアニメーションはtransformとopacityだけで実現することで、LayoutもPaintもスキップしてCompositeだけで毎フレームを処理できます。これがCSS AnimationsとWeb Animations APIで滑らかなアニメーションを作る基本原則です。`,
+table:T.renderPipeline,
+afterTable:`Chromeの開発者ツールのPerformanceパネルでレイヤービューを確認できます。「Layers」タブを開くとGPUレイヤーとして昇格した要素が緑色で表示され、どの要素がCompositeで処理されているかを視覚的に確認できます。`},
+{title:"GPUレイヤー昇格とwill-change",
+body:`will-changeプロパティはブラウザに「この要素は近いうちに変化する」というヒントを与え、事前にGPUレイヤーとして昇格させます。これにより変化発生時のPaintコストが削減されます。以前はtransform: translateZ(0)というハックが使われていましたが、will-changeが標準的な方法です。
+
+ただし過剰なwill-changeはGPUメモリを消費し、モバイル端末ではかえってパフォーマンスが悪化します。アニメーションが始まる直前にJavaScriptでwill-changeを追加し、終了後に削除するのがベストプラクティスです。content-visibilityと組み合わせることでオフスクリーン要素のレンダリングもスキップでき、長いリストページのLCPを大幅に改善できます。`,
+table:T.layerPromotion,
+afterTable:`Chrome DevToolsでLayout Shiftを確認するには、Performanceパネルで録画後に「Experience」セクションのLayout Shiftマーカーを探します。CLSの原因となる要素が赤くハイライトされ、シフト量が表示されます。`},
+]},
+{id:"ch2",num:2,title:"CSS Houdini",est:"65分",
+goal:"CSS Houdini Paint APIでカスタム描画WorkletをCSSから呼び出せる。Typed OMでCSSStyleValueを型安全に操作できる。@propertyでアニメーション可能なカスタムプロパティを定義できる。",
+sections:[
+{title:"Paint APIとTyped OM",
+body:`CSS Houdiniはブラウザのレンダリングエンジンに直接フックするJavaScript APIの集合です。Paint APIではregisterPaint()でカスタム描画ロジックをWorkletとして登録し、CSS内でbackground: paint(myPainter)のように呼び出せます。これにより、これまでCSSだけでは実現できなかった波形・ノイズ・格子模様などの動的な背景をCSSとして定義できます。
+
+Typed OM（CSS Typed Object Model）はelement.style.widthのような文字列操作を廃止し、CSSNumericValue等の型付きオブジェクトで操作します。element.attributeStyleMap.set('width', CSS.px(100))のように書き、パース処理が不要になるためCSSプロパティ操作のパフォーマンスが向上します。`,
+table:T.houdiniAPIs,
+afterTable:`CSS Houdiniの各APIは対応ブラウザが異なります。Paint APIはChrome/Edgeで実用可能ですが、FirefoxやSafariでは未対応です。本番投入前にcaniuse.comで最新の対応状況を確認し、@supports (background: paint(test))でのフォールバック実装が必要です。`},
+{title:"@property とアニメーション可能なカスタムプロパティ",
+body:`CSS Properties & Values API（@property）を使うと、CSS変数に型・初期値・継承フラグを宣言できます。通常のCSS変数はブラウザから見れば不透明な文字列なのでアニメーションができませんが、@propertyでsyntax: '<number>'や'<color>'を宣言すると、transitionやanimationで補間できるようになります。
+
+これはグラデーションのtransition、カウンターのアニメーション、色の連続的な変化など、これまでJavaScriptを使わなければ実現できなかった表現をピュアCSSで可能にします。Pythonのtype hintに似た発想で、CSS変数に型情報を付加することで補間方法をブラウザに伝えます。`,
+code:`@property --progress {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
+.progress-ring {
+  --progress: 0;
+  background: conic-gradient(
+    #6366f1 calc(var(--progress) * 1%),
+    #e5e7eb 0
+  );
+  transition: --progress 0.6s ease;
+  width: 80px; height: 80px; border-radius: 50%;
+}
+
+.progress-ring.active { --progress: 75; }`,
+afterCode:`@propertyはChrome 85+・Safari 15.4+・Firefox 128+で対応しています。JSからCSS.registerProperty()で同等の登録もできますが、CSSで書く方が宣言的でツールのサポートも良いため@propertyを推奨します。`},
+]},
+{id:"ch3",num:3,title:"CSS Cascade Level 5",est:"55分",
+goal:"@layerでカスケード優先度をコントロールできる。@scopeで範囲スコープを定義できる。:where()で詳細度ゼロのリセット戦略を実装できる。大規模プロジェクト向けのCSS設計に@layerを活用できる。",
+sections:[
+{title:"@layer カスケードレイヤー",
+body:`@layerはCSS Cascade Level 5で追加されたカスケード制御の仕組みです。従来のCSSは詳細度（specificity）が高いセレクタが勝つという単純なルールでしたが、大規模プロジェクトでは詳細度の衝突が管理困難になります。@layerを使うと「このCSSはresetレイヤー」「このCSSはcomponentsレイヤー」と宣言でき、後に宣言したレイヤーが優先されます。
+
+Tailwind CSSのユーティリティクラスがコンポーネントスタイルに負けてしまう問題や、サードパーティCSSが自前スタイルに干渉する問題を、詳細度の泥試合なしに解決できます。@layer reset, base, components, utilitiesと先頭で宣言するだけで優先度の順序が確定し、以降どこでその層に追加しても同じ優先度になります。`,
+table:T.cascadeLayers,
+afterTable:`@layerはChrome 99+・Firefox 97+・Safari 15.4+で対応しています。古いブラウザでは@layerブロック全体が無視されるため、サポート範囲に応じて段階的な導入が可能です。既存プロジェクトへの追加は@layer legacy { /* 既存のCSS全体 */ }でラップするところから始めると安全です。`},
+{title:"@scope と :where() の活用",
+body:`@scope（CSS Cascade Level 6）はCSSの適用範囲をDOM上のサブツリーに限定できます。@scope (.card)と書くとその中のスタイルは.cardの子孫要素にのみ適用され、同名クラスが別の場所にあっても干渉しません。さらに@scope (.card) to (.card__body)のように終点を指定するドーナツスコープも可能で、入れ子コンポーネントへの意図せぬ適用を防げます。
+
+:where()は引数にセレクタを受け取りますが詳細度が常にゼロです。:is()と使い分けが重要で、リセットCSSやベーススタイルに:where()を使うと後からどんなセレクタでも上書きでき、スタイルガイドのベースレイヤーとして最適です。Pythonのsuper()のように「上書き可能な基底実装」を提供するイメージです。`,
+code:`/* :where() による詳細度ゼロリセット */
+:where(*, *::before, *::after) { box-sizing: border-box; }
+:where(body) { line-height: 1.5; }
+
+/* @scope でコンポーネント境界を強制 */
+@scope (.card) to (.card *[data-scope-boundary]) {
+  a { color: #6366f1; }
+  p  { margin-bottom: 0.75rem; }
+}
+
+/* @scope の外 → このaは影響なし */`,
+afterCode:`@scopeはChrome 118+・Safari 17.4+で対応、Firefoxは対応中です（2024年時点）。:where()は全モダンブラウザで対応済みなので先行して使えます。`},
+]},
+{id:"ch4",num:4,title:"コンテナクエリと最新レイアウト",est:"55分",
+goal:"@containerクエリでビューポートではなくコンテナ幅に応じたレイアウトを作れる。Subgridで入れ子グリッドの軸を親と揃えられる。anchor positioningで要素を相対的に配置できる。",
+sections:[
+{title:"コンテナクエリ詳解",
+body:`コンテナクエリはメディアクエリの「コンポーネント版」です。@media (min-width: 768px)はビューポート幅を見るのに対し、@container (min-width: 400px)はそのコンポーネントの親コンテナの幅を見ます。サイドバーにも本文エリアにも同じCardコンポーネントを使いつつ、幅に応じて自動的にレイアウトを変えられます。
+
+container-type: inline-sizeはインライン方向（通常は横幅）のみを計測対象にします。container-type: sizeは縦横両方を計測しますが、ブロック方向は内容物によって決まるため無限ループになるケースがあり注意が必要です。スタイルクエリ（@container style(--theme: dark)）はカスタムプロパティの値に応じてスタイルを変えられ、テーマ切り替えに活用できます。`,
+table:T.containerQuery,
+afterTable:`コンテナクエリはChrome 105+・Firefox 110+・Safari 16+で対応しており、2024年時点では実用的なブラウザサポート率になっています。スタイルクエリはChrome 111+のみ対応中です。`},
+{title:"Subgridとanchor positioning",
+body:`CSS SubgridはCSS Grid Layout Level 2で追加され、子要素が親グリッドのトラック定義を継承できます。grid-template-columns: subgridと書くと、親のgrid-template-columnsで定義したカラムラインを子要素がそのまま使えます。これにより複数のカードコンポーネントのタイトルや本文の位置をDOMを変えずに揃えることができ、Figmaのオートレイアウトに近い感覚でコーディングできます。
+
+CSS Anchor Positioning（Chrome 125+）はposition: absolute要素を特定の「アンカー要素」を基準に配置できます。anchor-name: --myBtnとanchor: --myBtnで紐付け、position-area: topなどで相対位置を指定します。ツールチップ・ドロップダウン・ポップオーバーをJavaScriptなしでスクロールに追従させて表示できる強力な機能です。`,
+code:`/* anchor positioning でツールチップ */
+.btn {
+  anchor-name: --submit-btn;
+  position: relative;
+}
+
+.tooltip {
+  position: fixed;       /* fixedにする */
+  position-anchor: --submit-btn;
+  position-area: top;    /* ボタンの上に配置 */
+  margin-bottom: 8px;
+  background: #1e1b4b; color: #fff;
+  padding: 4px 10px; border-radius: 6px;
+  font-size: 0.8rem;
+}`,
+afterCode:`anchor positioningはChrome 125+で対応（2024年）。他のブラウザへの普及はまだこれからですが、段階的に@supportsで提供することで先取りできます。JavaScriptのpopper.js/floating-uiの代替として将来性が高い機能です。`},
+]},
+{id:"ch5",num:5,title:"高度なアニメーション",est:"60分",
+goal:"Web Animations APIでアニメーションをJavaScriptから細かく制御できる。Scroll-driven Animationsでスクロール連動の表現をCSSだけで実装できる。View Transitions APIでページ遷移アニメーションを追加できる。",
+sections:[
+{title:"Web Animations APIとScroll-driven Animations",
+body:`Web Animations API（WAAPI）はCSSアニメーションと同等の機能をJavaScriptから制御できます。element.animate(keyframes, options)でアニメーションを開始し、animation.pause()・play()・reverse()・currentTimeで精密に制御できます。animation.finishedはPromiseを返すため、async/awaitでアニメーション完了後の処理を書けます。これはjQueryの.animate().done()パターンに近いですが、CSSの描画エンジンを直接使うためパフォーマンスが高いです。
+
+Scroll-driven Animationsはanimation-timelineプロパティでCSSアニメーションをスクロール位置に連動させます。view()タイムラインは要素がビューポートに入ってから出るまでをアニメーションタイムラインとして使い、animation-rangeで「入り始め10%〜入り終わり40%の間でフェードイン」のような制御ができます。従来はIntersection ObserverとJavaScriptでやっていたスクロールアニメーションがCSSだけで書けます。`,
+table:T.webAnimationsAPI,
+afterTable:`Scroll-driven AnimationsはChrome 115+・Safari 18+で対応。Firefoxは2024年末時点で実装中です。@supportsとIntersection Observerフォールバックを組み合わせたProgressiveEnhancementが推奨されます。`},
+{title:"View Transitions API",
+body:`View Transitions APIはDOM更新をまたいだアニメーションを実現します。document.startViewTransition(() => { /* DOMを更新する処理 */ })でラップするだけで、更新前後のスナップショットを撮ってクロスフェードします。::view-transition-old(root)と::view-transition-new(root)のアニメーションをCSSでカスタマイズできます。
+
+SPAのページ遷移に使えば、React RouterやNext.jsのルート変更時に滑らかなフェードやスライドを追加できます。view-transition-name: headerのように名前を付けると要素単位でモーフィングアニメーションが可能で、共有要素のアニメーション（ヒーロー画像がギャラリーから詳細ページに移動するような表現）をシンプルなCSSで実現できます。`,
+code:`// View Transitions でページ遷移
+async function navigateTo(url) {
+  if (!document.startViewTransition) {
+    // フォールバック
+    await loadPage(url);
+    return;
+  }
+  const transition = document.startViewTransition(async () => {
+    await loadPage(url);
+  });
+  await transition.finished;
+}
+
+/* CSS でクロスフェードをカスタマイズ */
+/* ::view-transition-old(root) { animation: slide-out 0.3s ease; }
+   ::view-transition-new(root) { animation: slide-in  0.3s ease; } */`,
+afterCode:`View Transitions APIはChrome 111+・Safari 18+で対応。MPAモード（通常のHTMLページ間遷移）はChrome 126+でview-transition: matchという<meta>タグで有効化できます。Next.js 14やAstro等のフレームワークが実験的サポートを提供し始めています。`},
+]},
+{id:"ch6",num:6,title:"Web Components",est:"60分",
+goal:"Custom ElementsとShadow DOMで再利用可能なカスタムHTML要素を作れる。HTMLテンプレートと<slot>でコンテンツ配信できる。Form-Associated Custom ElementsでフォームAPI（FormData）に統合された要素を作れる。",
+sections:[
+{title:"Custom ElementsとShadow DOM",
+body:`Web ComponentsはCustom Elements・Shadow DOM・HTML Templatesの3技術の総称です。customElements.define('my-button', MyButton)でHTMLに独自要素を追加でき、React/Vueコンポーネントと異なりフレームワーク非依存で動作します。Shadow DOMはattachShadow({mode:'open'})で取得し、その中のスタイルはホストページのCSSに影響せず、外のCSSも入ってきません。
+
+connectedCallback・disconnectedCallback・attributeChangedCallback・adoptedCallbackの4つのライフサイクルコールバックがあります。static observedAttributes = ['type']で監視するアトリビュートを宣言し、変化をattributeChangedCallbackで受け取ります。Pythonのデスクリプタに似た発想で、プロパティ変化をフックする仕組みです。`,
+table:T.webComponents,
+afterTable:`Shadow DOMのmode:'open'はJSからshadowRootにアクセスできます。mode:'closed'は外部からアクセスできませんが、完全な隔離にはなりません。::part()疑似要素を使うとShadow DOM外部から特定の要素にスタイルを当てることができ、カスタマイズポイントを明示的に提供できます。`},
+{title:"HTML TemplatesとForm統合",
+body:`<template>要素はDOMにレンダリングされない不活性なHTMLの雛形です。document.importNode(template.content, true)でクローンし、DOMに挿入することで再利用できます。<slot>はShadow DOM内でホスト側のコンテンツを受け取るプレースホルダで、<slot name="header">のように名前付きスロットでコンテンツ配信先を制御できます。
+
+Form-Associated Custom Elements（FACE）はHTMLInputElementに相当するフォーム統合機能をカスタム要素に提供します。static formAssociated = trueと宣言し、this.attachInternals()で取得したElementInternalsのsetFormValue()でフォーム値を設定します。FormDataに自動的に含まれ、required・disabledなどのフォーム属性も正しく動作します。`,
+code:`<!-- HTML Template の使い方 -->
+<template id="card-tpl">
+  <div class="card">
+    <slot name="title"><h2>Title</h2></slot>
+    <slot><!-- デフォルトスロット: 本文 --></slot>
+  </div>
+</template>
+
+<script>
+const tpl = document.getElementById('card-tpl');
+const clone = document.importNode(tpl.content, true);
+document.body.appendChild(clone);
+<\/script>
+
+<!-- 使用例 -->
+<my-card>
+  <h2 slot="title">見出し</h2>
+  <p>本文コンテンツはデフォルトスロットへ</p>
+</my-card>`,
+afterCode:`Web ComponentsはReact・Vue・Svelte等のフレームワークと共存できます。Litライブラリ（Google製）はWeb Componentsをシンプルに書けるマイクロフレームワークで、テンプレートリテラルベースのHTML描画とリアクティブプロパティを提供します。`},
+]},
+{id:"ch7",num:7,title:"CSSパフォーマンス計測",est:"60分",
+goal:"Core Web Vitals（LCP/CLS/INP）をPerformanceObserverで計測できる。content-visibilityとCSS containmentでレンダリングコストを削減できる。DevToolsでLayout Shiftの原因を特定して修正できる。",
+sections:[
+{title:"Core Web VitalsとPerformanceObserver",
+body:`Core Web VitalsはGoogleがページ体験の指標として定義した3つのメトリクスです。LCP（最大コンテンツ描画）は画像やテキストブロック等の最大の要素が描画されるまでの時間、CLS（累積レイアウトシフト）はページロード中に要素が意図せず動く量の累積、INP（操作から次の描画まで）はクリックやキー入力への応答速度を測ります。Googleの検索ランキングにも影響するため実務で無視できません。
+
+PerformanceObserverはこれらのメトリクスをブラウザから直接観測できるAPIです。new PerformanceObserver(callback).observe({type: 'largest-contentful-paint', buffered: true})のように登録します。buffered:trueはページロード開始時点まで遡ってエントリを取得できるオプションで、観測登録前のイベントも拾えます。実務ではweb-vitals（Google製ライブラリ）を使うと各ブラウザの差異を吸収したより正確な計測ができます。`,
+table:T.coreWebVitals,
+afterTable:`Google Search ConsoleのCore Web Vitalsレポートはフィールドデータ（実ユーザーデータ）を28日間集計します。ラボデータ（Lighthouse）と乖離がある場合は実際のネットワーク環境・デバイス性能の差異が原因です。Chrome UX Report（CrUX）APIでURLごとのフィールドデータをプログラムで取得できます。`},
+{title:"content-visibilityとCSS containment",
+body:`content-visibility: autoはビューポート外の要素のレンダリングをブラウザが自動的にスキップする機能です。長いリストページでは画面外の数千要素のStyleとLayoutを計算していましたが、content-visibilityを適用するとスクロールして見えるまで計算を遅延させます。contain-intrinsic-sizeでおおよそのサイズをヒントとして与えることで、スキップ中でもスクロールバーの位置計算が狂いません。
+
+CSS containmentのcontain: layoutは「この要素の内部レイアウトが外部に影響しない」ことを宣言し、ブラウザが部分的な再計算を可能にします。contain: paintは要素の外にはみ出したコンテンツを描画しないため、オフスクリーン要素のPaintをスキップできます。contain: strictはsize・layout・paintを一括で宣言する最強のcontainmentです。`,
+code:`/* content-visibility で長いリストを最適化 */
+.feed-item {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 320px; /* カードの概算高さ */
+}
+
+/* 画像のCLSを防ぐ: aspect-ratioでスペースを事前確保 */
+img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  /* width/heightアトリビュートがあればブラウザが自動計算 */
+}
+
+/* CSS containment: グリッドアイテムを独立させる */
+.grid-item {
+  contain: layout paint;
+}`,
+afterCode:`content-visibilityはChrome 85+・Safari 17+・Firefox 125+で対応。aspect-ratioによるCLSの防止は最も簡単で効果が高いCLS対策です。Google Fontsの読み込みによるCLSはfont-display: optionalまたはfont-display: swapで軽減できます。`},
+]},
+{id:"ch8",num:8,title:"PostCSSとCSS in JS",est:"55分",
+goal:"PostCSSプラグインをASTを操作して作成できる。CSS ModulesとVanilla ExtractでTypeScript型安全なスタイリングができる。StyleXの原則（アトミックCSS）を理解し、Lightning CSSの変換機能を活用できる。",
+sections:[
+{title:"PostCSSとLightning CSS",
+body:`PostCSSはCSSをASTに変換してプラグインで変換するNode.jsツールです。CSSのbabelに相当し、Autoprefixer・cssnano・Tailwind CSSもPostCSSプラグインとして動作しています。プラグインはRoot・Rule・Declaration・Commentなどのノードにコールバックを登録して変換します。Declaration(decl)フックでdecl.prop（プロパティ名）とdecl.value（値）を読み書きし、新しいルールはpostcss.decl()・postcss.rule()で生成します。
+
+Lightning CSS（以前はParcel CSS）はRustで実装された超高速CSSトランスフォーマーです。PostCSSより10〜100倍速く、minification・ベンダープレフィックス自動付与・CSS Modules対応・新しいCSS構文のダウンコンパイルをワンツールで行えます。Viteのデフォルト設定に組み込まれており、Next.js・Astro・Remixでも採用が進んでいます。`,
+table:T.cssInJS,
+afterTable:`PostCSSのAST操作はpostcss.parseでパース、result.rootでルートノードにアクセスします。walkDecls(callback)・walkRules(callback)・walkAtRules(callback)で再帰的にノードを走査できます。node.cloneAfter()で複製を挿入、node.remove()でノードを削除する操作が基本パターンです。`},
+{title:"CSS ModulesとVanilla Extract・StyleX",
+body:`CSS Modulesはビルド時にクラス名を一意なハッシュ（例: Card_title__abc12）に変換するCSSのスコーピング手法です。Reactでimport styles from './card.module.css'でスタイルオブジェクトを受け取り、className={styles.title}で使います。ランタイムコストはゼロで、既存のCSS知識が活かせるため入門しやすいです。
+
+Vanilla Extractは「TypeScriptで書くCSS」というアプローチで、style()・styleVariants()・globalStyle()をTypeScriptから呼び出し、ビルド時に通常のCSSファイルを生成します。ゼロランタイム・完全な型安全・変数のリファクタリング対応という利点があります。StyleX（Meta/Facebookが開発）はアトミックCSSを生成し、スタイルの重複排除と予測可能な詳細度を提供します。Next.js・Remix・Astroのような大規模アプリに向いています。`,
+code:`// Vanilla Extract の使い方
+// button.css.ts
+import { style, createVar } from '@vanilla-extract/css';
+
+export const colorVar = createVar();
+
+export const button = style({
+  vars: { [colorVar]: '#6366f1' },
+  background: colorVar,
+  color: '#fff',
+  padding: '0.5rem 1.25rem',
+  borderRadius: '8px',
+  border: 'none',
+  ':hover': { filter: 'brightness(0.9)' },
+});
+
+// Button.tsx
+// import { button } from './button.css';
+// <button className={button}>Click</button>`,
+afterCode:`CSSツールチェーンの選択は「ゼロランタイムが必要か」「TypeScript統合が必要か」「既存のCSS資産の再利用が必要か」で決まります。新規のTypeScriptプロジェクトではVanilla ExtractかStyleXが、既存のCSSベースプロジェクトの移行にはCSS Modules + Lightning CSSが向いています。`},
+]},
+];
+
+function DataTable({ data }) {
+  if (!data) return null;
+  const { h, r, cap } = data;
+  return React.createElement('div', { style:{ margin:'1.2rem 0', overflowX:'auto' } },
+    React.createElement('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'0.875rem' } },
+      React.createElement('thead', null,
+        React.createElement('tr', null, h.map((col, i) =>
+          React.createElement('th', { key:i, style:{ background:'#f3f0ff', color:'#4c1d95', padding:'8px 12px', textAlign:'left', borderBottom:'2px solid #c4b5fd', whiteSpace:'nowrap' } }, col)
+        ))
+      ),
+      React.createElement('tbody', null, r.map((row, ri) =>
+        React.createElement('tr', { key:ri, style:{ background: ri%2===0?'#faf9ff':'#fff' } },
+          row.map((cell, ci) =>
+            React.createElement('td', { key:ci, style:{ padding:'7px 12px', borderBottom:'1px solid #ede9fe', color:'#374151', fontFamily: ci===0?'JetBrains Mono, monospace':undefined } }, cell)
+          )
+        )
+      ))
+    ),
+    cap && React.createElement('p', { style:{ textAlign:'right', fontSize:'0.75rem', color:'#9ca3af', marginTop:'4px' } }, cap)
+  );
+}
+
+function CodeBlock({ code }) {
+  if (!code) return null;
+  return React.createElement('pre', {
+    style:{
+      background:'#1e1b4b', color:'#c4b5fd',
+      padding:'1.1rem 1.3rem', borderRadius:'10px',
+      fontSize:'0.82rem', lineHeight:'1.7',
+      overflowX:'auto', margin:'1rem 0',
+      fontFamily:'JetBrains Mono, monospace',
+    }
+  }, React.createElement('code', null, code));
+}
+
+function Exercise({ ex, chId }) {
+  const [open, setOpen] = useState(false);
+  const stars = '⭐'.repeat(ex.diff);
+  return React.createElement('div', {
+    style:{
+      border:'1px solid #ddd6fe', borderRadius:'10px',
+      marginBottom:'1rem', overflow:'hidden',
+    }
+  },
+    React.createElement('div', { style:{ background:'#f5f3ff', padding:'0.9rem 1.1rem' } },
+      React.createElement('div', { style:{ fontWeight:700, color:'#1e1b4b', fontSize:'0.95rem', marginBottom:'0.4rem' } },
+        React.createElement('span', { style:{ color:'#7c3aed', marginRight:'8px' } }, stars),
+        ex.q
+      ),
+      React.createElement(CodeBlock, { code: ex.code })
+    ),
+    React.createElement('button', {
+      onClick: () => setOpen(!open),
+      style:{
+        width:'100%', padding:'0.65rem 1.1rem', background:'#ede9fe',
+        border:'none', borderTop:'1px solid #ddd6fe', cursor:'pointer',
+        fontWeight:700, color:'#4c1d95', fontSize:'0.88rem', textAlign:'left',
+        display:'flex', alignItems:'center', gap:'6px',
+      }
+    }, open ? '▲ 解答を閉じる' : '▶ 解答を見る'),
+    open && React.createElement('div', { style:{ padding:'0.9rem 1.1rem', background:'#fff' } },
+      React.createElement(CodeBlock, { code: ex.answer })
+    )
+  );
+}
+
+function Section({ s }) {
+  return React.createElement('div', { style:{ marginBottom:'2rem' } },
+    React.createElement('h3', { style:{ fontSize:'1.1rem', fontWeight:700, color:'#1e1b4b', marginBottom:'0.8rem' } }, s.title),
+    React.createElement('div', {
+      style:{ color:'#374151', lineHeight:'1.85', fontSize:'0.95rem',
+              whiteSpace:'pre-wrap', marginBottom:'0.8rem' }
+    }, s.body),
+    s.table && React.createElement(DataTable, { data: s.table }),
+    s.table2 && React.createElement(DataTable, { data: s.table2 }),
+    s.code && React.createElement(CodeBlock, { code: s.code }),
+    s.afterTable && React.createElement('div', {
+      style:{ color:'#374151', lineHeight:'1.85', fontSize:'0.93rem',
+              background:'#f5f3ff', borderLeft:'3px solid #8b5cf6',
+              padding:'0.75rem 1rem', borderRadius:'0 8px 8px 0', marginTop:'0.5rem' }
+    }, s.afterTable),
+    s.afterCode && React.createElement('div', {
+      style:{ color:'#374151', lineHeight:'1.85', fontSize:'0.93rem',
+              background:'#f5f3ff', borderLeft:'3px solid #8b5cf6',
+              padding:'0.75rem 1rem', borderRadius:'0 8px 8px 0', marginTop:'0.5rem' }
+    }, s.afterCode),
+  );
+}
+
+function HTMLCSSAdvancedCourse() {
+  const [curId, setCurId] = useState(chapters[0].id);
+  const [openSecs, setOpenSecs] = useState({});
+  const cur = chapters.find(c => c.id === curId);
+  const curIdx = chapters.findIndex(c => c.id === curId);
+  const exList = EX[curId] || [];
+
+  function goChapter(id) {
+    setCurId(id);
+    setOpenSecs({});
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  function toggleSec(key) {
+    setOpenSecs(prev => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  const purple = 'linear-gradient(135deg,#6366f1,#8b5cf6,#a78bfa)';
+
+  return React.createElement('div', { style:{ background:'#faf9ff', minHeight:'100vh' } },
+    // Hero
+    React.createElement('div', { style:{ background: purple, color:'#fff', padding:'3.5rem 1.5rem 2.5rem', textAlign:'center' } },
+      React.createElement('div', { style:{ maxWidth:'800px', margin:'0 auto' } },
+        React.createElement('div', { style:{ fontSize:'0.8rem', fontWeight:700, letterSpacing:'2px', opacity:0.8, marginBottom:'0.75rem' } }, 'HTML/CSS ADVANCED COURSE'),
+        React.createElement('h1', { style:{ fontSize:'2.2rem', fontWeight:900, marginBottom:'1rem', letterSpacing:'-0.02em' } }, 'HTML/CSS 上級コース'),
+        React.createElement('p', { style:{ opacity:0.9, lineHeight:'1.8', fontSize:'1.0rem', marginBottom:'1.5rem', maxWidth:'640px', margin:'0 auto 1.5rem' } },
+          'ブラウザのレンダリングエンジン内部からCSS Houdini・Cascade Level 5・コンテナクエリ・Web Componentsまで、モダンCSSの最前線を体系的に習得します。' +
+          'パフォーマンス計測の手法からPostCSS・Vanilla ExtractによるCSS設計まで、実務で通用するフロントエンドエンジニアの知識を身につけます。'
+        ),
+        React.createElement('div', { style:{ display:'flex', gap:'1.5rem', justifyContent:'center', flexWrap:'wrap', marginTop:'1.5rem' } },
+          React.createElement('div', { style:{ textAlign:'center' } },
+            React.createElement('div', { style:{ fontSize:'1.6rem', fontWeight:900 } }, chapters.length),
+            React.createElement('div', { style:{ fontSize:'0.78rem', opacity:0.8 } }, 'チャプター')
+          ),
+          React.createElement('div', { style:{ textAlign:'center' } },
+            React.createElement('div', { style:{ fontSize:'1.6rem', fontWeight:900 } }, chapters.reduce((a,c)=>(EX[c.id]||[]).length+a,0)),
+            React.createElement('div', { style:{ fontSize:'0.78rem', opacity:0.8 } }, '演習問題')
+          ),
+          React.createElement('div', { style:{ textAlign:'center' } },
+            React.createElement('div', { style:{ fontSize:'1.6rem', fontWeight:900 } }, '上級'),
+            React.createElement('div', { style:{ fontSize:'0.78rem', opacity:0.8 } }, 'レベル')
+          ),
+        )
+      )
+    ),
+
+    // Main content
+    React.createElement('div', { style:{ maxWidth:'1100px', margin:'0 auto', padding:'2rem 1.25rem', display:'grid', gridTemplateColumns:'240px 1fr', gap:'2rem', alignItems:'start' } },
+      // Sidebar
+      React.createElement('nav', { style:{ position:'sticky', top:'72px' } },
+        React.createElement('div', { style:{ background:'#fff', borderRadius:'14px', padding:'1rem', boxShadow:'0 2px 12px rgba(99,102,241,0.08)' } },
+          React.createElement('div', { style:{ fontSize:'0.72rem', fontWeight:700, color:'#9ca3af', letterSpacing:'1.5px', marginBottom:'0.75rem', paddingLeft:'0.25rem' } }, 'チャプター一覧'),
+          chapters.map(ch =>
+            React.createElement('button', {
+              key: ch.id,
+              onClick: () => goChapter(ch.id),
+              style:{
+                width:'100%', textAlign:'left', padding:'0.6rem 0.75rem',
+                border:'none', borderRadius:'8px', cursor:'pointer',
+                background: ch.id===curId ? '#ede9fe' : 'transparent',
+                color: ch.id===curId ? '#4c1d95' : '#374151',
+                fontWeight: ch.id===curId ? 700 : 500,
+                fontSize:'0.85rem', marginBottom:'2px',
+                display:'flex', alignItems:'center', gap:'6px',
+              }
+            },
+              React.createElement('span', { style:{ color:'#a78bfa', fontSize:'0.75rem', minWidth:'20px' } }, ch.num),
+              ch.title
+            )
+          )
+        )
+      ),
+
+      // Chapter area
+      React.createElement('div', null,
+        // Chapter header
+        React.createElement('div', { style:{ background:'#fff', borderRadius:'16px', padding:'2rem', marginBottom:'1.5rem', boxShadow:'0 2px 12px rgba(99,102,241,0.08)' } },
+          React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'0.75rem' } },
+            React.createElement('span', { style:{ background:purple, color:'#fff', borderRadius:'8px', padding:'4px 12px', fontSize:'0.8rem', fontWeight:700 } }, `CH ${cur.num}`),
+            React.createElement('span', { style:{ color:'#9ca3af', fontSize:'0.85rem' } }, `推定 ${cur.est}`)
+          ),
+          React.createElement('h2', { style:{ fontSize:'1.5rem', fontWeight:800, color:'#1e1b4b', marginBottom:'1rem' } }, cur.title),
+          React.createElement('div', { style:{ background:'#f0fdf4', borderLeft:'4px solid #4ade80', padding:'0.85rem 1.1rem', borderRadius:'0 10px 10px 0' } },
+            React.createElement('div', { style:{ fontSize:'0.78rem', fontWeight:700, color:'#16a34a', marginBottom:'4px' } }, '🎯 この章のゴール'),
+            React.createElement('div', { style:{ color:'#374151', fontSize:'0.9rem', lineHeight:'1.7' } }, cur.goal)
+          )
+        ),
+
+        // Sections
+        cur.sections.map((s, si) =>
+          React.createElement('div', { key: `${cur.id}-s${si}`, style:{ background:'#fff', borderRadius:'14px', marginBottom:'1rem', overflow:'hidden', boxShadow:'0 2px 12px rgba(99,102,241,0.07)' } },
+            React.createElement('button', {
+              onClick: () => toggleSec(`${cur.id}-s${si}`),
+              style:{
+                width:'100%', textAlign:'left', padding:'1.1rem 1.5rem',
+                border:'none', background:'transparent', cursor:'pointer',
+                display:'flex', justifyContent:'space-between', alignItems:'center',
+              }
+            },
+              React.createElement('span', { style:{ fontWeight:700, color:'#1e1b4b', fontSize:'1rem' } }, s.title),
+              React.createElement('span', { style:{ color:'#8b5cf6', fontWeight:700 } }, openSecs[`${cur.id}-s${si}`] ? '▲' : '▶')
+            ),
+            openSecs[`${cur.id}-s${si}`] && React.createElement('div', { style:{ padding:'0 1.5rem 1.5rem' } },
+              React.createElement(Section, { key:`${cur.id}-s${si}`, s })
+            )
+          )
+        ),
+
+        // Exercises
+        exList.length > 0 && React.createElement('div', { style:{ background:'#fff', borderRadius:'14px', padding:'1.5rem', marginTop:'1.5rem', boxShadow:'0 2px 12px rgba(99,102,241,0.07)' } },
+          React.createElement('h3', { style:{ fontWeight:700, color:'#1e1b4b', fontSize:'1.1rem', marginBottom:'1.25rem', paddingBottom:'0.75rem', borderBottom:'2px solid #ede9fe' } }, '演習問題'),
+          exList.map((ex, i) =>
+            React.createElement(Exercise, { key:`${curId}-ex${i}`, ex, chId: curId })
+          )
+        ),
+
+        // Chapter nav
+        React.createElement('div', { style:{ display:'flex', justifyContent:'space-between', marginTop:'2rem', gap:'1rem' } },
+          curIdx > 0
+            ? React.createElement('button', {
+                onClick: () => goChapter(chapters[curIdx-1].id),
+                style:{ padding:'0.7rem 1.4rem', border:'2px solid #c4b5fd', background:'#fff', borderRadius:'10px', cursor:'pointer', color:'#4c1d95', fontWeight:700, fontSize:'0.9rem' }
+              }, `← CH${chapters[curIdx-1].num} ${chapters[curIdx-1].title}`)
+            : React.createElement('div'),
+          curIdx < chapters.length - 1
+            ? React.createElement('button', {
+                onClick: () => goChapter(chapters[curIdx+1].id),
+                style:{ padding:'0.7rem 1.4rem', border:'none', background:purple, borderRadius:'10px', cursor:'pointer', color:'#fff', fontWeight:700, fontSize:'0.9rem' }
+              }, `CH${chapters[curIdx+1].num} ${chapters[curIdx+1].title} →`)
+            : React.createElement('a', {
+                href:'../index.html',
+                style:{ padding:'0.7rem 1.4rem', border:'none', background:purple, borderRadius:'10px', cursor:'pointer', color:'#fff', fontWeight:700, fontSize:'0.9rem', textDecoration:'none', display:'inline-block' }
+              }, '🎓 コース完了 — ホームへ')
+        )
+      )
+    ),
+
+    // Footer
+    React.createElement('footer', { style:{ textAlign:'center', padding:'2rem', color:'#9ca3af', fontSize:'0.82rem', borderTop:'1px solid #e5e7eb', marginTop:'2rem' } },
+      'HTML/CSS 上級コース — 情報の基準: developer.mozilla.org ・ CSS 2024 時点'
+    )
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(HTMLCSSAdvancedCourse));
+  </script>
+</body>
+</html>
