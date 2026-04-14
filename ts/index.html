@@ -1,0 +1,2670 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeScript 入門コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのTypeScript入門コース。全10章・30問の演習付き。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  tsPyCompare: {
+    h: ["項目", "Python", "TypeScript"],
+    r: [["型チェック", "実行時（動的型付け）", "コンパイル時（静的型付け）"], ["実行環境", "CPython インタプリタ", "JavaScript ランタイム（Node.js / ブラウザ）"], ["型注釈", "任意（mypy で静的チェック可）", "必須 or 推論（コンパイラが強制）"], ["トランスパイル", "不要", "tsc で .ts → .js に変換"], ["パッケージ管理", "pip / poetry", "npm / yarn / pnpm"], ["用途", "データ分析・AI・スクリプト", "Web フロント・バックエンド・CLI"]]
+  },
+  tsconfig: {
+    h: ["オプション", "意味", "推奨値"],
+    r: [["target", "出力する JS のバージョン", "ES2022 以上"], ["module", "モジュール形式", "NodeNext / ESNext"], ["strict", "厳格モードを一括で有効化", "true"], ["outDir", "コンパイル結果の出力先", "./dist"], ["rootDir", "ソースの起点ディレクトリ", "./src"], ["esModuleInterop", "CommonJS と ESM の互換", "true"]]
+  },
+  basicTypes: {
+    h: ["TypeScript", "Python", "説明"],
+    r: [["string", "str", "文字列。ダブル / シングルクォートどちらも可。"], ["number", "int / float", "整数・浮動小数点を区別しない単一の数値型。"], ["boolean", "bool", "true / false（小文字）。"], ["null", "None", "値が存在しないことを表す。"], ["undefined", "(なし)", "変数が宣言されたが値が代入されていない状態。"], ["bigint", "int(大きい値)", "任意精度の整数。100n のようにリテラル末尾に n を付ける。"], ["symbol", "(なし)", "一意の識別子。主にオブジェクトのキーに使う。"]]
+  },
+  unionLiteral: {
+    h: ["概念", "構文例", "Python 類似"],
+    r: [["Union 型", "string | number", "Union[str, int] / str | int (3.10+)"], ["リテラル型", "\"success\" | \"error\"", "Literal[\"success\", \"error\"]"], ["any", "any", "Any — 全ての型チェックを無効化"], ["unknown", "unknown", "object — 安全な any（使用前に型チェック必須）"], ["never", "never", "NoReturn — 到達しない型"]]
+  },
+  funcCompare: {
+    h: ["機能", "Python", "TypeScript"],
+    r: [["引数型", "def f(x: int):", "function f(x: number):"], ["戻り値型", "def f() -> int:", "function f(): number"], ["デフォルト引数", "def f(x=10):", "function f(x = 10):"], ["可変長引数", "*args: int", "...args: number[]"], ["キーワード引数", "name=value", "オブジェクト分割代入で代替"], ["ラムダ", "lambda x: x*2", "(x) => x * 2"]]
+  },
+  overloadCompare: {
+    h: ["言語", "オーバーロード方法"],
+    r: [["Python", "@overload デコレータ + 実装本体"], ["TypeScript", "シグネチャ宣言を複数 + 実装本体1つ"], ["C++ / Java", "同名関数を複数定義（それぞれ本体あり）"]]
+  },
+  interfaceVsType: {
+    h: ["機能", "interface", "type"],
+    r: [["オブジェクト型定義", "可能", "可能"], ["extends（継承）", "可能", "交差型 & で代替"], ["declaration merging", "可能（同名で自動合併）", "不可（重複エラー）"], ["ユニオン型", "不可", "可能（type A = X | Y）"], ["マップ型 / 条件型", "不可", "可能"], ["クラスの implements", "可能", "可能"]]
+  },
+  utilityTypes: {
+    h: ["ユーティリティ型", "意味", "使用例"],
+    r: [["Partial<T>", "全プロパティを省略可能にする", "Partial<User>"], ["Required<T>", "全プロパティを必須にする", "Required<Config>"], ["Readonly<T>", "全プロパティを読み取り専用にする", "Readonly<State>"], ["Pick<T, K>", "指定したプロパティだけ抽出", "Pick<User, \"id\" | \"name\">"], ["Omit<T, K>", "指定したプロパティを除外", "Omit<User, \"password\">"], ["Record<K, V>", "キーと値の型を指定した辞書", "Record<string, number>"], ["ReturnType<T>", "関数の戻り値型を取得", "ReturnType<typeof fn>"], ["Parameters<T>", "関数の引数型をタプルで取得", "Parameters<typeof fn>"]]
+  },
+  mappedCond: {
+    h: ["概念", "構文", "Python 類似"],
+    r: [["Mapped Types", "{ [K in keyof T]: V }", "dict comprehension 的な型生成"], ["Conditional Types", "T extends U ? X : Y", "型レベルの三項演算子"], ["Template Literal Types", "`${A}_${B}`", "f-string 的な型生成"], ["infer", "T extends (infer U)[] ? U : never", "型レベルのパターンマッチ"]]
+  },
+  classModifiers: {
+    h: ["修飾子", "意味", "Python 類似"],
+    r: [["public", "どこからでもアクセス可（デフォルト）", "通常の属性"], ["private", "クラス内部からのみアクセス可", "_name（慣習的プライベート）"], ["protected", "クラスとサブクラスからアクセス可", "（なし）"], ["readonly", "初期化後に変更不可", "@property（setter なし）"], ["static", "インスタンスではなくクラスに属する", "@staticmethod"], ["abstract", "サブクラスで実装を強制する", "@abstractmethod"]]
+  },
+  moduleFormats: {
+    h: ["形式", "import 構文", "特徴"],
+    r: [["ESM (ES Modules)", "import { x } from './mod'", "標準仕様。静的解析可能。tree-shaking 対応。"], ["CommonJS", "const x = require('./mod')", "Node.js 従来形式。動的 require 可能。"], ["宣言ファイル (.d.ts)", "自動参照", "型情報のみ。実行コードなし。"]]
+  },
+  narrowingMethods: {
+    h: ["手法", "構文例", "判定対象"],
+    r: [["typeof", "typeof x === 'string'", "プリミティブ型（string, number, boolean 等）"], ["instanceof", "x instanceof Date", "クラスのインスタンス"], ["in 演算子", "'name' in obj", "プロパティの存在"], ["等値チェック", "x === null", "特定の値"], ["ユーザー定義型ガード", "function isX(v): v is X", "任意の条件（最も柔軟）"], ["Discriminated Union", "switch(obj.kind)", "判別プロパティ（タグ）による分岐"]]
+  },
+  strictOptions: {
+    h: ["オプション", "効果", "推奨"],
+    r: [["strict", "以下の全てを一括有効化", "true"], ["strictNullChecks", "null/undefined を厳密にチェック", "true"], ["noImplicitAny", "暗黙の any を禁止", "true"], ["strictFunctionTypes", "関数型の互換を厳密にチェック", "true"], ["strictPropertyInitialization", "クラスプロパティの初期化を強制", "true"], ["noUncheckedIndexedAccess", "配列/辞書アクセスに undefined を付加", "true（推奨）"], ["exactOptionalProperties", "optional と undefined を区別", "true（推奨）"]]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "TypeScript の開発環境を構築し、Hello World を実行してください。\nNode.js がインストール済みの前提で、tsc を使ってコンパイル・実行するまでの手順を書いてください。",
+    code: `// hello.ts に書くコード
+// ???`,
+    answer: `// hello.ts
+console.log("Hello, TypeScript!");
+
+// ターミナルで実行:
+// npx tsc hello.ts
+// node hello.js
+
+// または ts-node を使う場合:
+// npx ts-node hello.ts`
+  }, {
+    diff: 1,
+    q: "以下の Python コードを TypeScript に書き換えてください。\n変数には適切な型注釈を付けること。",
+    code: `# Python
+name = "太郎"
+age = 25
+is_student = True
+print(f"{name}は{age}歳、学生: {is_student}")`,
+    answer: `const name: string = "太郎";
+const age: number = 25;
+const isStudent: boolean = true;
+console.log(\`\${name}は\${age}歳、学生: \${isStudent}\`);`
+  }, {
+    diff: 2,
+    q: "tsconfig.json を作成し、strict モードを有効にした最小限の設定を書いてください。\ntarget は ES2022、module は NodeNext とすること。",
+    code: `// tsconfig.json の内容を書いてください`,
+    answer: `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"]
+}`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "以下の変数に適切な型注釈を付けてください。\nany は使わないこと。",
+    code: `let title = "TypeScript入門";
+let price = 2980;
+let inStock = true;
+let tags = ["技術書", "プログラミング"];
+let nothing = null;`,
+    answer: `let title: string = "TypeScript入門";
+let price: number = 2980;
+let inStock: boolean = true;
+let tags: string[] = ["技術書", "プログラミング"];
+let nothing: null = null;`
+  }, {
+    diff: 2,
+    q: "HTTPステータスを表す型を定義してください。\n・status は 200, 301, 404, 500 のいずれか（リテラル型）\n・message は string\n・ok は boolean\n関数 describeStatus を作り、ステータスに応じたメッセージを返すこと。",
+    code: `// Python なら:
+# status: Literal[200, 301, 404, 500]
+# 上記に対応するTypeScript型を定義`,
+    answer: `type HttpStatus = 200 | 301 | 404 | 500;
+
+interface StatusResponse {
+  status: HttpStatus;
+  message: string;
+  ok: boolean;
+}
+
+function describeStatus(status: HttpStatus): StatusResponse {
+  switch (status) {
+    case 200:
+      return { status, message: "OK", ok: true };
+    case 301:
+      return { status, message: "Moved Permanently", ok: false };
+    case 404:
+      return { status, message: "Not Found", ok: false };
+    case 500:
+      return { status, message: "Internal Server Error", ok: false };
+  }
+}`
+  }, {
+    diff: 3,
+    q: "any, unknown, never の違いを示すコードを書いてください。\n・any: 何でも代入でき、何にでも代入できる\n・unknown: 何でも代入できるが、使う前に型チェックが必要\n・never: 到達しない場合に使う（網羅性チェック）",
+    code: `// 3つの型の違いを実例で示してください`,
+    answer: `// any: 型チェックを完全に無効化（危険）
+let a: any = "hello";
+a = 42;              // OK
+a.toFixed();         // OK（実行時エラーの可能性）
+
+// unknown: 安全な any（使う前に型チェック必須）
+let u: unknown = "hello";
+// u.toUpperCase();  // コンパイルエラー！
+if (typeof u === "string") {
+  u.toUpperCase();   // OK（型チェック後）
+}
+
+// never: 到達不能を表す
+type Shape = "circle" | "square";
+function getArea(shape: Shape): number {
+  switch (shape) {
+    case "circle": return 3.14;
+    case "square": return 1.0;
+    default:
+      const _exhaustive: never = shape;
+      // ↑ Shape に新しい値を追加し忘れるとエラー
+      return _exhaustive;
+  }
+}`
+  }],
+  ch3: [{
+    diff: 1,
+    q: "以下の Python 関数を TypeScript に変換してください。\n引数と戻り値に型注釈を付けること。",
+    code: `# Python
+def greet(name: str, greeting: str = "こんにちは") -> str:
+    return f"{greeting}、{name}さん！"
+
+print(greet("太郎"))
+print(greet("花子", "おはよう"))`,
+    answer: `function greet(name: string, greeting: string = "こんにちは"): string {
+  return \`\${greeting}、\${name}さん！\`;
+}
+
+console.log(greet("太郎"));
+console.log(greet("花子", "おはよう"));`
+  }, {
+    diff: 2,
+    q: "ジェネリック関数 firstElement を書いてください。\n配列の最初の要素を返し、空配列なら undefined を返します。\n\n型パラメータ T を使い、戻り値型は T | undefined とすること。",
+    code: `// firstElement([1, 2, 3]) → 1
+// firstElement(["a", "b"]) → "a"
+// firstElement([]) → undefined`,
+    answer: `function firstElement<T>(arr: T[]): T | undefined {
+  return arr.length > 0 ? arr[0] : undefined;
+}
+
+console.log(firstElement([1, 2, 3]));    // 1
+console.log(firstElement(["a", "b"]));   // "a"
+console.log(firstElement([]));           // undefined`
+  }, {
+    diff: 3,
+    q: "関数オーバーロードを使って、parse 関数を定義してください。\n・string を渡すと number を返す\n・number を渡すと string を返す\n\nオーバーロードシグネチャと実装本体を両方書くこと。",
+    code: `// parse("42") → 42
+// parse(42)   → "42"`,
+    answer: `function parse(value: string): number;
+function parse(value: number): string;
+function parse(value: string | number): number | string {
+  if (typeof value === "string") {
+    return Number(value);
+  } else {
+    return String(value);
+  }
+}
+
+console.log(parse("42"));  // 42 (number)
+console.log(parse(42));    // "42" (string)`
+  }],
+  ch4: [{
+    diff: 1,
+    q: "ユーザー情報を表す interface User を定義してください。\n・id: number（必須）\n・name: string（必須）\n・email: string（省略可能）\n・readonly createdAt: Date（読み取り専用）\n\nUser 型の変数を作成して表示すること。",
+    code: `// Python だと dataclass で書くイメージ
+// @dataclass
+// class User:
+//     id: int
+//     name: str
+//     email: Optional[str] = None`,
+    answer: `interface User {
+  id: number;
+  name: string;
+  email?: string;
+  readonly createdAt: Date;
+}
+
+const user: User = {
+  id: 1,
+  name: "太郎",
+  createdAt: new Date()
+};
+
+console.log(user.name);
+// user.createdAt = new Date();  // エラー！readonly`
+  }, {
+    diff: 2,
+    q: "interface の extends を使って、以下の型階層を定義してください。\n・Animal: name, age\n・Dog extends Animal: breed（犬種）\n・ServiceDog extends Dog: certificationId（認定番号）\n\nそれぞれのオブジェクトを作成すること。",
+    code: `// 型の継承階層を作ってください`,
+    answer: `interface Animal {
+  name: string;
+  age: number;
+}
+
+interface Dog extends Animal {
+  breed: string;
+}
+
+interface ServiceDog extends Dog {
+  certificationId: string;
+}
+
+const pet: Dog = {
+  name: "ポチ",
+  age: 3,
+  breed: "柴犬"
+};
+
+const helper: ServiceDog = {
+  name: "ラブ",
+  age: 5,
+  breed: "ラブラドール",
+  certificationId: "SD-2024-001"
+};
+
+console.log(pet);
+console.log(helper);`
+  }, {
+    diff: 3,
+    q: "interface と type の両方を使い分ける場面を示してください。\n・interface: APIレスポンスの型定義（extends で拡張）\n・type: ユニオン型でステータスを表現\n両方を組み合わせた関数も書くこと。",
+    code: `// interface が得意な場面と type が得意な場面を
+// 1つのプログラムで示してください`,
+    answer: `// interface: オブジェクト型の定義と拡張に強い
+interface ApiResponse {
+  statusCode: number;
+  timestamp: string;
+}
+
+interface SuccessResponse extends ApiResponse {
+  data: unknown;
+}
+
+interface ErrorResponse extends ApiResponse {
+  error: string;
+  details?: string;
+}
+
+// type: ユニオン型やエイリアスに強い
+type Result = SuccessResponse | ErrorResponse;
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+
+function handleResult(result: Result): void {
+  if ("error" in result) {
+    console.log("エラー:", result.error);
+  } else {
+    console.log("成功:", result.data);
+  }
+}
+
+const ok: Result = {
+  statusCode: 200,
+  timestamp: new Date().toISOString(),
+  data: { id: 1 }
+};
+handleResult(ok);`
+  }],
+  ch5: [{
+    diff: 1,
+    q: "ジェネリックな Box<T> 型を定義してください。\nvalue プロパティを持ち、getValue() メソッドで値を取り出せること。",
+    code: `// const numBox = new Box(42);
+// numBox.getValue() → 42
+// const strBox = new Box("hello");
+// strBox.getValue() → "hello"`,
+    answer: `class Box<T> {
+  constructor(private value: T) {}
+
+  getValue(): T {
+    return this.value;
+  }
+
+  map<U>(fn: (v: T) => U): Box<U> {
+    return new Box(fn(this.value));
+  }
+}
+
+const numBox = new Box(42);
+console.log(numBox.getValue());  // 42
+
+const strBox = new Box("hello");
+console.log(strBox.getValue());  // "hello"
+
+const doubled = numBox.map(n => n * 2);
+console.log(doubled.getValue()); // 84`
+  }, {
+    diff: 2,
+    q: "extends による型制約を使って、オブジェクトの特定プロパティを取り出す関数 getProperty を書いてください。\nT はオブジェクト、K は T のキーに制約すること。",
+    code: `// getProperty({ name: "太郎", age: 25 }, "name") → "太郎"
+// getProperty({ name: "太郎", age: 25 }, "foo") → コンパイルエラー`,
+    answer: `function getProperty<T extends object, K extends keyof T>(
+  obj: T,
+  key: K
+): T[K] {
+  return obj[key];
+}
+
+const person = { name: "太郎", age: 25, active: true };
+
+const name = getProperty(person, "name");    // string
+const age = getProperty(person, "age");      // number
+// getProperty(person, "foo");  // コンパイルエラー！
+
+console.log(name);  // "太郎"
+console.log(age);   // 25`
+  }, {
+    diff: 3,
+    q: "以下のユーティリティ型を使い分ける関数群を書いてください。\n・Partial<T> で更新関数\n・Readonly<T> で凍結関数\n・Pick<T, K> でサマリ生成関数",
+    code: `interface Product {
+  id: number;
+  name: string;
+  price: number;
+  description: string;
+  inStock: boolean;
+}
+// 上記の型を使って3つの関数を書いてください`,
+    answer: `interface Product {
+  id: number;
+  name: string;
+  price: number;
+  description: string;
+  inStock: boolean;
+}
+
+// Partial<T>: 部分的な更新
+function updateProduct(
+  product: Product,
+  updates: Partial<Product>
+): Product {
+  return { ...product, ...updates };
+}
+
+// Readonly<T>: 変更不可にする
+function freezeProduct(product: Product): Readonly<Product> {
+  return Object.freeze(product);
+}
+
+// Pick<T, K>: 必要なプロパティだけ抽出
+type ProductSummary = Pick<Product, "id" | "name" | "price">;
+function toSummary(product: Product): ProductSummary {
+  return { id: product.id, name: product.name, price: product.price };
+}
+
+const p: Product = {
+  id: 1, name: "TypeScript本", price: 3000,
+  description: "入門書", inStock: true
+};
+const updated = updateProduct(p, { price: 2500 });
+const frozen = freezeProduct(p);
+const summary = toSummary(p);
+console.log(updated.price);    // 2500
+console.log(summary);          // { id:1, name:"TypeScript本", price:3000 }`
+  }],
+  ch6: [{
+    diff: 2,
+    q: "Mapped Type を使って、全てのプロパティを getter 関数に変換する型 Getters<T> を定義してください。\n\n例: Getters<{ name: string; age: number }>\n→ { getName: () => string; getAge: () => number }",
+    code: `// Getters<T> を定義してください
+// ヒント: Template Literal Types + Mapped Types`,
+    answer: `type Getters<T> = {
+  [K in keyof T as \`get\${Capitalize<string & K>}\`]: () => T[K];
+};
+
+interface Person {
+  name: string;
+  age: number;
+  active: boolean;
+}
+
+type PersonGetters = Getters<Person>;
+// {
+//   getName: () => string;
+//   getAge: () => number;
+//   getActive: () => boolean;
+// }
+
+const getters: PersonGetters = {
+  getName: () => "太郎",
+  getAge: () => 25,
+  getActive: () => true
+};
+console.log(getters.getName());  // "太郎"`
+  }, {
+    diff: 2,
+    q: "Conditional Type を使って、配列なら要素型を、それ以外ならそのままの型を返す Flatten<T> を定義してください。",
+    code: `// Flatten<string[]> → string
+// Flatten<number[][]> → number[]
+// Flatten<boolean> → boolean`,
+    answer: `type Flatten<T> = T extends (infer U)[] ? U : T;
+
+type A = Flatten<string[]>;     // string
+type B = Flatten<number[][]>;   // number[]
+type C = Flatten<boolean>;      // boolean
+
+// 再帰的にネストも解除する DeepFlatten
+type DeepFlatten<T> = T extends (infer U)[] ? DeepFlatten<U> : T;
+
+type D = DeepFlatten<number[][][]>;  // number
+
+// 実用例: 関数の戻り値型から Promise を剥がす
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
+
+type E = UnwrapPromise<Promise<string>>;  // string
+type F = UnwrapPromise<number>;           // number`
+  }, {
+    diff: 3,
+    q: "Template Literal Types を使って、型安全なイベントシステムの型を定義してください。\n・イベント名は \"click\" | \"hover\" | \"focus\"\n・ハンドラ名は \"onClick\" | \"onHover\" | \"onFocus\" を自動生成\n・EventHandlers 型を定義してオブジェクトを作成",
+    code: `// イベント名から自動的にハンドラ名の型を生成してください`,
+    answer: `type EventName = "click" | "hover" | "focus";
+
+// Template Literal Types でハンドラ名を自動生成
+type HandlerName<T extends string> =
+  \`on\${Capitalize<T>}\`;
+
+type EventHandlerName = HandlerName<EventName>;
+// "onClick" | "onHover" | "onFocus"
+
+// Mapped Types と組み合わせてハンドラ型を生成
+type EventHandlers = {
+  [K in EventName as HandlerName<K>]: (
+    event: { type: K; timestamp: number }
+  ) => void;
+};
+
+const handlers: EventHandlers = {
+  onClick: (e) => console.log("Click at", e.timestamp),
+  onHover: (e) => console.log("Hover at", e.timestamp),
+  onFocus: (e) => console.log("Focus at", e.timestamp),
+};
+
+handlers.onClick({ type: "click", timestamp: Date.now() });`
+  }],
+  ch7: [{
+    diff: 1,
+    q: "以下の Python クラスを TypeScript に変換してください。\npublic / private / readonly を適切に使い分けること。",
+    code: `# Python
+class BankAccount:
+    def __init__(self, owner: str, balance: float = 0):
+        self.owner = owner        # 公開
+        self._balance = balance   # 慣習的プライベート
+
+    def deposit(self, amount: float) -> None:
+        self._balance += amount
+
+    def get_balance(self) -> float:
+        return self._balance`,
+    answer: `class BankAccount {
+  public readonly owner: string;
+  private balance: number;
+
+  constructor(owner: string, balance: number = 0) {
+    this.owner = owner;
+    this.balance = balance;
+  }
+
+  deposit(amount: number): void {
+    this.balance += amount;
+  }
+
+  getBalance(): number {
+    return this.balance;
+  }
+}
+
+const account = new BankAccount("太郎", 1000);
+account.deposit(500);
+console.log(account.owner);        // "太郎"
+console.log(account.getBalance()); // 1500
+// account.balance;  // エラー！private`
+  }, {
+    diff: 2,
+    q: "abstract クラス Shape と、それを継承する Circle, Rectangle を定義してください。\n・area(): number を抽象メソッドとして宣言\n・describe(): string を共通メソッドとして実装\n・interface Drawable も定義して Circle に実装",
+    code: `// Shape (abstract)
+//   ├─ Circle (implements Drawable)
+//   └─ Rectangle`,
+    answer: `interface Drawable {
+  draw(): string;
+}
+
+abstract class Shape {
+  constructor(public readonly name: string) {}
+
+  abstract area(): number;
+
+  describe(): string {
+    return \`\${this.name}: 面積 = \${this.area().toFixed(2)}\`;
+  }
+}
+
+class Circle extends Shape implements Drawable {
+  constructor(private radius: number) {
+    super("円");
+  }
+
+  area(): number {
+    return Math.PI * this.radius ** 2;
+  }
+
+  draw(): string {
+    return \`○ (半径: \${this.radius})\`;
+  }
+}
+
+class Rectangle extends Shape {
+  constructor(
+    private width: number,
+    private height: number
+  ) {
+    super("長方形");
+  }
+
+  area(): number {
+    return this.width * this.height;
+  }
+}
+
+const c = new Circle(5);
+const r = new Rectangle(4, 6);
+console.log(c.describe());  // "円: 面積 = 78.54"
+console.log(c.draw());      // "○ (半径: 5)"
+console.log(r.describe());  // "長方形: 面積 = 24.00"`
+  }, {
+    diff: 3,
+    q: "ジェネリッククラス Repository<T> を定義してください。\n・T は { id: number } を持つ型に制約\n・findById, save, delete, getAll メソッドを実装\n・private なマップでデータを保持",
+    code: `// const repo = new Repository<User>();
+// repo.save({ id: 1, name: "太郎" });
+// repo.findById(1) → { id: 1, name: "太郎" }`,
+    answer: `interface HasId {
+  id: number;
+}
+
+class Repository<T extends HasId> {
+  private items: Map<number, T> = new Map();
+
+  save(item: T): void {
+    this.items.set(item.id, item);
+  }
+
+  findById(id: number): T | undefined {
+    return this.items.get(id);
+  }
+
+  delete(id: number): boolean {
+    return this.items.delete(id);
+  }
+
+  getAll(): T[] {
+    return Array.from(this.items.values());
+  }
+
+  count(): number {
+    return this.items.size;
+  }
+}
+
+interface User extends HasId {
+  name: string;
+  email: string;
+}
+
+const repo = new Repository<User>();
+repo.save({ id: 1, name: "太郎", email: "taro@example.com" });
+repo.save({ id: 2, name: "花子", email: "hanako@example.com" });
+console.log(repo.findById(1));  // { id:1, name:"太郎", ... }
+console.log(repo.count());     // 2`
+  }],
+  ch8: [{
+    diff: 1,
+    q: "ES Modules 形式で、math ユーティリティモジュールを作成してください。\n・add, subtract, multiply を名前付きエクスポート\n・Calculator クラスをデフォルトエクスポート\n・別ファイルからインポートして使う例も書くこと",
+    code: `// math.ts と main.ts の両方を書いてください`,
+    answer: `// ===== math.ts =====
+export function add(a: number, b: number): number {
+  return a + b;
+}
+
+export function subtract(a: number, b: number): number {
+  return a - b;
+}
+
+export function multiply(a: number, b: number): number {
+  return a * b;
+}
+
+export default class Calculator {
+  private result = 0;
+
+  add(n: number): this { this.result += n; return this; }
+  sub(n: number): this { this.result -= n; return this; }
+  getResult(): number { return this.result; }
+}
+
+// ===== main.ts =====
+import Calculator, { add, subtract } from "./math.js";
+
+console.log(add(3, 5));        // 8
+console.log(subtract(10, 4));  // 6
+
+const calc = new Calculator();
+console.log(calc.add(10).sub(3).getResult());  // 7`
+  }, {
+    diff: 2,
+    q: "サードパーティライブラリ用の型宣言ファイル (.d.ts) を書いてください。\n以下の仕様の legacy-lib というライブラリの型定義を作成すること。\n・formatDate(date: Date, pattern: string): string\n・parseCSV(text: string): string[][]\n・config オブジェクト: { debug: boolean; version: string }",
+    code: `// legacy-lib.d.ts を書いてください
+// このライブラリは JavaScript 製で型定義がない想定`,
+    answer: `// ===== legacy-lib.d.ts =====
+declare module "legacy-lib" {
+  export function formatDate(date: Date, pattern: string): string;
+  export function parseCSV(text: string): string[][];
+
+  export interface Config {
+    debug: boolean;
+    version: string;
+  }
+
+  export const config: Config;
+}
+
+// ===== 使用例 (main.ts) =====
+// import { formatDate, parseCSV, config } from "legacy-lib";
+//
+// const today = formatDate(new Date(), "YYYY-MM-DD");
+// const data = parseCSV("a,b,c\\n1,2,3");
+// console.log(config.version);`
+  }, {
+    diff: 2,
+    q: "declare を使って、グローバル変数と Window オブジェクトの拡張を型定義してください。\n・グローバル変数 APP_VERSION: string\n・Window に analytics メソッドを追加",
+    code: `// グローバル型の拡張方法を示してください`,
+    answer: `// ===== global.d.ts =====
+// グローバル変数の宣言
+declare const APP_VERSION: string;
+
+// グローバルの Window 型を拡張
+declare global {
+  interface Window {
+    analytics: {
+      track(event: string, data?: Record<string, unknown>): void;
+      identify(userId: string): void;
+    };
+  }
+}
+
+export {};  // ファイルをモジュールとして扱うため必要
+
+// ===== 使用例 =====
+// console.log(APP_VERSION);  // 型安全にアクセス
+// window.analytics.track("page_view", { path: "/" });
+// window.analytics.identify("user-123");`
+  }],
+  ch9: [{
+    diff: 1,
+    q: "typeof と instanceof を使った型ガードの関数を書いてください。\n・formatValue: string | number | Date を受け取り、\n  string → そのまま、number → toFixed(2)、Date → toISOString() を返す",
+    code: `// formatValue("hello") → "hello"
+// formatValue(3.14159) → "3.14"
+// formatValue(new Date()) → "2024-..."`,
+    answer: `function formatValue(value: string | number | Date): string {
+  if (typeof value === "string") {
+    return value;
+  } else if (typeof value === "number") {
+    return value.toFixed(2);
+  } else if (value instanceof Date) {
+    return value.toISOString();
+  }
+  // ここには到達しない（never）
+  const _: never = value;
+  return _;
+}
+
+console.log(formatValue("hello"));       // "hello"
+console.log(formatValue(3.14159));       // "3.14"
+console.log(formatValue(new Date()));    // "2024-..."`
+  }, {
+    diff: 2,
+    q: "Discriminated Union（判別可能なユニオン）を使って、図形の面積計算を実装してください。\n・Circle: kind=\"circle\", radius\n・Rectangle: kind=\"rectangle\", width, height\n・Triangle: kind=\"triangle\", base, height\n\n網羅性チェック（exhaustive check）も含めること。",
+    code: `// calculateArea(shape) で面積を返す関数を実装`,
+    answer: `interface Circle {
+  kind: "circle";
+  radius: number;
+}
+
+interface Rectangle {
+  kind: "rectangle";
+  width: number;
+  height: number;
+}
+
+interface Triangle {
+  kind: "triangle";
+  base: number;
+  height: number;
+}
+
+type Shape = Circle | Rectangle | Triangle;
+
+function calculateArea(shape: Shape): number {
+  switch (shape.kind) {
+    case "circle":
+      return Math.PI * shape.radius ** 2;
+    case "rectangle":
+      return shape.width * shape.height;
+    case "triangle":
+      return (shape.base * shape.height) / 2;
+    default:
+      // 網羅性チェック: Shape に新しい型を追加したら
+      // ここでコンパイルエラーになる
+      const _exhaustive: never = shape;
+      return _exhaustive;
+  }
+}
+
+console.log(calculateArea({ kind: "circle", radius: 5 }));
+console.log(calculateArea({ kind: "rectangle", width: 4, height: 6 }));
+console.log(calculateArea({ kind: "triangle", base: 3, height: 8 }));`
+  }, {
+    diff: 3,
+    q: "ユーザー定義型ガード（type predicate）を書いてください。\n・isString, isNonNull, isUser の3つの型ガードを定義\n・フィルタリングと組み合わせて使う例も示すこと",
+    code: `// ユーザー定義型ガードで安全にフィルタリング
+// const mixed: (string | number | null)[] = ...
+// mixed.filter(isString) → string[]`,
+    answer: `interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+// ユーザー定義型ガード
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isNonNull<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
+
+function isUser(value: unknown): value is User {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    "name" in value &&
+    "email" in value &&
+    typeof (value as User).id === "number" &&
+    typeof (value as User).name === "string"
+  );
+}
+
+// フィルタリングで使用
+const mixed: (string | number | null)[] = ["a", 1, null, "b", 2, null];
+const strings: string[] = mixed.filter(isString);
+const nonNulls = mixed.filter(isNonNull);
+
+console.log(strings);   // ["a", "b"]
+console.log(nonNulls);  // ["a", 1, "b", 2]
+
+const data: unknown[] = [
+  { id: 1, name: "太郎", email: "t@e.com" },
+  { id: 2, name: "花子" },  // email がないので User ではない
+  "not a user"
+];
+const users: User[] = data.filter(isUser);
+console.log(users);  // [{ id:1, name:"太郎", email:"t@e.com" }]`
+  }],
+  ch10: [{
+    diff: 1,
+    q: "strict: true を有効にした場合に発生する典型的なエラーを3つ示し、それぞれの修正方法を書いてください。",
+    code: `// strict: true でエラーになるコードと修正後を示してください`,
+    answer: `// 1. noImplicitAny: 暗黙の any
+// エラー: Parameter 'x' implicitly has an 'any' type.
+// function double(x) { return x * 2; }
+function double(x: number): number { return x * 2; }
+
+// 2. strictNullChecks: null チェック
+// エラー: Object is possibly 'null'.
+// const el = document.getElementById("app");
+// el.textContent = "hello";  // el は null かもしれない
+const el = document.getElementById("app");
+if (el) {
+  el.textContent = "hello";  // OK: null チェック済み
+}
+
+// 3. strictPropertyInitialization: 初期化漏れ
+// エラー: Property 'name' has no initializer
+// class User { name: string; }
+class User {
+  name: string;
+  constructor(name: string) {
+    this.name = name;  // コンストラクタで初期化
+  }
+}`
+  }, {
+    diff: 2,
+    q: "paths エイリアスを設定して、深いインポートパスを短縮する tsconfig.json を書いてください。\n・@/utils/* → src/utils/*\n・@/models/* → src/models/*\n・@/services/* → src/services/*\n\n使用例のコードも書くこと。",
+    code: `// tsconfig.json の paths 設定と使用例を書いてください`,
+    answer: `// ===== tsconfig.json =====
+// {
+//   "compilerOptions": {
+//     "target": "ES2022",
+//     "module": "NodeNext",
+//     "strict": true,
+//     "baseUrl": ".",
+//     "paths": {
+//       "@/utils/*": ["src/utils/*"],
+//       "@/models/*": ["src/models/*"],
+//       "@/services/*": ["src/services/*"]
+//     },
+//     "outDir": "./dist",
+//     "rootDir": "./src"
+//   }
+// }
+
+// ===== 使用例 =====
+// 変更前（相対パス地獄）:
+// import { formatDate } from "../../../utils/date";
+// import { User } from "../../models/user";
+
+// 変更後（paths エイリアス）:
+// import { formatDate } from "@/utils/date";
+// import { User } from "@/models/user";
+// import { AuthService } from "@/services/auth";
+
+// 注意: 実行時の解決には tsconfig-paths や
+// bundler の設定が別途必要です
+console.log("paths alias configured");`
+  }, {
+    diff: 3,
+    q: "Project References を使ったモノレポ構成の tsconfig を設計してください。\n・packages/shared: 共通ユーティリティ\n・packages/api: バックエンド（shared に依存）\n・packages/web: フロントエンド（shared に依存）\n\n各パッケージの tsconfig.json とルートの tsconfig.json を書くこと。",
+    code: `// 3つのパッケージ + ルートの tsconfig を書いてください`,
+    answer: `// ===== tsconfig.json (ルート) =====
+// {
+//   "files": [],
+//   "references": [
+//     { "path": "packages/shared" },
+//     { "path": "packages/api" },
+//     { "path": "packages/web" }
+//   ]
+// }
+
+// ===== packages/shared/tsconfig.json =====
+// {
+//   "compilerOptions": {
+//     "target": "ES2022",
+//     "module": "NodeNext",
+//     "strict": true,
+//     "composite": true,
+//     "declaration": true,
+//     "declarationMap": true,
+//     "outDir": "./dist",
+//     "rootDir": "./src"
+//   },
+//   "include": ["src/**/*"]
+// }
+
+// ===== packages/api/tsconfig.json =====
+// {
+//   "compilerOptions": {
+//     "target": "ES2022",
+//     "module": "NodeNext",
+//     "strict": true,
+//     "composite": true,
+//     "outDir": "./dist",
+//     "rootDir": "./src"
+//   },
+//   "references": [
+//     { "path": "../shared" }
+//   ],
+//   "include": ["src/**/*"]
+// }
+
+// ===== packages/web/tsconfig.json =====
+// {
+//   "compilerOptions": {
+//     "target": "ES2022",
+//     "module": "ESNext",
+//     "strict": true,
+//     "composite": true,
+//     "outDir": "./dist",
+//     "rootDir": "./src",
+//     "jsx": "react-jsx"
+//   },
+//   "references": [
+//     { "path": "../shared" }
+//   ],
+//   "include": ["src/**/*"]
+// }
+
+// ビルド: tsc --build（依存順に自動ビルド）
+// tsc -b packages/api  → shared → api の順にビルド
+console.log("Project references configured");`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "TypeScriptの位置づけと環境構築",
+  est: "30分",
+  goal: "TypeScript が JavaScript に型システムを追加したスーパーセットであることを理解し、tsc によるコンパイル、tsconfig.json による設定、ts-node による簡易実行の一連の流れを手元で動かせる状態になる。Python との開発体験の違い（インタプリタ vs トランスパイラ）を自分の言葉で説明できることを目指す。",
+  sections: [{
+    title: "TypeScriptとは何か",
+    body: "TypeScript は Microsoft が開発したプログラミング言語で、JavaScript に「静的型付け」を加えたスーパーセットです。Python で例えると、mypy を言語レベルで統合したようなものだと考えると分かりやすいでしょう。TypeScript のコードはそのまま実行できず、まず tsc（TypeScript Compiler）で JavaScript に変換（トランスパイル）してから Node.js やブラウザで実行します。\n\nPython 開発者が TypeScript を学ぶ理由は明確です。Web 開発では JavaScript が事実上の標準言語であり、React / Next.js / Express などのメジャーフレームワークは全て TypeScript 対応です。Python のようにデータ分析や機械学習には使いませんが、Web アプリケーションのフロントエンドとバックエンドを型安全に統一できるのが最大の強みです。\n\nPython は動的型付けの言語で、変数に何の型でも自由に入れられます。TypeScript は静的型付けで、変数の型がコンパイル時に確定します。この違いはバグの発見タイミングに直結します。Python では実行してみないとわからない型エラーを、TypeScript ではコードを書いている最中にエディタが指摘してくれます。",
+    table: T.tsPyCompare,
+    afterTable: "TypeScript は JavaScript の完全なスーパーセットであるため、有効な JavaScript コードは全て有効な TypeScript コードでもあります。既存の JavaScript プロジェクトに段階的に型を追加していけるのが、TypeScript の現実的な強みです。"
+  }, {
+    title: "環境構築",
+    body: "TypeScript の開発には Node.js が必要です。Node.js は JavaScript のサーバーサイド実行環境で、Python で言えば CPython に相当します。Node.js をインストールすると npm（パッケージマネージャ）も同時に入り、これが pip に相当する役割を果たします。\n\nTypeScript 本体は npm パッケージとして配布されています。グローバルにインストールすることも、プロジェクトごとにインストールすることもできますが、チーム開発ではプロジェクトごと（devDependencies）にインストールするのが標準です。Python の venv + pip install に近い感覚です。\n\nts-node というツールを使うと、.ts ファイルを直接実行できます（内部で tsc → node を自動で行う）。開発中のちょっとした確認に便利ですが、本番環境では事前にコンパイルした .js を実行するのが一般的です。",
+    code: `# Node.js インストール確認
+node --version          # v20.x.x 以上推奨
+npm --version           # 10.x.x
+
+# TypeScript をプロジェクトにインストール
+mkdir my-ts-project && cd my-ts-project
+npm init -y
+npm install --save-dev typescript ts-node @types/node
+
+# tsc のバージョン確認
+npx tsc --version       # Version 5.4.x
+
+# 最初のファイルを作成・コンパイル・実行
+echo 'console.log("Hello, TypeScript!")' > hello.ts
+npx tsc hello.ts        # hello.js が生成される
+node hello.js           # Hello, TypeScript!
+
+# ts-node で直接実行（コンパイル不要）
+npx ts-node hello.ts    # Hello, TypeScript!`,
+    afterCode: "ポイント: npx はプロジェクトローカルにインストールされたコマンドを実行するための仕組みです。Python で言えば python -m に近い役割で、グローバル汚染を避けられます。"
+  }, {
+    title: "tsconfig.json — プロジェクト設定",
+    body: "tsconfig.json は TypeScript プロジェクトの設定ファイルで、Python で言えば pyproject.toml + mypy.ini を合わせたようなものです。コンパイルターゲット（出力する JavaScript のバージョン）、モジュール形式、型チェックの厳しさなど、プロジェクト全体に影響する設定を一元管理します。\n\nもっとも重要な設定は strict: true です。これを有効にすると、暗黙の any 禁止、null チェック強制、関数パラメータの厳密な型チェックなど、複数の厳格オプションが一括で有効になります。新規プロジェクトでは必ず strict: true から始めることを強く推奨します。\n\ntsc --init コマンドで雛形を自動生成できます。生成されたファイルには全オプションがコメント付きで書かれているので、リファレンスとしても便利です。",
+    table: T.tsconfig,
+    code: `// tsconfig.json を生成
+// npx tsc --init
+
+// 最小限の tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"]
+}`,
+    afterCode: "ミニ演習: tsc --init で生成されたファイルを開き、strict を true にしてコンパイルしてみましょう。エラーが増えるはずですが、それが TypeScript の型安全性が効いている証拠です。"
+  }, {
+    title: "Hello World から始めるTypeScript",
+    body: "Python では print('Hello') と書けばすぐ動きますが、TypeScript では console.log('Hello') と書きます。console.log は JavaScript / TypeScript における標準出力で、Python の print に相当します。引数は可変長で、カンマ区切りで複数の値を渡せる点も同じです。\n\nTypeScript の変数宣言には const（再代入不可）、let（再代入可能）、var（レガシー・使用非推奨）の 3 種類があります。Python には const に相当するキーワードがないため、これは新しい概念です。基本的に const をデフォルトで使い、再代入が必要な場合だけ let を使うのが TypeScript の流儀です。\n\n型注釈は変数名の後にコロンで書きます（const name: string = \"太郎\"）。Python の型ヒント（name: str = \"太郎\"）と構文がよく似ているため、すぐに慣れるはずです。ただし Python では型ヒントは任意ですが、TypeScript では省略すると型推論が働き、推論できない場合はエラーになります。",
+    code: `// 変数宣言と型注釈
+const name: string = "太郎";     // 再代入不可
+let age: number = 25;            // 再代入可能
+// var old: string = "非推奨";   // var は使わない
+
+// 型推論: 型注釈を省略してもリテラルから推論される
+const language = "TypeScript";   // string と推論
+let count = 0;                   // number と推論
+
+// テンプレートリテラル（Python の f-string に相当）
+console.log(\`\${name}は\${age}歳です\`);
+
+// 配列
+const scores: number[] = [80, 90, 75];
+const names: string[] = ["Alice", "Bob"];
+
+// オブジェクト（Python の dict に近いが型付き）
+const user: { name: string; age: number } = {
+  name: "太郎",
+  age: 25
+};`,
+    afterCode: "ポイント: Python の f\"{}\" に相当するのがバッククォートで囲むテンプレートリテラル `${}` です。シングルクォートやダブルクォートでは変数展開されません。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "基本型と型アノテーション",
+  est: "40分",
+  goal: "TypeScript の基本型（string, number, boolean, null, undefined）を正確に理解し、Union 型・リテラル型で「取りうる値の範囲」を型レベルで表現できるようになる。any / unknown / never の 3 つの特殊型の違いを把握し、any を避けて unknown を選ぶ判断ができる状態がゴール。",
+  sections: [{
+    title: "プリミティブ型",
+    body: "TypeScript のプリミティブ型は Python と似ていますが、いくつか重要な違いがあります。最大の違いは number 型です。Python は int と float を明確に分けますが、TypeScript（JavaScript）は整数も浮動小数点数も全て number 型として扱います。内部的には全て IEEE 754 の倍精度浮動小数点数です。\n\nもう 1 つの大きな違いは null と undefined の二重構造です。Python には None だけがありますが、TypeScript では「値が意図的に存在しない（null）」と「値がまだ代入されていない（undefined）」を区別します。実務では両方を扱う必要があり、strictNullChecks を有効にすると、null / undefined の可能性がある変数を安全にチェックせずに使うとエラーになります。\n\nboolean は true / false（小文字）です。Python の True / False（大文字始まり）とは異なるので注意してください。",
+    table: T.basicTypes,
+    code: `// 基本型の宣言
+const name: string = "TypeScript";
+const version: number = 5.4;       // 整数も小数も number
+const isReady: boolean = true;
+const nothing: null = null;
+const notSet: undefined = undefined;
+const big: bigint = 9007199254740993n;  // 大きな整数
+
+// Python との比較
+// Python: x: int = 42        → 整数
+// TS:     x: number = 42     → number（整数も小数も同じ）
+
+// Python: x: float = 3.14    → 浮動小数点
+// TS:     x: number = 3.14   → number（同じ型！）
+
+// Python: x: Optional[str] = None
+// TS:     x: string | null = null;`,
+    afterCode: "ポイント: TypeScript の number は 2^53 - 1 までの整数を正確に表現できます。それを超える整数が必要な場合は bigint を使います。Python の int は任意精度なので、この制限は TypeScript 固有のものです。"
+  }, {
+    title: "配列とタプル",
+    body: "配列は Python のリストに相当しますが、TypeScript では全要素が同じ型である必要があります。Python では [1, \"hello\", True] のように異なる型を混在させられますが、TypeScript の number[] には数値しか入りません。異なる型を混ぜたい場合は後述のユニオン型やタプル型を使います。\n\n配列の型宣言は 2 通りの書き方があります。number[] と Array<number> は完全に同じ意味ですが、number[] の方が簡潔で広く使われています。ネストした配列（number[][]）や、読み取り専用配列（readonly number[]）も型レベルで表現できます。\n\nタプルは「要素数と各位置の型が固定された配列」です。Python のタプルと考え方は同じですが、TypeScript では型レベルで [string, number] のように各位置の型を指定します。関数から複数の値を返したい場合に便利です。",
+    code: `// 配列
+const scores: number[] = [80, 90, 75];
+const names: Array<string> = ["Alice", "Bob"];  // 同じ意味
+
+// 読み取り専用配列
+const frozen: readonly number[] = [1, 2, 3];
+// frozen.push(4);  // エラー！readonly
+
+// タプル: 要素ごとに型が異なる固定長配列
+const pair: [string, number] = ["太郎", 25];
+const [pName, pAge] = pair;  // 分割代入
+
+// Python との比較
+// Python: scores: list[int] = [80, 90, 75]
+// Python: pair: tuple[str, int] = ("太郎", 25)`,
+    afterCode: "ポイント: TypeScript のタプルは内部的には配列（Array）なので、push() で要素を追加できてしまいます。これはTypeScript の型システムの限界の一つで、readonly を付けることで防げます。"
+  }, {
+    title: "Union型とリテラル型",
+    body: "Union 型は「この変数には A 型か B 型のどちらかが入る」を表す仕組みで、Python 3.10 以降の str | int とほぼ同じ構文です。TypeScript では Union 型が言語設計の中核を成しており、Python よりもはるかに頻繁に使います。API レスポンスの成功 / 失敗を表現したり、関数の引数に複数の型を受け付けたりする場面で必須です。\n\nリテラル型は「特定の値そのもの」を型として扱う仕組みです。Python の Literal[\"success\", \"error\"] に相当しますが、TypeScript ではごく自然に使えます。\"success\" | \"error\" のようにリテラル型を Union で結合することで、「この引数には success か error しか渡せない」という制約を型レベルで表現できます。\n\nconst で宣言した変数はリテラル型に推論されます（const x = \"hello\" は string ではなく \"hello\" 型）。一方 let で宣言すると広い型に推論されます（let x = \"hello\" は string 型）。この違いは型の精度に影響するので、意識しておく価値があります。",
+    table: T.unionLiteral,
+    code: `// Union 型
+let id: string | number;
+id = "abc-123";  // OK
+id = 42;         // OK
+// id = true;    // エラー！
+
+// リテラル型
+type Direction = "north" | "south" | "east" | "west";
+let dir: Direction = "north";  // OK
+// dir = "up";                 // エラー！
+
+// 数値リテラル
+type DiceRoll = 1 | 2 | 3 | 4 | 5 | 6;
+const roll: DiceRoll = 3;
+
+// const vs let の型推論の違い
+const x = "hello";   // 型は "hello"（リテラル型）
+let y = "hello";     // 型は string（広い型）`,
+    afterCode: "ポイント: リテラル型と Union 型の組み合わせは、TypeScript の型システムの真髄です。Python の Enum に近い用途で使えますが、TypeScript のリテラル型はもっと軽量で柔軟です。"
+  }, {
+    title: "any, unknown, never",
+    body: "any は「型チェックを完全に無効化する」型です。Python の Any と同じで、何でも代入でき、何にでも代入でき、どんなプロパティやメソッドにもアクセスできます。便利ですが、any を使った瞬間に TypeScript の型安全性は失われます。レガシーコードの移行時以外では使うべきではありません。\n\nunknown は「安全な any」です。何でも代入できる点は any と同じですが、unknown 型の値を使うには先に型チェック（typeof や instanceof）が必要です。「型が分からないデータを受け取るが、使う前に必ず検証する」という意図を明示できるため、外部入力の受け口に最適です。\n\nnever は「到達しない」ことを表す型で、Python の NoReturn に相当します。例外を必ず投げる関数の戻り値型や、switch 文で全ケースを網羅した後の default 節で使います。never 型の値は存在し得ないため、「ここに到達したらロジックに漏れがある」というコンパイル時チェックに活用できます。",
+    code: `// any: 全てを許可（危険）
+let danger: any = "hello";
+danger = 42;
+danger.nonExistent.method();  // コンパイルは通るが実行時エラー
+
+// unknown: 安全な any（使う前にチェック必須）
+let safe: unknown = "hello";
+// safe.toUpperCase();  // エラー！型が不明
+if (typeof safe === "string") {
+  safe.toUpperCase();   // OK: string と確認済み
+}
+
+// never: 到達不能
+function throwError(msg: string): never {
+  throw new Error(msg);
+  // この後には到達しない
+}
+
+// never による網羅性チェック
+type Color = "red" | "blue" | "green";
+function colorToHex(c: Color): string {
+  switch (c) {
+    case "red":   return "#ff0000";
+    case "blue":  return "#0000ff";
+    case "green": return "#00ff00";
+    default:
+      const _: never = c;  // 全ケース網羅を保証
+      return _;
+  }
+}`,
+    afterCode: "ポイント: any → unknown への置き換えを心がけましょう。unknown は「型が分からないことを認めた上で、安全に扱う」という TypeScript の思想を体現しています。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "関数の型付け",
+  est: "40分",
+  goal: "TypeScript の関数に引数型・戻り値型を正確に付けられるようになる。アロー関数・コールバック・ジェネリック関数・オーバーロードの 4 パターンを書けるようになり、Python の def / lambda との対応関係を把握する。関数型を型エイリアスとして定義し、高階関数に適用できる状態を目指す。",
+  sections: [{
+    title: "関数宣言とアロー関数",
+    body: "TypeScript の関数は function キーワードで宣言します。Python の def に相当しますが、引数と戻り値の型注釈の書き方が異なります。Python では def f(x: int) -> int: と書きますが、TypeScript では function f(x: number): number と書きます。コロンの位置が引数の後ろ（Python）か関数名の後ろ（TypeScript）かの違いです。\n\nアロー関数（=>）は Python の lambda に相当しますが、複数行の処理も書ける点が大きく異なります。Python の lambda は式 1 つだけですが、TypeScript のアロー関数は {} で囲んで何行でも書けます。実務では function 宣言よりアロー関数の方がよく使われており、特にコールバックやイベントハンドラで頻出します。\n\nTypeScript では関数も値として扱えます（第一級関数）。Python と同じで、変数に代入したり、他の関数に引数として渡したりできます。この性質はコールバックパターンで多用されます。",
+    table: T.funcCompare,
+    code: `// function 宣言
+function add(a: number, b: number): number {
+  return a + b;
+}
+
+// アロー関数（Python の lambda の強化版）
+const multiply = (a: number, b: number): number => a * b;
+
+// 複数行のアロー関数
+const greet = (name: string): string => {
+  const greeting = \`こんにちは、\${name}さん！\`;
+  return greeting;
+};
+
+// 戻り値が void（Python の -> None に相当）
+function logMessage(msg: string): void {
+  console.log(msg);
+  // return 不要（暗黙で undefined）
+}`,
+    afterCode: "ポイント: function 宣言は巻き上げ（hoisting）されるため、定義より前に呼び出せます。アロー関数は const に代入するため巻き上げられません。Python にはこの違いはありません。"
+  }, {
+    title: "オプショナル引数とデフォルト引数",
+    body: "TypeScript のデフォルト引数は Python と同じ感覚で書けます。function f(x: number = 10) のように、引数にデフォルト値を指定できます。デフォルト値がある引数の型注釈は省略可能で、値から推論されます。\n\nオプショナル引数（? 記号）は Python にはない概念です。function f(x?: number) と書くと、x は number | undefined 型になり、呼び出し時に省略できます。デフォルト引数との違いは、オプショナル引数は undefined になりうるのに対し、デフォルト引数は必ず値が入る点です。\n\n可変長引数は ...args: number[] のように書きます。Python の *args: int に相当しますが、構文が ... である点が異なります。TypeScript では rest パラメータと呼ばれ、配列として受け取ります。",
+    code: `// デフォルト引数（Python と同じ）
+function greet(name: string, greeting: string = "こんにちは"): string {
+  return \`\${greeting}、\${name}さん！\`;
+}
+
+// オプショナル引数（TypeScript 固有）
+function createUser(name: string, age?: number): void {
+  // age は number | undefined
+  if (age !== undefined) {
+    console.log(\`\${name}: \${age}歳\`);
+  } else {
+    console.log(\`\${name}: 年齢不明\`);
+  }
+}
+createUser("太郎", 25);  // OK
+createUser("花子");       // OK（age は undefined）
+
+// 可変長引数（rest パラメータ）
+function sum(...values: number[]): number {
+  return values.reduce((acc, v) => acc + v, 0);
+}
+console.log(sum(1, 2, 3, 4, 5));  // 15`,
+    afterCode: "ポイント: Python のキーワード引数（name=value）は TypeScript にはありません。代わりにオブジェクトの分割代入パターンを使います: function f({ name, age }: { name: string; age: number }) のように書きます。"
+  }, {
+    title: "関数型とコールバック",
+    body: "TypeScript では関数の型そのものを定義できます。(a: number, b: number) => number は「number を 2 つ受け取って number を返す関数」の型です。Python の Callable[[int, int], int] に相当しますが、構文はより直感的です。\n\n関数型はコールバックパターンで頻繁に使います。配列の map / filter / reduce に渡す関数、イベントハンドラ、非同期処理のコールバックなど、JavaScript/TypeScript の世界では関数を引数に渡すのが日常です。型が付いているので、コールバックに間違った関数を渡すとコンパイル時にエラーになります。\n\n型エイリアスを使って関数型に名前を付けることもできます。type Comparator = (a: number, b: number) => number のように定義しておくと、同じ関数型を複数箇所で再利用できます。",
+    code: `// 関数型の定義
+type MathOperation = (a: number, b: number) => number;
+
+const add: MathOperation = (a, b) => a + b;
+const sub: MathOperation = (a, b) => a - b;
+
+// コールバックを受け取る関数
+function applyOperation(
+  x: number,
+  y: number,
+  op: MathOperation
+): number {
+  return op(x, y);
+}
+console.log(applyOperation(10, 3, add));  // 13
+console.log(applyOperation(10, 3, sub));  // 7
+
+// 配列メソッドでのコールバック
+const numbers = [1, 2, 3, 4, 5];
+const doubled = numbers.map((n) => n * 2);        // [2,4,6,8,10]
+const evens = numbers.filter((n) => n % 2 === 0);  // [2, 4]
+const total = numbers.reduce((acc, n) => acc + n, 0); // 15`,
+    afterCode: "ポイント: Python の map(lambda x: x*2, [1,2,3]) を TypeScript では [1,2,3].map(x => x*2) と書きます。メソッドチェーンで繋げられる点で TypeScript の方が読みやすいと感じる場面が多いでしょう。"
+  }, {
+    title: "オーバーロード",
+    body: "TypeScript のオーバーロードは Python の @overload デコレータに似ていますが、構文が異なります。TypeScript では「シグネチャ宣言」を複数書き、その後に「実装本体」を 1 つだけ書きます。実装本体のシグネチャは外部から見えず、呼び出し側はシグネチャ宣言の型だけで型チェックされます。\n\nPython のオーバーロードは型チェッカー（mypy）のみが認識するヒントですが、TypeScript のオーバーロードはコンパイラが厳密にチェックします。シグネチャ宣言と実装本体の互換性がない場合はコンパイルエラーになります。\n\nオーバーロードは強力ですが、使いすぎると可読性が下がります。多くの場合、ジェネリック関数や Union 型で代替できるため、本当に引数の型によって戻り値の型が変わる場合にだけ使うのがベストプラクティスです。",
+    table: T.overloadCompare,
+    code: `// オーバーロードシグネチャ（外部に見える型）
+function format(value: string): string;
+function format(value: number): string;
+function format(value: Date): string;
+
+// 実装本体（外部からは見えない）
+function format(value: string | number | Date): string {
+  if (typeof value === "string") {
+    return value.trim();
+  } else if (typeof value === "number") {
+    return value.toFixed(2);
+  } else {
+    return value.toISOString();
+  }
+}
+
+console.log(format("  hello  "));    // "hello"
+console.log(format(3.14159));        // "3.14"
+console.log(format(new Date()));     // "2024-..."`,
+    afterCode: "ポイント: オーバーロードの代替として、ジェネリック関数を使うケースも多いです。次章で学ぶジェネリック関数と比較して、適切な方を選べるようになりましょう。"
+  }, {
+    title: "ジェネリック関数",
+    body: "ジェネリック関数は「型をパラメータとして受け取る関数」です。Python の TypeVar を使ったジェネリック関数（def first(items: list[T]) -> T:）に相当しますが、TypeScript では <T> という構文で型パラメータを宣言します。\n\nジェネリック関数の最大の利点は「入力の型に応じて出力の型が自動的に決まる」ことです。例えば identity<T>(x: T): T は、number を渡せば number を返し、string を渡せば string を返します。any を使えば同じことは実現できますが、型情報が失われます。ジェネリック関数なら型情報を保持したまま汎用的なコードが書けます。\n\n呼び出し時に型パラメータを明示することもできます（identity<number>(42)）が、多くの場合は引数から自動推論されるため省略可能です。",
+    code: `// ジェネリック関数
+function identity<T>(value: T): T {
+  return value;
+}
+const n = identity(42);       // T = number と推論
+const s = identity("hello");  // T = string と推論
+
+// 配列の最後の要素を返す
+function last<T>(arr: T[]): T | undefined {
+  return arr.length > 0 ? arr[arr.length - 1] : undefined;
+}
+
+// 複数の型パラメータ
+function pair<A, B>(first: A, second: B): [A, B] {
+  return [first, second];
+}
+const p = pair("太郎", 25);  // [string, number]
+
+// 制約付きジェネリック（extends）
+function getLength<T extends { length: number }>(item: T): number {
+  return item.length;
+}
+getLength("hello");    // 5
+getLength([1, 2, 3]);  // 3
+// getLength(42);      // エラー！number に length はない`,
+    afterCode: "ポイント: Python の TypeVar(\"T\", bound=Sized) に相当するのが TypeScript の T extends { length: number } です。extends で型パラメータに制約を付けることで、ジェネリック関数内で安全にプロパティやメソッドにアクセスできます。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "オブジェクト型とインターフェース",
+  est: "45分",
+  goal: "TypeScript のオブジェクト型を interface と type alias の両方で定義できるようになる。optional プロパティ / readonly / extends による拡張 / Index Signature など、オブジェクト型の表現力を一通り把握する。interface vs type の使い分けを判断基準つきで説明でき、Python の dataclass / TypedDict との対応関係を理解する。",
+  sections: [{
+    title: "オブジェクト型",
+    body: "TypeScript のオブジェクトは Python の辞書（dict）に近い見た目ですが、型レベルで「どのキーがどの型の値を持つか」を定義できます。Python の TypedDict に最も近い概念です。オブジェクト型を直接書くこともできますが、通常は interface か type alias で名前を付けて定義します。\n\nオブジェクトの各プロパティには型注釈を付けます。省略可能なプロパティには ? を付け（email?: string）、変更不可のプロパティには readonly を付けます（readonly id: number）。Python の dataclass で field(default=None) や frozen=True に相当する仕組みが、TypeScript ではプロパティレベルで指定できます。\n\nIndex Signature を使うと、任意のキーを受け付ける辞書的な型も定義できます。{ [key: string]: number } は Python の dict[str, int] に相当します。",
+    code: `// インラインのオブジェクト型
+const user: { name: string; age: number } = {
+  name: "太郎",
+  age: 25
+};
+
+// optional プロパティ
+const config: {
+  host: string;
+  port: number;
+  debug?: boolean;  // 省略可能
+} = { host: "localhost", port: 3000 };
+
+// readonly
+const point: {
+  readonly x: number;
+  readonly y: number;
+} = { x: 10, y: 20 };
+// point.x = 30;  // エラー！readonly
+
+// Index Signature（辞書的な型）
+const scores: { [subject: string]: number } = {
+  math: 90,
+  english: 85
+};
+scores["science"] = 95;  // 任意のキーを追加可能`,
+    afterCode: "ポイント: TypeScript のオブジェクトは Python の辞書と違い、定義されていないプロパティにアクセスするとコンパイルエラーになります。これが型安全性の基本です。"
+  }, {
+    title: "interface",
+    body: "interface はオブジェクトの形状（shape）を定義するための構文です。Python の Protocol クラスに概念的に近く、「このオブジェクトはこれらのプロパティとメソッドを持つ」という契約を宣言します。\n\ninterface の大きな特徴は extends による継承と Declaration Merging（同名インターフェースの自動合併）です。extends を使うと既存のインターフェースを拡張した新しいインターフェースを定義できます。これは Python のクラス継承に似た感覚で使えます。Declaration Merging は同じ名前の interface を複数回宣言すると自動的にプロパティが合併される仕組みで、ライブラリの型を拡張する際に便利です。\n\n実務では API のリクエスト / レスポンスの型定義、コンポーネントの Props 定義、設定オブジェクトの型定義など、「オブジェクトの構造を宣言する」場面で広く使われます。",
+    code: `// interface の基本
+interface User {
+  id: number;
+  name: string;
+  email?: string;         // 省略可能
+  readonly createdAt: Date;  // 読み取り専用
+}
+
+// extends による継承
+interface AdminUser extends User {
+  role: "admin";
+  permissions: string[];
+}
+
+// メソッドの定義
+interface Greeter {
+  greet(name: string): string;
+}
+
+// 実装
+const admin: AdminUser = {
+  id: 1,
+  name: "管理者",
+  role: "admin",
+  permissions: ["read", "write", "delete"],
+  createdAt: new Date()
+};
+
+// Declaration Merging（同名で合併）
+interface Config {
+  host: string;
+}
+interface Config {
+  port: number;  // 自動的に上と合併される
+}
+// Config = { host: string; port: number }`,
+    afterCode: "ポイント: Declaration Merging はライブラリの型を拡張するときに便利ですが、自分のコードでは意図せず型が変わるリスクがあるため、type alias の方が安全な場合もあります。"
+  }, {
+    title: "type alias",
+    body: "type alias（型エイリアス）は任意の型に名前を付ける構文です。interface と違い、Union 型やタプル型、関数型など、あらゆる型に名前を付けられます。Python の TypeAlias に相当しますが、TypeScript の方がはるかに表現力が高いです。\n\ntype alias と interface の最大の違いは「何を表現できるか」です。interface はオブジェクト型の定義に特化しており、extends や Declaration Merging が使えます。type alias はあらゆる型に名前を付けられ、Union 型 / 交差型（&）/ Mapped Types / Conditional Types なども扱えます。\n\n実務での使い分けの指針は明確です。オブジェクトの形状を定義するなら interface、それ以外（Union 型、関数型、複雑な型操作）なら type を使います。チーム内でどちらかに統一するプロジェクトもありますが、それぞれの得意分野を理解しておくことが重要です。",
+    table: T.interfaceVsType,
+    code: `// type alias の基本
+type ID = string | number;
+type Point = { x: number; y: number };
+
+// Union 型（interface ではできない）
+type Result = "success" | "error" | "pending";
+type Response = SuccessData | ErrorData;
+
+// 交差型（interface の extends に相当）
+type WithTimestamp<T> = T & { createdAt: Date; updatedAt: Date };
+type TimestampedUser = WithTimestamp<{ name: string; age: number }>;
+
+// 関数型（type の方が自然）
+type Predicate<T> = (value: T) => boolean;
+const isPositive: Predicate<number> = (n) => n > 0;
+
+// タプル型
+type Pair<A, B> = [A, B];
+const nameAge: Pair<string, number> = ["太郎", 25];`,
+    afterCode: "ポイント: interface と type のどちらを使うかは「宗教論争」になりがちですが、TypeScript 公式は「迷ったら interface を使い、Union 型が必要なときに type を使う」と推奨しています。"
+  }, {
+    title: "構造的型付け（Structural Typing）",
+    body: "TypeScript は「構造的型付け」を採用しています。これは Python の Protocol と同じ考え方で、「必要なプロパティを持っていれば、その型として扱える」というルールです。明示的に implements や extends を書かなくても、構造が一致していれば互換性があるとみなされます。\n\nこの仕組みは Python の duck typing（「アヒルのように歩き、アヒルのように鳴くなら、それはアヒルだ」）を型レベルで実現したものです。Java や C# の「名前的型付け（Nominal Typing）」とは対照的で、interface User を implements していなくても、name と age プロパティを持つオブジェクトは User 型として扱えます。\n\n構造的型付けのおかげで、既存のオブジェクトリテラルをそのまま型付きの関数に渡せます。わざわざクラスを作ってインスタンス化する必要がないため、コードが軽量になります。",
+    code: `interface HasName {
+  name: string;
+}
+
+function greet(obj: HasName): string {
+  return \`Hello, \${obj.name}!\`;
+}
+
+// HasName を明示的に実装していなくても OK
+const user = { name: "太郎", age: 25 };
+greet(user);  // OK: name プロパティを持っている
+
+// Python の Protocol と同じ発想
+// class HasName(Protocol):
+//     name: str
+// def greet(obj: HasName) -> str: ...
+
+// 余剰プロパティチェック（直接渡す場合のみ）
+// greet({ name: "太郎", age: 25 });  // エラー！余計なプロパティ
+greet({ name: "太郎" } as HasName);   // OK`,
+    afterCode: "ポイント: オブジェクトリテラルを直接渡す場合は「余剰プロパティチェック」が働き、定義にないプロパティがあるとエラーになります。変数経由で渡す場合はチェックされません。この非対称性は TypeScript のよくある落とし穴です。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "ジェネリクス",
+  est: "50分",
+  goal: "型パラメータ <T> の宣言・制約（extends）・デフォルト型を自在に操れるようになる。ユーティリティ型（Partial / Required / Pick / Omit / Record / ReturnType など）の用途を把握し、実務でよく使うパターンをすぐに適用できる状態を目指す。",
+  sections: [{
+    title: "ジェネリクスの基本",
+    body: "ジェネリクスは「型をパラメータ化する」仕組みです。Python の TypeVar / Generic に相当しますが、TypeScript のジェネリクスは構文がシンプルで、はるかに広く使われています。Array<number>、Promise<string>、Map<string, number> など、TypeScript の標準ライブラリのほぼ全てがジェネリクスで定義されています。\n\n<T> が型パラメータで、T は慣習的に Type の頭文字ですが、任意の名前を使えます。複数の型パラメータが必要な場合は <K, V>（Key, Value）や <T, U> のように書きます。Python で TypeVar(\"T\") を宣言するのに比べて、宣言が不要で使いたい場所に直接 <T> と書けるのが TypeScript の利点です。\n\nジェネリクスは関数だけでなく、interface / type alias / class にも適用できます。「この型は特定の型に依存するが、具体的な型は使う側が決める」という設計パターンを表現するためのものです。",
+    code: `// ジェネリックな interface
+interface Box<T> {
+  value: T;
+  label: string;
+}
+
+const numBox: Box<number> = { value: 42, label: "数値" };
+const strBox: Box<string> = { value: "hello", label: "文字列" };
+
+// ジェネリックな type alias
+type Nullable<T> = T | null;
+type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E };
+
+const success: Result<number> = { ok: true, value: 42 };
+const failure: Result<number> = { ok: false, error: new Error("失敗") };
+
+// Python との比較
+// T = TypeVar("T")
+// class Box(Generic[T]):
+//     value: T
+//     label: str`,
+    afterCode: "ポイント: ジェネリクスは「コンテナ型」を定義するのに特に有用です。Box<T>、List<T>、Map<K, V> のように、中身の型をパラメータ化することで、同じロジックを様々な型で再利用できます。"
+  }, {
+    title: "型制約（extends）とデフォルト型",
+    body: "型パラメータに extends で制約を付けると、「T はこの型を満たす型でなければならない」という条件を指定できます。Python の TypeVar(\"T\", bound=SomeClass) に相当します。制約を付けることで、ジェネリック関数内で安全にプロパティやメソッドにアクセスできるようになります。\n\n制約なしの <T> だと、T がどんな型かわからないため、T に対してできる操作はほぼありません（代入と比較くらい）。T extends { length: number } と書けば、T は length プロパティを持つことが保証されるため、value.length にアクセスできます。\n\nデフォルト型パラメータ（<T = string>）も指定できます。呼び出し側が型パラメータを省略した場合に使われるデフォルトの型で、Python のジェネリクスにはない便利な機能です。",
+    code: `// extends による型制約
+function longest<T extends { length: number }>(a: T, b: T): T {
+  return a.length >= b.length ? a : b;
+}
+longest("hello", "world!");     // OK: string は length を持つ
+longest([1, 2], [1, 2, 3]);    // OK: 配列も length を持つ
+// longest(10, 20);             // エラー！number に length はない
+
+// keyof による制約
+function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+  return obj[key];
+}
+const user = { name: "太郎", age: 25 };
+getProperty(user, "name");  // string
+getProperty(user, "age");   // number
+// getProperty(user, "foo"); // エラー！
+
+// デフォルト型パラメータ
+interface ApiResponse<T = unknown> {
+  data: T;
+  status: number;
+}
+const res1: ApiResponse<string> = { data: "OK", status: 200 };
+const res2: ApiResponse = { data: null, status: 500 };  // T = unknown`,
+    afterCode: "ポイント: keyof T は「T のプロパティ名のユニオン型」を返す型演算子です。keyof { name: string; age: number } は \"name\" | \"age\" になります。Python には直接対応する概念がなく、TypeScript の型システムの強力さを実感できる機能です。"
+  }, {
+    title: "ユーティリティ型",
+    body: "TypeScript には標準で多数のユーティリティ型が用意されています。これらは既存の型を変換して新しい型を作るための「型レベルの関数」で、実務で非常によく使います。Python の typing モジュールにも Optional や Union がありますが、TypeScript のユーティリティ型はそれをはるかに超える表現力を持っています。\n\n最も頻出するのは Partial<T>（全プロパティを省略可能にする）、Required<T>（全プロパティを必須にする）、Pick<T, K>（特定のプロパティだけ抽出）、Omit<T, K>（特定のプロパティを除外）の 4 つです。これらを使うと、既存の型から派生型を簡潔に作れます。\n\nRecord<K, V> は Python の dict[K, V] に相当し、キーと値の型を指定した辞書型を作ります。ReturnType<T> は関数の戻り値型を取得し、Parameters<T> は関数の引数型をタプルで取得します。",
+    table: T.utilityTypes,
+    code: `interface User {
+  id: number;
+  name: string;
+  email: string;
+  password: string;
+}
+
+// Partial: 全プロパティを省略可能に
+type UpdateUser = Partial<User>;
+// { id?: number; name?: string; email?: string; password?: string }
+
+// Pick: 指定プロパティだけ取り出す
+type PublicUser = Pick<User, "id" | "name" | "email">;
+// { id: number; name: string; email: string }
+
+// Omit: 指定プロパティを除外
+type UserWithoutPassword = Omit<User, "password">;
+// { id: number; name: string; email: string }
+
+// Record: キーと値の型を指定した辞書
+type Roles = Record<string, string[]>;
+const roles: Roles = {
+  admin: ["read", "write", "delete"],
+  viewer: ["read"]
+};
+
+// ReturnType: 関数の戻り値型を取得
+function createUser() { return { id: 1, name: "太郎" }; }
+type NewUser = ReturnType<typeof createUser>;
+// { id: number; name: string }`,
+    afterCode: "ポイント: typeof を型の文脈で使うと「この変数 / 関数の型」を取得できます。ReturnType<typeof fn> のパターンは、関数の戻り値型を手書きせずに自動的に取得する定番テクニックです。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "高度な型操作",
+  est: "60分",
+  goal: "Mapped Types / Conditional Types / Template Literal Types / infer キーワードを理解し、既存の型から新しい型を自動生成できるようになる。TypeScript の型システムがチューリング完全な「型レベルプログラミング言語」であることを体感し、ライブラリの型定義を読み解ける力を身につける。",
+  sections: [{
+    title: "Mapped Types",
+    body: "Mapped Types は「既存の型のプロパティを一括変換して新しい型を作る」仕組みです。Python のリスト内包表記（[f(x) for x in items]）の型版と考えると理解しやすいでしょう。{ [K in keyof T]: 新しい型 } と書き、T の全プロパティを走査して変換します。\n\n実は先ほど学んだ Partial<T> や Required<T> も内部的には Mapped Types で実装されています。Partial<T> は { [K in keyof T]?: T[K] } と定義されており、全プロパティに ? を付けているだけです。Readonly<T> は { readonly [K in keyof T]: T[K] } です。\n\nMapped Types に as 句を組み合わせると、プロパティ名そのものを変換できます。これは Template Literal Types と組み合わせることで、getter/setter の型を自動生成するような高度なパターンに使えます。",
+    table: T.mappedCond,
+    code: `// 基本的な Mapped Type
+type Readonly2<T> = {
+  readonly [K in keyof T]: T[K];
+};
+
+// プロパティを全て string に変換
+type Stringify<T> = {
+  [K in keyof T]: string;
+};
+
+interface Config {
+  host: string;
+  port: number;
+  debug: boolean;
+}
+
+type StringConfig = Stringify<Config>;
+// { host: string; port: string; debug: string }
+
+// as 句でキー名を変換
+type Getters<T> = {
+  [K in keyof T as \`get\${Capitalize<string & K>}\`]: () => T[K];
+};
+
+type ConfigGetters = Getters<Config>;
+// { getHost: () => string; getPort: () => number; getDebug: () => boolean }`,
+    afterCode: "ポイント: Capitalize は TypeScript 組み込みの型ユーティリティで、文字列型の先頭を大文字にします。Uppercase / Lowercase / Uncapitalize も用意されています。"
+  }, {
+    title: "Conditional Types",
+    body: "Conditional Types は「型レベルの三項演算子」です。T extends U ? X : Y と書き、「T が U に代入可能なら X 型、そうでなければ Y 型」という分岐を型レベルで行います。Python にはこのような型レベルの条件分岐はありません。\n\nConditional Types の真価は infer キーワードと組み合わせたときに発揮されます。infer は Conditional Types の中で「型をキャプチャする」ために使います。T extends Promise<infer U> ? U : T と書くと、「T が Promise<何か> ならその何かを U として取り出し、そうでなければ T をそのまま返す」という型操作になります。\n\n標準ライブラリの ReturnType<T> や Parameters<T> も内部的には Conditional Types + infer で実装されています。TypeScript の型システムがいかに強力かを示す好例です。",
+    code: `// 基本的な Conditional Type
+type IsString<T> = T extends string ? "yes" : "no";
+type A = IsString<"hello">;   // "yes"
+type B = IsString<42>;        // "no"
+
+// infer で型をキャプチャ
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
+type C = UnwrapPromise<Promise<string>>;  // string
+type D = UnwrapPromise<number>;           // number
+
+// 配列の要素型を取り出す
+type ElementType<T> = T extends (infer U)[] ? U : never;
+type E = ElementType<string[]>;    // string
+type F = ElementType<number[][]>;  // number[]
+
+// ReturnType の内部実装
+type MyReturnType<T extends (...args: any[]) => any> =
+  T extends (...args: any[]) => infer R ? R : never;
+
+type G = MyReturnType<() => string>;  // string`,
+    afterCode: "ポイント: Conditional Types は Union 型に対して「分配」されます。IsString<string | number> は IsString<string> | IsString<number> = \"yes\" | \"no\" になります。この分配的挙動は直感に反することがあるので、NoDistribute<T> パターンを覚えておくと便利です。"
+  }, {
+    title: "Template Literal Types",
+    body: "Template Literal Types は JavaScript のテンプレートリテラル（バッククォート文字列）を型レベルで扱える仕組みです。`${A}_${B}` のように書き、型の文字列を組み合わせて新しい文字列リテラル型を生成します。Python の f-string に相当する操作を型レベルで行えると考えてください。\n\nこの機能は API のルーティング、イベント名、CSS プロパティ名など、文字列パターンに型安全性を持たせたい場面で力を発揮します。例えば、on + イベント名（onClick, onHover, onFocus）のようなパターンを型レベルで自動生成できます。\n\nMapped Types と組み合わせると、既存の型からプロパティ名を自動変換した新しい型を生成できます。ライブラリの型定義でよく見かけるパターンです。",
+    code: `// 基本的な Template Literal Type
+type Greeting = \`Hello, \${"World" | "TypeScript"}\`;
+// "Hello, World" | "Hello, TypeScript"
+
+// イベント名の自動生成
+type Event = "click" | "focus" | "blur";
+type EventHandler = \`on\${Capitalize<Event>}\`;
+// "onClick" | "onFocus" | "onBlur"
+
+// CSS プロパティ風の型生成
+type CSSUnit = "px" | "em" | "rem" | "%";
+type CSSValue = \`\${number}\${CSSUnit}\`;
+const width: CSSValue = "100px";    // OK
+const height: CSSValue = "2.5em";   // OK
+// const bad: CSSValue = "100";     // エラー！
+
+// 組み合わせの爆発
+type Color = "red" | "blue";
+type Size = "small" | "large";
+type Variant = \`\${Color}-\${Size}\`;
+// "red-small" | "red-large" | "blue-small" | "blue-large"`,
+    afterCode: "ポイント: Template Literal Types は Union 型と組み合わせると自動的に全組み合わせが生成されます。Color が 2 種、Size が 2 種なら、Variant は 4 種の文字列リテラル型になります。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "クラスと修飾子",
+  est: "45分",
+  goal: "TypeScript のクラスを Python のクラスとの違いを意識しながら書けるようになる。public / private / protected / readonly のアクセス修飾子、abstract クラスと implements による interface 実装、コンストラクタの省略記法（Parameter Properties）を使いこなせる状態を目指す。",
+  sections: [{
+    title: "クラスの基本",
+    body: "TypeScript のクラスは JavaScript の class 構文に型注釈を追加したものです。Python のクラスと構造的によく似ていますが、フィールド（プロパティ）の事前宣言が必須である点が大きく異なります。Python では __init__ 内で self.name = name と書くだけで動的にフィールドを追加できますが、TypeScript ではクラス本体でフィールドの型を宣言してからコンストラクタで初期化します。\n\nコンストラクタは constructor() で、Python の __init__() に相当します。TypeScript 特有の便利機能として「Parameter Properties」があり、コンストラクタの引数にアクセス修飾子（public / private / readonly など）を付けると、フィールド宣言と初期化が同時に行われます。ボイラープレートを大幅に減らせるため、実務では頻繁に使われます。\n\nメソッドの定義は Python と同じく関数を書くだけですが、self 引数は不要です（JavaScript では this が自動的にインスタンスを参照します）。",
+    table: T.classModifiers,
+    code: `// 基本的なクラス
+class User {
+  // フィールド宣言（Python にはない）
+  name: string;
+  private age: number;
+  readonly id: number;
+
+  constructor(id: number, name: string, age: number) {
+    this.id = id;
+    this.name = name;
+    this.age = age;
+  }
+
+  greet(): string {
+    return \`こんにちは、\${this.name}です（\${this.age}歳）\`;
+  }
+}
+
+// Parameter Properties（省略記法）
+class Product {
+  // コンストラクタ引数に修飾子 → フィールド宣言+初期化を省略
+  constructor(
+    public readonly id: number,
+    public name: string,
+    private price: number
+  ) {}  // 本体は空でOK
+
+  getPrice(): number { return this.price; }
+}
+
+const p = new Product(1, "TypeScript本", 3000);
+console.log(p.name);       // OK: public
+// console.log(p.price);   // エラー: private`,
+    afterCode: "ポイント: Parameter Properties は TypeScript 固有の構文で、JavaScript には存在しません。コンパイル後の JavaScript ではフィールド宣言と代入に展開されます。"
+  }, {
+    title: "アクセス修飾子",
+    body: "Python ではアクセス制御は慣習的なものです（_private, __mangled）。どのフィールドにも実際にはアクセスできてしまいます。TypeScript では public / private / protected がコンパイラレベルで強制され、private フィールドへのアクセスはコンパイルエラーになります。\n\npublic はデフォルトで、どこからでもアクセスできます。private はクラス内部からのみアクセスでき、サブクラスからもアクセスできません。protected はクラス内部とサブクラスからアクセスできますが、外部からはアクセスできません。\n\nJavaScript の #private 記法も使えます。TypeScript の private が「コンパイル時のみのチェック」であるのに対し、#private は JavaScript ランタイムでも強制される「真のプライベート」です。ただし、TypeScript の private で実務上は十分なケースがほとんどです。",
+    code: `class Animal {
+  public name: string;          // どこからでもアクセス可
+  protected species: string;    // サブクラスからもアクセス可
+  private _sound: string;       // クラス内部のみ
+
+  constructor(name: string, species: string, sound: string) {
+    this.name = name;
+    this.species = species;
+    this._sound = sound;
+  }
+
+  makeSound(): string {
+    return \`\${this.name}: \${this._sound}\`;
+  }
+}
+
+class Dog extends Animal {
+  constructor(name: string) {
+    super(name, "犬", "ワン");
+  }
+
+  describe(): string {
+    return \`\${this.name}は\${this.species}です\`;
+    // OK: species は protected なのでサブクラスからアクセス可
+    // this._sound;  // エラー: private は子クラスからもアクセス不可
+  }
+}
+
+const dog = new Dog("ポチ");
+console.log(dog.name);         // OK: public
+// console.log(dog.species);   // エラー: protected
+// console.log(dog._sound);   // エラー: private`,
+    afterCode: "ポイント: readonly は「初期化後に変更不可」の修飾子で、Python の @property（setter なし）に相当します。id や createdAt など、一度設定したら変わらないフィールドに付けるのが定石です。"
+  }, {
+    title: "abstract クラスと implements",
+    body: "abstract クラスは「直接インスタンス化できないクラス」で、Python の ABC（Abstract Base Class）に相当します。abstract メソッドを持つことができ、サブクラスでの実装を強制します。Python の @abstractmethod と同じ役割です。\n\nimplements は interface をクラスに適用するキーワードで、Python の Protocol を明示的に宣言するイメージです。TypeScript は構造的型付けなので implements を書かなくても型の互換性はありますが、明示的に書くことで「このクラスはこの interface を満たすべきである」という意図を表明し、コンパイラに実装漏れを検出させることができます。\n\n抽象クラスと interface の使い分けは、「共通の実装を持つか否か」で判断します。共通メソッドの実装を基底クラスに書きたいなら abstract クラス、契約（形状）だけを定義したいなら interface です。",
+    code: `// abstract クラス
+abstract class Shape {
+  constructor(public readonly name: string) {}
+
+  // 抽象メソッド: サブクラスで必ず実装する
+  abstract area(): number;
+
+  // 共通メソッド: サブクラスに継承される
+  describe(): string {
+    return \`\${this.name}: 面積 = \${this.area().toFixed(2)}\`;
+  }
+}
+
+// new Shape("test");  // エラー: abstract は直接 new できない
+
+class Circle extends Shape {
+  constructor(private radius: number) {
+    super("円");
+  }
+  area(): number {
+    return Math.PI * this.radius ** 2;
+  }
+}
+
+// interface と implements
+interface Serializable {
+  serialize(): string;
+}
+
+class JsonCircle extends Circle implements Serializable {
+  serialize(): string {
+    return JSON.stringify({ type: "circle", area: this.area() });
+  }
+}
+
+const c = new JsonCircle(5);
+console.log(c.describe());    // "円: 面積 = 78.54"
+console.log(c.serialize());   // '{"type":"circle","area":78.53...}'`,
+    afterCode: "ポイント: TypeScript では多重継承はできません（extends は 1 つだけ）が、implements は複数指定できます（implements A, B, C）。Python の多重継承に比べてダイヤモンド問題が起きない安全な設計です。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "モジュールと宣言ファイル",
+  est: "40分",
+  goal: "ES Modules の import / export を使ったモジュール分割ができるようになる。.d.ts 宣言ファイルの役割と書き方を理解し、DefinitelyTyped（@types/*）から型定義をインストールして使えるようになる。declare キーワードによるアンビエント宣言の用途を把握する。",
+  sections: [{
+    title: "ES Modules",
+    body: "TypeScript のモジュールシステムは JavaScript の ES Modules（ESM）に準拠しています。Python の import 文に相当しますが、構文がかなり異なります。Python では import math や from os import path と書きますが、TypeScript では import { readFile } from 'fs' や import path from 'path' と書きます。\n\nエクスポートには「名前付きエクスポート」と「デフォルトエクスポート」の 2 種類があります。名前付きエクスポートは export function add() のように書き、インポート側では {} で受け取ります。デフォルトエクスポートは export default class Foo のように書き、インポート側では {} なしで任意の名前で受け取れます。\n\nPython と大きく異なる点は、TypeScript のモジュール解決が拡張子を含めたパスベースであることです。import { add } from './math.js' のように .js 拡張子を明示する必要があります（.ts ではなく .js であることに注意）。これは TypeScript が最終的に JavaScript にコンパイルされるためです。",
+    table: T.moduleFormats,
+    code: `// ===== utils.ts =====
+// 名前付きエクスポート
+export function add(a: number, b: number): number {
+  return a + b;
+}
+
+export const PI = 3.14159;
+
+// デフォルトエクスポート
+export default class Calculator {
+  add(a: number, b: number): number { return a + b; }
+}
+
+// ===== main.ts =====
+// 名前付きインポート
+import { add, PI } from './utils.js';
+
+// デフォルトインポート（任意の名前でOK）
+import Calculator from './utils.js';
+
+// 全てをまとめてインポート
+import * as Utils from './utils.js';
+
+// 型だけをインポート（実行時コードに含まれない）
+import type { SomeType } from './types.js';`,
+    afterCode: "ポイント: import type はコンパイル後の JavaScript から完全に除去されます。型定義だけが必要な場合は import type を使うと、バンドルサイズの削減と循環参照の回避に役立ちます。"
+  }, {
+    title: "宣言ファイル (.d.ts)",
+    body: "宣言ファイル（.d.ts）は「型情報だけを記述したファイル」で、実行コードは含みません。Python の .pyi スタブファイルに直接対応する概念です。JavaScript で書かれたライブラリに型情報を後付けするために使います。\n\nTypeScript で書いたコードを tsc でコンパイルする際、declaration: true オプションを有効にすると .d.ts ファイルが自動生成されます。ライブラリを公開する場合は、この .d.ts を同梱することで、TypeScript ユーザーが型の恩恵を受けられます。\n\nDefinitelyTyped は、JavaScript ライブラリの型定義を集めたコミュニティリポジトリです。npm install @types/lodash のようにインストールすると、lodash の型定義が自動的に使えるようになります。Python の typeshed リポジトリに相当するものです。",
+    code: `// ===== 型定義ファイルの例: string-utils.d.ts =====
+// JavaScript ライブラリの型を後付けで定義
+
+declare module "string-utils" {
+  // 関数の型宣言（実装は書かない）
+  export function capitalize(str: string): string;
+  export function truncate(str: string, length: number): string;
+  export function slugify(str: string): string;
+
+  // インターフェースの型宣言
+  export interface FormatOptions {
+    locale?: string;
+    currency?: string;
+  }
+
+  // クラスの型宣言
+  export class Formatter {
+    constructor(options?: FormatOptions);
+    format(value: number): string;
+  }
+}
+
+// ===== 使用例 =====
+// import { capitalize, Formatter } from "string-utils";
+// const f = new Formatter({ locale: "ja-JP" });`,
+    afterCode: "ポイント: @types/* パッケージが存在しないライブラリを使う場合は、自分で .d.ts を書くか、declare module \"ライブラリ名\"; と最低限の宣言を書いて any 型で凌ぐこともできます（非推奨ですが現実的な対処法です）。"
+  }, {
+    title: "declare とアンビエント宣言",
+    body: "declare キーワードは「この変数 / 関数 / クラスは別の場所で定義されているが、型情報だけここで宣言する」という意味です。Python の TYPE_CHECKING ブロック内での宣言に近い概念です。\n\nグローバル変数の宣言（declare const APP_VERSION: string）、グローバル型の拡張（declare global { interface Window { ... } }）、外部モジュールの宣言（declare module \"ライブラリ名\"）の 3 つが主な用途です。\n\ndeclare は実行時コードを一切生成しません。あくまで TypeScript コンパイラに「この名前はこの型を持つ」と教えるためだけの宣言です。実体が本当に存在することは開発者が保証する必要があります。",
+    code: `// グローバル変数の宣言
+declare const __DEV__: boolean;
+declare const process: { env: { NODE_ENV: string } };
+
+// 既存の型を拡張（Declaration Merging）
+declare global {
+  interface Window {
+    myApp: {
+      version: string;
+      init(): void;
+    };
+  }
+}
+
+// 型なしモジュールの最低限の宣言
+declare module "*.css" {
+  const styles: { [className: string]: string };
+  export default styles;
+}
+
+declare module "*.png" {
+  const src: string;
+  export default src;
+}
+
+// 使用例
+if (__DEV__) {
+  console.log("開発モード");
+}`,
+    afterCode: "ポイント: declare module \"*.css\" のようなワイルドカード宣言は、CSS Modules や画像ファイルの import に型を付けるためによく使われます。bundler（webpack, Vite 等）がこれらのファイルを処理する前提での宣言です。"
+  }]
+}, {
+  id: "ch9",
+  num: 9,
+  title: "型ガードとNarrowing",
+  est: "45分",
+  goal: "Union 型の変数に対して typeof / instanceof / in / ユーザー定義型ガードを使い、型を安全に絞り込む（Narrowing）手法を習得する。Discriminated Union パターンで switch 文と組み合わせた網羅性チェックを書けるようになり、never 型による漏れ検出を実務に適用できる状態を目指す。",
+  sections: [{
+    title: "Narrowingとは",
+    body: "Narrowing（型の絞り込み）は、Union 型の変数が実際にどの型であるかを条件分岐で特定し、その分岐内では特定の型として扱える仕組みです。Python の isinstance() チェック後に型チェッカーが型を絞り込むのと同じ発想ですが、TypeScript の方がはるかに多くのパターンをサポートしています。\n\n例えば string | number 型の変数に対して typeof x === 'string' のチェックを入れると、そのブロック内では x は string 型として扱われます。number のメソッドを呼ぼうとするとコンパイルエラーになり、string のメソッドだけが使えます。これが Narrowing です。\n\nTypeScript のコンパイラは制御フロー解析（Control Flow Analysis）を行い、if / switch / 三項演算子 / 論理演算子など、あらゆる条件分岐で自動的に型を絞り込みます。プログラマが明示的に「ここでは string です」と宣言する必要はなく、条件式を書くだけで型が自動的に狭まります。",
+    table: T.narrowingMethods,
+    code: `// typeof による Narrowing
+function processInput(input: string | number): string {
+  if (typeof input === "string") {
+    // ここでは input は string 型
+    return input.toUpperCase();
+  } else {
+    // ここでは input は number 型
+    return input.toFixed(2);
+  }
+}
+
+// instanceof による Narrowing
+function formatDate(value: string | Date): string {
+  if (value instanceof Date) {
+    return value.toISOString();  // Date 型
+  }
+  return value;  // string 型
+}
+
+// in 演算子による Narrowing
+interface Dog { bark(): void; }
+interface Cat { meow(): void; }
+
+function makeSound(animal: Dog | Cat): void {
+  if ("bark" in animal) {
+    animal.bark();   // Dog 型
+  } else {
+    animal.meow();   // Cat 型
+  }
+}`,
+    afterCode: "ポイント: Python では isinstance(x, str) を書きますが、TypeScript では typeof x === 'string' と書きます。typeof はプリミティブ型の判定に使い、クラスのインスタンス判定には instanceof を使います。"
+  }, {
+    title: "Discriminated Union",
+    body: "Discriminated Union（判別可能なユニオン）は TypeScript で最もよく使われる型パターンの一つです。各メンバーに共通の「タグ」プロパティ（通常は kind や type という名前のリテラル型）を持たせ、switch 文でそのタグに基づいて分岐します。\n\nPython の match 文（3.10+）と概念的に似ていますが、TypeScript では型レベルで網羅性が保証される点が異なります。switch 文の default 節で never 型に代入することで、「全てのケースを処理した」ことをコンパイラに証明できます。新しいメンバーを Union に追加した場合、処理を追加し忘れるとコンパイルエラーになります。\n\nこのパターンは API レスポンスの処理（Success | Error）、状態管理（Loading | Loaded | Failed）、AST の処理（Expression | Statement | Declaration）など、「有限個の型のいずれかである」データを扱うあらゆる場面で使えます。",
+    code: `// Discriminated Union パターン
+interface LoadingState {
+  status: "loading";
+}
+interface SuccessState {
+  status: "success";
+  data: string[];
+}
+interface ErrorState {
+  status: "error";
+  error: string;
+}
+
+type AppState = LoadingState | SuccessState | ErrorState;
+
+function renderState(state: AppState): string {
+  switch (state.status) {
+    case "loading":
+      return "読み込み中...";
+    case "success":
+      return \`データ: \${state.data.join(", ")}\`;
+    case "error":
+      return \`エラー: \${state.error}\`;
+    default:
+      // 網羅性チェック
+      const _: never = state;
+      return _;
+  }
+}`,
+    afterCode: "ポイント: default の never 代入パターンは「exhaustive check（網羅性チェック）」と呼ばれます。AppState に新しい型を追加したら、switch 文に case を追加するまでコンパイルエラーが消えません。"
+  }, {
+    title: "ユーザー定義型ガード",
+    body: "typeof や instanceof では判定できない複雑な型チェックには、ユーザー定義型ガード（Type Predicate）を使います。関数の戻り値型を value is SomeType と書くことで、「この関数が true を返したら、引数は SomeType 型である」とコンパイラに伝えます。\n\nPython の TypeGuard（typing.TypeGuard）と同じ概念ですが、TypeScript の方が先に導入されました。実務では API レスポンスの型チェック、フォーム入力のバリデーション、設定オブジェクトの検証など、外部データの型を保証する場面で頻繁に使います。\n\n型ガード関数は boolean を返す普通の関数ですが、戻り値型に is を使うことで TypeScript のコンパイラに型の絞り込み情報を伝えます。is を書かないと、たとえ中身が同じでも型の絞り込みは行われません。",
+    code: `// ユーザー定義型ガード
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+// value is User: 戻り値が true なら value は User 型
+function isUser(value: unknown): value is User {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    "name" in value &&
+    "email" in value
+  );
+}
+
+// 使用例
+function processData(data: unknown): void {
+  if (isUser(data)) {
+    // data は User 型として扱える
+    console.log(\`ユーザー: \${data.name} (\${data.email})\`);
+  }
+}
+
+// 配列フィルタリングとの組み合わせ
+function isNonNull<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
+
+const items = ["a", null, "b", undefined, "c"];
+const clean: string[] = items.filter(isNonNull);
+// ["a", "b", "c"]  — 型も string[] に絞り込まれる`,
+    afterCode: "ポイント: .filter() のコールバックにユーザー定義型ガードを渡すと、フィルタ後の配列の型が自動的に絞り込まれます。isNonNull を使わずに .filter(x => x != null) と書くと、型が絞り込まれない場合があります。"
+  }]
+}, {
+  id: "ch10",
+  num: 10,
+  title: "tsconfig深掘りとエコシステム",
+  est: "35分",
+  goal: "tsconfig.json の重要オプション（strict 系、paths、project references）を深く理解し、プロジェクトの規模に応じた適切な設定ができるようになる。ESLint / Prettier との連携、モノレポ構成での Project References の活用など、実務で必要なエコシステム知識を一通り身につける。",
+  sections: [{
+    title: "strict オプション詳解",
+    body: "strict: true は複数の厳格オプションを一括で有効化するメタオプションです。Python の mypy で --strict を付けるのに似ていますが、TypeScript の方がきめ細かい制御が可能です。strict を有効にすると、暗黙の any 禁止（noImplicitAny）、null チェック強制（strictNullChecks）、関数型の厳密チェック（strictFunctionTypes）などが全て有効になります。\n\n新規プロジェクトでは必ず strict: true から始めるべきです。既存の JavaScript プロジェクトを TypeScript に移行する場合は、strict: false から始めて段階的にオプションを有効化していく戦略もあります。\n\nstrict に含まれないが推奨されるオプションもあります。noUncheckedIndexedAccess は配列やオブジェクトのインデックスアクセスに undefined を付加し、範囲外アクセスのバグを防ぎます。exactOptionalProperties は optional プロパティと undefined 値を区別します。",
+    table: T.strictOptions,
+    code: `// noImplicitAny の効果
+// function double(x) { ... }  // エラー: x は暗黙の any
+function double(x: number): number { return x * 2; }
+
+// strictNullChecks の効果
+const el = document.getElementById("app");
+// el.textContent = "hello";   // エラー: el は null かも
+if (el) {
+  el.textContent = "hello";   // OK: null チェック済み
+}
+// または Non-null Assertion（確信がある場合のみ）
+// el!.textContent = "hello";
+
+// noUncheckedIndexedAccess の効果
+const arr = [1, 2, 3];
+// const first: number = arr[0];  // エラー: number | undefined
+const first = arr[0];            // first は number | undefined
+if (first !== undefined) {
+  console.log(first * 2);       // OK
+}`,
+    afterCode: "ポイント: Non-null Assertion（!）は「null / undefined ではないことを開発者が保証する」演算子です。間違って使うと実行時エラーになるため、本当に確信がある場合にだけ使いましょう。"
+  }, {
+    title: "paths と baseUrl",
+    body: "大規模プロジェクトでは import のパスが ../../../utils/helper のように深くなりがちです。paths オプションを使うとエイリアスを定義でき、@/utils/helper のように短いパスで import できるようになります。Python の sys.path の操作に近い概念ですが、コンパイラレベルで解決されるため安全です。\n\npaths を使うには baseUrl の設定が必要です。baseUrl はパス解決の起点ディレクトリで、通常はプロジェクトルート（\".\"）を指定します。paths はこの baseUrl からの相対パスで定義します。\n\n重要な注意点として、paths は TypeScript のコンパイラ（tsc）が型チェック時にパスを解決するための設定であり、実行時のパス解決は別途対応が必要です。Node.js で実行する場合は tsconfig-paths パッケージ、bundler（webpack, Vite）を使う場合はそれぞれの設定で対応します。",
+    code: `// tsconfig.json
+// {
+//   "compilerOptions": {
+//     "baseUrl": ".",
+//     "paths": {
+//       "@/*": ["src/*"],
+//       "@/utils/*": ["src/utils/*"],
+//       "@/types/*": ["src/types/*"]
+//     }
+//   }
+// }
+
+// 使用例: 深いパスをエイリアスで短縮
+// Before:
+// import { formatDate } from "../../../utils/date";
+// import { User } from "../../types/user";
+
+// After:
+// import { formatDate } from "@/utils/date";
+// import { User } from "@/types/user";
+
+// ts-node で paths を使う場合
+// npm install tsconfig-paths
+// ts-node -r tsconfig-paths/register src/main.ts`,
+    afterCode: "ポイント: Vite や Next.js などのフレームワークは paths の設定を自動的に読み取ってくれる場合があります。フレームワーク固有のドキュメントを確認しましょう。"
+  }, {
+    title: "Project References",
+    body: "Project References は大規模プロジェクト（モノレポ）で複数の TypeScript プロジェクトを連携させるための仕組みです。Python のワークスペース（poetry の monorepo 対応など）に近い概念です。\n\n各サブプロジェクト（パッケージ）がそれぞれの tsconfig.json を持ち、ルートの tsconfig.json で references として参照します。tsc --build（-b）コマンドで依存順にビルドされ、変更のないパッケージはスキップされるためビルドが高速化されます。\n\n各サブプロジェクトには composite: true を設定する必要があります。これにより declaration ファイルが自動生成され、他のプロジェクトから型情報を参照できるようになります。",
+    code: `// モノレポ構成例:
+// packages/
+//   shared/     ← 共通ライブラリ
+//   api/        ← バックエンド（shared に依存）
+//   web/        ← フロントエンド（shared に依存）
+// tsconfig.json ← ルート
+
+// ===== ルート tsconfig.json =====
+// {
+//   "files": [],
+//   "references": [
+//     { "path": "packages/shared" },
+//     { "path": "packages/api" },
+//     { "path": "packages/web" }
+//   ]
+// }
+
+// ===== packages/shared/tsconfig.json =====
+// {
+//   "compilerOptions": {
+//     "composite": true,
+//     "declaration": true,
+//     "outDir": "./dist"
+//   }
+// }
+
+// ===== ビルドコマンド =====
+// tsc --build            # 全パッケージをビルド
+// tsc --build --watch    # 変更監視
+// tsc --build --clean    # ビルド成果物を削除`,
+    afterCode: "ポイント: Project References を使うと、IDE の「定義へジャンプ」が .d.ts ではなくソースの .ts ファイルに飛ぶようになります（declarationMap: true が必要）。開発体験が大幅に向上します。"
+  }, {
+    title: "ESLint・Prettier連携",
+    body: "TypeScript プロジェクトでは、型チェック（tsc）に加えて、コードスタイルの統一（Prettier）とコード品質のチェック（ESLint）を組み合わせるのが標準です。Python での black + ruff（または flake8）に相当する構成です。\n\nESLint は TypeScript 専用のパーサー（@typescript-eslint/parser）とプラグイン（@typescript-eslint/eslint-plugin）を追加することで TypeScript に対応します。型情報を使ったルール（no-floating-promises、no-unsafe-assignment など）も有効化でき、tsc では検出できないバグを見つけられます。\n\nPrettier はコードフォーマッター専門のツールで、ESLint のスタイル関連ルールと競合しないように設定します。eslint-config-prettier を導入すると、Prettier と重複する ESLint ルールが自動的に無効化されます。",
+    code: `// ESLint + TypeScript の設定（eslint.config.mjs 形式）
+// npm install --save-dev eslint @typescript-eslint/parser
+//   @typescript-eslint/eslint-plugin eslint-config-prettier
+
+// eslint.config.mjs
+// import tseslint from "@typescript-eslint/eslint-plugin";
+// import tsparser from "@typescript-eslint/parser";
+//
+// export default [
+//   {
+//     files: ["src/**/*.ts"],
+//     languageOptions: {
+//       parser: tsparser,
+//       parserOptions: {
+//         project: "./tsconfig.json"
+//       }
+//     },
+//     plugins: { "@typescript-eslint": tseslint },
+//     rules: {
+//       "@typescript-eslint/no-unused-vars": "error",
+//       "@typescript-eslint/no-floating-promises": "error",
+//       "@typescript-eslint/no-unsafe-assignment": "warn"
+//     }
+//   }
+// ];
+
+// Prettier 設定（.prettierrc）
+// {
+//   "semi": true,
+//   "singleQuote": false,
+//   "tabWidth": 2,
+//   "trailingComma": "all"
+// }`,
+    afterCode: "コース完了後に習得できる状態: TypeScript の型システムの基礎を理解し、Python との違いを説明でき、型安全な TypeScript コードを書き始められる。公式ドキュメント（typescriptlang.org）を読みながら、実務レベルのプロジェクトに段階的に取り組める。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, data.h.map((h, i) => /*#__PURE__*/React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, data.r.map((row, ri) => /*#__PURE__*/React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => /*#__PURE__*/React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return /*#__PURE__*/React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, /*#__PURE__*/React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, /*#__PURE__*/React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), /*#__PURE__*/React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && /*#__PURE__*/React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && /*#__PURE__*/React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function TsCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\uD83D\uDD37"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "TypeScript \u5165\u9580\u30B3\u30FC\u30B9"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), /*#__PURE__*/React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "TypeScript \u306E\u578B\u30B7\u30B9\u30C6\u30E0\u3092 Python \u3068\u306E\u5DEE\u5206\u3092\u8EF8\u306B\u4FEF\u77B0\u3057\u307E\u3059\u3002\u9759\u7684\u578B\u4ED8\u3051\u304C\u306A\u305C\u30D0\u30B0\u3092\u6E1B\u3089\u3059\u306E\u304B\u3001interface \u30FB Union \u578B \u30FB Generics \u30FB\u578B\u30AC\u30FC\u30C9\u304C\u5B9F\u52D9\u3067\u3069\u3046\u6D3B\u304D\u308B\u306E\u304B\u3092\u4E00\u901A\u308A\u89E6\u308A\u3001\u300C\u6B21\u306B\u4F55\u3092\u5B66\u3079\u3070\u3088\u3044\u304B\u300D\u306E\u5730\u56F3\u3092\u624B\u306B\u5165\u308C\u308B\u3053\u3068\u304C\u30B4\u30FC\u30EB\u3067\u3059\u3002"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "\u25B2" : "\u25BC")), menuOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => /*#__PURE__*/React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` \u30FB \u6F14\u7FD2${exercises.length}\u554F` : ""))), chapter.goal && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => /*#__PURE__*/React.createElement(Section, {
+    key: ch + "-" + i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Exercise, {
+    key: ch + "-" + i,
+    ex: ex,
+    idx: i
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : /*#__PURE__*/React.createElement("a", {
+    href: "../index.html",
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "TypeScript 5.4 \u30FB tsc 5.4 \u6E96\u62E0 \u30FB 2026\u5E744\u6708\u6642\u70B9")));
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(TsCourse));
+  </script>
+</body>
+</html>
