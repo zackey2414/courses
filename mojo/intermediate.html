@@ -1,0 +1,4136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mojo 中級コース — 初級コース修了者向け</title>
+  <meta name="description" content="Mojo中級コース。全12章・演習付き。実務で戦えるレベルを目指す。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  argConvDeep: {
+    h: ["規約", "キーワード", "所有権", "変更", "コピー", "典型的な用途"],
+    r: [
+      ["不変参照", "read（省略可）", "借用", "不可", "なし", "読み取り専用アクセス。デフォルト。"],
+      ["可変参照", "mut", "借用", "可能", "なし", "呼び出し元の値を直接変更。"],
+      ["所有権取得", "var（旧owned）", "取得", "可能", "移動/コピー", "値を関数内で自由に使う。呼び出し元は ^ で渡す。"],
+      ["出力引数", "out", "生成", "初期化", "なし", "__init__ の self や戻り値の内部表現。"],
+      ["参照（ライフタイム付き）", "ref [life]", "借用", "ライフタイム依存", "なし", "ライフタイムを明示して参照を返す。"]
+    ],
+    cap: "v26.2 で owned は var に改名。read はキーワード省略可。"
+  },
+  asapVsScope: {
+    h: ["ポリシー", "破棄タイミング", "メリット", "デメリット"],
+    r: [
+      ["スコープ末破棄（C++/Rust）", "変数のスコープ（}）を抜けた時", "予測しやすい", "不要なリソースを長く保持"],
+      ["ASAP破棄（Mojo）", "最終使用の直後", "リソースを早く解放", "破棄順序の直感と異なる場合がある"]
+    ],
+    cap: "Mojoの ASAP (As Soon As Possible) ポリシーはメモリ効率を最大化するが、デストラクタの実行タイミングに注意が必要。"
+  },
+  lifetimeChecks: {
+    h: ["チェック", "説明", "エラー例"],
+    r: [
+      ["ダングリング参照", "参照先が先に破棄されるのを防止", "ref を返した後に元の値が破棄される"],
+      ["二重借用", "mut 参照中に別の参照を取るのを防止", "mut 借用中に read 借用を試みる"],
+      ["ムーブ後使用", "^ で移動した値の再使用を防止", "var b = a^; print(a) はエラー"],
+      ["未初期化使用", "初期化前の変数アクセスを防止", "var x: Int; print(x) はエラー"]
+    ]
+  },
+  refLifetime: {
+    h: ["パターン", "構文", "説明"],
+    r: [
+      ["入力ライフタイム", "ref [life] value: T", "引数の参照にライフタイムを付与"],
+      ["出力ライフタイム", "-> ref [life] T", "戻り値が入力と同じライフタイムを持つ"],
+      ["複数ライフタイム", "ref [a] x, ref [b] y", "異なるライフタイムで独立した参照"],
+      ["ライフタイム結合", "ref [a and b]", "複数のライフタイムの交差（最短）"]
+    ]
+  },
+  pointerTypes: {
+    h: ["ポインタ型", "安全性", "所有権", "参照カウント", "用途"],
+    r: [
+      ["Pointer[T]", "安全", "非所有（借用）", "なし", "既存の値への安全な参照。nullチェック不要。"],
+      ["OwnedPointer[T]", "安全", "単独所有", "なし", "ヒープ上に値を配置。unique_ptr相当。"],
+      ["ArcPointer[T]", "安全", "共有所有", "あり（アトミック）", "複数箇所で共有。Arc相当。スレッド安全。"],
+      ["UnsafePointer[T]", "非安全", "手動管理", "なし", "FFI・低レベル操作。alloc/free必須。"]
+    ],
+    cap: "原則: Pointer → OwnedPointer → ArcPointer の順に検討し、UnsafePointer は最終手段。"
+  },
+  unsafeOps: {
+    h: ["操作", "メソッド", "説明"],
+    r: [
+      ["確保", "UnsafePointer[T].alloc(n)", "n個分のメモリ確保（未初期化）"],
+      ["初期化", "ptr.init_pointee_move(value)", "確保済みメモリに値を配置（ムーブ）"],
+      ["コピー初期化", "ptr.init_pointee_copy(value)", "確保済みメモリに値を配置（コピー）"],
+      ["読み取り", "ptr[]", "ポインタが指す値を読み取り"],
+      ["書き込み", "ptr[] = value", "ポインタが指す値を上書き"],
+      ["オフセット", "ptr + n / ptr - n", "ポインタ算術"],
+      ["破棄", "ptr.destroy_pointee()", "値のデストラクタを呼ぶ"],
+      ["解放", "ptr.free()", "メモリを解放"]
+    ]
+  },
+  specialMethods: {
+    h: ["メソッド", "self規約", "説明", "自動生成"],
+    r: [
+      ["__init__", "out self", "コンストラクタ。全フィールド初期化必須。", "@fieldwise_init"],
+      ["__copyinit__", "out self, existing: Self", "コピーコンストラクタ。=代入時に呼ばれる。", "@value"],
+      ["__moveinit__", "out self, owned existing: Self", "ムーブコンストラクタ。^演算子で呼ばれる。", "@value"],
+      ["__del__", "owned self", "デストラクタ。リソース解放。", "自動（trivial型）"],
+      ["__len__", "self", "len()関数で呼ばれる。Sized トレイト。", "なし"],
+      ["__str__", "self", "String()変換。Stringable トレイト。", "なし"],
+      ["__repr__", "self", "repr()変換。Representable トレイト。", "なし"],
+      ["__bool__", "self", "Bool()変換。Boolable トレイト。", "なし"],
+      ["__hash__", "self", "hash()関数。Hashable トレイト。", "なし"],
+      ["__contains__", "self, value", "in 演算子。", "なし"],
+      ["__iter__", "self", "for ループ用イテレータ。", "なし"],
+      ["__getitem__", "self, idx", "[] 読み取り。", "なし"],
+      ["__setitem__", "mut self, idx, val", "[] 書き込み。", "なし"]
+    ]
+  },
+  operatorOverload: {
+    h: ["カテゴリ", "メソッド", "演算子", "戻り値型"],
+    r: [
+      ["算術", "__add__ / __sub__ / __mul__ / __truediv__", "+ - * /", "Self"],
+      ["累算代入", "__iadd__ / __isub__ / __imul__", "+= -= *=", "None (mut self)"],
+      ["比較", "__eq__ / __ne__", "== !=", "Bool"],
+      ["順序", "__lt__ / __le__ / __gt__ / __ge__", "< <= > >=", "Bool"],
+      ["単項", "__neg__ / __invert__", "- ~", "Self"],
+      ["ビット", "__and__ / __or__ / __xor__", "& | ^", "Self"],
+      ["シフト", "__lshift__ / __rshift__", "<< >>", "Self"],
+      ["逆演算", "__radd__ / __rmul__ 等", "右辺オペランド用", "Self"]
+    ],
+    cap: "@value デコレータは __copyinit__, __moveinit__, __del__ を自動生成。@fieldwise_init は __init__ のみ自動生成。"
+  },
+  decorators: {
+    h: ["デコレータ", "効果", "用途"],
+    r: [
+      ["@value", "__copyinit__ + __moveinit__ + __del__ 自動生成", "値セマンティクスの簡易定義"],
+      ["@fieldwise_init", "__init__ 自動生成（全フィールド引数）", "ボイラープレート削減"],
+      ["@explicit_destroy", "__del__ の明示実装を強制", "リソース管理の安全性"],
+      ["@register_passable", "レジスタに載るサイズの型", "小さな値型の最適化"],
+      ["@always_inline", "常にインライン展開", "パフォーマンスクリティカル"],
+      ["@no_inline", "インライン展開を禁止", "コードサイズ削減"],
+      ["@align(N)", "メモリアライメント指定", "SIMD/キャッシュライン最適化"],
+      ["@parameter", "コンパイル時実行", "コンパイル時定数計算"]
+    ]
+  },
+  paramVsArg: {
+    h: ["概念", "構文", "解決時点", "例"],
+    r: [
+      ["パラメータ", "[T: Trait, N: Int]", "コンパイル時", "struct Array[T: Movable, N: Int]"],
+      ["引数", "(x: Int, y: Float64)", "実行時", "def add(x: Int, y: Int) -> Int"]
+    ],
+    cap: "パラメータは [] で囲み、引数は () で囲む。パラメータはコンパイル時に確定し、型やサイズを決定する。"
+  },
+  comptimeFeatures: {
+    h: ["機能", "構文", "説明"],
+    r: [
+      ["コンパイル時if", "comptime if condition:", "@parameter if の後継。条件分岐をコンパイル時に解決。"],
+      ["コンパイル時for", "comptime for i in range(N):", "コンパイル時にループを展開。"],
+      ["コンパイル時メンバー", "alias member = ...", "struct 内のコンパイル時定数。型レベルの情報を保持。"],
+      ["alias", "alias Name = expression", "コンパイル時定数。型エイリアスにも使用。"],
+      ["自動パラメータ化", "def foo(x: auto):", "引数の型から自動的にパラメータを推論。"]
+    ]
+  },
+  inferOnly: {
+    h: ["パターン", "構文", "説明"],
+    r: [
+      ["通常パラメータ", "[T: Trait]", "呼び出し側で明示可能"],
+      ["infer-only", "[//,  T: Trait]", "// の右側は推論専用。明示指定不可。"],
+      ["混合", "[N: Int, //, T: Trait]", "N は明示可能、T は推論のみ。"]
+    ],
+    cap: "infer-only パラメータにより、ユーザーが指定不要なパラメータを隠蔽でき、APIが簡潔になる。"
+  },
+  traitCompose: {
+    h: ["パターン", "構文", "説明"],
+    r: [
+      ["単一トレイト制約", "[T: Movable]", "T は Movable を実装する型"],
+      ["トレイト合成（&）", "[T: Movable & Copyable]", "T は両方を実装する型"],
+      ["トレイト継承", "trait Printable(Stringable, Writable)", "Printable は両トレイトを含む"],
+      ["条件付き適合", "... where T: Comparable", "特定条件下でのみメソッドを提供"],
+      ["条件付きトレイト実装", "impl Comparable for MyType where ...", "条件付きでトレイトを実装"]
+    ]
+  },
+  builtinTraits: {
+    h: ["トレイト", "要求メソッド", "使えるようになるもの", "備考"],
+    r: [
+      ["Copyable", "__copyinit__", "= 代入コピー", "@value で自動生成"],
+      ["Movable", "__moveinit__", "^ ムーブ演算子", "@value で自動生成"],
+      ["Stringable", "__str__ -> String", "String(val) 変換", ""],
+      ["Writable", "write_to(self, mut writer)", "print(val) 出力", "Writerプロトコル"],
+      ["Representable", "__repr__ -> String", "repr(val)", "デバッグ用文字列"],
+      ["Sized", "__len__ -> Int", "len(val)", ""],
+      ["Boolable", "__bool__ -> Bool", "Bool(val) / if val:", ""],
+      ["EqualityComparable", "__eq__ / __ne__", "== / !=", ""],
+      ["Comparable", "__lt__ / __le__ / __gt__ / __ge__", "< <= > >=", "EqualityComparable を含む"],
+      ["Hashable", "__hash__ -> UInt", "hash(val) / Dict キー", ""],
+      ["Defaultable", "__init__(out self)", "デフォルト構築", "引数なしコンストラクタ"],
+      ["CollectionElement", "Copyable & Movable", "List/Dict等の要素型", "複合トレイト"],
+      ["KeyElement", "Hashable & EqualityComparable & ...", "Dict のキー型", "複合トレイト"],
+      ["Identifiable", "id() -> ObjectIdentifier", "オブジェクト同一性", ""],
+      ["Absable", "__abs__", "abs(val)", ""],
+      ["Intable", "__int__ -> Int", "Int(val) 変換", ""],
+      ["Indexer", "__index__ -> Int", "シーケンスインデックス", ""]
+    ]
+  },
+  errorPatterns: {
+    h: ["パターン", "構文", "説明"],
+    r: [
+      ["基本エラー", "raise Error(\"msg\")", "文字列メッセージのみ"],
+      ["型付きエラー", "raises ValidationError", "特定のエラー型を宣言"],
+      ["複数エラー型", "raises IOError | ParseError", "Variant型で複数エラーを扱う"],
+      ["パラメトリックraises", "def f[E: ErrorType]() raises E:", "エラー型をパラメータ化"],
+      ["Never型", "def unreachable() -> Never:", "この関数は正常に返らないことを表明"]
+    ]
+  },
+  errorDesign: {
+    h: ["設計原則", "説明", "例"],
+    r: [
+      ["階層化", "エラーをカテゴリ別に構造化", "IOError > FileNotFoundError"],
+      ["コンテキスト付与", "エラーに追加情報を持たせる", "ParseError(line=10, col=5)"],
+      ["回復可能性の区別", "回復可能/不可能を型で区別", "ValidationError vs FatalError"],
+      ["エラーチェーン", "根本原因を保持しながらラップ", "cause フィールドで元エラーを保持"]
+    ]
+  },
+  contextManager: {
+    h: ["メソッド", "呼ばれるタイミング", "典型的な処理"],
+    r: [
+      ["__enter__(mut self)", "with ブロック開始時", "リソース取得、初期化"],
+      ["__exit__(mut self)", "with ブロック終了時（正常）", "リソース解放、クリーンアップ"],
+      ["__exit__(mut self, err: Error)", "with ブロック終了時（エラー）", "エラーログ、ロールバック"]
+    ]
+  },
+  packageStructure: {
+    h: ["ファイル/ディレクトリ", "役割", "備考"],
+    r: [
+      ["mypackage/", "パッケージルート", "ディレクトリ名がパッケージ名"],
+      ["mypackage/__init__.mojo", "パッケージ初期化・公開API定義", "from mypackage import ... のエントリポイント"],
+      ["mypackage/core.mojo", "コアモジュール", "内部実装"],
+      ["mypackage/utils.mojo", "ユーティリティモジュール", "共通関数"],
+      ["mypackage/types/", "サブパッケージ", "さらに __init__.mojo を持つ"],
+      ["mypackage/types/__init__.mojo", "サブパッケージ初期化", "サブパッケージの公開API"]
+    ]
+  },
+  accessControl: {
+    h: ["アクセス修飾", "可視性", "構文"],
+    r: [
+      ["public（デフォルト）", "どこからでもアクセス可能", "def foo(): ..."],
+      ["private（_ prefix慣例）", "モジュール内のみ（慣例）", "def _internal(): ..."],
+      ["パッケージ内", "__init__.mojo で再エクスポートしたもの", "from .core import public_func"]
+    ]
+  },
+  mojopkg: {
+    h: ["コマンド", "説明", "用途"],
+    r: [
+      ["mojo package mypackage", ".mojopkg ファイルを生成", "バイナリ配布"],
+      ["mojo package mypackage -o out.mojopkg", "出力パスを指定", "CI/CDでの成果物生成"],
+      ["import で .mojopkg を使用", "コンパイル済みパッケージをインポート", "依存関係として利用"]
+    ]
+  },
+  collectionPerf: {
+    h: ["操作", "List", "Dict", "Set", "備考"],
+    r: [
+      ["末尾追加", "O(1) 償却", "-", "-", "容量超過時のみ O(n) リアロケーション"],
+      ["先頭挿入", "O(n)", "-", "-", "全要素シフト"],
+      ["インデックスアクセス", "O(1)", "-", "-", "連続メモリ"],
+      ["検索（in）", "O(n)", "O(1) 平均", "O(1) 平均", "Dict/Setはハッシュテーブル"],
+      ["挿入", "-", "O(1) 平均", "O(1) 平均", "ハッシュ衝突時 O(n)"],
+      ["削除", "O(n)", "O(1) 平均", "O(1) 平均", "List は要素シフト"],
+      ["イテレーション", "O(n)", "O(n)", "O(n)", "全要素走査"]
+    ],
+    cap: "List は連続メモリ配置でキャッシュフレンドリー。Dict/Set はハッシュテーブルで O(1) ルックアップ。"
+  },
+  listInternal: {
+    h: ["フィールド", "型", "説明"],
+    r: [
+      ["data", "UnsafePointer[T]", "要素を格納する連続メモリ領域へのポインタ"],
+      ["size", "Int", "現在の要素数"],
+      ["capacity", "Int", "確保済みのスロット数。size <= capacity。"],
+    ],
+    cap: "容量が足りなくなると、通常2倍のメモリを再確保し、全要素をコピー/ムーブする（amortized O(1)）。"
+  },
+  dtypeComplete: {
+    h: ["カテゴリ", "DType値", "ビット幅", "備考"],
+    r: [
+      ["符号付き整数", "int8 / int16 / int32 / int64", "8/16/32/64", "Int = int64（プラットフォーム依存）"],
+      ["符号なし整数", "uint8 / uint16 / uint32 / uint64", "8/16/32/64", "UInt = uint64"],
+      ["浮動小数点", "float16 / bfloat16 / float32 / float64", "16/16/32/64", "bfloat16 はML向け"],
+      ["特殊浮動小数点", "tensor_float32", "19(有効)", "NVIDIA TF32互換"],
+      ["真偽値", "bool", "8", "SIMD[DType.bool, N] で論理ベクトル"],
+      ["インデックス", "index", "プラットフォーム依存", "ループカウンタ・インデックス向け"]
+    ]
+  },
+  simdPatterns: {
+    h: ["パターン", "コード例", "説明"],
+    r: [
+      ["要素ごとの演算", "a + b, a * b", "加算・乗算等が全要素に同時適用"],
+      ["リダクション", "a.reduce_add(), a.reduce_max()", "全要素の集約"],
+      ["比較マスク", "a > b  # SIMD[DType.bool, N]", "要素ごとの比較結果をマスクとして取得"],
+      ["選択", "mask.select(a, b)", "マスクに基づいて要素を選択"],
+      ["シャッフル", "a.shuffle[idx]()", "要素の並び替え"],
+      ["キャスト", "a.cast[DType.float32]()", "型変換"],
+      ["スプラット", "SIMD[T, N](scalar)", "全要素を同じ値で初期化"]
+    ]
+  },
+  pythonInterop: {
+    h: ["方向", "方法", "制約"],
+    r: [
+      ["Mojo → Python呼出", "Python.import_module()", "PythonObject 経由。GIL制約あり。"],
+      ["Python → Mojo呼出", "def exported_func(): ...", "エクスポートされた関数をPythonから呼ぶ"],
+      ["型変換（Mojo→Py）", "PythonObject(mojo_val)", "Int, Float64, String, Bool, List 等"],
+      ["型変換（Py→Mojo）", "Int(py_obj), Float64(py_obj)", "明示変換が必要。失敗時はエラー。"],
+      ["NumPy連携", "np.array() ↔ UnsafePointer", "ゼロコピーでデータ共有可能"],
+      ["例外変換", "PythonのException → MojoのError", "try/except で捕捉可能"]
+    ],
+    cap: "パフォーマンス境界: Python呼び出しごとにGILのオーバーヘッド。バッチ処理で呼び出し回数を最小化すべき。"
+  },
+  perfDecorators: {
+    h: ["デコレータ", "効果", "使いどころ", "注意点"],
+    r: [
+      ["@always_inline", "関数をインライン展開", "小さなホットパス関数", "コードサイズ増大"],
+      ["@no_inline", "インライン展開を禁止", "大きな関数・デバッグ", "性能低下の可能性"],
+      ["@parameter", "コンパイル時実行", "定数畳み込み", "コンパイル時間増大"],
+      ["@__copy_capture", "キャプチャ時にコピー", "クロージャ内での値保持", "コピーコスト"]
+    ]
+  },
+  benchmarkGuide: {
+    h: ["手法", "方法", "精度", "用途"],
+    r: [
+      ["time モジュール", "now() で時刻取得し差分計算", "低", "簡易計測"],
+      ["benchmark モジュール", "benchmark.run[func]()", "高", "統計的に有意な計測"],
+      ["カスタム Report", "benchmark.Report で結果出力", "高", "比較レポート生成"],
+      ["perf_counter", "高精度タイマー", "中", "区間計測"]
+    ]
+  },
+  optimizationPatterns: {
+    h: ["パターン", "説明", "効果"],
+    r: [
+      ["ループ展開", "comptime for で手動展開 / コンパイラ自動展開", "分岐予測ミス削減"],
+      ["SIMD化", "スカラー演算をSIMD演算に変換", "データ並列性の活用"],
+      ["メモリアライメント", "@align(64) でキャッシュライン整合", "キャッシュヒット率向上"],
+      ["インライン展開", "@always_inline で関数呼び出しオーバーヘッド削除", "ホットパス高速化"],
+      ["所有権の活用", "不要なコピーを ^ ムーブで回避", "メモリ割り当て削減"],
+      ["事前確保", "List の capacity を事前指定", "リアロケーション回避"],
+      ["定数畳み込み", "alias でコンパイル時計算", "実行時計算削減"]
+    ]
+  },
+  designPatterns: {
+    h: ["パターン", "Mojo での実現方法", "用途"],
+    r: [
+      ["ビルダー", "メソッドチェーン（mut self を返す）", "複雑なオブジェクト構築"],
+      ["ストラテジー", "トレイト + ジェネリック関数", "アルゴリズムの切り替え"],
+      ["イテレータ", "__iter__ + __next__ 実装", "コレクションの走査"],
+      ["RAII", "__init__ + __del__ でリソース管理", "リソースの自動管理"],
+      ["型状態", "パラメータで状態を型レベルで表現", "不正状態のコンパイル時排除"],
+      ["Newtype", "単一フィールドstruct でドメイン型", "型安全性の向上"]
+    ]
+  },
+  codeQuality: {
+    h: ["観点", "ツール/方法", "説明"],
+    r: [
+      ["フォーマット", "mojo format", "コードの自動整形"],
+      ["ドキュメント", "docstring (\"\"\"...\"\"\")", "関数・struct のドキュメント"],
+      ["テスト", "def test_*() パターン", "ユニットテスト関数"],
+      ["アサーション", "debug_assert(condition)", "開発時の不変条件チェック"],
+      ["型チェック", "静的型システム", "コンパイル時の型安全性"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "以下のコードで ASAP 破棄が発生する箇所を特定し、破棄順序をコメントで記述してください。\nResource struct の __del__ で \"解放: {name}\" と表示されるとき、出力順序を予測すること。",
+    code: `struct Resource:
+    var name: String
+    def __init__(out self, name: String):
+        self.name = name
+        print("取得:", self.name)
+    def __del__(owned self):
+        print("解放:", self.name)
+
+def main():
+    var a = Resource("A")
+    var b = Resource("B")
+    print("aを使用:", a.name)
+    # b はここ以降使われない → ASAP破棄
+    print("aをもう一度:", a.name)
+    # a はここ以降使われない → ASAP破棄`,
+    answer: `# ASAP破棄の出力順序:
+# 取得: A
+# 取得: B
+# aを使用: A
+# 解放: B      ← b の最終使用(取得時のprint)の後、次の文の前に破棄
+# aをもう一度: A
+# 解放: A      ← a の最終使用後に破棄
+
+# ポイント:
+# - スコープ末破棄なら A→B or B→A の順だが
+# - ASAP では「最終使用の直後」に破棄される
+# - b は a.name の print の後に使われないため先に破棄`
+  }, {
+    diff: 2,
+    q: "ref 引数を使って、List[Int] の最大値への可変参照を返す関数 max_ref を書いてください。\n返された参照を通じて最大値を変更できることを確認すること。",
+    code: `# def max_ref(ref [life] lst: List[Int]) -> ref [life] Int:
+#     ...
+#
+# var nums = List[Int](3, 7, 2, 9, 1)
+# max_ref(nums) = 100
+# print(nums)  # 9 が 100 に変わっている`,
+    answer: `def max_ref(ref [life] lst: List[Int]) -> ref [life] Int:
+    var max_idx = 0
+    for i in range(1, len(lst)):
+        if lst[i] > lst[max_idx]:
+            max_idx = i
+    return lst[max_idx]
+
+def main():
+    var nums = List[Int](3, 7, 2, 9, 1)
+    print("変更前:", nums[3])  # 9
+    max_ref(nums) = 100
+    print("変更後:", nums[3])  # 100`
+  }, {
+    diff: 2,
+    q: "var（owned）引数を使って、String の所有権を受け取り加工して返す関数 wrap を書いてください。\n呼び出し側では ^ でムーブすること。",
+    code: `# def wrap(var text: String) -> String:
+#     ...
+#
+# var msg = String("Hello")
+# var result = wrap(msg^)
+# print(result)  # "[Hello]"
+# # print(msg)  ← コンパイルエラー`,
+    answer: `def wrap(var text: String) -> String:
+    return "[" + text + "]"
+
+def main():
+    var msg = String("Hello")
+    var result = wrap(msg^)
+    print(result)     # [Hello]
+    # print(msg)      # コンパイルエラー: msg は移動済み`
+  }, {
+    diff: 3,
+    q: "以下のコードにはライフタイムに関するバグがあります。問題を特定し修正してください。",
+    code: `struct Container:
+    var data: List[Int]
+    def __init__(out self):
+        self.data = List[Int](1, 2, 3)
+
+def get_first_broken() -> Int:
+    # バグ: ローカル変数への参照を返そうとしている
+    var c = Container()
+    return c.data[0]  # c はこの後破棄される
+
+def main():
+    # 修正版を書いてください
+    # ヒント: 値をコピーして返すか、所有権を移動する
+    pass`,
+    answer: `struct Container:
+    var data: List[Int]
+    def __init__(out self):
+        self.data = List[Int](1, 2, 3)
+
+    def first(self) -> Int:
+        # 値をコピーして返す（安全）
+        return self.data[0]
+
+def get_first_safe() -> Int:
+    var c = Container()
+    return c.first()  # Int のコピーを返す
+
+def main():
+    var val = get_first_safe()
+    print("最初の要素:", val)  # 1`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "OwnedPointer を使ってヒープ上に Int 値を確保し、読み取り・変更・表示してください。",
+    code: `# var ptr = OwnedPointer[Int](42)
+# print(ptr[])      # 42
+# ptr[] = 100
+# print(ptr[])      # 100`,
+    answer: `def main():
+    var ptr = OwnedPointer[Int](42)
+    print("初期値:", ptr[])    # 42
+    ptr[] = 100
+    print("変更後:", ptr[])    # 100
+    # OwnedPointer はスコープ終了時に自動解放`
+  }, {
+    diff: 2,
+    q: "UnsafePointer を使って5個の Int を動的確保し、値を初期化、合計を計算、最後にメモリを解放してください。\nメモリリークが起きないよう、destroy_pointee と free を正しく呼ぶこと。",
+    code: `# ヒント:
+# var ptr = UnsafePointer[Int].alloc(5)
+# (ptr + i).init_pointee_move(value)
+# ...
+# (ptr + i).destroy_pointee()
+# ptr.free()`,
+    answer: `def main():
+    alias N = 5
+    var ptr = UnsafePointer[Int].alloc(N)
+
+    # 初期化
+    for i in range(N):
+        (ptr + i).init_pointee_move((i + 1) * 10)
+
+    # 読み取り・合計
+    var total = 0
+    for i in range(N):
+        print("ptr[" + String(i) + "] =", (ptr + i)[])
+        total += (ptr + i)[]
+    print("合計:", total)  # 150
+
+    # クリーンアップ（順序重要: destroy → free）
+    for i in range(N):
+        (ptr + i).destroy_pointee()
+    ptr.free()`
+  }, {
+    diff: 2,
+    q: "ArcPointer を使って、2つの変数が同じヒープ上のデータを共有していることを確認してください。\n一方を変更したら他方にも反映されることを示すこと。",
+    code: `# ArcPointer は参照カウント付きスマートポインタ
+# var a = ArcPointer[Int](42)
+# var b = a  # 参照カウント +1
+# ...`,
+    answer: `def main():
+    var a = ArcPointer[Int](42)
+    var b = a  # 参照カウント増加、同じデータを共有
+    print("a:", a[], "b:", b[])  # 両方 42
+
+    # 共有データの変更は両方に反映
+    a[] = 999
+    print("変更後 a:", a[], "b:", b[])  # 両方 999
+    # スコープ終了時、参照カウントが0になったら自動解放`
+  }, {
+    diff: 3,
+    q: "4種類のポインタを使い分ける場面を実装してください。\n・Pointer: 既存の変数への安全な参照\n・OwnedPointer: 単独所有のヒープ確保\n・ArcPointer: 共有所有\n・UnsafePointer: 低レベルバッファ操作\nそれぞれの特徴をコメントで説明すること。",
+    code: `def main():
+    # 4つのポインタ型をそれぞれ使い分ける
+    pass`,
+    answer: `def main():
+    # 1. Pointer: 既存の値への安全な参照（非所有）
+    var local_val: Int = 42
+    var safe_ref = Pointer(to=local_val)
+    print("Pointer:", safe_ref[])  # 42（借用のみ）
+
+    # 2. OwnedPointer: ヒープ上に単独所有（unique_ptr相当）
+    var unique = OwnedPointer[Int](100)
+    print("OwnedPointer:", unique[])
+    unique[] = 200
+    print("変更後:", unique[])  # 200
+
+    # 3. ArcPointer: ヒープ上に共有所有（Arc相当）
+    var shared1 = ArcPointer[Int](300)
+    var shared2 = shared1  # 参照カウント+1
+    print("ArcPointer shared1:", shared1[], "shared2:", shared2[])
+
+    # 4. UnsafePointer: 手動メモリ管理（最終手段）
+    var raw = UnsafePointer[Int].alloc(3)
+    for i in range(3):
+        (raw + i).init_pointee_move(i * 100)
+    for i in range(3):
+        print("UnsafePointer[" + String(i) + "]:", (raw + i)[])
+    for i in range(3):
+        (raw + i).destroy_pointee()
+    raw.free()`
+  }],
+  ch3: [{
+    diff: 1,
+    q: "@value デコレータを使って、コピーとムーブが自動で動作する Point struct を定義してください。\n手動で __copyinit__ や __moveinit__ を書かないこと。",
+    code: `# @value で __copyinit__, __moveinit__, __del__ を自動生成
+# var p1 = Point(1.0, 2.0)
+# var p2 = p1     # コピー
+# var p3 = p1^    # ムーブ`,
+    answer: `@value
+struct Point:
+    var x: Float64
+    var y: Float64
+
+def main():
+    var p1 = Point(1.0, 2.0)
+    var p2 = p1      # コピー（__copyinit__ 自動生成）
+    print("p1:", p1.x, p1.y)
+    print("p2:", p2.x, p2.y)
+    var p3 = p1^     # ムーブ（__moveinit__ 自動生成）
+    print("p3:", p3.x, p3.y)
+    # print(p1.x)   # エラー: p1 は移動済み`
+  }, {
+    diff: 2,
+    q: "演算子オーバーロードを完全に実装した Vector3 struct を作成してください。\n以下を全て実装すること:\n・__add__, __sub__, __mul__（スカラー倍）, __neg__\n・__eq__, __ne__\n・__str__\n・dot（内積）メソッド",
+    code: `# var a = Vector3(1.0, 2.0, 3.0)
+# var b = Vector3(4.0, 5.0, 6.0)
+# print((a + b).__str__())     # (5.0, 7.0, 9.0)
+# print((a * 2.0).__str__())   # (2.0, 4.0, 6.0)
+# print(a.dot(b))              # 32.0`,
+    answer: `@value
+struct Vector3(EqualityComparable, Stringable):
+    var x: Float64
+    var y: Float64
+    var z: Float64
+
+    def __add__(self, other: Vector3) -> Vector3:
+        return Vector3(self.x + other.x, self.y + other.y, self.z + other.z)
+
+    def __sub__(self, other: Vector3) -> Vector3:
+        return Vector3(self.x - other.x, self.y - other.y, self.z - other.z)
+
+    def __mul__(self, scalar: Float64) -> Vector3:
+        return Vector3(self.x * scalar, self.y * scalar, self.z * scalar)
+
+    def __neg__(self) -> Vector3:
+        return Vector3(-self.x, -self.y, -self.z)
+
+    def __eq__(self, other: Vector3) -> Bool:
+        return self.x == other.x and self.y == other.y and self.z == other.z
+
+    def __ne__(self, other: Vector3) -> Bool:
+        return not (self == other)
+
+    def __str__(self) -> String:
+        return "(" + String(self.x) + ", " + String(self.y) + ", " + String(self.z) + ")"
+
+    def dot(self, other: Vector3) -> Float64:
+        return self.x * other.x + self.y * other.y + self.z * other.z
+
+def main():
+    var a = Vector3(1.0, 2.0, 3.0)
+    var b = Vector3(4.0, 5.0, 6.0)
+    print("a + b:", (a + b).__str__())
+    print("a * 2:", (a * 2.0).__str__())
+    print("-a:", (-a).__str__())
+    print("a . b:", a.dot(b))
+    print("a == a:", a == a)
+    print("a == b:", a == b)`
+  }, {
+    diff: 3,
+    q: "@explicit_destroy デコレータを使って、リソースの解放忘れをコンパイル時に検出する ManagedFile struct を作成してください。\nclose() メソッドを明示的に呼ばないとコンパイルエラーになるようにすること。",
+    code: `# @explicit_destroy は __del__ の自動呼び出しを禁止し、
+# 明示的な破棄を強制する
+#
+# var f = ManagedFile("data.txt")
+# f.write("hello")
+# f.close()  # これを忘れるとコンパイルエラー`,
+    answer: `@explicit_destroy
+struct ManagedFile:
+    var path: String
+    var is_open: Bool
+
+    def __init__(out self, path: String):
+        self.path = path
+        self.is_open = True
+        print("開く:", path)
+
+    def write(self, content: String):
+        if self.is_open:
+            print("書込:", self.path, "←", content)
+
+    def close(owned self):
+        # owned self を受け取ることで所有権を消費
+        if self.is_open:
+            print("閉じる:", self.path)
+        # self のフィールドを個別に破棄
+        self.path.destroy()
+        self.is_open.destroy()
+
+def main():
+    var f = ManagedFile("data.txt")
+    f.write("hello")
+    f.write("world")
+    f.close()  # これがないとコンパイルエラー`
+  }],
+  ch4: [{
+    diff: 1,
+    q: "パラメータ化された固定長配列 FixedArray[T, N] を定義してください。\nT は要素の型、N は配列のサイズ（コンパイル時定数）。\nget(idx) と set(idx, val) メソッドを持つこと。",
+    code: `# var arr = FixedArray[Int, 5]()
+# arr.set(0, 42)
+# print(arr.get(0))  # 42`,
+    answer: `struct FixedArray[T: CollectionElement, N: Int]:
+    var data: List[T]
+
+    def __init__(out self):
+        self.data = List[T]()
+        for i in range(N):
+            self.data.append(T())
+
+    def get(self, idx: Int) -> T:
+        return self.data[idx]
+
+    def set(mut self, idx: Int, val: T):
+        self.data[idx] = val
+
+    def size(self) -> Int:
+        return N
+
+def main():
+    var arr = FixedArray[Int, 5]()
+    arr.set(0, 42)
+    arr.set(1, 100)
+    print("arr[0]:", arr.get(0))
+    print("arr[1]:", arr.get(1))
+    print("size:", arr.size())`
+  }, {
+    diff: 2,
+    q: "comptime if を使って、型パラメータに基づいてコンパイル時に異なるコードを生成する関数を書いてください。\n数値型なら加算、文字列型なら連結を行うこと。",
+    code: `# def smart_combine[T: ...](a: T, b: T) -> T:
+#     comptime if T is Int:
+#         return a + b  # 数値加算
+#     else:
+#         ...`,
+    answer: `def smart_combine[T: Addable](a: T, b: T) -> T:
+    # comptime if による型に基づくコンパイル時分岐
+    return a + b
+
+# より実用的な例: comptime if でDTypeに基づく分岐
+def describe_dtype[dt: DType]():
+    comptime if dt.is_floating_point():
+        print("浮動小数点型:", dt)
+    elif dt.is_integral():
+        comptime if dt.is_signed():
+            print("符号付き整数型:", dt)
+        else:
+            print("符号なし整数型:", dt)
+    else:
+        print("その他の型:", dt)
+
+def main():
+    describe_dtype[DType.float32]()   # 浮動小数点型
+    describe_dtype[DType.int64]()     # 符号付き整数型
+    describe_dtype[DType.uint8]()     # 符号なし整数型`
+  }, {
+    diff: 2,
+    q: "infer-only パラメータ（//）を使って、ユーザーが型パラメータを明示指定せずに使える sum_list 関数を書いてください。",
+    code: `# // の右側のパラメータは推論専用
+# def sum_list[//, T: Addable](lst: List[T]) -> T:
+#     ...
+#
+# var nums = List[Int](1, 2, 3, 4, 5)
+# print(sum_list(nums))  # T を明示指定しなくてよい`,
+    answer: `def sum_list[//, T: CollectionElement](lst: List[T]) -> T:
+    var result = lst[0]
+    for i in range(1, len(lst)):
+        result = result + lst[i]
+    return result
+
+def main():
+    var ints = List[Int](1, 2, 3, 4, 5)
+    print("Int合計:", sum_list(ints))  # T は Int と推論
+
+    var floats = List[Float64](1.5, 2.5, 3.5)
+    print("Float合計:", sum_list(floats))  # T は Float64 と推論`
+  }, {
+    diff: 3,
+    q: "comptime for を使って、コンパイル時にフィボナッチ数列の最初の10項を計算し、結果を表示する関数を書いてください。\nalias を活用してコンパイル時計算を行うこと。",
+    code: `# comptime for はコンパイル時にループを展開する
+# alias で計算結果をコンパイル時定数として保持`,
+    answer: `def fib(n: Int) -> Int:
+    if n <= 1:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+def print_fib_table():
+    # comptime for でコンパイル時にループ展開
+    comptime for i in range(10):
+        alias val = fib(i)
+        print("fib(" + String(i) + ") =", val)
+
+def main():
+    print_fib_table()`
+  }],
+  ch5: [{
+    diff: 1,
+    q: "トレイト合成（&）を使って、PrintableAndComparable な型を要求するジェネリック関数を書いてください。",
+    code: `# trait 合成で複数の制約を同時に指定
+# def show_max[T: Stringable & Comparable](a: T, b: T):
+#     ...`,
+    answer: `def show_max[T: Stringable & Comparable](a: T, b: T):
+    if a > b:
+        print("最大値:", String(a))
+    else:
+        print("最大値:", String(b))
+
+def main():
+    show_max(10, 20)       # Int は Stringable & Comparable
+    show_max(3.14, 2.71)   # Float64 も同様`
+  }, {
+    diff: 2,
+    q: "トレイト継承を使って、Printable トレイトが Stringable と Writable を両方含むように定義してください。\nstruct に Printable を実装すれば、String() 変換も print() も使えることを確認。",
+    code: `# trait Printable(Stringable, Writable):
+#     ...  # 追加のメソッド要求もOK
+#
+# struct MyType(Printable):
+#     ...`,
+    answer: `trait Printable(Stringable, Writable):
+    def display(self) -> String: ...
+
+@value
+struct Color(Printable):
+    var r: UInt8
+    var g: UInt8
+    var b: UInt8
+
+    def __str__(self) -> String:
+        return "rgb(" + String(self.r) + "," + String(self.g) + "," + String(self.b) + ")"
+
+    def write_to[W: Writer](self, mut writer: W):
+        writer.write(self.__str__())
+
+    def display(self) -> String:
+        return "Color: " + self.__str__()
+
+def show[T: Printable](item: T):
+    print(item.display())
+
+def main():
+    var c = Color(255, 128, 0)
+    show(c)              # Printable として使用
+    print(String(c))     # Stringable として使用
+    print(c)             # Writable として使用`
+  }, {
+    diff: 2,
+    q: "条件付きメソッド実装を使って、SortableList struct に where 句で sort メソッドを条件付きで提供してください。\n要素が Comparable な場合のみ sort が使えるようにすること。",
+    code: `# struct SortableList[T: CollectionElement]:
+#     ...
+#     def sort(mut self) where T: Comparable:
+#         # T が Comparable のときだけこのメソッドが存在
+#         ...`,
+    answer: `struct SortableList[T: CollectionElement]:
+    var data: List[T]
+
+    def __init__(out self):
+        self.data = List[T]()
+
+    def append(mut self, val: T):
+        self.data.append(val)
+
+    def __len__(self) -> Int:
+        return len(self.data)
+
+    def get(self, idx: Int) -> T:
+        return self.data[idx]
+
+    # Comparable な型のみ sort メソッドを持つ
+    def sort(mut self) where T: Comparable:
+        # バブルソート（簡易実装）
+        for i in range(len(self.data)):
+            for j in range(len(self.data) - 1 - i):
+                if self.data[j] > self.data[j + 1]:
+                    var tmp = self.data[j]
+                    self.data[j] = self.data[j + 1]
+                    self.data[j + 1] = tmp
+
+def main():
+    var lst = SortableList[Int]()
+    lst.append(5)
+    lst.append(2)
+    lst.append(8)
+    lst.append(1)
+    lst.sort()  # Int は Comparable なので OK
+    for i in range(len(lst)):
+        print(lst.get(i))`
+  }, {
+    diff: 3,
+    q: "組み込みトレイトを活用して、Dict のキーとして使える UserID struct を実装してください。\nKeyElement トレイト（Hashable, EqualityComparable, etc.）を満たす必要があります。",
+    code: `# struct UserID(KeyElement):
+#     var id: Int
+#     # __hash__, __eq__, __ne__ 等を実装
+#
+# var users = Dict[UserID, String]()
+# users[UserID(1)] = "Alice"`,
+    answer: `@value
+struct UserID(KeyElement):
+    var id: Int
+
+    def __hash__(self) -> UInt:
+        return UInt(self.id)
+
+    def __eq__(self, other: UserID) -> Bool:
+        return self.id == other.id
+
+    def __ne__(self, other: UserID) -> Bool:
+        return self.id != other.id
+
+    def __str__(self) -> String:
+        return "UserID(" + String(self.id) + ")"
+
+def main():
+    var users = Dict[UserID, String]()
+    users[UserID(1)] = "Alice"
+    users[UserID(2)] = "Bob"
+    users[UserID(3)] = "Charlie"
+
+    var target = UserID(2)
+    if target in users:
+        print(target.__str__() + ":", users[target])
+
+    print("ユーザー数:", len(users))`
+  }],
+  ch6: [{
+    diff: 1,
+    q: "カスタムエラー型 ValidationError を定義し、年齢のバリデーション関数で使ってください。\n年齢が0未満または150超の場合にエラーを送出すること。",
+    code: `# struct ValidationError(Error):
+#     ...
+#
+# def validate_age(age: Int) raises ValidationError -> Int:
+#     ...`,
+    answer: `@value
+struct ValidationError:
+    var message: String
+
+    def __str__(self) -> String:
+        return "ValidationError: " + self.message
+
+def validate_age(age: Int) raises -> Int:
+    if age < 0:
+        raise Error("年齢は0以上である必要があります: " + String(age))
+    if age > 150:
+        raise Error("年齢は150以下である必要があります: " + String(age))
+    return age
+
+def main():
+    try:
+        var age1 = validate_age(25)
+        print("有効な年齢:", age1)
+        var age2 = validate_age(-5)
+        print("ここには到達しない")
+    except e:
+        print("エラー:", String(e))
+
+    try:
+        var age3 = validate_age(200)
+    except e:
+        print("エラー:", String(e))`
+  }, {
+    diff: 2,
+    q: "with 文とコンテキストマネージャを使って、データベース接続を模した DatabaseConnection struct を実装してください。\n__enter__ で接続、__exit__ で切断するようにすること。",
+    code: `# struct DatabaseConnection:
+#     def __enter__(mut self) -> Self: ...
+#     def __exit__(mut self): ...
+#
+# with DatabaseConnection("localhost") as db:
+#     db.query("SELECT * FROM users")`,
+    answer: `struct DatabaseConnection:
+    var host: String
+    var connected: Bool
+
+    def __init__(out self, host: String):
+        self.host = host
+        self.connected = False
+        print("DB作成:", host)
+
+    def __enter__(mut self) -> ref [self] Self:
+        self.connected = True
+        print("DB接続:", self.host)
+        return self
+
+    def __exit__(mut self):
+        if self.connected:
+            self.connected = False
+            print("DB切断:", self.host)
+
+    def query(self, sql: String):
+        if self.connected:
+            print("実行:", sql)
+        else:
+            print("エラー: 未接続")
+
+def main():
+    with DatabaseConnection("localhost:5432") as db:
+        db.query("SELECT * FROM users")
+        db.query("INSERT INTO logs VALUES ('login')")
+    # with ブロック終了時に自動的に __exit__ が呼ばれる
+    print("接続は安全に解放済み")`
+  }, {
+    diff: 3,
+    q: "エラー設計パターンを実践してください。\nResult 的な型（成功 or エラー）を struct で実装し、エラーチェーンもサポートすること。",
+    code: `# struct Result[T: CollectionElement]:
+#     var value: Optional[T]
+#     var error: Optional[String]
+#
+# def parse_int(s: String) -> Result[Int]:
+#     ...`,
+    answer: `@value
+struct Result[T: CollectionElement]:
+    var _value: T
+    var _error: String
+    var _has_value: Bool
+
+    @staticmethod
+    def ok(val: T) -> Self:
+        return Self(_value=val, _error=String(""), _has_value=True)
+
+    @staticmethod
+    def err(msg: String) -> Self:
+        return Self(_value=T(), _error=msg, _has_value=False)
+
+    def is_ok(self) -> Bool:
+        return self._has_value
+
+    def is_err(self) -> Bool:
+        return not self._has_value
+
+    def unwrap(self) raises -> T:
+        if self._has_value:
+            return self._value
+        raise Error(self._error)
+
+    def unwrap_or(self, default: T) -> T:
+        if self._has_value:
+            return self._value
+        return default
+
+    def map_error(self, prefix: String) -> Self:
+        if self._has_value:
+            return self
+        return Self.err(prefix + ": " + self._error)
+
+def parse_int(s: String) -> Result[Int]:
+    try:
+        return Result[Int].ok(Int(s))
+    except:
+        return Result[Int].err("'" + s + "' は整数ではありません")
+
+def main():
+    var r1 = parse_int("42")
+    var r2 = parse_int("abc")
+
+    print("r1 ok?", r1.is_ok(), "value:", r1.unwrap_or(0))
+    print("r2 ok?", r2.is_ok(), "value:", r2.unwrap_or(-1))
+
+    # エラーチェーン
+    var r3 = parse_int("xyz").map_error("設定読込失敗")
+    try:
+        var v = r3.unwrap()
+    except e:
+        print("チェーンエラー:", String(e))`
+  }],
+  ch7: [{
+    diff: 1,
+    q: "以下のパッケージ構成を設計し、__init__.mojo の内容を書いてください。\nmathlib パッケージに geometry と algebra の2つのサブモジュールを持たせること。",
+    code: `# mathlib/
+# ├── __init__.mojo     ← ここを書く
+# ├── geometry.mojo     ← area(), perimeter()
+# └── algebra.mojo      ← solve_linear(), gcd()
+#
+# 使い方:
+# from mathlib import area, solve_linear`,
+    answer: `# mathlib/__init__.mojo
+# パッケージの公開APIを定義
+
+from .geometry import area, perimeter
+from .algebra import solve_linear, gcd
+
+# --- geometry.mojo ---
+# def area(width: Float64, height: Float64) -> Float64:
+#     return width * height
+#
+# def perimeter(width: Float64, height: Float64) -> Float64:
+#     return 2.0 * (width + height)
+#
+# def _helper():  # _ prefix = 内部関数（慣例）
+#     pass
+
+# --- algebra.mojo ---
+# def solve_linear(a: Float64, b: Float64) -> Float64:
+#     """ax + b = 0 の解を返す"""
+#     return -b / a
+#
+# def gcd(a: Int, b: Int) -> Int:
+#     var x = a
+#     var y = b
+#     while y != 0:
+#         var tmp = y
+#         y = x % y
+#         x = tmp
+#     return x`
+  }, {
+    diff: 2,
+    q: "大規模プロジェクト向けのパッケージ構成を設計してください。\nWebフレームワーク風のプロジェクトで、router, handler, middleware, model の4モジュールを持つ構成を提案すること。",
+    code: `# webframework/
+# ├── __init__.mojo
+# ├── router.mojo
+# ├── handler.mojo
+# ├── middleware.mojo
+# └── model.mojo
+#
+# 各モジュールの主要な struct/関数を定義`,
+    answer: `# webframework/__init__.mojo
+# 公開API
+from .router import Router, Route
+from .handler import Handler, Response
+from .middleware import Middleware, Logger, AuthMiddleware
+from .model import Model
+
+# --- router.mojo ---
+@value
+struct Route:
+    var path: String
+    var method: String
+
+struct Router:
+    var routes: List[Route]
+
+    def __init__(out self):
+        self.routes = List[Route]()
+
+    def add_route(mut self, method: String, path: String):
+        self.routes.append(Route(path, method))
+        print("ルート登録:", method, path)
+
+    def get(mut self, path: String):
+        self.add_route("GET", path)
+
+    def post(mut self, path: String):
+        self.add_route("POST", path)
+
+# --- handler.mojo ---
+@value
+struct Response:
+    var status: Int
+    var body: String
+
+trait Handler:
+    def handle(self, path: String) -> Response: ...
+
+# --- middleware.mojo ---
+trait Middleware:
+    def process(self, path: String) -> Bool: ...
+
+struct Logger(Middleware):
+    def __init__(out self): pass
+    def process(self, path: String) -> Bool:
+        print("[LOG]", path)
+        return True
+
+# --- model.mojo ---
+trait Model:
+    def validate(self) -> Bool: ...
+    def to_dict(self) -> Dict[String, String]: ...
+
+# 使用例
+def main():
+    var router = Router()
+    router.get("/users")
+    router.post("/users")
+    router.get("/users/:id")
+    print("登録ルート数:", len(router.routes))`
+  }, {
+    diff: 3,
+    q: ".mojopkg のビルドと利用フローを説明するコードを書いてください。\nAPI設計の原則（公開/非公開の区別、docstring、バージョニング）も含めること。",
+    code: `# ビルドコマンド:
+# mojo package mylib -o mylib.mojopkg
+#
+# 使用側:
+# from mylib import ...`,
+    answer: `# === mylib/__init__.mojo ===
+# バージョン情報
+alias VERSION = "1.0.0"
+alias VERSION_MAJOR = 1
+alias VERSION_MINOR = 0
+
+# 公開API（明示的に再エクスポート）
+from .core import transform, validate
+from .types import Config, Status
+# _internal は再エクスポートしない → 非公開
+
+# === mylib/core.mojo ===
+def transform(data: String) -> String:
+    """データを変換する。
+
+    Args:
+        data: 変換対象の文字列。
+
+    Returns:
+        変換後の文字列。
+    """
+    return _apply_rules(data)
+
+def _apply_rules(data: String) -> String:
+    """内部関数。直接使用しないこと。"""
+    return "[" + data + "]"
+
+def validate(data: String) -> Bool:
+    """データの妥当性を検証する。"""
+    return len(data) > 0
+
+# === mylib/types.mojo ===
+@value
+struct Config:
+    """設定を保持する構造体。"""
+    var name: String
+    var debug: Bool
+
+@value
+struct Status:
+    """処理結果の状態。"""
+    var code: Int
+    var message: String
+
+    def is_ok(self) -> Bool:
+        return self.code == 0
+
+# === ビルドと使用 ===
+# $ mojo package mylib -o mylib.mojopkg
+# $ ls mylib.mojopkg  # コンパイル済みパッケージ
+#
+# 使用側の main.mojo:
+# from mylib import transform, Config, VERSION
+# def main():
+#     print("Version:", VERSION)
+#     var cfg = Config("prod", False)
+#     var result = transform("hello")
+#     print(result)  # [hello]`
+  }],
+  ch8: [{
+    diff: 1,
+    q: "List[Int] を内部的に再実装した SimpleList struct を作成してください。\nUnsafePointer を使い、append, get, len の3メソッドを実装すること。\n容量が足りなくなったら2倍に拡張する。",
+    code: `# struct SimpleList:
+#     var data: UnsafePointer[Int]
+#     var size: Int
+#     var capacity: Int
+#
+# var lst = SimpleList()
+# lst.append(10)
+# lst.append(20)
+# print(lst.get(0))  # 10`,
+    answer: `struct SimpleList:
+    var data: UnsafePointer[Int]
+    var size: Int
+    var capacity: Int
+
+    def __init__(out self):
+        self.capacity = 4
+        self.size = 0
+        self.data = UnsafePointer[Int].alloc(self.capacity)
+
+    def _grow(mut self):
+        var new_cap = self.capacity * 2
+        var new_data = UnsafePointer[Int].alloc(new_cap)
+        for i in range(self.size):
+            (new_data + i).init_pointee_move((self.data + i)[])
+            (self.data + i).destroy_pointee()
+        self.data.free()
+        self.data = new_data
+        self.capacity = new_cap
+
+    def append(mut self, val: Int):
+        if self.size == self.capacity:
+            self._grow()
+        (self.data + self.size).init_pointee_move(val)
+        self.size += 1
+
+    def get(self, idx: Int) -> Int:
+        return (self.data + idx)[]
+
+    def __len__(self) -> Int:
+        return self.size
+
+    def __del__(owned self):
+        for i in range(self.size):
+            (self.data + i).destroy_pointee()
+        self.data.free()
+
+def main():
+    var lst = SimpleList()
+    for i in range(10):
+        lst.append(i * 10)
+    print("size:", len(lst), "capacity:", lst.capacity)
+    for i in range(len(lst)):
+        print("lst[" + String(i) + "]:", lst.get(i))`
+  }, {
+    diff: 2,
+    q: "ハッシュマップの基本的な仕組みを実装してください。\nSimpleDict struct で、String キーと Int 値のマッピングを実現すること。\nオープンアドレス法（線形探索）を使うこと。",
+    code: `# struct SimpleDict:
+#     ...
+#     def put(mut self, key: String, val: Int): ...
+#     def get(self, key: String) -> Int: ...
+#     def contains(self, key: String) -> Bool: ...`,
+    answer: `@value
+struct Entry:
+    var key: String
+    var value: Int
+    var occupied: Bool
+
+struct SimpleDict:
+    var buckets: List[Entry]
+    var capacity: Int
+    var size: Int
+
+    def __init__(out self, capacity: Int = 16):
+        self.capacity = capacity
+        self.size = 0
+        self.buckets = List[Entry]()
+        for i in range(capacity):
+            self.buckets.append(Entry("", 0, False))
+
+    def _hash(self, key: String) -> Int:
+        var h: Int = 0
+        for i in range(len(key)):
+            h = h * 31 + ord(key[i])
+        return h % self.capacity
+
+    def put(mut self, key: String, val: Int):
+        var idx = self._hash(key)
+        for i in range(self.capacity):
+            var probe = (idx + i) % self.capacity
+            if not self.buckets[probe].occupied:
+                self.buckets[probe] = Entry(key, val, True)
+                self.size += 1
+                return
+            if self.buckets[probe].key == key:
+                self.buckets[probe].value = val
+                return
+
+    def get(self, key: String) raises -> Int:
+        var idx = self._hash(key)
+        for i in range(self.capacity):
+            var probe = (idx + i) % self.capacity
+            if not self.buckets[probe].occupied:
+                raise Error("Key not found: " + key)
+            if self.buckets[probe].key == key:
+                return self.buckets[probe].value
+        raise Error("Key not found: " + key)
+
+    def contains(self, key: String) -> Bool:
+        try:
+            _ = self.get(key)
+            return True
+        except:
+            return False
+
+def main():
+    var d = SimpleDict()
+    d.put("alice", 100)
+    d.put("bob", 200)
+    d.put("charlie", 300)
+    print("alice:", d.get("alice"))
+    print("bob:", d.get("bob"))
+    print("contains charlie:", d.contains("charlie"))
+    print("contains dave:", d.contains("dave"))`
+  }, {
+    diff: 3,
+    q: "イテレータプロトコル（__iter__, __next__）を実装した Range 風のカスタムコレクションを作成してください。\nstep 付きで for ループで使えるようにすること。",
+    code: `# struct StepRange:
+#     ...
+#     def __iter__(self) -> StepRangeIter: ...
+#
+# for val in StepRange(0, 20, 3):
+#     print(val)  # 0, 3, 6, 9, 12, 15, 18`,
+    answer: `@value
+struct StepRange:
+    var start: Int
+    var stop: Int
+    var step: Int
+
+    def __iter__(self) -> StepRangeIter:
+        return StepRangeIter(self.start, self.stop, self.step)
+
+@value
+struct StepRangeIter:
+    var current: Int
+    var stop: Int
+    var step: Int
+
+    def __next__(mut self) -> Int:
+        var val = self.current
+        self.current += self.step
+        return val
+
+    def __has_next__(self) -> Bool:
+        if self.step > 0:
+            return self.current < self.stop
+        return self.current > self.stop
+
+    def __len__(self) -> Int:
+        if self.step > 0:
+            if self.current >= self.stop:
+                return 0
+            return (self.stop - self.current + self.step - 1) // self.step
+        if self.current <= self.stop:
+            return 0
+        return (self.current - self.stop - self.step - 1) // (-self.step)
+
+def main():
+    print("0から20、ステップ3:")
+    for val in StepRange(0, 20, 3):
+        print(val)
+
+    print("\\n10から0、ステップ-2:")
+    for val in StepRange(10, 0, -2):
+        print(val)`
+  }],
+  ch9: [{
+    diff: 1,
+    q: "SIMD を使ってベクトルの内積（ドット積）を計算する関数を書いてください。\n4要素の float32 ベクトル2つの内積を求めること。",
+    code: `# def dot4(a: SIMD[DType.float32, 4], b: SIMD[DType.float32, 4]) -> Float32:
+#     ...
+#
+# dot4([1,2,3,4], [5,6,7,8]) = 1*5+2*6+3*7+4*8 = 70`,
+    answer: `def dot4(a: SIMD[DType.float32, 4], b: SIMD[DType.float32, 4]) -> Float32:
+    return (a * b).reduce_add()
+
+def main():
+    var a = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)
+    var b = SIMD[DType.float32, 4](5.0, 6.0, 7.0, 8.0)
+    print("内積:", dot4(a, b))  # 70.0
+
+    # 検算: 1*5 + 2*6 + 3*7 + 4*8 = 5+12+21+32 = 70
+    var manual = a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3]
+    print("検算:", manual)`
+  }, {
+    diff: 2,
+    q: "SIMD の比較マスクと select を使って、ベクトルの要素を条件付きで変換する関数を書いてください。\n負の要素を0にクランプ（ReLU関数）する処理を実装すること。",
+    code: `# def relu(v: SIMD[DType.float32, 8]) -> SIMD[DType.float32, 8]:
+#     # 負の要素 → 0、正の要素 → そのまま
+#     ...`,
+    answer: `def relu(v: SIMD[DType.float32, 8]) -> SIMD[DType.float32, 8]:
+    var zero = SIMD[DType.float32, 8](0.0)
+    var mask = v > zero  # Bool マスク
+    return mask.select(v, zero)  # True→v, False→0
+
+def main():
+    var input = SIMD[DType.float32, 8](
+        -3.0, 1.5, -0.5, 4.0, -2.0, 0.0, 3.0, -1.0
+    )
+    print("入力:", input)
+    print("ReLU:", relu(input))
+    # 期待: [0.0, 1.5, 0.0, 4.0, 0.0, 0.0, 3.0, 0.0]`
+  }, {
+    diff: 2,
+    q: "DType パラメータを活用して、任意の数値型で動作するジェネリックな SIMD 統計関数を書いてください。\nmin, max, mean を計算すること。",
+    code: `# def simd_stats[dt: DType, N: Int](v: SIMD[dt, N]):
+#     # min, max, mean を表示
+#     ...`,
+    answer: `def simd_stats[dt: DType, N: Int](v: SIMD[dt, N]):
+    print("型:", dt, "要素数:", N)
+    print("値:", v)
+    print("最小:", v.reduce_min())
+    print("最大:", v.reduce_max())
+
+    # mean はキャストして計算
+    var sum = v.reduce_add()
+    print("合計:", sum)
+    print("---")
+
+def main():
+    # float32
+    var f = SIMD[DType.float32, 4](1.5, 3.0, 0.5, 2.0)
+    simd_stats(f)
+
+    # int32
+    var n = SIMD[DType.int32, 8](10, -5, 30, 15, -20, 25, 0, 5)
+    simd_stats(n)
+
+    # float64
+    var d = SIMD[DType.float64, 4](100.0, 200.0, 300.0, 400.0)
+    simd_stats(d)`
+  }, {
+    diff: 3,
+    q: "SIMD を活用してマンデルブロ集合の1行分を高速に計算する関数を書いてください。\n4ピクセルを同時に計算するバージョンを実装すること。",
+    code: `# SIMD[DType.float64, 4] で4ピクセル同時に計算
+# 各ピクセルの反復回数を返す`,
+    answer: `alias WIDTH = 80
+alias MAX_ITER = 50
+
+def mandelbrot_simd(
+    cx: SIMD[DType.float64, 4],
+    cy: SIMD[DType.float64, 4],
+) -> SIMD[DType.int32, 4]:
+    """4ピクセル同時にマンデルブロ集合を計算"""
+    var zx = SIMD[DType.float64, 4](0.0)
+    var zy = SIMD[DType.float64, 4](0.0)
+    var count = SIMD[DType.int32, 4](0)
+    var one = SIMD[DType.int32, 4](1)
+    var four = SIMD[DType.float64, 4](4.0)
+
+    for i in range(MAX_ITER):
+        var zx2 = zx * zx
+        var zy2 = zy * zy
+        var mag2 = zx2 + zy2
+        var mask = mag2 < four  # まだ発散していないピクセル
+        if not mask.reduce_or():
+            break
+        count = count + mask.select(one, SIMD[DType.int32, 4](0))
+        var new_zx = zx2 - zy2 + cx
+        zy = SIMD[DType.float64, 4](2.0) * zx * zy + cy
+        zx = new_zx
+
+    return count
+
+def main():
+    var chars = String(" .:-=+*#%@")
+    for row in range(24):
+        var cy_val = Float64(row) / 12.0 - 1.0
+        var line = String("")
+        var col = 0
+        while col < WIDTH:
+            var cx = SIMD[DType.float64, 4](
+                Float64(col) / 30.0 - 2.0,
+                Float64(col + 1) / 30.0 - 2.0,
+                Float64(col + 2) / 30.0 - 2.0,
+                Float64(col + 3) / 30.0 - 2.0,
+            )
+            var cy = SIMD[DType.float64, 4](cy_val)
+            var iters = mandelbrot_simd(cx, cy)
+            for j in range(4):
+                var idx = Int(iters[j]) % len(chars)
+                line += chars[idx]
+            col += 4
+        print(line)`
+  }],
+  ch10: [{
+    diff: 1,
+    q: "Python の NumPy 配列を Mojo で受け取り、各要素を2乗して返す関数を書いてください。\n型変換（PythonObject ↔ Mojo型）を明示的に行うこと。",
+    code: `# from python import Python
+# def square_array():
+#     var np = Python.import_module("numpy")
+#     var arr = np.array([1, 2, 3, 4, 5])
+#     # Mojo側で処理して結果を返す`,
+    answer: `from python import Python
+
+def main():
+    var np = Python.import_module("numpy")
+
+    # Python 側で配列作成
+    var py_arr = np.array([1, 2, 3, 4, 5])
+    print("入力:", py_arr)
+
+    # 方法1: NumPy演算をそのまま使う（PythonObject上で操作）
+    var squared_py = py_arr ** 2
+    print("NumPy直接:", squared_py)
+
+    # 方法2: Mojo側に変換して処理
+    var size = Int(py_arr.size)
+    var result = List[Int]()
+    for i in range(size):
+        var val = Int(py_arr[i])  # PythonObject → Int 明示変換
+        result.append(val * val)
+
+    print("Mojo処理結果:")
+    for i in range(len(result)):
+        print("  [" + String(i) + "]:", result[i])`
+  }, {
+    diff: 2,
+    q: "Python の pandas DataFrame を Mojo で操作する関数を書いてください。\n列の統計情報（平均、標準偏差）を Mojo の Float64 に変換して表示すること。",
+    code: `# pandas DataFrame をMojoで分析
+# 型変換のオーバーヘッドに注意`,
+    answer: `from python import Python
+
+def main():
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+
+    # DataFrame 作成
+    var data = Python.dict()
+    data["name"] = ["Alice", "Bob", "Charlie", "Diana"]
+    data["age"] = [25, 30, 35, 28]
+    data["score"] = [85.5, 92.3, 78.1, 95.7]
+    var df = pd.DataFrame(data)
+    print("DataFrame:")
+    print(df)
+    print()
+
+    # Mojo の Float64 に変換して統計計算
+    var mean_age: Float64 = Float64(df["age"].mean())
+    var std_age: Float64 = Float64(df["age"].std())
+    var mean_score: Float64 = Float64(df["score"].mean())
+    var max_score: Float64 = Float64(df["score"].max())
+
+    print("=== Mojo側の統計結果 ===")
+    print("年齢 平均:", mean_age, "標準偏差:", std_age)
+    print("スコア 平均:", mean_score, "最高:", max_score)
+
+    # フィルタリングもPython側で実行し、結果をMojoに取得
+    var high_scorers = df[df["score"] > 90]
+    print("\\n高得点者:")
+    print(high_scorers)`
+  }, {
+    diff: 3,
+    q: "Python/Mojoのパフォーマンス境界を計測するベンチマークを書いてください。\n同じ計算（配列の合計）をPython(NumPy)、Python(ループ)、Mojo(ループ)で比較すること。",
+    code: `# 3つの方法で合計を計算し、時間を比較
+# 1. NumPy (Python)
+# 2. Python ループ
+# 3. Mojo ループ`,
+    answer: `from python import Python
+from time import now
+
+def main():
+    alias SIZE = 100_000
+    var np = Python.import_module("numpy")
+    var time_mod = Python.import_module("time")
+
+    # === 1. NumPy (Python側で完結) ===
+    var py_arr = np.arange(SIZE)
+    var t1 = now()
+    var sum_np = py_arr.sum()
+    var t2 = now()
+    var numpy_ns = t2 - t1
+    print("NumPy合計:", sum_np)
+    print("NumPy時間:", numpy_ns, "ns")
+
+    # === 2. Python ループ (遅い) ===
+    var t3 = now()
+    var sum_py = Python.evaluate("sum(range(" + String(SIZE) + "))")
+    var t4 = now()
+    var pyloop_ns = t4 - t3
+    print("\\nPyLoop合計:", sum_py)
+    print("PyLoop時間:", pyloop_ns, "ns")
+
+    # === 3. Mojo ネイティブループ ===
+    var t5 = now()
+    var sum_mojo: Int = 0
+    for i in range(SIZE):
+        sum_mojo += i
+    var t6 = now()
+    var mojo_ns = t6 - t5
+    print("\\nMojo合計:", sum_mojo)
+    print("Mojo時間:", mojo_ns, "ns")
+
+    # === 比較 ===
+    print("\\n=== 比較 ===")
+    print("NumPy / Mojo:", Float64(numpy_ns) / Float64(mojo_ns))
+    print("PyLoop / Mojo:", Float64(pyloop_ns) / Float64(mojo_ns))`
+  }],
+  ch11: [{
+    diff: 1,
+    q: "@always_inline と通常の関数で、小さな関数の呼び出しオーバーヘッドの違いを確認してください。\n加算関数を10万回呼び出して時間を比較すること。",
+    code: `# @always_inline
+# def fast_add(a: Int, b: Int) -> Int: ...
+#
+# def normal_add(a: Int, b: Int) -> Int: ...
+#
+# 両方を10万回呼び出して比較`,
+    answer: `from time import now
+
+@always_inline
+def fast_add(a: Int, b: Int) -> Int:
+    return a + b
+
+def normal_add(a: Int, b: Int) -> Int:
+    return a + b
+
+def main():
+    alias ITERS = 100_000
+
+    # 通常関数
+    var t1 = now()
+    var sum1 = 0
+    for i in range(ITERS):
+        sum1 = normal_add(sum1, i)
+    var t2 = now()
+    print("通常関数:", t2 - t1, "ns / 結果:", sum1)
+
+    # インライン関数
+    var t3 = now()
+    var sum2 = 0
+    for i in range(ITERS):
+        sum2 = fast_add(sum2, i)
+    var t4 = now()
+    print("インライン:", t4 - t3, "ns / 結果:", sum2)
+
+    print("速度比:", Float64(t2 - t1) / Float64(t4 - t3))`
+  }, {
+    diff: 2,
+    q: "List の事前容量確保による性能改善を計測してください。\n事前確保なしと事前確保ありで、100万要素の append にかかる時間を比較すること。",
+    code: `# 事前確保なし: var lst = List[Int]()
+# 事前確保あり: var lst = List[Int](capacity=1_000_000)
+# 100万回 append して比較`,
+    answer: `from time import now
+
+def main():
+    alias N = 1_000_000
+
+    # 事前確保なし
+    var t1 = now()
+    var lst1 = List[Int]()
+    for i in range(N):
+        lst1.append(i)
+    var t2 = now()
+    var no_reserve_ns = t2 - t1
+    print("事前確保なし:", no_reserve_ns, "ns")
+    print("  size:", len(lst1), "capacity:", lst1.capacity)
+
+    # 事前確保あり
+    var t3 = now()
+    var lst2 = List[Int](capacity=N)
+    for i in range(N):
+        lst2.append(i)
+    var t4 = now()
+    var with_reserve_ns = t4 - t3
+    print("事前確保あり:", with_reserve_ns, "ns")
+    print("  size:", len(lst2), "capacity:", lst2.capacity)
+
+    # 比較
+    print("\\n速度比(なし/あり):", Float64(no_reserve_ns) / Float64(with_reserve_ns))
+    print("リアロケーション回避により高速化")`
+  }, {
+    diff: 3,
+    q: "コピー vs ムーブのパフォーマンス差を計測してください。\n大きなデータを持つ struct を関数に渡す際、read/var(owned)/コピーの3パターンを比較すること。",
+    code: `# struct BigData:
+#     var data: List[Int]  # 大きなデータ
+#
+# read引数、var引数（^ムーブ）、コピーの3パターンを比較`,
+    answer: `from time import now
+
+struct BigData:
+    var data: List[Int]
+
+    def __init__(out self, size: Int):
+        self.data = List[Int]()
+        for i in range(size):
+            self.data.append(i)
+
+    def __copyinit__(out self, existing: Self):
+        self.data = existing.data
+
+    def __moveinit__(out self, owned existing: Self):
+        self.data = existing.data^
+
+def process_read(d: BigData) -> Int:
+    """read: コピーなし、借用のみ"""
+    return len(d.data)
+
+def process_owned(var d: BigData) -> Int:
+    """var(owned): ムーブで受け取り"""
+    return len(d.data)
+
+def process_copy(d: BigData) -> Int:
+    """read + 内部コピー: 最もコストが高い"""
+    var local = d  # 明示コピー
+    return len(local.data)
+
+def main():
+    alias SIZE = 100_000
+    alias ITERS = 100
+
+    # read（借用のみ）
+    var t1 = now()
+    for i in range(ITERS):
+        var d = BigData(SIZE)
+        _ = process_read(d)
+    var t2 = now()
+    print("read:", t2 - t1, "ns")
+
+    # owned（ムーブ）
+    var t3 = now()
+    for i in range(ITERS):
+        var d = BigData(SIZE)
+        _ = process_owned(d^)
+    var t4 = now()
+    print("owned(move):", t4 - t3, "ns")
+
+    # copy（最もコストが高い）
+    var t5 = now()
+    for i in range(ITERS):
+        var d = BigData(SIZE)
+        _ = process_copy(d)
+    var t6 = now()
+    print("copy:", t6 - t5, "ns")
+
+    print("\\ncopy/read比:", Float64(t6-t5) / Float64(t2-t1))
+    print("copy/move比:", Float64(t6-t5) / Float64(t4-t3))`
+  }],
+  ch12: [{
+    diff: 1,
+    q: "ストラテジーパターンをトレイト + ジェネリック関数で実装してください。\nソートアルゴリズムを切り替えられる設計にすること。",
+    code: `# trait SortStrategy:
+#     def sort(self, mut data: List[Int]): ...
+#
+# struct BubbleSort(SortStrategy): ...
+# struct SelectionSort(SortStrategy): ...
+#
+# def sort_data[T: SortStrategy](strategy: T, mut data: List[Int]):
+#     strategy.sort(data)`,
+    answer: `trait SortStrategy:
+    def sort(self, mut data: List[Int]): ...
+    def name(self) -> String: ...
+
+struct BubbleSort(SortStrategy):
+    def __init__(out self): pass
+
+    def sort(self, mut data: List[Int]):
+        for i in range(len(data)):
+            for j in range(len(data) - 1 - i):
+                if data[j] > data[j + 1]:
+                    var tmp = data[j]
+                    data[j] = data[j + 1]
+                    data[j + 1] = tmp
+
+    def name(self) -> String:
+        return "BubbleSort"
+
+struct SelectionSort(SortStrategy):
+    def __init__(out self): pass
+
+    def sort(self, mut data: List[Int]):
+        for i in range(len(data)):
+            var min_idx = i
+            for j in range(i + 1, len(data)):
+                if data[j] < data[min_idx]:
+                    min_idx = j
+            if min_idx != i:
+                var tmp = data[i]
+                data[i] = data[min_idx]
+                data[min_idx] = tmp
+
+    def name(self) -> String:
+        return "SelectionSort"
+
+def sort_data[T: SortStrategy](strategy: T, mut data: List[Int]):
+    print("アルゴリズム:", strategy.name())
+    strategy.sort(data)
+
+def print_list(data: List[Int]):
+    for i in range(len(data)):
+        print(data[i], end=" ")
+    print()
+
+def main():
+    var data1 = List[Int](5, 2, 8, 1, 9, 3)
+    sort_data(BubbleSort(), data1)
+    print_list(data1)
+
+    var data2 = List[Int](5, 2, 8, 1, 9, 3)
+    sort_data(SelectionSort(), data2)
+    print_list(data2)`
+  }, {
+    diff: 2,
+    q: "Newtype パターンを使って、型安全な単位付き数値型を実装してください。\nMeters, Seconds, MetersPerSecond の3つの型を定義し、\n距離 / 時間 = 速度 の計算が型安全に行えるようにすること。",
+    code: `# struct Meters: ...
+# struct Seconds: ...
+# struct MetersPerSecond: ...
+#
+# var d = Meters(100.0)
+# var t = Seconds(9.58)
+# var speed = d / t  # MetersPerSecond
+# # var wrong = d + t  ← コンパイルエラー!`,
+    answer: `@value
+struct Meters:
+    var value: Float64
+    def __truediv__(self, time: Seconds) -> MetersPerSecond:
+        return MetersPerSecond(self.value / time.value)
+    def __add__(self, other: Meters) -> Meters:
+        return Meters(self.value + other.value)
+    def __str__(self) -> String:
+        return String(self.value) + " m"
+
+@value
+struct Seconds:
+    var value: Float64
+    def __add__(self, other: Seconds) -> Seconds:
+        return Seconds(self.value + other.value)
+    def __str__(self) -> String:
+        return String(self.value) + " s"
+
+@value
+struct MetersPerSecond:
+    var value: Float64
+    def __mul__(self, time: Seconds) -> Meters:
+        return Meters(self.value * time.value)
+    def __str__(self) -> String:
+        return String(self.value) + " m/s"
+
+def main():
+    var distance = Meters(100.0)
+    var time = Seconds(9.58)
+    var speed = distance / time
+
+    print("距離:", distance.__str__())
+    print("時間:", time.__str__())
+    print("速度:", speed.__str__())
+
+    # 型安全: distance + time はコンパイルエラー
+    # var wrong = distance + time  # エラー!
+
+    # 速度 × 時間 = 距離 も型安全
+    var new_distance = speed * Seconds(10.0)
+    print("10秒後の距離:", new_distance.__str__())`
+  }, {
+    diff: 2,
+    q: "docstring とテスト関数のパターンを実践してください。\nstack struct を実装し、各メソッドにドキュメントを書き、テスト関数で検証すること。",
+    code: `# struct Stack[T: CollectionElement]:
+#     \"\"\"LIFO スタックデータ構造。\"\"\"
+#     ...
+#
+# def test_stack_push_pop():
+#     \"\"\"push/pop の基本動作をテスト。\"\"\"
+#     ...`,
+    answer: `struct Stack[T: CollectionElement]:
+    """LIFO (Last-In-First-Out) スタックデータ構造。
+
+    型パラメータ:
+        T: スタックに格納する要素の型。CollectionElement を実装する必要がある。
+
+    使用例:
+        var s = Stack[Int]()
+        s.push(42)
+        var top = s.pop()
+    """
+    var data: List[T]
+
+    def __init__(out self):
+        """空のスタックを作成する。"""
+        self.data = List[T]()
+
+    def push(mut self, val: T):
+        """要素をスタックの先頭に追加する。
+
+        Args:
+            val: 追加する要素。
+        """
+        self.data.append(val)
+
+    def pop(mut self) raises -> T:
+        """スタックの先頭要素を取り出して返す。
+
+        Returns:
+            先頭の要素。
+
+        Raises:
+            Error: スタックが空の場合。
+        """
+        if len(self.data) == 0:
+            raise Error("Stack is empty")
+        return self.data.pop()
+
+    def peek(self) raises -> T:
+        """先頭要素を取り出さずに返す。"""
+        if len(self.data) == 0:
+            raise Error("Stack is empty")
+        return self.data[len(self.data) - 1]
+
+    def is_empty(self) -> Bool:
+        """スタックが空かどうかを返す。"""
+        return len(self.data) == 0
+
+    def __len__(self) -> Int:
+        """スタック内の要素数を返す。"""
+        return len(self.data)
+
+def test_stack_push_pop():
+    """push/pop の基本動作テスト。"""
+    var s = Stack[Int]()
+    debug_assert(s.is_empty(), "初期状態は空")
+    s.push(10)
+    s.push(20)
+    s.push(30)
+    debug_assert(len(s) == 3, "3要素")
+    debug_assert(s.pop() == 30, "LIFO: 30")
+    debug_assert(s.pop() == 20, "LIFO: 20")
+    debug_assert(s.pop() == 10, "LIFO: 10")
+    debug_assert(s.is_empty(), "全pop後は空")
+    print("test_stack_push_pop: PASSED")
+
+def test_stack_peek():
+    """peek が要素を消費しないことをテスト。"""
+    var s = Stack[Int]()
+    s.push(42)
+    debug_assert(s.peek() == 42, "peek == 42")
+    debug_assert(len(s) == 1, "peek後もサイズ不変")
+    print("test_stack_peek: PASSED")
+
+def test_stack_empty_error():
+    """空スタックの pop でエラーが出ることをテスト。"""
+    var s = Stack[Int]()
+    try:
+        _ = s.pop()
+        debug_assert(False, "エラーが出るべき")
+    except e:
+        debug_assert(String(e) == "Stack is empty", "正しいエラー")
+    print("test_stack_empty_error: PASSED")
+
+def main():
+    test_stack_push_pop()
+    test_stack_peek()
+    test_stack_empty_error()
+    print("\\n全テスト合格!")`
+  }, {
+    diff: 3,
+    q: "型状態パターンを使って、不正な状態遷移をコンパイル時に排除する接続管理 struct を設計してください。\nDisconnected → Connected → Authenticated の順でのみ遷移可能にすること。",
+    code: `# パラメータで状態を型レベルで表現
+# struct Connection[State: Int]:
+#     ...
+# alias Disconnected = 0
+# alias Connected = 1
+# alias Authenticated = 2
+#
+# # connect は Disconnected → Connected のみ可能
+# # authenticate は Connected → Authenticated のみ可能`,
+    answer: `alias Disconnected = 0
+alias Connected = 1
+alias Authenticated = 2
+
+struct Connection[State: Int]:
+    var host: String
+
+    def __init__(out self, host: String):
+        self.host = host
+
+# Disconnected 状態でのみ connect が使える
+def connect(var conn: Connection[Disconnected]) -> Connection[Connected]:
+    print("接続:", conn.host)
+    return Connection[Connected](conn.host^)
+
+# Connected 状態でのみ authenticate が使える
+def authenticate(var conn: Connection[Connected], user: String) -> Connection[Authenticated]:
+    print("認証:", user, "@", conn.host)
+    return Connection[Authenticated](conn.host^)
+
+# Authenticated 状態でのみ query が使える
+def query(conn: Connection[Authenticated], sql: String):
+    print("実行:", sql, "on", conn.host)
+
+# Authenticated 状態でのみ disconnect が使える
+def disconnect(var conn: Connection[Authenticated]) -> Connection[Disconnected]:
+    print("切断:", conn.host)
+    return Connection[Disconnected](conn.host^)
+
+def main():
+    # 正しい遷移: Disconnected → Connected → Authenticated
+    var c0 = Connection[Disconnected]("db.example.com")
+    var c1 = connect(c0^)
+    var c2 = authenticate(c1^, "admin")
+    query(c2, "SELECT * FROM users")
+    var c3 = disconnect(c2^)
+    print("正常に切断完了")
+
+    # 以下はコンパイルエラー（不正な遷移）:
+    # query(c0, "...")          # Disconnected で query は不可
+    # authenticate(c0, "admin") # Disconnected で authenticate は不可
+    # disconnect(c1)            # Connected で disconnect は不可`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "所有権とライフタイムの深掘り",
+  est: "4時間",
+  sections: [{
+    title: "引数規約の完全ガイド",
+    body: "初級で学んだ read / mut / var に加え、out と ref [life] を理解します。v26.2 では owned が var に改名されました。\n\n各規約は「所有権をどう扱うか」を宣言するものです。関数シグネチャを見るだけで、データの流れが分かります。",
+    table: T.argConvDeep,
+    code: `# read: デフォルト。変更不可。
+def show(value: Int):
+    print(value)
+
+# mut: 呼び出し元の値を変更。
+def double_it(mut value: Int):
+    value *= 2
+
+# var (旧owned): 所有権を受け取る。
+def consume(var text: String):
+    text += "!"
+    print(text)
+
+# out: __init__ 専用。未初期化のselfを初期化。
+struct Point:
+    var x: Float64
+    var y: Float64
+    def __init__(out self, x: Float64, y: Float64):
+        self.x = x
+        self.y = y
+
+# ref [life]: ライフタイム付き参照を返す。
+def first(ref [life] lst: List[Int]) -> ref [life] Int:
+    return lst[0]`,
+    afterCode: "read は最もコストが低い（コピーなし）。mut は呼び出し元のデータを直接変更する。var は所有権を完全に移動するため、呼び出し側は ^ 演算子でムーブする必要がある。"
+  }, {
+    title: "ASAP 破棄ポリシー",
+    body: "Mojoの最も特徴的なメモリ管理方式です。C++やRustでは変数はスコープ末（ } の位置）で破棄されますが、Mojoでは「最終使用の直後」に破棄されます。\n\nこれにより、不要なリソースをいち早く解放できます。ただし、デストラクタの実行タイミングがスコープと異なるため注意が必要です。",
+    table: T.asapVsScope,
+    code: `struct Conn:
+    var name: String
+    def __init__(out self, name: String):
+        self.name = name
+        print("接続:", self.name)
+    def __del__(owned self):
+        print("切断:", self.name)
+
+def main():
+    var a = Conn("DB-A")
+    var b = Conn("DB-B")
+    print(a.name)  # a の最終使用
+    # ← ここで b が先に ASAP 破棄される可能性
+    # ← a も直後に破棄
+    print("関数終了")`,
+    afterCode: "ASAP 破棄の順序:\n1. b は宣言後、一度も使われなければ即座に破棄\n2. a は print(a.name) の直後に破棄\n3. \"関数終了\" は両方の破棄後に表示される\n\n破棄を遅延させたい場合は _ = value で明示的に最終使用を延ばせます。"
+  }, {
+    title: "ライフタイムチェッカー",
+    body: "コンパイラが自動で行う安全性検査の一覧です。これらのチェックにより、メモリ安全性がコンパイル時に保証されます。",
+    table: T.lifetimeChecks,
+    code: `# ダングリング参照の防止例
+def bad_ref() -> ref [???] Int:  # コンパイルエラー
+    var x = 42
+    return x  # x はこの関数で破棄される → 参照が無効に
+
+# 二重借用の防止例
+def main():
+    var lst = List[Int](1, 2, 3)
+    # var ref1 = lst[0]  # read 借用
+    # lst.append(4)      # mut 借用 → read借用中は不可!
+
+# ムーブ後使用の防止
+def main():
+    var a = String("hello")
+    var b = a^     # ムーブ
+    # print(a)     # コンパイルエラー: a は移動済み
+    print(b)       # OK`,
+    afterCode: "ライフタイムチェッカーは「ゼロコスト」です。全てコンパイル時に検査され、実行時のオーバーヘッドはありません。"
+  }, {
+    title: "ref 引数規約とライフタイム",
+    body: "ref は参照を返す関数で使います。ライフタイムパラメータ [life] で、返される参照が入力のどの値と同じ寿命を持つかを指定します。\n\nこれにより、関数が返す参照の安全性をコンパイラが検証できます。",
+    table: T.refLifetime,
+    code: `# 基本的な ref の使い方
+def get_item(ref [life] lst: List[Int], idx: Int) -> ref [life] Int:
+    return lst[idx]
+
+# ref を使ったインプレース変更
+def set_max(ref [life] lst: List[Int], val: Int):
+    for i in range(len(lst)):
+        if lst[i] < val:
+            lst[i] = val
+
+def main():
+    var nums = List[Int](1, 5, 3, 8, 2)
+    # get_item が返す参照は nums と同じライフタイム
+    var item = get_item(nums, 2)
+    print("3番目:", item)  # 3`,
+    afterCode: "ref のライフタイムは通常、コンパイラが自動推論します。複数の入力から参照を返す場合や、struct のメソッドで参照を返す場合に明示が必要になることがあります。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "ポインタとメモリ管理",
+  est: "5時間",
+  sections: [{
+    title: "4種のポインタ比較",
+    body: "Mojoには4種類のポインタ型があり、それぞれ安全性と柔軟性のトレードオフが異なります。原則として安全なポインタを優先し、UnsafePointer は最終手段として使います。",
+    table: T.pointerTypes,
+    code: `# 安全なポインタ
+var local_val: Int = 42
+var safe_ptr = Pointer(to=local_val)   # 借用参照
+var owned_ptr = OwnedPointer[Int](42)  # 単独所有
+var shared_ptr = ArcPointer[Int](42)   # 共有所有
+
+# 非安全ポインタ（最終手段）
+var raw_ptr = UnsafePointer[Int].alloc(1)
+raw_ptr.init_pointee_move(42)
+print(raw_ptr[])  # 42
+raw_ptr.destroy_pointee()
+raw_ptr.free()`,
+    afterCode: "選択基準:\n1. 既存の値を参照するだけ → Pointer\n2. ヒープに独占的に配置 → OwnedPointer\n3. 複数箇所で共有 → ArcPointer\n4. FFI・低レベル操作 → UnsafePointer"
+  }, {
+    title: "Pointer（安全な借用参照）",
+    body: "Pointer[T] は既存の値への安全な参照です。値の所有権は持たず、借用するだけです。null にはならず、常に有効な参照を保持します。",
+    code: `def main():
+    var x: Int = 100
+    var y: Float64 = 3.14
+
+    # Pointer は既存の値を借用
+    var px = Pointer(to=x)
+    var py = Pointer(to=y)
+
+    print("px:", px[])  # 100
+    print("py:", py[])  # 3.14
+
+    # 元の値を変更すると Pointer 経由でも反映
+    x = 200
+    print("変更後 px:", px[])  # 200
+
+    # Pointer は所有権を持たない → 解放不要
+    # スコープ終了時に何もしない`,
+    afterCode: "Pointer はC++の参照（T&）に似ています。ただしMojoでは借用チェッカーにより、ダングリング参照が防止されます。"
+  }, {
+    title: "OwnedPointer（安全な単独所有）",
+    body: "OwnedPointer[T] はヒープ上に値を配置し、単独で所有します。C++ の std::unique_ptr や Rust の Box に相当します。\n\nスコープ終了時に自動的にメモリが解放されます。コピーは不可、ムーブ（^）のみ可能です。",
+    code: `def main():
+    # ヒープに Int を配置
+    var ptr = OwnedPointer[Int](42)
+    print("値:", ptr[])    # 42
+    ptr[] = 100            # 値を変更
+    print("変更後:", ptr[]) # 100
+
+    # 所有権の移動
+    var ptr2 = ptr^
+    print("移動後:", ptr2[])
+    # print(ptr[])  # エラー: ptr は移動済み
+
+    # 大きなデータのヒープ配置
+    var big = OwnedPointer[List[Int]](List[Int]())
+    big[].append(1)
+    big[].append(2)
+    big[].append(3)
+    print("size:", len(big[]))
+    # スコープ終了時に自動解放`
+  }, {
+    title: "ArcPointer（安全な共有所有）",
+    body: "ArcPointer[T] は参照カウントによる共有所有を提供します。Rust の Arc に相当し、アトミックな参照カウントによりスレッドセーフです。\n\n最後の ArcPointer が破棄されたとき、ヒープ上のデータが解放されます。",
+    code: `def main():
+    var a = ArcPointer[Int](42)
+    var b = a  # 参照カウント +1（コピー）
+
+    print("a:", a[], "b:", b[])  # 両方 42
+
+    # 片方を変更すると他方にも反映（共有）
+    a[] = 999
+    print("a:", a[], "b:", b[])  # 両方 999
+
+    # b がスコープ外に出ても a は有効
+    # 最後の参照が消えたときにメモリ解放`,
+    afterCode: "注意: ArcPointer は参照カウントのオーバーヘッドがあります。頻繁なコピー/破棄が発生する場合はパフォーマンスに影響します。単独所有で十分な場合は OwnedPointer を使いましょう。"
+  }, {
+    title: "UnsafePointer（低レベル操作）",
+    body: "UnsafePointer[T] は手動メモリ管理のための低レベルポインタです。FFI、カスタムアロケータ、パフォーマンスクリティカルなデータ構造の実装に使います。\n\n全てのメモリ管理をプログラマが責任を持ちます。",
+    table: T.unsafeOps,
+    code: `def main():
+    # 5個分のメモリを確保
+    var ptr = UnsafePointer[Int].alloc(5)
+
+    # 初期化（alloc 直後は未初期化！）
+    for i in range(5):
+        (ptr + i).init_pointee_move(i * 10)
+
+    # 読み取り
+    for i in range(5):
+        print("ptr[" + String(i) + "] =", (ptr + i)[])
+
+    # 書き込み（初期化済みの場所のみ）
+    (ptr + 2)[] = 999
+    print("変更後 ptr[2] =", (ptr + 2)[])
+
+    # 後片付け: 必ず destroy → free の順
+    for i in range(5):
+        (ptr + i).destroy_pointee()
+    ptr.free()`,
+    afterCode: "UnsafePointer のミスは即座にクラッシュや未定義動作につながります。\n・alloc 後に init 前に読むと未初期化読み取り\n・destroy 後に読むと解放済み読み取り\n・free を忘れるとメモリリーク\n・二重 free はクラッシュ"
+  }, {
+    title: "メモリ安全性のベストプラクティス",
+    body: "安全なコードを書くための原則をまとめます。",
+    code: `# 原則1: 安全なポインタを優先
+# Bad:  UnsafePointer を使ってリスト実装
+# Good: List[T] を使う（内部で安全に管理）
+
+# 原則2: UnsafePointer を使う場合はラップ
+struct SafeBuffer:
+    var ptr: UnsafePointer[Int]
+    var size: Int
+
+    def __init__(out self, size: Int):
+        self.ptr = UnsafePointer[Int].alloc(size)
+        self.size = size
+        for i in range(size):
+            (self.ptr + i).init_pointee_move(0)
+
+    def __del__(owned self):
+        for i in range(self.size):
+            (self.ptr + i).destroy_pointee()
+        self.ptr.free()
+
+    def get(self, idx: Int) raises -> Int:
+        if idx < 0 or idx >= self.size:
+            raise Error("Index out of bounds")
+        return (self.ptr + idx)[]
+
+    def set(mut self, idx: Int, val: Int) raises:
+        if idx < 0 or idx >= self.size:
+            raise Error("Index out of bounds")
+        (self.ptr + idx)[] = val`,
+    afterCode: "原則3: RAII パターンを使う\n__init__ でリソース確保、__del__ で解放。with 文と組み合わせるとさらに安全。\n\n原則4: 境界チェックを入れる\nUnsafePointer のアクセスには常に範囲チェックを追加する。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "高度なstruct設計",
+  est: "5時間",
+  sections: [{
+    title: "デコレータ一覧",
+    body: "structに適用できるデコレータの完全ガイドです。適切なデコレータを選ぶことで、ボイラープレートを削減し、意図を明確にできます。",
+    table: T.decorators,
+    code: `# @value: コピー・ムーブ・破棄を自動生成
+@value
+struct Point:
+    var x: Float64
+    var y: Float64
+
+# @fieldwise_init: __init__ のみ自動生成
+@fieldwise_init
+struct Config:
+    var name: String
+    var debug: Bool
+    var port: Int
+
+# @explicit_destroy: 明示破棄を強制
+@explicit_destroy
+struct FileHandle:
+    var fd: Int
+    def __init__(out self, fd: Int): self.fd = fd
+    def close(owned self):
+        print("closing fd:", self.fd)
+        self.fd.destroy()
+
+# @register_passable: レジスタサイズの型
+@register_passable
+struct Pair:
+    var a: Int
+    var b: Int`,
+    afterCode: "@value は最もよく使うデコレータです。カスタムの __copyinit__ や __moveinit__ が不要な場合は常に @value を使いましょう。"
+  }, {
+    title: "特殊メソッド一覧",
+    body: "Pythonの「ダンダーメソッド」に相当するMojoの特殊メソッド一覧です。これらを実装することで、組み込みの構文や関数で型を使えるようになります。",
+    table: T.specialMethods,
+    afterTable: "全ての特殊メソッドは対応するトレイトと結びついています。例えば __len__ を実装するには Sized トレイトを宣言する必要があります。"
+  }, {
+    title: "演算子オーバーロード完全ガイド",
+    body: "Mojoでは演算子を特殊メソッドとして定義します。Pythonとほぼ同じですが、型の厳密さが異なります。",
+    table: T.operatorOverload,
+    code: `@value
+struct Money(EqualityComparable, Comparable, Stringable):
+    var amount: Int  # セント単位
+
+    def __add__(self, other: Money) -> Money:
+        return Money(self.amount + other.amount)
+
+    def __sub__(self, other: Money) -> Money:
+        return Money(self.amount - other.amount)
+
+    def __mul__(self, factor: Int) -> Money:
+        return Money(self.amount * factor)
+
+    def __eq__(self, other: Money) -> Bool:
+        return self.amount == other.amount
+
+    def __ne__(self, other: Money) -> Bool:
+        return self.amount != other.amount
+
+    def __lt__(self, other: Money) -> Bool:
+        return self.amount < other.amount
+
+    def __le__(self, other: Money) -> Bool:
+        return self.amount <= other.amount
+
+    def __gt__(self, other: Money) -> Bool:
+        return self.amount > other.amount
+
+    def __ge__(self, other: Money) -> Bool:
+        return self.amount >= other.amount
+
+    def __str__(self) -> String:
+        var dollars = self.amount // 100
+        var cents = self.amount % 100
+        return "$" + String(dollars) + "." + String(cents)
+
+def main():
+    var a = Money(1050)  # $10.50
+    var b = Money(350)   # $3.50
+    print((a + b).__str__())   # $14.00
+    print((a * 3).__str__())   # $31.50
+    print("a > b:", a > b)     # True`
+  }, {
+    title: "@explicit_destroy による安全なリソース管理",
+    body: "@explicit_destroy を使うと、__del__ の自動呼び出しが禁止され、プログラマが明示的に破棄メソッドを呼ぶことを強制されます。\n\nリソースリーク（ファイルの閉じ忘れ、接続の切断忘れ等）をコンパイル時に検出できます。",
+    code: `@explicit_destroy
+struct Connection:
+    var host: String
+    var connected: Bool
+
+    def __init__(out self, host: String):
+        self.host = host
+        self.connected = True
+        print("接続:", host)
+
+    def query(self, sql: String):
+        print("実行:", sql)
+
+    def disconnect(owned self):
+        """明示的に呼ばないとコンパイルエラー"""
+        print("切断:", self.host)
+        self.host.destroy()
+        self.connected.destroy()
+
+def main():
+    var conn = Connection("db.example.com")
+    conn.query("SELECT 1")
+    conn.disconnect()  # 必須！忘れるとコンパイルエラー`,
+    afterCode: "@explicit_destroy は「リソース管理の意図を明示する」ためのツールです。全てのstructに使うのではなく、ファイルハンドル・ネットワーク接続・ロックなど、解放を忘れてはいけないリソースに使います。"
+  }, {
+    title: "@align(N) によるメモリアライメント",
+    body: "SIMD演算やキャッシュライン最適化のために、structのメモリ配置を制御します。N は2のべき乗（8, 16, 32, 64 等）。",
+    code: `# キャッシュライン（64バイト）に合わせる
+@align(64)
+struct CacheAligned:
+    var data: SIMD[DType.float64, 8]  # 64バイト
+
+    def __init__(out self):
+        self.data = SIMD[DType.float64, 8](0.0)
+
+# SIMD演算用の16バイトアライメント
+@align(16)
+struct Vec4:
+    var data: SIMD[DType.float32, 4]
+
+    def __init__(out self, x: Float32, y: Float32, z: Float32, w: Float32):
+        self.data = SIMD[DType.float32, 4](x, y, z, w)`,
+    afterCode: "アライメントはパフォーマンスチューニングの上級テクニックです。通常のコードでは不要ですが、SIMD演算を多用する場合やメモリバウンドな処理では効果があります。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "ジェネリクスとパラメトリック型",
+  est: "5時間",
+  sections: [{
+    title: "パラメータと引数の違い",
+    body: "Mojoでは「コンパイル時に決まるもの」と「実行時に決まるもの」を明確に区別します。[] がパラメータ（コンパイル時）、() が引数（実行時）です。",
+    table: T.paramVsArg,
+    code: `# パラメータ: [] で囲む = コンパイル時
+struct Array[T: CollectionElement, N: Int]:
+    var data: List[T]
+
+    def __init__(out self):
+        self.data = List[T]()
+        for i in range(N):
+            self.data.append(T())
+
+# 引数: () で囲む = 実行時
+def get[T: CollectionElement, N: Int](arr: Array[T, N], idx: Int) -> T:
+    return arr.data[idx]
+
+def main():
+    # T=Int, N=5 はコンパイル時に決定
+    var arr = Array[Int, 5]()
+    # idx=2 は実行時に決定
+    print(get(arr, 2))`,
+    afterCode: "パラメータはコンパイル時に確定するため、異なるパラメータの組み合わせごとに別のコードが生成されます（モノモーフィゼーション）。これにより仮想関数テーブルのオーバーヘッドがなく、高速です。"
+  }, {
+    title: "パラメータ化された関数",
+    body: "関数にパラメータを付けることで、型や定数をコンパイル時に指定できます。",
+    code: `# 型パラメータ
+def max_val[T: Comparable](a: T, b: T) -> T:
+    if a > b:
+        return a
+    return b
+
+# 値パラメータ
+def repeat[N: Int](val: String) -> String:
+    var result = String("")
+    for i in range(N):
+        result += val
+    return result
+
+# 複合パラメータ
+def fill_array[T: CollectionElement, N: Int](val: T) -> List[T]:
+    var result = List[T]()
+    for i in range(N):
+        result.append(val)
+    return result
+
+def main():
+    print(max_val(10, 20))         # T=Int と推論
+    print(repeat[3]("abc"))        # N=3 を明示
+    var arr = fill_array[Int, 5](42)
+    print(len(arr))                # 5`
+  }, {
+    title: "comptime if / comptime for",
+    body: "v26.2 で @parameter if は comptime if に置き換えられました。コンパイル時に条件を評価し、不要なブランチを除去します。\n\ncomptime for はループをコンパイル時に展開します。",
+    table: T.comptimeFeatures,
+    code: `# comptime if: 型に基づくコンパイル時分岐
+def describe[dt: DType]():
+    comptime if dt.is_floating_point():
+        print("浮動小数点:", dt)
+    elif dt.is_integral():
+        print("整数:", dt)
+    else:
+        print("その他:", dt)
+
+# comptime for: コンパイル時ループ展開
+def print_dtypes():
+    comptime for dt in [DType.int32, DType.float32, DType.float64]:
+        print("型:", dt, "ビット幅:", dt.bitwidth())
+
+# comptime メンバー: struct 内のコンパイル時定数
+struct Matrix[rows: Int, cols: Int]:
+    alias total_elements = rows * cols
+    var data: List[Float64]
+
+    def __init__(out self):
+        self.data = List[Float64]()
+        for i in range(Self.total_elements):
+            self.data.append(0.0)
+
+def main():
+    describe[DType.float32]()
+    describe[DType.int64]()
+    print_dtypes()
+    var m = Matrix[3, 4]()
+    print("要素数:", Matrix[3, 4].total_elements)  # 12`,
+    afterCode: "comptime if/for はコードの特殊化に非常に強力です。実行時のオーバーヘッドなしに、型や値に応じた最適なコードを生成できます。"
+  }, {
+    title: "infer-only パラメータ",
+    body: "// セパレータの右側に配置したパラメータは「推論専用」になります。呼び出し側は明示指定できず、コンパイラが自動的に推論します。\n\nこれによりAPIが簡潔になり、ユーザーが不要なパラメータを気にする必要がなくなります。",
+    table: T.inferOnly,
+    code: `# infer-only パラメータの例
+def sum_list[//, T: CollectionElement](lst: List[T]) -> T:
+    var result = lst[0]
+    for i in range(1, len(lst)):
+        result = result + lst[i]
+    return result
+
+# N は明示可能、T は推論のみ
+def take[N: Int, //, T: CollectionElement](lst: List[T]) -> List[T]:
+    var result = List[T]()
+    for i in range(min(N, len(lst))):
+        result.append(lst[i])
+    return result
+
+def main():
+    var ints = List[Int](1, 2, 3, 4, 5)
+    print("合計:", sum_list(ints))  # T は Int と推論
+
+    var first3 = take[3](ints)     # N=3 は明示、T=Int は推論
+    print("先頭3:", len(first3))`
+  }, {
+    title: "自動パラメータ化",
+    body: "def foo(x: auto) と書くと、引数の型から自動的にジェネリック関数が生成されます。明示的なパラメータ宣言が不要になります。",
+    code: `# auto による自動パラメータ化
+def print_twice(x: auto):
+    print(x)
+    print(x)
+
+# 上記は以下と等価:
+# def print_twice[T: Writable](x: T):
+#     print(x)
+#     print(x)
+
+def main():
+    print_twice(42)        # Int版が生成
+    print_twice(3.14)      # Float64版が生成
+    print_twice("hello")   # String版が生成`,
+    afterCode: "auto は便利ですが、制約が緩いため意図しない型が渡される可能性があります。ライブラリのAPIでは、明示的なトレイト制約 [T: SomeTrait] を使う方が安全です。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "高度なトレイト",
+  est: "5時間",
+  sections: [{
+    title: "トレイト合成（&）",
+    body: "複数のトレイトを & で結合し、「全てを満たす型」を要求できます。Union型（いずれかを満たす）ではなく、Intersection型（全てを満たす）です。",
+    table: T.traitCompose,
+    code: `# 合成: 複数トレイトを同時に要求
+def serialize[T: Stringable & Copyable](val: T) -> String:
+    var copy = val  # Copyable が必要
+    return String(copy)  # Stringable が必要
+
+# 継承: 新しいトレイトが既存トレイトを含む
+trait Printable(Stringable, Writable):
+    def display(self) -> String: ...
+
+# Printable を実装する型は、Stringable も Writable も満たす
+# つまり String(val), print(val), val.display() が全て使える`
+  }, {
+    title: "トレイト継承",
+    body: "trait A(B, C) と書くと、A は B と C の全メソッドを含みます。A を実装する型は B, C の全メソッドも実装する必要があります。\n\nこれにより、トレイトの階層構造を作れます。",
+    code: `trait Identifiable:
+    def id(self) -> Int: ...
+
+trait Named:
+    def name(self) -> String: ...
+
+# Entity は Identifiable + Named の全メソッドを含む
+trait Entity(Identifiable, Named):
+    def description(self) -> String: ...
+
+@value
+struct User(Entity):
+    var _id: Int
+    var _name: String
+
+    def id(self) -> Int: return self._id
+    def name(self) -> String: return self._name
+    def description(self) -> String:
+        return "User#" + String(self._id) + ": " + self._name
+
+# Entity を要求 → id(), name(), description() が全て使える
+def print_entity[T: Entity](e: T):
+    print("ID:", e.id(), "名前:", e.name())
+    print("説明:", e.description())
+
+def main():
+    var u = User(1, "Alice")
+    print_entity(u)`
+  }, {
+    title: "条件付き適合（where）",
+    body: "where 句を使うと、特定の条件を満たす場合のみメソッドやトレイト実装を提供できます。\n\nこれにより、型パラメータの能力に応じて機能を出し分けられます。",
+    code: `struct Container[T: CollectionElement]:
+    var items: List[T]
+
+    def __init__(out self):
+        self.items = List[T]()
+
+    def add(mut self, item: T):
+        self.items.append(item)
+
+    def __len__(self) -> Int:
+        return len(self.items)
+
+    # T が Comparable な場合のみ sort が使える
+    def sort(mut self) where T: Comparable:
+        # バブルソート
+        for i in range(len(self.items)):
+            for j in range(len(self.items) - 1 - i):
+                if self.items[j] > self.items[j + 1]:
+                    var tmp = self.items[j]
+                    self.items[j] = self.items[j + 1]
+                    self.items[j + 1] = tmp
+
+    # T が Stringable な場合のみ print_all が使える
+    def print_all(self) where T: Stringable:
+        for i in range(len(self.items)):
+            print(String(self.items[i]))
+
+def main():
+    var nums = Container[Int]()
+    nums.add(5); nums.add(2); nums.add(8)
+    nums.sort()       # Int は Comparable → OK
+    nums.print_all()  # Int は Stringable → OK`,
+    afterCode: "条件付き適合はSwiftの conditional conformance に似た機能です。ジェネリックな型が、パラメータの能力に応じて段階的に機能を提供できます。"
+  }, {
+    title: "組み込みトレイト完全一覧",
+    body: "Mojoの標準ライブラリで定義されている主要なトレイト一覧です。これらを知ることで、型設計の幅が広がります。",
+    table: T.builtinTraits,
+    afterTable: "CollectionElement (= Copyable & Movable) は List, Dict 等のコレクションに要素を格納するために必要です。KeyElement は Dict のキーに必要です。\n\nほとんどの場合、@value デコレータで Copyable と Movable は自動生成されます。残りのトレイトは必要に応じて手動で実装します。"
+  }, {
+    title: "comptimeメンバーとトレイト",
+    body: "alias でトレイト内にコンパイル時定数を持たせることができます。これにより、型レベルの情報をトレイト経由で取得できます。",
+    code: `trait Numeric:
+    alias zero: Self
+    alias one: Self
+    def __add__(self, other: Self) -> Self: ...
+    def __mul__(self, other: Self) -> Self: ...
+
+# 使用例（概念的なコード）
+def sum_all[T: Numeric](lst: List[T]) -> T:
+    var result = T.zero  # コンパイル時メンバーにアクセス
+    for i in range(len(lst)):
+        result = result + lst[i]
+    return result`,
+    afterCode: "comptimeメンバーにより、ジェネリック関数内で型固有の定数（ゼロ値、単位元等）にアクセスできます。これはC++のstatic constexprメンバーに相当します。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "高度なエラーハンドリング",
+  est: "4時間",
+  sections: [{
+    title: "エラー設計パターン",
+    body: "実務では単純な Error(\"msg\") では不十分です。型付きエラー、エラー階層、コンテキスト付きエラーを使い分けます。\n\nv26.2 では raises に型を指定できるようになり、エラーの種類を型レベルで管理できます。",
+    table: T.errorPatterns,
+    code: `# 基本的なエラー
+def divide(a: Float64, b: Float64) raises -> Float64:
+    if b == 0.0:
+        raise Error("Division by zero")
+    return a / b
+
+# カスタムエラー型
+@value
+struct ParseError:
+    var message: String
+    var line: Int
+    var column: Int
+
+    def __str__(self) -> String:
+        return "ParseError at " + String(self.line) + ":" + String(self.column) + ": " + self.message
+
+def main():
+    try:
+        var result = divide(10.0, 0.0)
+    except e:
+        print("エラー:", String(e))`,
+    afterCode: "エラー設計の3原則:\n1. エラーは回復可能性で分類する（再試行可能？ユーザー入力の修正可能？）\n2. エラーにはコンテキスト（何がどこで起きたか）を含める\n3. 呼び出し元が適切に対処できる粒度でエラーを定義する"
+  }, {
+    title: "型付きエラーの設計",
+    body: "エラーを構造化することで、コンパイル時にエラーハンドリングの網羅性を検証できます。",
+    table: T.errorDesign,
+    code: `@value
+struct ValidationError:
+    var field: String
+    var message: String
+    var code: Int
+
+    def __str__(self) -> String:
+        return "[" + String(self.code) + "] " + self.field + ": " + self.message
+
+@value
+struct IOError:
+    var path: String
+    var operation: String
+    var cause: String
+
+    def __str__(self) -> String:
+        return "IOError(" + self.operation + " " + self.path + "): " + self.cause
+
+# エラー型を使い分ける
+def validate_email(email: String) raises -> String:
+    if len(email) == 0:
+        raise Error("email は必須です")
+    var has_at = False
+    for i in range(len(email)):
+        if email[i] == "@":
+            has_at = True
+    if not has_at:
+        raise Error("無効なメールアドレス: @ がありません")
+    return email
+
+def main():
+    try:
+        var email = validate_email("user@example.com")
+        print("有効:", email)
+        var bad = validate_email("invalid")
+    except e:
+        print("検証エラー:", String(e))`
+  }, {
+    title: "Never 型",
+    body: "Never 型は「この関数は正常に返らない」ことを型レベルで表明します。必ず例外を投げる関数やプログラムを終了する関数に使います。",
+    code: `# Never 型: この関数は戻らない
+def unreachable(msg: String) -> Never:
+    """到達不能コードを示す。常に例外を送出。"""
+    raise Error("Unreachable: " + msg)
+
+def process(code: Int) raises -> String:
+    if code == 0:
+        return "success"
+    elif code == 1:
+        return "warning"
+    elif code == 2:
+        return "error"
+    else:
+        unreachable("unknown code: " + String(code))
+        # Never 型なので、ここに到達しないことが保証される`,
+    afterCode: "Never 型は網羅性チェックに役立ちます。全ての分岐が値を返すか Never に到達することをコンパイラが検証できます。"
+  }, {
+    title: "コンテキストマネージャ（with文）",
+    body: "with 文を使うと、リソースの取得と解放を自動化できます。__enter__ と __exit__ メソッドを実装します。",
+    table: T.contextManager,
+    code: `struct Timer:
+    var label: String
+    var start_time: Int
+
+    def __init__(out self, label: String):
+        self.label = label
+        self.start_time = 0
+
+    def __enter__(mut self) -> ref [self] Self:
+        from time import now
+        self.start_time = now()
+        print("[" + self.label + "] 開始")
+        return self
+
+    def __exit__(mut self):
+        from time import now
+        var elapsed = now() - self.start_time
+        print("[" + self.label + "] 完了:", elapsed, "ns")
+
+def main():
+    with Timer("処理A"):
+        var total = 0
+        for i in range(1000):
+            total += i
+        print("合計:", total)
+    # Timer.__exit__ が自動呼び出し`,
+    afterCode: "with 文のメリット:\n1. 例外が発生しても __exit__ が呼ばれる（リソースリーク防止）\n2. ネストした with で複数リソースを安全に管理\n3. コードの意図が明確（「このブロック中だけリソースを使う」）"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "パッケージ設計とモジュール管理",
+  est: "3時間",
+  sections: [{
+    title: "モジュールとパッケージの基本",
+    body: "Mojoのモジュールシステムはパッケージ（ディレクトリ）とモジュール（.mojoファイル）で構成されます。\n\n__init__.mojo がパッケージの初期化ファイルで、公開APIを定義します（Pythonの __init__.py と同じ役割）。",
+    table: T.packageStructure,
+    code: `# ファイル構成例
+# myproject/
+# ├── main.mojo            # エントリポイント
+# └── mylib/
+#     ├── __init__.mojo     # from mylib import ... のエントリポイント
+#     ├── core.mojo
+#     ├── utils.mojo
+#     └── types/
+#         ├── __init__.mojo
+#         └── basic.mojo
+
+# main.mojo
+from mylib import process, Config
+from mylib.types import BasicType
+
+def main():
+    var cfg = Config("prod", False)
+    process(cfg)`
+  }, {
+    title: "アクセス制御と公開API",
+    body: "Mojoには明示的なアクセス修飾子（public/private）はまだありません。慣例として _ プレフィックスで非公開を示し、__init__.mojo での再エクスポートで公開APIを制御します。",
+    table: T.accessControl,
+    code: `# mylib/__init__.mojo
+# 公開するものだけ再エクスポート
+from .core import process, validate
+from .types import Config, Status
+# _internal は再エクスポートしない → 非公開
+
+# mylib/core.mojo
+def process(data: String) -> String:
+    """公開API: データを処理する。"""
+    return _transform(data)
+
+def _transform(data: String) -> String:
+    """内部関数: 直接呼ばないこと。"""
+    return "[" + data + "]"
+
+def validate(data: String) -> Bool:
+    """公開API: データの妥当性を検証。"""
+    return len(data) > 0`,
+    afterCode: "API設計の原則:\n1. 最小限の公開API（必要なものだけエクスポート）\n2. 内部実装は _ プレフィックスで隠蔽\n3. __init__.mojo が「玄関」の役割を果たす\n4. ユーザーは内部モジュールを直接参照しない"
+  }, {
+    title: ".mojopkg によるバイナリ配布",
+    body: "mojo package コマンドでパッケージをコンパイル済みバイナリ（.mojopkg）にできます。ソースコードを公開せずに配布可能です。",
+    table: T.mojopkg,
+    code: `# ビルド手順
+# 1. パッケージのソースコードを用意
+# mylib/
+# ├── __init__.mojo
+# ├── core.mojo
+# └── utils.mojo
+
+# 2. .mojopkg にコンパイル
+# $ mojo package mylib
+# → mylib.mojopkg が生成される
+
+# 3. 出力パスを指定する場合
+# $ mojo package mylib -o dist/mylib.mojopkg
+
+# 4. 使用側
+# main.mojo
+from mylib import process  # .mojopkg からインポート
+
+def main():
+    print(process("hello"))`,
+    afterCode: ".mojopkg は事前コンパイル済みなので、利用者のビルド時間が短縮されます。ただしプラットフォーム依存なので、ターゲット環境ごとにビルドが必要です。"
+  }, {
+    title: "大規模プロジェクトの構成パターン",
+    body: "実務プロジェクトでの典型的なディレクトリ構成です。",
+    code: `# 推奨プロジェクト構成
+# my_project/
+# ├── mojoproject.toml      # プロジェクト設定
+# ├── src/
+# │   └── my_project/
+# │       ├── __init__.mojo  # 公開API
+# │       ├── core/
+# │       │   ├── __init__.mojo
+# │       │   ├── engine.mojo
+# │       │   └── types.mojo
+# │       ├── utils/
+# │       │   ├── __init__.mojo
+# │       │   ├── math.mojo
+# │       │   └── strings.mojo
+# │       └── io/
+# │           ├── __init__.mojo
+# │           ├── file.mojo
+# │           └── network.mojo
+# ├── tests/
+# │   ├── test_core.mojo
+# │   ├── test_utils.mojo
+# │   └── test_io.mojo
+# └── examples/
+#     ├── basic.mojo
+#     └── advanced.mojo`,
+    afterCode: "構成のポイント:\n1. src/ にソースコード、tests/ にテスト、examples/ に使用例\n2. 機能ごとにサブパッケージ（core/, utils/, io/）に分割\n3. 各サブパッケージは独立した __init__.mojo を持つ\n4. mojoproject.toml でプロジェクトメタデータを管理"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "コレクションの内部実装",
+  est: "5時間",
+  sections: [{
+    title: "コレクションの性能特性",
+    body: "List, Dict, Set の操作ごとの計算量を理解することで、適切なデータ構造を選択できます。",
+    table: T.collectionPerf,
+    afterTable: "使い分け:\n・順序保持＋インデックスアクセス → List\n・キーによる高速検索 → Dict\n・重複排除＋存在チェック → Set"
+  }, {
+    title: "Listの内部構造",
+    body: "List[T] は連続メモリ領域に要素を格納する動的配列です。内部的には UnsafePointer、サイズ、容量の3つを管理しています。",
+    table: T.listInternal,
+    code: `# List の内部動作イメージ
+# 初期状態: capacity=4, size=0
+# [_, _, _, _]
+
+# append(10): size=1
+# [10, _, _, _]
+
+# append(20), append(30), append(40): size=4 = capacity
+# [10, 20, 30, 40]
+
+# append(50): capacity不足 → 2倍に拡張
+# 新しいメモリ確保 → コピー → 旧メモリ解放
+# [10, 20, 30, 40, 50, _, _, _]  capacity=8
+
+def main():
+    var lst = List[Int]()
+    print("初期 size:", len(lst), "capacity:", lst.capacity)
+
+    for i in range(10):
+        lst.append(i)
+        print("append", i, "→ size:", len(lst), "capacity:", lst.capacity)`,
+    afterCode: "容量拡張のコスト:\n・メモリ確保: O(new_capacity)\n・要素コピー: O(size)\n・旧メモリ解放: O(1)\n\n事前に capacity を指定すれば拡張を回避できます:\nvar lst = List[Int](capacity=1000)"
+  }, {
+    title: "カスタムコレクション: リングバッファ",
+    body: "固定サイズのバッファを循環的に使用するデータ構造です。ストリーミングデータやログバッファに適しています。",
+    code: `struct RingBuffer[T: CollectionElement, N: Int]:
+    """固定サイズのリングバッファ。"""
+    var data: List[T]
+    var head: Int
+    var size: Int
+
+    def __init__(out self):
+        self.data = List[T]()
+        for i in range(N):
+            self.data.append(T())
+        self.head = 0
+        self.size = 0
+
+    def push(mut self, val: T):
+        """要素を追加。満杯なら最古の要素を上書き。"""
+        var idx = (self.head + self.size) % N
+        self.data[idx] = val
+        if self.size < N:
+            self.size += 1
+        else:
+            self.head = (self.head + 1) % N
+
+    def get(self, idx: Int) -> T:
+        """0が最古、size-1が最新。"""
+        return self.data[(self.head + idx) % N]
+
+    def __len__(self) -> Int:
+        return self.size
+
+def main():
+    var buf = RingBuffer[Int, 3]()
+    buf.push(10); buf.push(20); buf.push(30)
+    print("size:", len(buf))  # 3
+    buf.push(40)  # 10 が上書きされる
+    for i in range(len(buf)):
+        print(buf.get(i))  # 20, 30, 40`
+  }, {
+    title: "カスタムコレクション: 優先度付きキュー",
+    body: "ヒープ構造を使った優先度付きキューの実装です。最小値を O(log n) で取り出せます。",
+    code: `struct MinHeap:
+    var data: List[Int]
+
+    def __init__(out self):
+        self.data = List[Int]()
+
+    def _parent(self, i: Int) -> Int: return (i - 1) // 2
+    def _left(self, i: Int) -> Int: return 2 * i + 1
+    def _right(self, i: Int) -> Int: return 2 * i + 2
+
+    def _swap(mut self, i: Int, j: Int):
+        var tmp = self.data[i]
+        self.data[i] = self.data[j]
+        self.data[j] = tmp
+
+    def _sift_up(mut self, mut idx: Int):
+        while idx > 0 and self.data[idx] < self.data[self._parent(idx)]:
+            self._swap(idx, self._parent(idx))
+            idx = self._parent(idx)
+
+    def _sift_down(mut self, mut idx: Int):
+        var size = len(self.data)
+        while self._left(idx) < size:
+            var smallest = idx
+            var l = self._left(idx)
+            var r = self._right(idx)
+            if l < size and self.data[l] < self.data[smallest]:
+                smallest = l
+            if r < size and self.data[r] < self.data[smallest]:
+                smallest = r
+            if smallest == idx:
+                break
+            self._swap(idx, smallest)
+            idx = smallest
+
+    def push(mut self, val: Int):
+        self.data.append(val)
+        var idx = len(self.data) - 1
+        self._sift_up(idx)
+
+    def pop_min(mut self) raises -> Int:
+        if len(self.data) == 0:
+            raise Error("Heap is empty")
+        var min_val = self.data[0]
+        var last = self.data.pop()
+        if len(self.data) > 0:
+            self.data[0] = last
+            var idx = 0
+            self._sift_down(idx)
+        return min_val
+
+    def __len__(self) -> Int:
+        return len(self.data)
+
+def main():
+    var heap = MinHeap()
+    heap.push(30); heap.push(10); heap.push(50); heap.push(5); heap.push(20)
+    while len(heap) > 0:
+        print(heap.pop_min())  # 5, 10, 20, 30, 50`
+  }]
+}, {
+  id: "ch9",
+  num: 9,
+  title: "SIMD実践とベクトル化",
+  est: "5時間",
+  sections: [{
+    title: "DType完全ガイド",
+    body: "DType はSIMD演算で使用するデータ型を指定するコンパイル時パラメータです。適切なDTypeの選択は精度とパフォーマンスのトレードオフです。",
+    table: T.dtypeComplete,
+    code: `# DType のプロパティ
+def inspect_dtype[dt: DType]():
+    print("型:", dt)
+    print("  ビット幅:", dt.bitwidth())
+    print("  浮動小数点?:", dt.is_floating_point())
+    print("  整数?:", dt.is_integral())
+    print("  符号付き?:", dt.is_signed())
+    print("  数値?:", dt.is_numeric())
+
+def main():
+    inspect_dtype[DType.float32]()
+    inspect_dtype[DType.int64]()
+    inspect_dtype[DType.uint8]()
+    inspect_dtype[DType.bool]()`,
+    afterCode: "DType選択の指針:\n・汎用計算: float64 / int64\n・機械学習: float16 / bfloat16（精度を犠牲にして速度向上）\n・画像処理: uint8（0-255のピクセル値）\n・SIMD幅: レジスタサイズ / 要素サイズ = 最大幅（AVX-512なら512/32=16個のfloat32）"
+  }, {
+    title: "SIMD演算パターン",
+    body: "SIMDの主要な演算パターンを網羅します。これらを組み合わせることで、高速な数値計算を実現します。",
+    table: T.simdPatterns,
+    code: `def main():
+    var a = SIMD[DType.float32, 8](1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0)
+    var b = SIMD[DType.float32, 8](8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0)
+
+    # 要素ごとの演算
+    print("a + b:", a + b)
+    print("a * b:", a * b)
+
+    # リダクション
+    print("sum:", a.reduce_add())      # 36.0
+    print("max:", a.reduce_max())      # 8.0
+    print("min:", a.reduce_min())      # 1.0
+
+    # 比較マスク
+    var mask = a > b
+    print("a > b:", mask)  # [F,F,F,F,T,T,T,T]
+
+    # 条件付き選択
+    var result = mask.select(a, b)
+    print("max(a,b):", result)  # 各要素の大きい方
+
+    # 型変換
+    var as_int = a.cast[DType.int32]()
+    print("as int:", as_int)
+
+    # スプラット（全要素同じ値）
+    var zeros = SIMD[DType.float32, 8](0.0)
+    print("zeros:", zeros)`
+  }, {
+    title: "ベクトル化の設計パターン",
+    body: "スカラー処理をSIMD処理に変換する実践的なパターンです。",
+    code: `# パターン1: 配列の要素ごとの処理
+def add_arrays_scalar(a: List[Float32], b: List[Float32]) -> List[Float32]:
+    """スカラー版: 1要素ずつ処理（遅い）"""
+    var result = List[Float32]()
+    for i in range(len(a)):
+        result.append(a[i] + b[i])
+    return result
+
+# パターン2: SIMD化（4要素ずつ処理）
+alias SIMD_WIDTH = 4
+
+def add_arrays_simd(
+    a_ptr: UnsafePointer[Float32],
+    b_ptr: UnsafePointer[Float32],
+    out_ptr: UnsafePointer[Float32],
+    n: Int,
+):
+    """SIMD版: 4要素ずつ並列処理（速い）"""
+    # メインループ: SIMD幅単位で処理
+    var i = 0
+    while i + SIMD_WIDTH <= n:
+        var va = (a_ptr + i).load[width=SIMD_WIDTH]()
+        var vb = (b_ptr + i).load[width=SIMD_WIDTH]()
+        (out_ptr + i).store(va + vb)
+        i += SIMD_WIDTH
+
+    # 端数処理: 残りの要素をスカラーで
+    while i < n:
+        (out_ptr + i).init_pointee_move((a_ptr + i)[] + (b_ptr + i)[])
+        i += 1`,
+    afterCode: "SIMD化の手順:\n1. データを連続メモリに配置（List / UnsafePointer）\n2. SIMD幅（4, 8, 16等）で分割してロード\n3. SIMD演算を適用\n4. 結果をストア\n5. 端数をスカラーで処理"
+  }, {
+    title: "実践: 画像処理（明るさ調整）",
+    body: "SIMD を使った実践的な例として、画像の明るさ調整を実装します。uint8 のピクセル値を SIMD で並列処理します。",
+    code: `def adjust_brightness(
+    pixels: UnsafePointer[UInt8],
+    n: Int,
+    adjustment: Int,
+):
+    """画像の明るさを調整（SIMDで16ピクセル同時処理）"""
+    alias W = 16  # uint8 なら16要素同時
+    var adj = SIMD[DType.int16, W](Int16(adjustment))
+    var zero = SIMD[DType.int16, W](0)
+    var max_val = SIMD[DType.int16, W](255)
+
+    var i = 0
+    while i + W <= n:
+        # uint8 → int16 に拡張（オーバーフロー防止）
+        var px = (pixels + i).load[width=W]().cast[DType.int16]()
+        var result = px + adj
+
+        # クランプ: 0-255 の範囲に収める
+        result = result.select(result > zero, zero)    # max(result, 0)
+        result = max_val.select(result < max_val, result)  # min(result, 255)
+
+        # int16 → uint8 に戻してストア
+        (pixels + i).store(result.cast[DType.uint8]())
+        i += W
+
+    # 端数処理
+    while i < n:
+        var val = Int(pixels[i]) + adjustment
+        if val < 0: val = 0
+        if val > 255: val = 255
+        pixels[i] = UInt8(val)
+        i += 1`
+  }]
+}, {
+  id: "ch10",
+  num: 10,
+  title: "Python連携の高度な活用",
+  est: "3時間",
+  sections: [{
+    title: "Python連携の全体像",
+    body: "MojoとPythonの相互運用は、高速な処理と豊富なエコシステムの両方を活用するための重要な機能です。",
+    table: T.pythonInterop,
+    code: `from python import Python, PythonObject
+
+def main():
+    # モジュールインポート
+    var np = Python.import_module("numpy")
+    var pd = Python.import_module("pandas")
+    var json = Python.import_module("json")
+
+    # NumPy配列の操作
+    var arr = np.array([1, 2, 3, 4, 5])
+    print("型:", arr.dtype)
+    print("合計:", arr.sum())
+
+    # Mojo → Python の型変換
+    var mojo_int: Int = 42
+    var py_obj: PythonObject = PythonObject(mojo_int)
+
+    # Python → Mojo の型変換（明示的）
+    var back_to_mojo: Int = Int(py_obj)
+    print("変換:", back_to_mojo)`
+  }, {
+    title: "型変換の完全ガイド",
+    body: "MojoとPython間の型変換ルールを理解することが重要です。暗黙変換は一部のみ、ほとんどは明示的な変換が必要です。",
+    code: `from python import Python, PythonObject
+
+def main():
+    var np = Python.import_module("numpy")
+
+    # === Mojo → Python ===
+    # 基本型は PythonObject() で変換
+    var py_int = PythonObject(42)
+    var py_float = PythonObject(3.14)
+    var py_str = PythonObject("hello")
+    var py_bool = PythonObject(True)
+
+    # List → Python list
+    var py_list = PythonObject([1, 2, 3])
+
+    # === Python → Mojo ===
+    # 基本型は型名() で変換
+    var mojo_int: Int = Int(py_int)
+    var mojo_float: Float64 = Float64(py_float)
+    var mojo_str: String = String(py_str)
+    var mojo_bool: Bool = Bool(py_bool)
+
+    # NumPy スカラー → Mojo
+    var np_val = np.float64(2.718)
+    var mojo_val: Float64 = Float64(np_val)
+    print("Mojo Float64:", mojo_val)
+
+    # 変換失敗の処理
+    try:
+        var bad = Int(PythonObject("not_a_number"))
+    except e:
+        print("変換エラー:", String(e))`,
+    afterCode: "変換のオーバーヘッド:\n・各変換はデータのコピーを伴う\n・頻繁な変換はパフォーマンスを低下させる\n・大量データの変換はバッチで行う（1要素ずつ変換しない）"
+  }, {
+    title: "パフォーマンス境界の理解",
+    body: "Python呼び出しにはGIL（Global Interpreter Lock）のオーバーヘッドがあります。Mojo/Python間の呼び出し頻度を最小化することが重要です。",
+    code: `from python import Python
+from time import now
+
+def main():
+    var np = Python.import_module("numpy")
+    alias SIZE = 10000
+
+    # Bad: 1要素ずつPython呼び出し（遅い）
+    var t1 = now()
+    var py_arr = np.zeros(SIZE)
+    for i in range(SIZE):
+        py_arr[i] = py_arr[i] + 1  # 毎回Python呼び出し
+    var t2 = now()
+    print("1要素ずつ:", t2 - t1, "ns")
+
+    # Good: バッチ操作（速い）
+    var t3 = now()
+    var py_arr2 = np.zeros(SIZE)
+    py_arr2 = py_arr2 + 1  # NumPyの一括演算
+    var t4 = now()
+    print("バッチ:", t4 - t3, "ns")
+
+    print("速度比:", Float64(t2 - t1) / Float64(t4 - t3))`,
+    afterCode: "パフォーマンス最適化の指針:\n1. Python呼び出しの回数を最小化（バッチ処理）\n2. 計算集約的な部分はMojoネイティブで実行\n3. データ変換は境界で一度だけ行う\n4. NumPyのベクトル化演算を活用（内部はC実装）"
+  }, {
+    title: "実践: Matplotlib でのグラフ描画",
+    body: "Mojoで計算した結果をPythonのMatplotlibで可視化する実践例です。",
+    code: `from python import Python
+
+def main():
+    var plt = Python.import_module("matplotlib.pyplot")
+    var np = Python.import_module("numpy")
+
+    # Mojo で計算
+    var n = 100
+    var x_list = PythonObject([])
+    var y_list = PythonObject([])
+
+    for i in range(n):
+        var x: Float64 = Float64(i) * 0.1
+        var y: Float64 = x * x  # y = x^2 をMojoで計算
+        x_list.append(x)
+        y_list.append(y)
+
+    # Python で可視化
+    var x_arr = np.array(x_list)
+    var y_arr = np.array(y_list)
+
+    plt.figure(figsize=PythonObject((10, 6)))
+    plt.plot(x_arr, y_arr, label="y = x^2")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title("Mojo Computation + Python Visualization")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("output.png")
+    print("グラフを output.png に保存しました")`
+  }]
+}, {
+  id: "ch11",
+  num: 11,
+  title: "パフォーマンスチューニング",
+  est: "4時間",
+  sections: [{
+    title: "パフォーマンス関連デコレータ",
+    body: "コンパイラの最適化を制御するデコレータです。適切に使うことで大幅な性能改善が可能です。",
+    table: T.perfDecorators,
+    code: `# @always_inline: 小さなホットパス関数に使う
+@always_inline
+def fast_abs(x: Int) -> Int:
+    if x < 0:
+        return -x
+    return x
+
+# @no_inline: 大きな関数やデバッグ時に使う
+@no_inline
+def complex_process(data: List[Int]) -> Int:
+    var result = 0
+    for i in range(len(data)):
+        result += data[i]
+    return result
+
+# @parameter: コンパイル時に計算結果を確定
+@parameter
+def compile_time_fib(n: Int) -> Int:
+    if n <= 1:
+        return n
+    return compile_time_fib(n - 1) + compile_time_fib(n - 2)
+
+def main():
+    # コンパイル時に計算済み
+    alias fib10 = compile_time_fib(10)
+    print("fib(10) =", fib10)  # 55`
+  }, {
+    title: "ベンチマークの方法",
+    body: "正確なパフォーマンス計測にはベンチマークモジュールを使います。簡易計測には time.now() を使います。",
+    table: T.benchmarkGuide,
+    code: `from time import now
+from benchmark import run as benchmark_run
+
+# 方法1: 簡易計測
+def main():
+    alias N = 1_000_000
+
+    var t1 = now()
+    var total = 0
+    for i in range(N):
+        total += i
+    var t2 = now()
+    print("結果:", total)
+    print("時間:", t2 - t1, "ns")
+    print("速度:", Float64(N) / Float64(t2 - t1) * 1e9, "ops/s")
+
+    # 方法2: 複数回実行して比較
+    var times = List[Int]()
+    for trial in range(5):
+        var start = now()
+        var s = 0
+        for i in range(N):
+            s += i
+        var end = now()
+        times.append(end - start)
+        print("Trial", trial, ":", end - start, "ns")`,
+    afterCode: "ベンチマークの注意点:\n1. ウォームアップ実行を行う（JITコンパイル、キャッシュ暖機）\n2. 複数回実行して統計を取る\n3. 結果を使用する（デッドコード除去を防ぐ）\n4. 外部要因（他のプロセス）を最小化する"
+  }, {
+    title: "最適化パターン一覧",
+    body: "Mojoで使える主要な最適化パターンです。ボトルネックに応じて適用します。",
+    table: T.optimizationPatterns,
+    code: `from time import now
+
+# パターン1: 事前確保
+def demo_prealloc():
+    alias N = 100_000
+
+    # Bad: リアロケーションが何度も発生
+    var t1 = now()
+    var lst1 = List[Int]()
+    for i in range(N):
+        lst1.append(i)
+    var t2 = now()
+
+    # Good: 事前確保でリアロケーションなし
+    var t3 = now()
+    var lst2 = List[Int](capacity=N)
+    for i in range(N):
+        lst2.append(i)
+    var t4 = now()
+
+    print("事前確保なし:", t2 - t1, "ns")
+    print("事前確保あり:", t4 - t3, "ns")
+
+# パターン2: ムーブで不要なコピーを回避
+def demo_move():
+    var data = List[Int]()
+    for i in range(10000):
+        data.append(i)
+
+    # Bad: コピー（O(n)のメモリ確保+コピー）
+    var copy = data
+
+    # Good: ムーブ（O(1)のポインタ移動のみ）
+    var moved = data^  # data はもう使えない
+
+def main():
+    demo_prealloc()`,
+    afterCode: "最適化の順序:\n1. アルゴリズムの改善（O(n^2) → O(n log n)）\n2. データ構造の選択（List vs Dict vs Set）\n3. メモリアクセスパターン（キャッシュフレンドリー）\n4. SIMD化・並列化\n5. マイクロ最適化（インライン化、アライメント）\n\nプロファイリングなしに最適化しない。計測 → 分析 → 改善 → 計測 のサイクルを回す。"
+  }]
+}, {
+  id: "ch12",
+  num: 12,
+  title: "実務プロジェクト設計",
+  est: "4時間",
+  sections: [{
+    title: "設計パターン in Mojo",
+    body: "GoFの設計パターンをMojoの言語機能で実現する方法です。Mojoには継承がないため、トレイトとジェネリクスで代替します。",
+    table: T.designPatterns,
+    code: `# ストラテジーパターン: トレイト + ジェネリクス
+trait Compressor:
+    def compress(self, data: String) -> String: ...
+    def name(self) -> String: ...
+
+struct NoCompression(Compressor):
+    def __init__(out self): pass
+    def compress(self, data: String) -> String: return data
+    def name(self) -> String: return "None"
+
+struct SimpleCompression(Compressor):
+    def __init__(out self): pass
+    def compress(self, data: String) -> String:
+        return "[compressed:" + String(len(data)) + "bytes]"
+    def name(self) -> String: return "Simple"
+
+def save_data[C: Compressor](compressor: C, data: String):
+    var compressed = compressor.compress(data)
+    print("[" + compressor.name() + "] 保存:", compressed)
+
+def main():
+    var data = "Hello, World! This is test data."
+    save_data(NoCompression(), data)
+    save_data(SimpleCompression(), data)`,
+    afterCode: "Mojoの設計パターンの特徴:\n・継承なし → トレイトでインターフェースを定義\n・仮想関数テーブルなし → ジェネリクスでモノモーフィゼーション\n・値セマンティクス → 所有権を意識した設計\n・RAII → デストラクタでリソース管理"
+  }, {
+    title: "RAII とイテレータパターン",
+    body: "RAII (Resource Acquisition Is Initialization) はMojoのリソース管理の基本です。__init__ でリソース取得、__del__ で解放します。",
+    code: `# RAII パターン: ファイルラッパー
+struct File:
+    var path: String
+    var is_open: Bool
+
+    def __init__(out self, path: String):
+        self.path = path
+        self.is_open = True
+        print("OPEN:", path)
+
+    def write(self, content: String):
+        if self.is_open:
+            print("WRITE:", self.path, "←", content)
+
+    def __del__(owned self):
+        if self.is_open:
+            print("CLOSE:", self.path)
+
+# イテレータパターン
+trait Iterable:
+    alias Item: CollectionElement
+    def __iter__(self) -> Self.Iterator: ...
+
+@value
+struct NumberRange:
+    var start: Int
+    var end: Int
+
+    def __iter__(self) -> NumberRangeIter:
+        return NumberRangeIter(self.start, self.end)
+
+@value
+struct NumberRangeIter:
+    var current: Int
+    var end: Int
+
+    def __next__(mut self) -> Int:
+        var val = self.current
+        self.current += 1
+        return val
+
+    def __has_next__(self) -> Bool:
+        return self.current < self.end
+
+    def __len__(self) -> Int:
+        if self.current >= self.end:
+            return 0
+        return self.end - self.current
+
+def main():
+    # RAII: スコープ終了時に自動解放
+    var f = File("data.txt")
+    f.write("hello")
+    f.write("world")
+    # f の __del__ が自動呼び出し
+
+    # イテレータ
+    for val in NumberRange(1, 6):
+        print(val)`
+  }, {
+    title: "コード品質",
+    body: "保守性の高いコードを書くための実践ガイドです。",
+    table: T.codeQuality,
+    code: `# docstring の書き方
+def calculate_bmi(weight_kg: Float64, height_m: Float64) raises -> Float64:
+    """BMI (Body Mass Index) を計算する。
+
+    Args:
+        weight_kg: 体重（キログラム）。正の値。
+        height_m: 身長（メートル）。正の値。
+
+    Returns:
+        BMI値。
+
+    Raises:
+        Error: 体重または身長が0以下の場合。
+
+    Examples:
+        var bmi = calculate_bmi(70.0, 1.75)  # → 22.86
+    """
+    if weight_kg <= 0.0 or height_m <= 0.0:
+        raise Error("体重と身長は正の値である必要があります")
+    return weight_kg / (height_m * height_m)
+
+# テスト関数パターン
+def test_bmi_normal():
+    """正常な入力でのBMI計算テスト。"""
+    var bmi = calculate_bmi(70.0, 1.75)
+    # 22.86 ± 0.01 の範囲内であることを確認
+    debug_assert(bmi > 22.8 and bmi < 22.9, "BMI計算が正しくない")
+    print("test_bmi_normal: PASSED")
+
+def test_bmi_invalid():
+    """不正な入力でエラーが出ることを確認。"""
+    try:
+        _ = calculate_bmi(0.0, 1.75)
+        debug_assert(False, "エラーが出るべき")
+    except:
+        pass
+    print("test_bmi_invalid: PASSED")
+
+def main():
+    test_bmi_normal()
+    test_bmi_invalid()
+    var bmi = calculate_bmi(70.0, 1.75)
+    print("BMI:", bmi)`
+  }, {
+    title: "Newtype パターンと型安全性",
+    body: "プリミティブ型をラップして、ドメイン固有の型を作成するパターンです。コンパイル時に単位の混同を防止します。",
+    code: `# 問題: 引数の順序を間違えやすい
+# def create_user(name: String, email: String, id: Int, age: Int):
+#     pass  # name と email を逆にしてもコンパイルエラーにならない!
+
+# 解決: Newtype パターン
+@value
+struct UserName:
+    var value: String
+@value
+struct Email:
+    var value: String
+@value
+struct UserId:
+    var value: Int
+@value
+struct Age:
+    var value: Int
+
+def create_user(name: UserName, email: Email, id: UserId, age: Age):
+    """引数の型が全て異なるため、順序を間違えるとコンパイルエラー。"""
+    print("作成: " + name.value + " <" + email.value + ">")
+
+def main():
+    create_user(
+        UserName("Alice"),
+        Email("alice@example.com"),
+        UserId(1),
+        Age(25),
+    )
+    # 以下はコンパイルエラー（型が合わない）:
+    # create_user(Email("..."), UserName("..."), Age(25), UserId(1))`,
+    afterCode: "Newtype パターンの利点:\n1. 引数の取り違えをコンパイル時に検出\n2. ドメインの意図がコードに表現される\n3. @register_passable でオーバーヘッドなし（コンパイラが最適化）\n4. 単位の混同を防止（メートル + 秒 のような無意味な計算を防ぐ）"
+  }, {
+    title: "CI/CD とプロジェクト管理",
+    body: "Mojoプロジェクトの継続的インテグレーション・デリバリーの設定例です。",
+    code: `# mojoproject.toml の例
+# [project]
+# name = "my-project"
+# version = "1.0.0"
+# description = "My Mojo project"
+# authors = ["Developer <dev@example.com>"]
+# channels = ["conda-forge", "https://conda.modular.com/max"]
+#
+# [dependencies]
+# max = ">=26.2"
+#
+# [tasks]
+# build = "mojo build src/main.mojo -o build/app"
+# test = "mojo test tests/"
+# format = "mojo format src/ tests/"
+# package = "mojo package src/mylib -o dist/mylib.mojopkg"
+
+# GitHub Actions CI/CD 例 (.github/workflows/ci.yml):
+# name: Mojo CI
+# on: [push, pull_request]
+# jobs:
+#   test:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#       - name: Install Mojo
+#         run: pip install mojo
+#       - name: Format check
+#         run: mojo format --check src/ tests/
+#       - name: Run tests
+#         run: mojo test tests/
+#       - name: Build
+#         run: mojo build src/main.mojo -o build/app
+#       - name: Package
+#         run: mojo package src/mylib -o dist/mylib.mojopkg`,
+    afterCode: "CI/CDのベストプラクティス:\n1. フォーマットチェック（mojo format --check）\n2. テスト実行（mojo test）\n3. ビルド確認（mojo build）\n4. パッケージ生成（mojo package）\n5. パフォーマンス回帰テスト（ベンチマーク結果の比較）"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, data.h.map((h, i) => /*#__PURE__*/React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, data.r.map((row, ri) => /*#__PURE__*/React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => /*#__PURE__*/React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return /*#__PURE__*/React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, /*#__PURE__*/React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, /*#__PURE__*/React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), /*#__PURE__*/React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && /*#__PURE__*/React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && /*#__PURE__*/React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function MojoIntermediate() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: 760,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\u26A1"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "\u521D\u7D1A\u30B3\u30FC\u30B9\u4FEE\u4E86\u8005\u5411\u3051"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "Mojo \u4E2D\u7D1A\u30B3\u30FC\u30B9"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "\u25B2" : "\u25BC")), menuOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => /*#__PURE__*/React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` \u30FB \u6F14\u7FD2${exercises.length}\u554F` : ""))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => /*#__PURE__*/React.createElement(Section, {
+    key: i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Exercise, {
+    key: i,
+    ex: ex,
+    idx: i
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "Mojo v26.2 (2026\u5E743\u6708) \u6642\u70B9 \u30FB docs.modular.com/mojo/manual/")));
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(MojoIntermediate));
+  </script>
+</body>
+</html>

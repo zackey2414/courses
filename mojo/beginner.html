@@ -1,0 +1,4417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mojo 初級コース — 入門コース修了者向け</title>
+  <meta name="description" content="入門コース修了者のためのMojo初級コース。全12章・42問の演習付き。CLIタスク管理アプリを段階的に構築。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  projStructure: {
+    h: ["ファイル/ディレクトリ", "役割", "備考"],
+    r: [["mojoproject.toml", "プロジェクト設定ファイル（依存関係・ビルド設定）", "magic init で自動生成"], ["src/", "ソースコードのルートディレクトリ", "パッケージとして機能"], ["src/__init__.mojo", "パッケージ初期化ファイル", "空でも必須"], ["src/main.mojo", "エントリポイント（def main()）", "mojo run の対象"], ["src/models/", "データモデル用サブパッケージ", "__init__.mojo 必須"], ["src/utils/", "ユーティリティ用サブパッケージ", "__init__.mojo 必須"], ["test/", "テストコード用ディレクトリ", "mojo test で実行"]]
+  },
+  importStyles: {
+    h: ["構文", "例", "効果"],
+    r: [["import パッケージ", "import models", "パッケージ全体をインポート"], ["from パッケージ import 名前", "from models import Task", "特定のstructや関数をインポート"], ["from パッケージ import *", "from utils import *", "パッケージ内の公開名を全てインポート"], ["パッケージ.サブパッケージ", "from models.task import Task", "ネストしたパッケージからインポート"]]
+  },
+  initFileRole: {
+    h: ["__init__.mojo の内容", "効果", "使い分け"],
+    r: [["空ファイル", "ディレクトリをパッケージとして認識させるだけ", "明示的なfrom指定を強制したい場合"], ["from .task import Task", "Taskを再エクスポート（from models import Taskが可能に）", "よく使う型を便利にアクセスさせたい場合"], ["alias VERSION = \"1.0\"", "パッケージレベルの定数を定義", "設定値を一元管理したい場合"]]
+  },
+  structDesign: {
+    h: ["設計原則", "説明", "例"],
+    r: [["単一責任", "1つのstructは1つの責務だけを持つ", "Task は タスクデータのみ、TaskList はタスク管理のみ"], ["不変フィールド優先", "変更不要なフィールドはread専用メソッドのみ提供", "id, created_at は変更不可"], ["@fieldwise_init活用", "全フィールドを引数に取るコンストラクタを自動生成", "シンプルなデータ構造に最適"], ["バリデーション", "不正な状態を作れないようにコンストラクタでチェック", "優先度は1〜5のみ許可"]]
+  },
+  fieldwiseVsManual: {
+    h: ["方式", "コード", "使い分け"],
+    r: [["@fieldwise_init", "@fieldwise_init\\nstruct Color:\\n    var r: UInt8\\n    var g: UInt8\\n    var b: UInt8", "全フィールドをそのまま初期化するだけの場合"], ["手動 __init__", "struct Task:\\n    var id: Int\\n    def __init__(out self, title: String):\\n        self.id = generate_id()\\n        self.title = title", "デフォルト値やバリデーション、計算が必要な場合"]]
+  },
+  structRelation: {
+    h: ["関係パターン", "説明", "例"],
+    r: [["所有（has-a）", "structが別のstructをフィールドとして持つ", "TaskList が List[Task] を持つ"], ["利用（uses）", "メソッドの引数や戻り値で別のstructを使う", "Formatter が Task を受け取って String を返す"], ["変換（converts）", "あるstructから別のstructを生成", "TaskCSVRow から Task を生成"]]
+  },
+  collectionTypes: {
+    h: ["型", "用途", "初期化例", "主な操作"],
+    r: [["List[T]", "順序付きの可変長リスト", "List[Int](1, 2, 3)", "append, pop, insert, len"], ["Dict[K, V]", "キーと値のペア", "Dict[String, Int]()", "d[key] = val, pop, keys"], ["Set[T]", "重複なしの集合", "Set[String]()", "add, remove, contains"], ["Optional[T]", "値がある/ないを表現", "Optional[Int](42) / Optional[Int](None)", "value(), or_else, __bool__"]]
+  },
+  listMethods: {
+    h: ["メソッド", "説明", "例"],
+    r: [["append(val)", "末尾に要素追加", "tasks.append(task)"], ["pop()", "末尾の要素を取り出して返す", "var last = tasks.pop()"], ["pop(i)", "i番目の要素を取り出して返す", "var removed = tasks.pop(0)"], ["insert(i, val)", "i番目に要素を挿入", "tasks.insert(0, task)"], ["__len__() / len(list)", "要素数を返す", "if len(tasks) > 0:"], ["__getitem__(i)", "i番目の要素を取得", "var t = tasks[i]"], ["__setitem__(i, val)", "i番目の要素を上書き", "tasks[i] = new_task"], ["clear()", "全要素を削除", "tasks.clear()"]]
+  },
+  dictMethods: {
+    h: ["メソッド", "説明", "例"],
+    r: [["d[key] = val", "キーに値を設定（追加/更新）", "counts[\"done\"] = 5"], ["d[key]", "キーの値を取得（存在しない場合エラー）", "var n = counts[\"done\"]"], ["pop(key)", "キーの要素を削除して値を返す", "var v = counts.pop(\"done\")"], ["keys()", "全キーのイテレータを返す", "for k in counts.keys():"], ["values()", "全値のイテレータを返す", "for v in counts.values():"], ["items()", "全キー値ペアのイテレータを返す", "for item in counts.items():"], ["__contains__(key)", "キーの存在確認", "if \"done\" in counts:"]]
+  },
+  optionalUsage: {
+    h: ["パターン", "コード例", "説明"],
+    r: [["値あり", "var x = Optional[Int](42)", "内部に値を持つ"], ["値なし", "var x = Optional[Int](None)", "値がない状態"], ["値の取得", "var v = x.value()", "値がない場合はエラー"], ["デフォルト付き取得", "var v = x.or_else(0)", "値がなければデフォルトを返す"], ["存在チェック", "if x:", "Bool変換で存在確認"]]
+  },
+  iterPatterns: {
+    h: ["パターン", "コード", "用途"],
+    r: [["インデックスループ", "for i in range(len(list)):\\n    var item = list[i]", "インデックスが必要な場合"], ["要素参照ループ", "for ref in list:\\n    print(ref[])", "読み取り専用アクセス"], ["Dict keys ループ", "for key in dict.keys():\\n    print(key[])", "キーの列挙"], ["Dict items ループ", "for entry in dict.items():\\n    print(entry[].key, entry[].value)", "キーと値の両方が必要"]]
+  },
+  errorTypes: {
+    h: ["エラーの種類", "説明", "例"],
+    r: [["Error（汎用）", "文字列メッセージを持つ基本エラー", "raise Error(\"invalid input\")"], ["型付きエラー", "独自のstruct型でエラーを表現", "raise ValidationError(\"empty title\")"], ["パラメトリックraises", "関数がどのエラー型を送出するか型で指定", "def parse() raises ValidationError:"]]
+  },
+  tryExceptPatterns: {
+    h: ["パターン", "構文", "用途"],
+    r: [["基本", "try:\\n    risky()\\nexcept e:\\n    print(e)", "全てのエラーをキャッチ"], ["型指定キャッチ", "try:\\n    parse(s)\\nexcept e: ValidationError:\\n    print(\"検証エラー:\", e.message)", "特定の型のエラーのみキャッチ"], ["複数キャッチ", "try:\\n    process()\\nexcept e: ParseError:\\n    ...\\nexcept e: IOError:\\n    ...", "エラー型ごとに処理を分岐"], ["try/except/else/finally", "try:\\n    op()\\nexcept e:\\n    handle(e)\\nelse:\\n    on_success()\\nfinally:\\n    cleanup()", "成功時処理・後片付け"]]
+  },
+  raisesDecl: {
+    h: ["宣言", "意味", "使い分け"],
+    r: [["def func():", "raises しない（v26.2ではdefは暗黙raisesなし）", "エラーを投げない関数"], ["def func() raises:", "汎用Errorを送出する可能性がある", "何らかのエラーを投げうる関数"], ["def func() raises ValidationError:", "特定の型のエラーのみ送出", "エラーの型を呼び出し元に保証したい場合"]]
+  },
+  contextManager: {
+    h: ["特殊メソッド", "役割", "呼ばれるタイミング"],
+    r: [["__enter__(mut self)", "リソースの取得・初期化", "with ブロックの開始時"], ["__exit__(mut self)", "リソースの解放・後片付け", "with ブロックの終了時（正常/例外問わず）"]]
+  },
+  stringMethods: {
+    h: ["メソッド", "説明", "例"],
+    r: [["len(s)", "文字列の長さ", "len(\"hello\") → 5"], ["s.upper()", "大文字に変換", "\"hello\".upper() → \"HELLO\""], ["s.lower()", "小文字に変換", "\"HELLO\".lower() → \"hello\""], ["s.split(sep)", "区切り文字で分割してListに", "\"a,b,c\".split(\",\")"], ["s.strip()", "前後の空白を除去", "\" hi \".strip() → \"hi\""], ["s.find(sub)", "部分文字列の位置を返す（見つからなければ-1）", "\"hello\".find(\"ll\") → 2"], ["s.replace(old, new)", "部分文字列を置換", "\"hi\".replace(\"hi\",\"hello\")"], ["s.startswith(prefix)", "先頭一致判定", "\"hello\".startswith(\"he\") → True"], ["s.endswith(suffix)", "末尾一致判定", "\"hello\".endswith(\"lo\") → True"], ["s.count(sub)", "部分文字列の出現回数", "\"aabaa\".count(\"a\") → 4"]]
+  },
+  stringConcat: {
+    h: ["方法", "構文", "用途"],
+    r: [["+ 演算子", "\"Hello, \" + name + \"!\"", "単純な連結"], ["String() 変換", "\"ID: \" + String(task.id)", "数値を文字列に変換して連結"], ["T-Strings", "t\"Task #{task.id}: {task.title}\"", "テンプレートベースのフォーマット（v26.2新機能）"]]
+  },
+  tstringSyntax: {
+    h: ["構文", "説明", "例"],
+    r: [["t\"...{expr}...\"", "式を埋め込んだテンプレート文字列", "t\"Hello, {name}!\""], ["{expr}", "任意の式を埋め込み", "t\"合計: {a + b}\""], ["{expr:format}", "フォーマット指定付き", "t\"{price:.2f}円\""], ["{{, }}", "リテラルの波括弧をエスケープ", "t\"Dict は {{key: val}} の形式\""]]
+  },
+  parsePatterns: {
+    h: ["パース対象", "手法", "コード例"],
+    r: [["CSV行", "split + インデックスアクセス", "var fields = line.split(\",\")\\nvar title = fields[0]"], ["キー=値", "find + スライス", "var eq = s.find(\"=\")\\nvar key = s[:eq]"], ["コマンド引数", "split + 先頭判定", "var parts = input.split(\" \")\\nif parts[0] == \"add\":"], ["数値変換", "Int() / Float64()", "var n = Int(s)  # raises on invalid"]]
+  },
+  fileOps: {
+    h: ["操作", "関数/構文", "説明"],
+    r: [["読み取り", "with open(path, \"r\") as f:\\n    var content = f.read()", "ファイル全体を文字列として読み込み"], ["書き込み（上書き）", "with open(path, \"w\") as f:\\n    f.write(data)", "ファイルを新規作成/上書き"], ["追記", "with open(path, \"a\") as f:\\n    f.write(line)", "既存ファイルの末尾に追加"], ["行単位読み込み", "var lines = content.split(\"\\n\")", "読み込んだ文字列を行に分割"], ["存在確認", "from os.path import exists\\nif exists(path):", "ファイルの存在を確認"]]
+  },
+  csvFormat: {
+    h: ["項目", "フォーマット", "例"],
+    r: [["ヘッダー行", "id,title,status,priority,created_at", "1行目に列名"], ["データ行", "1,買い物,todo,2,2026-04-01", "カンマ区切りの値"], ["ステータス", "todo / doing / done", "3つの状態"], ["優先度", "1（低）〜 5（高）", "整数値"]]
+  },
+  dataFormats: {
+    h: ["形式", "メリット", "デメリット", "用途"],
+    r: [["CSV", "シンプル、人間が読める", "型情報なし、ネストに不向き", "タスクリストなどフラットなデータ"], ["JSON（Python経由）", "構造化データに強い", "Mojoネイティブでは未サポート", "設定ファイル、APIデータ"], ["独自テキスト形式", "完全に制御可能", "パーサーの実装が必要", "特殊なフォーマットが必要な場合"]]
+  },
+  cliCommands: {
+    h: ["コマンド", "書式", "説明"],
+    r: [["add", "add <タイトル> [優先度]", "新しいタスクを追加"], ["list", "list [ステータス]", "タスク一覧を表示（フィルタ可）"], ["done", "done <ID>", "タスクを完了にする"], ["delete", "delete <ID>", "タスクを削除する"], ["edit", "edit <ID> <新タイトル>", "タスクのタイトルを変更"], ["priority", "priority <ID> <1-5>", "タスクの優先度を変更"], ["search", "search <キーワード>", "タイトルでタスクを検索"], ["stats", "stats", "タスクの統計情報を表示"], ["save", "save", "データをファイルに保存"], ["load", "load", "ファイルからデータを読み込み"], ["help", "help", "ヘルプを表示"], ["quit", "quit", "アプリを終了"]]
+  },
+  argParsePattern: {
+    h: ["処理", "コード例", "説明"],
+    r: [["入力の取得", "var line = input(\"> \")", "プロンプトを表示して1行読み込み"], ["コマンド分離", "var parts = line.strip().split(\" \")\\nvar cmd = parts[0]", "空白で分割して先頭をコマンドとして取得"], ["引数の取得", "if len(parts) > 1:\\n    var arg = parts[1]", "2番目以降を引数として取り出し"], ["引数の結合", "var title = \" \".join(parts[1:])", "2番目以降の要素をスペースで結合"]]
+  },
+  replLoop: {
+    h: ["要素", "実装", "説明"],
+    r: [["メインループ", "while True:", "quit コマンドまで繰り返す"], ["入力取得", "var line = input(prompt)", "ユーザー入力を1行取得"], ["空入力スキップ", "if len(line.strip()) == 0: continue", "空行を無視"], ["コマンド分岐", "if cmd == \"add\": ... elif cmd == \"list\": ...", "コマンドに応じた処理を実行"], ["エラーハンドリング", "try: ... except e: print(\"Error:\", e)", "不正入力時にクラッシュしない"]]
+  },
+  testFunctions: {
+    h: ["機能", "構文", "説明"],
+    r: [["テスト関数", "def test_my_func():", "test_ プレフィックスの関数がテスト対象"], ["等値アサート", "assert_equal(actual, expected)", "値が等しいことを検証"], ["真偽アサート", "assert_true(condition)", "条件がTrueであることを検証"], ["偽アサート", "assert_false(condition)", "条件がFalseであることを検証"], ["エラーアサート", "with assert_raises():\\n    risky_func()", "例外が発生することを検証"], ["テスト実行", "mojo test test_file.mojo", "ファイル内のtest_関数を全て実行"]]
+  },
+  testPatterns: {
+    h: ["パターン", "説明", "例"],
+    r: [["正常系テスト", "期待する入力に対して正しい結果が返ることを検証", "add後にlen==1を確認"], ["異常系テスト", "不正な入力に対してエラーが発生することを検証", "空タイトルでValidationError"], ["境界値テスト", "境界となる値での動作を検証", "優先度0, 1, 5, 6での動作"], ["状態変化テスト", "操作前後で状態が正しく変わることを検証", "done後にstatus==\"done\"を確認"]]
+  },
+  tddCycle: {
+    h: ["ステップ", "内容", "コマンド"],
+    r: [["1. Red（失敗）", "まずテストを書く → 当然失敗する", "mojo test → FAIL"], ["2. Green（成功）", "テストを通す最小限のコードを書く", "mojo test → PASS"], ["3. Refactor（改善）", "テストが通ったままコードを整理", "mojo test → PASS"]]
+  },
+  simdTypes: {
+    h: ["型", "ビット幅", "用途", "メモリ効率"],
+    r: [["DType.uint8", "8bit", "ステータスコード、フラグ", "最高（1バイト/要素）"], ["DType.int32", "32bit", "ID、カウンタ", "良い（4バイト/要素）"], ["DType.int64", "64bit", "タイムスタンプ、大きな整数", "標準（8バイト/要素）"], ["DType.float32", "32bit", "集計値、スコア", "良い（4バイト/要素）"], ["DType.float64", "64bit", "精密な計算", "標準（8バイト/要素）"]]
+  },
+  typeOptimization: {
+    h: ["場面", "非最適", "最適", "理由"],
+    r: [["タスクID", "Int（64bit）", "Int32 or UInt32", "IDは小さな正の整数"], ["優先度", "Int（64bit）", "UInt8", "1〜5の値域なら8bitで十分"], ["ステータス", "String", "UInt8 + alias", "文字列比較よりInt比較が高速"], ["フラグ集合", "List[Bool]", "SIMD[DType.bool, N]", "ビット演算で一括処理可能"]]
+  },
+  benchmarkApproach: {
+    h: ["手法", "コード", "用途"],
+    r: [["time.now()", "from time import now\\nvar start = now()\\n# 処理\\nvar elapsed = now() - start", "簡易的な実行時間測定"], ["benchmark モジュール", "from benchmark import benchmark\\nvar report = benchmark.run[func]()", "正確なベンチマーク（ウォームアップ・統計付き）"], ["比較ベンチマーク", "2つの実装を同条件で計測して比較", "最適化の効果を数値で確認"]]
+  },
+  pythonInterop: {
+    h: ["操作", "コード", "説明"],
+    r: [["モジュール読込", "var np = Python.import_module(\"numpy\")", "Pythonライブラリをインポート"], ["Mojo → Python", "PythonObject(mojo_val)", "Mojo値をPythonObjectに変換"], ["Python → Mojo", "Int(py_val) / Float64(py_val) / String(py_val)", "PythonObjectをMojo型に変換"], ["Pythonリスト作成", "var py_list = Python.list()\\npy_list.append(1)", "Python側のリストを操作"], ["Python関数呼出", "var result = py_module.func(arg1, arg2)", "Python関数をMojoから呼ぶ"]]
+  },
+  vizLibraries: {
+    h: ["ライブラリ", "用途", "呼び出し例"],
+    r: [["matplotlib", "グラフ描画", "plt.bar(labels, values)\\nplt.savefig(\"chart.png\")"], ["numpy", "数値計算・統計", "np.mean(arr), np.std(arr)"], ["json", "JSON読み書き", "json.dumps(data), json.loads(text)"], ["datetime", "日時操作", "datetime.datetime.now().isoformat()"]]
+  },
+  traitDesignPatterns: {
+    h: ["パターン", "説明", "例"],
+    r: [["インターフェース分離", "大きなtraitを小さなtraitに分割", "Readable + Writable vs ReadWritable"], ["trait合成", "複数のtraitを組み合わせた要件定義", "struct Task(Stringable, EqualityComparable, Writable)"], ["デフォルト実装", "traitメソッドにデフォルト実装を提供", "trait Loggable: def log(self): print(String(self))"], ["ジェネリック制約", "traitをパラメータ制約に使用", "def sort[T: Comparable](mut list: List[T])"]]
+  },
+  ownershipPatterns: {
+    h: ["パターン", "引数規約", "使い場面", "コード例"],
+    r: [["読み取り専用", "read（デフォルト）", "値を参照するだけ", "def display(task: Task):"], ["その場で変更", "mut", "呼び出し元の値を直接変更", "def mark_done(mut task: Task):"], ["所有権の移動", "var (owned)", "値を受け取って消費/保存", "def add(mut self, var task: Task):"], ["出力パラメータ", "out", "新しい値を書き込む", "def __init__(out self):"]]
+  },
+  refactorChecklist: {
+    h: ["チェック項目", "Before", "After"],
+    r: [["重複コードの排除", "同じロジックが複数箇所に散在", "共通関数/メソッドに抽出"], ["適切な型の選択", "全てInt/Stringで管理", "意味のあるstruct/aliasを定義"], ["エラー処理の統一", "場当たり的なif/printエラー", "型付きエラー + try/except"], ["trait活用", "型ごとに似たメソッドを個別定義", "共通traitで統一的なインターフェース"], ["テストカバレッジ", "手動確認のみ", "自動テストで主要機能を網羅"]]
+  },
+  finalFeatures: {
+    h: ["機能", "実装内容", "使用する知識"],
+    r: [["タスクCRUD", "追加・表示・更新・削除", "struct, List, Dict"], ["永続化", "CSV形式でファイル保存/読込", "ファイルI/O, 文字列処理"], ["検索・フィルタ", "キーワード検索、ステータスフィルタ", "String操作, イテレーション"], ["統計表示", "完了率、優先度分布、期間分析", "数値計算, Python連携"], ["REPL UI", "対話型コマンドインターフェース", "CLI処理, エラーハンドリング"], ["テスト", "主要機能の自動テスト", "assert, テスト関数"]]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "以下のディレクトリ構造に合わせて、__init__.mojo ファイルの内容を書いてください。\nmodels パッケージから Task を、utils パッケージから format_date を再エクスポートします。\n\n【ポイント】from .モジュール import 名前 の形式",
+    code: `# ディレクトリ構造:
+# src/
+#   __init__.mojo        ← ここは空でOK
+#   main.mojo
+#   models/
+#     __init__.mojo      ← Task を再エクスポート
+#     task.mojo           ← struct Task を定義
+#   utils/
+#     __init__.mojo      ← format_date を再エクスポート
+#     date_helper.mojo    ← def format_date() を定義
+
+# models/__init__.mojo の内容を書いてください
+# utils/__init__.mojo の内容を書いてください`,
+    answer: `# models/__init__.mojo
+from .task import Task
+
+# utils/__init__.mojo
+from .date_helper import format_date`
+  }, {
+    diff: 2,
+    q: "タスク管理アプリのプロジェクト構造を設計してください。\nmain.mojo では models と utils からインポートして使います。\n各ファイルにスタブ（最小限の定義）を書いてください。\n\n【ポイント】モジュール分割、import文、def main()",
+    code: `# 以下のファイルの内容をそれぞれ書いてください:
+# 1. src/models/task.mojo（Task struct のスタブ）
+# 2. src/utils/helpers.mojo（generate_id 関数のスタブ）
+# 3. src/main.mojo（インポートして使うエントリポイント）`,
+    answer: `# --- src/models/task.mojo ---
+struct Task:
+    var id: Int
+    var title: String
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id
+        self.title = title
+
+    def summary(self) -> String:
+        return String(self.id) + ": " + self.title
+
+# --- src/models/__init__.mojo ---
+from .task import Task
+
+# --- src/utils/helpers.mojo ---
+var _next_id: Int = 0
+
+def generate_id() -> Int:
+    _next_id += 1
+    return _next_id
+
+# --- src/utils/__init__.mojo ---
+from .helpers import generate_id
+
+# --- src/main.mojo ---
+from models import Task
+from utils import generate_id
+
+def main():
+    var t = Task(generate_id(), "牛乳を買う")
+    print(t.summary())`
+  }, {
+    diff: 2,
+    q: "パッケージの公開/非公開を管理する __init__.mojo を書いてください。\nmodels パッケージでは Task だけを公開し、内部ヘルパーの _validate_title は非公開にします。\n\n【ポイント】再エクスポートするものだけが外部から見える",
+    code: `# models/task.mojo に Task と _validate_title がある場合
+# models/__init__.mojo で Task だけを公開する
+
+# そしてmain.mojoで正しいimportと間違ったimportの例を示す`,
+    answer: `# --- models/task.mojo ---
+def _validate_title(title: String) raises:
+    if len(title) == 0:
+        raise Error("title must not be empty")
+
+struct Task:
+    var id: Int
+    var title: String
+
+    def __init__(out self, id: Int, title: String) raises:
+        _validate_title(title)
+        self.id = id
+        self.title = title
+
+# --- models/__init__.mojo ---
+from .task import Task
+# _validate_title は再エクスポートしない → 外部からアクセス不可
+
+# --- main.mojo ---
+from models import Task  # OK
+
+def main():
+    try:
+        var t = Task(1, "テスト")
+        print(t.title)
+    except e:
+        print("Error:", e)`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "タスク管理アプリの基本データモデル Task struct を設計してください。\nフィールド: id(Int), title(String), status(String), priority(Int)\n__init__ではstatusのデフォルトを\"todo\"、priorityのデフォルトを1にします。\n\n【ポイント】手動__init__でデフォルト値を設定",
+    code: `# var t = Task(1, "レポート提出")
+# print(t.status)    → "todo"
+# print(t.priority)  → 1`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id
+        self.title = title
+        self.status = "todo"
+        self.priority = 1
+
+    def __init__(out self, id: Int, title: String, priority: Int):
+        self.id = id
+        self.title = title
+        self.status = "todo"
+        self.priority = priority
+
+    def summary(self) -> String:
+        return "[" + self.status + "] " + String(self.id) + ": " + self.title
+
+def main():
+    var t1 = Task(1, "レポート提出")
+    var t2 = Task(2, "買い物", 3)
+    print(t1.summary())
+    print(t2.summary())`
+  }, {
+    diff: 2,
+    q: "Task に加えて TaskList struct を設計してください。\nTaskList は List[Task] を持ち、add / count / get メソッドを提供します。\nstruct間の「所有」関係（has-a）を実践してください。\n\n【ポイント】複数structの連携、List[Task]の所有",
+    code: `# var tl = TaskList()
+# tl.add(Task(1, "タスクA"))
+# tl.add(Task(2, "タスクB"))
+# print(tl.count())  → 2`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id
+        self.title = title
+        self.status = "todo"
+
+    def summary(self) -> String:
+        return String(self.id) + ": " + self.title + " [" + self.status + "]"
+
+struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+
+    def __init__(out self):
+        self.tasks = List[Task]()
+        self.next_id = 1
+
+    def add(mut self, title: String):
+        var t = Task(self.next_id, title)
+        self.tasks.append(t^)
+        self.next_id += 1
+
+    def count(self) -> Int:
+        return len(self.tasks)
+
+    def get(self, index: Int) -> ref [self.tasks] Task:
+        return self.tasks[index]
+
+def main():
+    var tl = TaskList()
+    tl.add("タスクA")
+    tl.add("タスクB")
+    print("件数:", tl.count())
+    print(tl.get(0).summary())
+    print(tl.get(1).summary())`
+  }, {
+    diff: 3,
+    q: "Task struct にバリデーション付きの set_priority メソッドを追加してください。\n優先度は1〜5のみ許可し、範囲外ならエラーを送出します。\nまた set_status も \"todo\"/\"doing\"/\"done\" のみ許可してください。\n\n【ポイント】バリデーション、raises宣言、mut self",
+    code: `# t.set_priority(3)   → OK
+# t.set_priority(10)  → raises Error
+# t.set_status("done") → OK
+# t.set_status("xxx")  → raises Error`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id
+        self.title = title
+        self.status = "todo"
+        self.priority = 1
+
+    def set_priority(mut self, p: Int) raises:
+        if p < 1 or p > 5:
+            raise Error("priority must be 1-5, got " + String(p))
+        self.priority = p
+
+    def set_status(mut self, s: String) raises:
+        if s != "todo" and s != "doing" and s != "done":
+            raise Error("invalid status: " + s)
+        self.status = s
+
+    def summary(self) -> String:
+        return "[P" + String(self.priority) + "/" + self.status + "] " + self.title
+
+def main():
+    var t = Task(1, "レポート提出")
+    try:
+        t.set_priority(3)
+        t.set_status("doing")
+        print(t.summary())
+        t.set_priority(10)
+    except e:
+        print("Error:", e)`
+  }],
+  ch3: [{
+    diff: 1,
+    q: "TaskList に全タスクを表示する list_all メソッドを追加してください。\nfor と range を使ってインデックスループで各タスクの summary を表示します。\n\n【ポイント】List のインデックスアクセス、for + range",
+    code: `# tl.list_all()
+# 出力:
+# 1: 買い物 [todo]
+# 2: レポート [todo]`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id
+        self.title = title
+        self.status = "todo"
+
+    def summary(self) -> String:
+        return String(self.id) + ": " + self.title + " [" + self.status + "]"
+
+struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+
+    def __init__(out self):
+        self.tasks = List[Task]()
+        self.next_id = 1
+
+    def add(mut self, title: String):
+        self.tasks.append(Task(self.next_id, title)^)
+        self.next_id += 1
+
+    def list_all(self):
+        if len(self.tasks) == 0:
+            print("タスクはありません")
+            return
+        for i in range(len(self.tasks)):
+            print(self.tasks[i].summary())
+
+def main():
+    var tl = TaskList()
+    tl.add("買い物")
+    tl.add("レポート")
+    tl.add("掃除")
+    tl.list_all()`
+  }, {
+    diff: 2,
+    q: "TaskList に find_by_id メソッドを追加してください。\n指定IDのタスクが見つかれば Optional[Int]（インデックス）を返し、\n見つからなければ None を返します。\n\n【ポイント】Optional の使い方、Listの検索",
+    code: `# var idx = tl.find_by_id(2)
+# if idx:
+#     print("見つかった: インデックス", idx.value())`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title; self.status = "todo"
+    def summary(self) -> String:
+        return String(self.id) + ": " + self.title
+
+struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+
+    def __init__(out self):
+        self.tasks = List[Task]()
+        self.next_id = 1
+
+    def add(mut self, title: String):
+        self.tasks.append(Task(self.next_id, title)^)
+        self.next_id += 1
+
+    def find_by_id(self, id: Int) -> Optional[Int]:
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                return Optional[Int](i)
+        return Optional[Int](None)
+
+def main():
+    var tl = TaskList()
+    tl.add("買い物")
+    tl.add("レポート")
+    tl.add("掃除")
+
+    var idx = tl.find_by_id(2)
+    if idx:
+        print("Found:", tl.tasks[idx.value()].summary())
+
+    var idx2 = tl.find_by_id(99)
+    if not idx2:
+        print("ID 99 not found")`
+  }, {
+    diff: 2,
+    q: "タスクのステータス別カウントを Dict で集計する count_by_status メソッドを追加してください。\n戻り値は Dict[String, Int] で、\"todo\", \"doing\", \"done\" のカウントを返します。\n\n【ポイント】Dict の初期化・更新、条件分岐",
+    code: `# var counts = tl.count_by_status()
+# print("todo:", counts["todo"])
+# print("doing:", counts["doing"])
+# print("done:", counts["done"])`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title; self.status = "todo"
+
+struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+
+    def __init__(out self):
+        self.tasks = List[Task]()
+        self.next_id = 1
+
+    def add(mut self, title: String):
+        self.tasks.append(Task(self.next_id, title)^)
+        self.next_id += 1
+
+    def mark_done(mut self, index: Int):
+        self.tasks[index].status = "done"
+
+    def count_by_status(self) -> Dict[String, Int]:
+        var counts = Dict[String, Int]()
+        counts["todo"] = 0
+        counts["doing"] = 0
+        counts["done"] = 0
+        for i in range(len(self.tasks)):
+            var s = self.tasks[i].status
+            counts[s] = counts[s] + 1
+        return counts
+
+def main():
+    var tl = TaskList()
+    tl.add("タスクA")
+    tl.add("タスクB")
+    tl.add("タスクC")
+    tl.mark_done(0)
+    var counts = tl.count_by_status()
+    print("todo:", counts["todo"])
+    print("doing:", counts["doing"])
+    print("done:", counts["done"])`
+  }, {
+    diff: 3,
+    q: "TaskList に filter_by_status メソッドと sort_by_priority メソッドを追加してください。\nfilter は指定ステータスのタスクのみを新しい List[Task] として返します。\nsort は優先度の高い順（降順）にソートした新しいリストを返します。\n\n【ポイント】新しいListの構築、ソートアルゴリズムの実装",
+    code: `# var todos = tl.filter_by_status("todo")
+# var sorted = tl.sort_by_priority()`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String, priority: Int):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = priority
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title
+        self.status = other.status; self.priority = other.priority
+    def summary(self) -> String:
+        return "[P" + String(self.priority) + "] " + self.title
+
+struct TaskList:
+    var tasks: List[Task]
+
+    def __init__(out self):
+        self.tasks = List[Task]()
+
+    def add(mut self, task: Task):
+        self.tasks.append(task^)
+
+    def filter_by_status(self, status: String) -> List[Task]:
+        var result = List[Task]()
+        for i in range(len(self.tasks)):
+            if self.tasks[i].status == status:
+                result.append(self.tasks[i])
+        return result
+
+    def sort_by_priority(self) -> List[Task]:
+        var result = List[Task]()
+        for i in range(len(self.tasks)):
+            result.append(self.tasks[i])
+        # バブルソート（降順）
+        for i in range(len(result)):
+            for j in range(len(result) - 1 - i):
+                if result[j].priority < result[j + 1].priority:
+                    var tmp = result[j]
+                    result[j] = result[j + 1]
+                    result[j + 1] = tmp
+        return result
+
+def main():
+    var tl = TaskList()
+    tl.add(Task(1, "低タスク", 1)^)
+    tl.add(Task(2, "高タスク", 5)^)
+    tl.add(Task(3, "中タスク", 3)^)
+
+    print("--- 優先度順 ---")
+    var sorted = tl.sort_by_priority()
+    for i in range(len(sorted)):
+        print(sorted[i].summary())`
+  }],
+  ch4: [{
+    diff: 1,
+    q: "タスク追加時にタイトルが空文字列の場合にエラーを送出する validate_title 関数を書いてください。\ntry/except で呼び出してエラーメッセージを表示します。\n\n【ポイント】raise Error(), try/except, raises 宣言",
+    code: `# validate_title("")     → raises Error
+# validate_title("OK")   → 通過（何もしない）`,
+    answer: `def validate_title(title: String) raises:
+    if len(title) == 0:
+        raise Error("タイトルが空です")
+    if len(title) > 100:
+        raise Error("タイトルが長すぎます（100文字以内）")
+
+def add_task(title: String):
+    try:
+        validate_title(title)
+        print("タスク追加:", title)
+    except e:
+        print("追加失敗:", e)
+
+def main():
+    add_task("買い物")
+    add_task("")
+    add_task("A" * 101)`
+  }, {
+    diff: 2,
+    q: "型付きエラーを使って ValidationError と NotFoundError を定義してください。\nTaskList の add と find_by_id でそれぞれ使い分けます。\n\n【ポイント】独自エラーstruct、raises 型指定、型別キャッチ",
+    code: `# tl.add("")          → raises ValidationError
+# tl.find_by_id(99)   → raises NotFoundError`,
+    answer: `struct ValidationError:
+    var message: String
+    def __init__(out self, message: String):
+        self.message = message
+
+struct NotFoundError:
+    var message: String
+    def __init__(out self, message: String):
+        self.message = message
+
+struct Task:
+    var id: Int
+    var title: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+
+struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+
+    def __init__(out self):
+        self.tasks = List[Task]()
+        self.next_id = 1
+
+    def add(mut self, title: String) raises ValidationError:
+        if len(title) == 0:
+            raise ValidationError("タイトルが空です")
+        self.tasks.append(Task(self.next_id, title)^)
+        self.next_id += 1
+
+    def find_by_id(self, id: Int) raises NotFoundError -> ref [self.tasks] Task:
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                return self.tasks[i]
+        raise NotFoundError("ID " + String(id) + " が見つかりません")
+
+def main():
+    var tl = TaskList()
+    try:
+        tl.add("買い物")
+        tl.add("")
+    except e: ValidationError:
+        print("検証エラー:", e.message)
+
+    try:
+        var t = tl.find_by_id(99)
+    except e: NotFoundError:
+        print("検索エラー:", e.message)`
+  }, {
+    diff: 2,
+    q: "コンテキストマネージャを実装した Logger struct を作ってください。\n__enter__ でログファイルを開き、__exit__ で閉じます。\nwith 文で使えるようにしてください。\n\n【ポイント】__enter__, __exit__, with 文",
+    code: `# with Logger("app.log") as logger:
+#     logger.log("タスク追加")
+#     logger.log("タスク完了")
+# → ファイルが自動的に閉じられる`,
+    answer: `struct Logger:
+    var filename: String
+    var entries: List[String]
+    var is_open: Bool
+
+    def __init__(out self, filename: String):
+        self.filename = filename
+        self.entries = List[String]()
+        self.is_open = False
+
+    def __enter__(mut self) -> ref [self] Self:
+        self.is_open = True
+        print("[Logger] 開始:", self.filename)
+        return self
+
+    def __exit__(mut self):
+        print("[Logger] 保存中... (" + String(len(self.entries)) + "件)")
+        for i in range(len(self.entries)):
+            print("  ", self.entries[i])
+        self.is_open = False
+        print("[Logger] 終了:", self.filename)
+
+    def log(mut self, message: String):
+        if self.is_open:
+            self.entries.append(message)
+
+def main():
+    with Logger("app.log") as logger:
+        logger.log("タスク追加: 買い物")
+        logger.log("タスク完了: ID=1")
+        logger.log("アプリ終了")`
+  }, {
+    diff: 3,
+    q: "try/except/else/finally の全パターンを使って、\nタスクの追加→検証→保存の一連の処理を書いてください。\nelse はエラーがなかった場合の成功処理、finally は必ず実行する後片付けです。\n\n【ポイント】try/except/else/finally、複合的なエラー処理",
+    code: `# 正常時: 追加 → 成功メッセージ → 後片付け
+# 異常時: 追加 → エラーメッセージ → 後片付け`,
+    answer: `def validate_and_add(title: String) raises:
+    if len(title) == 0:
+        raise Error("空のタイトル")
+    if len(title) > 50:
+        raise Error("タイトルが長すぎます")
+    print("タスク追加:", title)
+
+def process_task(title: String):
+    print("--- 処理開始:", title, "---")
+    try:
+        validate_and_add(title)
+    except e:
+        print("エラー発生:", e)
+    else:
+        print("成功: タスクが正常に追加されました")
+    finally:
+        print("後片付け: リソース解放完了")
+    print("")
+
+def main():
+    process_task("買い物")
+    process_task("")
+    process_task("A" * 51)`
+  }],
+  ch5: [{
+    diff: 1,
+    q: "Task struct に to_display_string メソッドを追加してください。\n書式: \"[P3/doing] 2: 買い物\" のように、優先度・ステータス・ID・タイトルを含む文字列を返します。\n\n【ポイント】String() 変換、+ 連結、フォーマット設計",
+    code: `# t.to_display_string()
+# → "[P3/doing] 2: 買い物"`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+
+    def to_display_string(self) -> String:
+        return "[P" + String(self.priority) + "/" + self.status + "] " + String(self.id) + ": " + self.title
+
+def main():
+    var t = Task(2, "買い物")
+    t.status = "doing"
+    t.priority = 3
+    print(t.to_display_string())`
+  }, {
+    diff: 2,
+    q: "コマンド文字列をパースする parse_command 関数を書いてください。\n入力: \"add 牛乳を買う 3\" → コマンド=\"add\", 引数=[\"牛乳を買う\", \"3\"]\nsplit と インデックスアクセスを使います。\n\n【ポイント】String.split(), List操作、パース処理",
+    code: `# parse_command("add 牛乳を買う 3")
+# → cmd="add", args=["牛乳を買う", "3"]
+# parse_command("list")
+# → cmd="list", args=[]
+# parse_command("done 5")
+# → cmd="done", args=["5"]`,
+    answer: `struct ParsedCommand:
+    var command: String
+    var args: List[String]
+
+    def __init__(out self, command: String, owned args: List[String]):
+        self.command = command
+        self.args = args^
+
+def parse_command(input: String) raises -> ParsedCommand:
+    var trimmed = input.strip()
+    if len(trimmed) == 0:
+        raise Error("空のコマンド")
+
+    var parts = trimmed.split(" ")
+    var cmd = parts[0]
+    var args = List[String]()
+    for i in range(1, len(parts)):
+        if len(parts[i]) > 0:
+            args.append(parts[i])
+    return ParsedCommand(cmd, args^)
+
+def main():
+    try:
+        var p1 = parse_command("add 牛乳を買う 3")
+        print("cmd:", p1.command, "args count:", len(p1.args))
+
+        var p2 = parse_command("list")
+        print("cmd:", p2.command, "args count:", len(p2.args))
+
+        var p3 = parse_command("done 5")
+        print("cmd:", p3.command, "args count:", len(p3.args))
+    except e:
+        print("Error:", e)`
+  }, {
+    diff: 2,
+    q: "Task を CSV の1行に変換する to_csv メソッドと、\nCSV行から Task を復元する from_csv 静的メソッドを実装してください。\nCSV形式: \"id,title,status,priority\"\n\n【ポイント】文字列のsplit/連結、型変換（String→Int）",
+    code: `# t.to_csv() → "1,買い物,todo,2"
+# Task.from_csv("1,買い物,todo,2") → Task`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+
+    def __init__(out self, id: Int, title: String, status: String, priority: Int):
+        self.id = id; self.title = title
+        self.status = status; self.priority = priority
+
+    def to_csv(self) -> String:
+        return String(self.id) + "," + self.title + "," + self.status + "," + String(self.priority)
+
+    @staticmethod
+    def from_csv(line: String) raises -> Task:
+        var parts = line.split(",")
+        if len(parts) != 4:
+            raise Error("invalid CSV format: " + line)
+        var id = Int(parts[0])
+        var title = parts[1]
+        var status = parts[2]
+        var priority = Int(parts[3])
+        return Task(id, title, status, priority)
+
+def main():
+    var t = Task(1, "買い物")
+    t.priority = 2
+    var csv = t.to_csv()
+    print("CSV:", csv)
+
+    try:
+        var t2 = Task.from_csv(csv)
+        print("復元:", t2.id, t2.title, t2.status, t2.priority)
+    except e:
+        print("Error:", e)`
+  }, {
+    diff: 3,
+    q: "T-Strings（t\"...\"）を使って、タスクの整形表示を書いてください。\n以下の3つの表示形式を実装します:\n1. 一覧表示: \"[P3/doing] #2: 買い物\"\n2. 詳細表示: 複数行の詳細情報\n3. 統計表示: \"完了: 5/10 (50.0%)\"\n\n【ポイント】T-Strings の式埋め込み、フォーマット指定",
+    code: `# format_list_item(task) → "[P3/doing] #2: 買い物"
+# format_detail(task) → 複数行の詳細
+# format_stats(done, total) → "完了: 5/10 (50.0%)"`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String, status: String, priority: Int):
+        self.id = id; self.title = title
+        self.status = status; self.priority = priority
+
+def format_list_item(task: Task) -> String:
+    return t"[P{task.priority}/{task.status}] #{task.id}: {task.title}"
+
+def format_detail(task: Task) -> String:
+    var priority_label: String
+    if task.priority >= 4:
+        priority_label = "高"
+    elif task.priority >= 2:
+        priority_label = "中"
+    else:
+        priority_label = "低"
+    return t"=== タスク詳細 ===\\nID:       #{task.id}\\nタイトル: {task.title}\\nステータス: {task.status}\\n優先度:   {task.priority} ({priority_label})\\n================="
+
+def format_stats(done: Int, total: Int) -> String:
+    var pct: Float64 = 0.0
+    if total > 0:
+        pct = Float64(done) / Float64(total) * 100.0
+    return t"完了: {done}/{total} ({pct:.1f}%)"
+
+def main():
+    var t = Task(2, "買い物", "doing", 3)
+    print(format_list_item(t))
+    print(format_detail(t))
+    print(format_stats(5, 10))`
+  }],
+  ch6: [{
+    diff: 1,
+    q: "TaskList のデータを CSV ファイルに保存する save メソッドを書いてください。\nヘッダー行 + データ行の形式で書き出します。\nwith open() を使ってください。\n\n【ポイント】with open(), f.write(), to_csv()",
+    code: `# tl.save("tasks.csv")
+# ファイル内容:
+# id,title,status,priority
+# 1,買い物,todo,2
+# 2,レポート,done,1`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+    def to_csv(self) -> String:
+        return String(self.id) + "," + self.title + "," + self.status + "," + String(self.priority)
+
+struct TaskList:
+    var tasks: List[Task]
+
+    def __init__(out self):
+        self.tasks = List[Task]()
+
+    def add(mut self, task: Task):
+        self.tasks.append(task^)
+
+    def save(self, path: String) raises:
+        with open(path, "w") as f:
+            f.write("id,title,status,priority\\n")
+            for i in range(len(self.tasks)):
+                f.write(self.tasks[i].to_csv() + "\\n")
+        print("保存完了:", path, "(" + String(len(self.tasks)) + "件)")
+
+def main():
+    var tl = TaskList()
+    tl.add(Task(1, "買い物")^)
+    tl.add(Task(2, "レポート")^)
+    try:
+        tl.save("tasks.csv")
+    except e:
+        print("保存エラー:", e)`
+  }, {
+    diff: 2,
+    q: "CSV ファイルからタスクを読み込む load メソッドを書いてください。\nヘッダー行をスキップし、各行を Task に変換して List に格納します。\nファイルが存在しない場合は空のリストを返します。\n\n【ポイント】with open(\"r\"), split(\"\\n\"), from_csv, エラー処理",
+    code: `# tl.load("tasks.csv")
+# → ファイルから全タスクを読み込み`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String, status: String, priority: Int):
+        self.id = id; self.title = title
+        self.status = status; self.priority = priority
+    def to_csv(self) -> String:
+        return String(self.id) + "," + self.title + "," + self.status + "," + String(self.priority)
+    @staticmethod
+    def from_csv(line: String) raises -> Task:
+        var parts = line.split(",")
+        if len(parts) != 4:
+            raise Error("invalid CSV: " + line)
+        return Task(Int(parts[0]), parts[1], parts[2], Int(parts[3]))
+    def summary(self) -> String:
+        return String(self.id) + ": " + self.title + " [" + self.status + "]"
+
+struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+
+    def __init__(out self):
+        self.tasks = List[Task]()
+        self.next_id = 1
+
+    def add(mut self, task: Task):
+        self.tasks.append(task^)
+        if self.tasks[len(self.tasks)-1].id >= self.next_id:
+            self.next_id = self.tasks[len(self.tasks)-1].id + 1
+
+    def save(self, path: String) raises:
+        with open(path, "w") as f:
+            f.write("id,title,status,priority\\n")
+            for i in range(len(self.tasks)):
+                f.write(self.tasks[i].to_csv() + "\\n")
+
+    def load(mut self, path: String) raises:
+        self.tasks.clear()
+        self.next_id = 1
+        with open(path, "r") as f:
+            var content = f.read()
+        var lines = content.split("\\n")
+        for i in range(1, len(lines)):  # ヘッダーをスキップ
+            var line = lines[i].strip()
+            if len(line) > 0:
+                var task = Task.from_csv(line)
+                self.add(task^)
+        print("読込完了:", String(len(self.tasks)) + "件")
+
+def main():
+    var tl = TaskList()
+    tl.add(Task(1, "買い物", "todo", 2)^)
+    tl.add(Task(2, "レポート", "done", 1)^)
+    try:
+        tl.save("tasks.csv")
+        var tl2 = TaskList()
+        tl2.load("tasks.csv")
+        for i in range(len(tl2.tasks)):
+            print(tl2.tasks[i].summary())
+    except e:
+        print("Error:", e)`
+  }, {
+    diff: 3,
+    q: "自動保存機能付きの PersistentTaskList を実装してください。\nコンテキストマネージャ（__enter__/__exit__）を使い、\nwith ブロック開始時にファイルから読込、終了時に自動保存します。\n\n【ポイント】コンテキストマネージャ、ファイルI/O、with文の実践",
+    code: `# with PersistentTaskList("tasks.csv") as tl:
+#     tl.add("新しいタスク")
+#     tl.mark_done(1)
+# → ブロック終了時に自動保存`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+    def __init__(out self, id: Int, title: String, status: String, priority: Int):
+        self.id = id; self.title = title
+        self.status = status; self.priority = priority
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title
+        self.status = other.status; self.priority = other.priority
+    def to_csv(self) -> String:
+        return String(self.id) + "," + self.title + "," + self.status + "," + String(self.priority)
+    @staticmethod
+    def from_csv(line: String) raises -> Task:
+        var parts = line.split(",")
+        if len(parts) != 4: raise Error("bad CSV")
+        return Task(Int(parts[0]), parts[1], parts[2], Int(parts[3]))
+
+struct PersistentTaskList:
+    var tasks: List[Task]
+    var next_id: Int
+    var filepath: String
+
+    def __init__(out self, filepath: String):
+        self.tasks = List[Task]()
+        self.next_id = 1
+        self.filepath = filepath
+
+    def __enter__(mut self) -> ref [self] Self:
+        try:
+            with open(self.filepath, "r") as f:
+                var content = f.read()
+            var lines = content.split("\\n")
+            for i in range(1, len(lines)):
+                var line = lines[i].strip()
+                if len(line) > 0:
+                    var t = Task.from_csv(line)
+                    if t.id >= self.next_id:
+                        self.next_id = t.id + 1
+                    self.tasks.append(t^)
+            print("[Load]", len(self.tasks), "件読込")
+        except:
+            print("[Load] 新規作成")
+        return self
+
+    def __exit__(mut self):
+        try:
+            with open(self.filepath, "w") as f:
+                f.write("id,title,status,priority\\n")
+                for i in range(len(self.tasks)):
+                    f.write(self.tasks[i].to_csv() + "\\n")
+            print("[Save]", len(self.tasks), "件保存")
+        except e:
+            print("[Save] Error:", e)
+
+    def add(mut self, title: String):
+        self.tasks.append(Task(self.next_id, title)^)
+        self.next_id += 1
+
+    def mark_done(mut self, id: Int):
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                self.tasks[i].status = "done"
+                return
+        print("ID not found:", id)
+
+def main():
+    with PersistentTaskList("tasks.csv") as tl:
+        tl.add("新しいタスク")
+        tl.add("もう一つ")
+        tl.mark_done(1)
+        for i in range(len(tl.tasks)):
+            print(tl.tasks[i].to_csv())`
+  }],
+  ch7: [{
+    diff: 1,
+    q: "REPL（対話型）ループの基本構造を書いてください。\nプロンプト \"> \" を表示し、\"quit\" で終了、それ以外はエコーバックします。\n空入力はスキップしてください。\n\n【ポイント】while True, input(), strip(), continue, break",
+    code: `# > hello
+# echo: hello
+# >
+# > quit
+# さようなら`,
+    answer: `def main():
+    print("=== タスク管理アプリ ===")
+    print("'quit' で終了")
+    print("")
+
+    while True:
+        var line = input("> ")
+        var trimmed = line.strip()
+
+        if len(trimmed) == 0:
+            continue
+
+        if trimmed == "quit":
+            print("さようなら")
+            break
+
+        print("echo:", trimmed)`
+  }, {
+    diff: 2,
+    q: "コマンドの分岐処理を実装してください。\nadd, list, done, help, quit の5つのコマンドを処理し、\n不明なコマンドにはエラーメッセージを表示します。\n\n【ポイント】split(), if/elif/else, コマンドパターン",
+    code: `# > add 買い物
+# 追加: 買い物
+# > list
+# (一覧表示)
+# > done 1
+# 完了: ID=1
+# > help
+# (ヘルプ表示)
+# > xxx
+# 不明なコマンド: xxx`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title; self.status = "todo"
+
+def main():
+    var tasks = List[Task]()
+    var next_id: Int = 1
+
+    print("=== タスク管理 ===")
+    print("help でコマンド一覧")
+
+    while True:
+        var line = input("> ")
+        var trimmed = line.strip()
+        if len(trimmed) == 0:
+            continue
+
+        var parts = trimmed.split(" ")
+        var cmd = parts[0]
+
+        if cmd == "quit":
+            print("終了します")
+            break
+        elif cmd == "add":
+            if len(parts) < 2:
+                print("使い方: add <タイトル>")
+                continue
+            # partsの1以降を結合
+            var title = parts[1]
+            for i in range(2, len(parts)):
+                title = title + " " + parts[i]
+            tasks.append(Task(next_id, title)^)
+            print("追加: #" + String(next_id) + " " + title)
+            next_id += 1
+        elif cmd == "list":
+            if len(tasks) == 0:
+                print("タスクなし")
+            else:
+                for i in range(len(tasks)):
+                    print(String(tasks[i].id) + ": " + tasks[i].title + " [" + tasks[i].status + "]")
+        elif cmd == "done":
+            if len(parts) < 2:
+                print("使い方: done <ID>")
+                continue
+            try:
+                var id = Int(parts[1])
+                var found = False
+                for i in range(len(tasks)):
+                    if tasks[i].id == id:
+                        tasks[i].status = "done"
+                        found = True
+                        print("完了: #" + String(id))
+                        break
+                if not found:
+                    print("ID " + String(id) + " が見つかりません")
+            except:
+                print("無効なID:", parts[1])
+        elif cmd == "help":
+            print("コマンド一覧:")
+            print("  add <タイトル>  - タスク追加")
+            print("  list           - 一覧表示")
+            print("  done <ID>      - タスク完了")
+            print("  quit           - 終了")
+        else:
+            print("不明なコマンド:", cmd)`
+  }, {
+    diff: 3,
+    q: "ユーザー入力のバリデーションとエラーハンドリングを組み込んだ\n堅牢なコマンド処理関数を書いてください。\nどんな入力でもクラッシュしないようにしてください。\n\n【ポイント】try/except の網羅的適用、入力検証、ユーザーフレンドリーなエラー",
+    code: `# > add
+# エラー: タイトルを指定してください
+# > done abc
+# エラー: IDは数値で指定してください
+# > done 999
+# エラー: ID 999 が見つかりません
+# > priority 1 10
+# エラー: 優先度は1〜5の範囲で指定してください`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+
+def find_task_index(tasks: List[Task], id: Int) -> Int:
+    for i in range(len(tasks)):
+        if tasks[i].id == id:
+            return i
+    return -1
+
+def parse_int_safe(s: String) raises -> Int:
+    return Int(s)
+
+def process_command(mut tasks: List[Task], mut next_id: Int, line: String):
+    var parts = line.strip().split(" ")
+    if len(parts) == 0:
+        return
+    var cmd = parts[0]
+
+    if cmd == "add":
+        if len(parts) < 2:
+            print("エラー: タイトルを指定してください")
+            print("使い方: add <タイトル>")
+            return
+        var title = parts[1]
+        for i in range(2, len(parts)):
+            title = title + " " + parts[i]
+        if len(title) > 100:
+            print("エラー: タイトルは100文字以内にしてください")
+            return
+        tasks.append(Task(next_id, title)^)
+        print("追加: #" + String(next_id) + " " + title)
+        next_id += 1
+
+    elif cmd == "done":
+        if len(parts) < 2:
+            print("エラー: IDを指定してください")
+            return
+        try:
+            var id = parse_int_safe(parts[1])
+            var idx = find_task_index(tasks, id)
+            if idx == -1:
+                print("エラー: ID " + String(id) + " が見つかりません")
+                return
+            if tasks[idx].status == "done":
+                print("ID " + String(id) + " は既に完了しています")
+                return
+            tasks[idx].status = "done"
+            print("完了: #" + String(id) + " " + tasks[idx].title)
+        except:
+            print("エラー: IDは数値で指定してください")
+
+    elif cmd == "priority":
+        if len(parts) < 3:
+            print("エラー: priority <ID> <1-5>")
+            return
+        try:
+            var id = parse_int_safe(parts[1])
+            var p = parse_int_safe(parts[2])
+            if p < 1 or p > 5:
+                print("エラー: 優先度は1〜5の範囲で指定してください")
+                return
+            var idx = find_task_index(tasks, id)
+            if idx == -1:
+                print("エラー: ID " + String(id) + " が見つかりません")
+                return
+            tasks[idx].priority = p
+            print("優先度変更: #" + String(id) + " → P" + String(p))
+        except:
+            print("エラー: IDと優先度は数値で指定してください")
+
+    elif cmd == "list":
+        if len(tasks) == 0:
+            print("タスクなし")
+        else:
+            for i in range(len(tasks)):
+                var t = tasks[i]
+                print("[P" + String(t.priority) + "/" + t.status + "] #" + String(t.id) + ": " + t.title)
+    else:
+        print("不明なコマンド: " + cmd)
+
+def main():
+    var tasks = List[Task]()
+    var next_id: Int = 1
+    while True:
+        var line = input("> ")
+        if line.strip() == "quit":
+            break
+        process_command(tasks, next_id, line)`
+  }],
+  ch8: [{
+    diff: 1,
+    q: "Task struct の基本テストを書いてください。\n1. Taskの初期値が正しいか\n2. set_priority が正しく動作するか\nassert_equal を使って検証します。\n\n【ポイント】def test_xxx(), assert_equal, assert_true",
+    code: `# mojo test test_task.mojo
+# → 全テスト PASS`,
+    answer: `from testing import assert_equal, assert_true
+
+struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+
+def test_task_defaults():
+    var t = Task(1, "テスト")
+    assert_equal(t.id, 1)
+    assert_equal(t.title, "テスト")
+    assert_equal(t.status, "todo")
+    assert_equal(t.priority, 1)
+
+def test_task_custom_values():
+    var t = Task(5, "買い物")
+    t.priority = 3
+    t.status = "doing"
+    assert_equal(t.priority, 3)
+    assert_equal(t.status, "doing")
+
+def test_task_summary():
+    var t = Task(1, "テスト")
+    var s = "[P" + String(t.priority) + "/" + t.status + "] " + String(t.id) + ": " + t.title
+    assert_equal(s, "[P1/todo] 1: テスト")`
+  }, {
+    diff: 2,
+    q: "TaskList の add / find / delete のテストを書いてください。\n正常系と異常系の両方をテストします。\nassert_raises も使ってエラーケースを検証してください。\n\n【ポイント】正常系/異常系テスト、assert_raises、状態変化テスト",
+    code: `# テスト項目:
+# 1. add → count が増える
+# 2. find_by_id → 存在するIDで正しいタスクが返る
+# 3. find_by_id → 存在しないIDでエラー
+# 4. delete → count が減る`,
+    answer: `from testing import assert_equal, assert_true, assert_raises
+
+struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title; self.status = "todo"
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title; self.status = other.status
+
+struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+    def __init__(out self):
+        self.tasks = List[Task](); self.next_id = 1
+    def add(mut self, title: String) raises:
+        if len(title) == 0: raise Error("empty title")
+        self.tasks.append(Task(self.next_id, title)^)
+        self.next_id += 1
+    def find_by_id(self, id: Int) raises -> Int:
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id: return i
+        raise Error("not found")
+    def delete(mut self, id: Int) raises:
+        var idx = self.find_by_id(id)
+        _ = self.tasks.pop(idx)
+
+def test_add_increases_count():
+    var tl = TaskList()
+    tl.add("タスクA")
+    assert_equal(len(tl.tasks), 1)
+    tl.add("タスクB")
+    assert_equal(len(tl.tasks), 2)
+
+def test_add_empty_title_raises():
+    var tl = TaskList()
+    with assert_raises():
+        tl.add("")
+
+def test_find_existing():
+    var tl = TaskList()
+    tl.add("タスクA")
+    tl.add("タスクB")
+    var idx = tl.find_by_id(2)
+    assert_equal(tl.tasks[idx].title, "タスクB")
+
+def test_find_nonexistent_raises():
+    var tl = TaskList()
+    tl.add("タスクA")
+    with assert_raises():
+        _ = tl.find_by_id(99)
+
+def test_delete_decreases_count():
+    var tl = TaskList()
+    tl.add("タスクA")
+    tl.add("タスクB")
+    tl.delete(1)
+    assert_equal(len(tl.tasks), 1)
+    assert_equal(tl.tasks[0].title, "タスクB")`
+  }, {
+    diff: 3,
+    q: "TDD（テスト駆動開発）のサイクルを実践してください。\n要件: TaskList に search(keyword) メソッドを追加する。\nタイトルにキーワードを含むタスクのリストを返す。\n\n手順:\n1. まずテストを書く（Red）\n2. テストを通す最小実装を書く（Green）\n3. コードを改善する（Refactor）\n\n【ポイント】TDDサイクル、テストファースト",
+    code: `# Step 1: テストを先に書く
+# Step 2: 実装する
+# Step 3: リファクタリング`,
+    answer: `from testing import assert_equal, assert_true
+
+struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title; self.status = "todo"
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title; self.status = other.status
+
+struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+    def __init__(out self):
+        self.tasks = List[Task](); self.next_id = 1
+    def add(mut self, title: String):
+        self.tasks.append(Task(self.next_id, title)^)
+        self.next_id += 1
+
+    # Step 2 & 3: search 実装
+    def search(self, keyword: String) -> List[Task]:
+        var results = List[Task]()
+        var kw = keyword.lower()
+        for i in range(len(self.tasks)):
+            if self.tasks[i].title.lower().find(kw) != -1:
+                results.append(self.tasks[i])
+        return results
+
+# Step 1: テスト（Red → Green → Refactor）
+def test_search_finds_matching():
+    var tl = TaskList()
+    tl.add("買い物に行く")
+    tl.add("レポート提出")
+    tl.add("買い物リスト作成")
+    var results = tl.search("買い物")
+    assert_equal(len(results), 2)
+
+def test_search_no_match():
+    var tl = TaskList()
+    tl.add("買い物")
+    tl.add("レポート")
+    var results = tl.search("掃除")
+    assert_equal(len(results), 0)
+
+def test_search_case_insensitive():
+    var tl = TaskList()
+    tl.add("Report submission")
+    tl.add("Daily report")
+    var results = tl.search("report")
+    assert_equal(len(results), 2)
+
+def test_search_empty_keyword():
+    var tl = TaskList()
+    tl.add("タスクA")
+    tl.add("タスクB")
+    var results = tl.search("")
+    assert_equal(len(results), 2)  # 空文字列は全てにマッチ`
+  }],
+  ch9: [{
+    diff: 1,
+    q: "タスクの優先度をUInt8に最適化し、ステータスもUInt8 + alias で表現してください。\nStringの比較よりInt比較が高速なことを理解する問題です。\n\n【ポイント】適切な型選択、alias定数、メモリ効率",
+    code: `# String "todo"/"doing"/"done" の代わりに
+# UInt8 の 0/1/2 を使う`,
+    answer: `alias STATUS_TODO: UInt8 = 0
+alias STATUS_DOING: UInt8 = 1
+alias STATUS_DONE: UInt8 = 2
+
+def status_to_string(s: UInt8) -> String:
+    if s == STATUS_TODO: return "todo"
+    if s == STATUS_DOING: return "doing"
+    if s == STATUS_DONE: return "done"
+    return "unknown"
+
+struct TaskOptimized:
+    var id: Int32          # Int64 → Int32 (IDは小さい)
+    var title: String
+    var status: UInt8      # String → UInt8
+    var priority: UInt8    # Int → UInt8 (1〜5)
+
+    def __init__(out self, id: Int32, title: String):
+        self.id = id
+        self.title = title
+        self.status = STATUS_TODO
+        self.priority = 1
+
+    def is_done(self) -> Bool:
+        return self.status == STATUS_DONE  # Int比較: 高速
+
+    def summary(self) -> String:
+        return "[P" + String(Int(self.priority)) + "/" + status_to_string(self.status) + "] " + String(Int(self.id)) + ": " + self.title
+
+def main():
+    var t = TaskOptimized(1, "買い物")
+    print(t.summary())
+    print("Size comparison:")
+    print("  UInt8:  1 byte per field")
+    print("  Int:    8 bytes per field")
+    print("  String: 24+ bytes per field")`
+  }, {
+    diff: 2,
+    q: "SIMD を使ってタスクの優先度の集計を一括処理してください。\n4つのタスクの優先度を SIMD[DType.uint8, 4] に入れ、\n合計・最大値を計算します。\n\n【ポイント】SIMD演算、reduce_add, reduce_max",
+    code: `# priorities = [3, 1, 5, 2]
+# 合計: 11
+# 最大: 5
+# 平均: 2.75`,
+    answer: `def main():
+    # 4つのタスクの優先度
+    var priorities = SIMD[DType.uint8, 4](3, 1, 5, 2)
+    print("優先度:", priorities)
+
+    # SIMD一括演算
+    var total = priorities.reduce_add()
+    var max_val = priorities.reduce_max()
+    var min_val = priorities.reduce_min()
+
+    print("合計:", total)
+    print("最大:", max_val)
+    print("最小:", min_val)
+    print("平均:", Float64(Int(total)) / 4.0)
+
+    # 高優先度（>=3）のマスク
+    var threshold = SIMD[DType.uint8, 4](3, 3, 3, 3)
+    var high_priority = priorities >= threshold
+    print("高優先度マスク:", high_priority)
+
+    # スカラーとの演算
+    var boosted = priorities + SIMD[DType.uint8, 4](1)
+    print("全て+1:", boosted)`
+  }, {
+    diff: 3,
+    q: "文字列検索とInt比較のパフォーマンスを比較するベンチマークを書いてください。\nステータス判定を String比較 vs UInt8比較 で計測します。\ntime.now() を使って実行時間を表示します。\n\n【ポイント】ベンチマーク手法、time.now()、最適化の効果",
+    code: `# String比較: 100000回 → ?ms
+# UInt8比較:  100000回 → ?ms
+# UInt8は何倍速いか`,
+    answer: `from time import now
+
+alias STATUS_TODO: UInt8 = 0
+alias STATUS_DONE: UInt8 = 2
+alias ITERATIONS = 1000000
+
+def bench_string_compare() -> Int:
+    var count: Int = 0
+    var status = "todo"
+    for i in range(ITERATIONS):
+        if status == "todo":
+            count += 1
+        elif status == "doing":
+            count += 2
+        elif status == "done":
+            count += 3
+    return count
+
+def bench_uint8_compare() -> Int:
+    var count: Int = 0
+    var status: UInt8 = STATUS_TODO
+    for i in range(ITERATIONS):
+        if status == 0:
+            count += 1
+        elif status == 1:
+            count += 2
+        elif status == 2:
+            count += 3
+    return count
+
+def main():
+    print("=== パフォーマンス比較 ===")
+    print("反復回数:", ITERATIONS)
+    print("")
+
+    var start1 = now()
+    var r1 = bench_string_compare()
+    var elapsed1 = now() - start1
+
+    var start2 = now()
+    var r2 = bench_uint8_compare()
+    var elapsed2 = now() - start2
+
+    print("String比較:", elapsed1, "ns")
+    print("UInt8比較: ", elapsed2, "ns")
+
+    if elapsed2 > 0:
+        var speedup = Float64(elapsed1) / Float64(elapsed2)
+        print("速度比: ", t"{speedup:.1f}x")
+
+    print("")
+    print("結論: 整数比較は文字列比較より高速")
+    print("ステータスなど値域が小さいデータにはUInt8が最適")`
+  }],
+  ch10: [{
+    diff: 1,
+    q: "Python の json モジュールを使って、タスクデータを JSON 形式で出力してください。\nMojo の Task データを PythonObject に変換して json.dumps() で整形表示します。\n\n【ポイント】Python.import_module、PythonObject変換",
+    code: `# 出力:
+# [
+#   {"id": 1, "title": "買い物", "status": "todo"},
+#   {"id": 2, "title": "レポート", "status": "done"}
+# ]`,
+    answer: `from python import Python
+
+def main():
+    var json = Python.import_module("json")
+
+    var tasks = Python.list()
+    var t1 = Python.dict()
+    t1["id"] = 1
+    t1["title"] = "買い物"
+    t1["status"] = "todo"
+    tasks.append(t1)
+
+    var t2 = Python.dict()
+    t2["id"] = 2
+    t2["title"] = "レポート"
+    t2["status"] = "done"
+    tasks.append(t2)
+
+    var output = json.dumps(tasks, indent=2, ensure_ascii=False)
+    print(output)`
+  }, {
+    diff: 2,
+    q: "NumPy を使ってタスクの優先度の統計分析を行ってください。\n平均・標準偏差・中央値を計算し、ヒストグラムのデータも出力します。\n\n【ポイント】NumPy配列操作、Python→Mojo型変換",
+    code: `# 優先度データ: [3, 1, 5, 2, 4, 3, 1, 5, 3, 2]
+# 平均: ?, 標準偏差: ?, 中央値: ?`,
+    answer: `from python import Python
+
+def main():
+    var np = Python.import_module("numpy")
+
+    # タスク優先度データ
+    var priorities = np.array([3, 1, 5, 2, 4, 3, 1, 5, 3, 2])
+
+    print("=== 優先度の統計分析 ===")
+    print("データ:", priorities)
+    print("件数:", Int(np.size(priorities)))
+    print("平均:", np.mean(priorities))
+    print("標準偏差:", np.std(priorities))
+    print("中央値:", np.median(priorities))
+    print("最小:", np.min(priorities))
+    print("最大:", np.max(priorities))
+
+    # 優先度分布（ヒストグラムデータ）
+    print("")
+    print("=== 優先度分布 ===")
+    var bins = np.array([0.5, 1.5, 2.5, 3.5, 4.5, 5.5])
+    var hist = np.histogram(priorities, bins)
+    var counts = hist[0]
+    for i in range(5):
+        var count = Int(counts[i])
+        var bar = ""
+        for j in range(count):
+            bar = bar + "#"
+        print("P" + String(i + 1) + ": " + bar + " (" + String(count) + "件)")`
+  }, {
+    diff: 3,
+    q: "matplotlib を使ってタスクの統計をグラフ化し、PNG画像として保存してください。\n1. ステータス別の円グラフ\n2. 優先度別の棒グラフ\n\n【ポイント】matplotlib操作、savefig、複数グラフ",
+    code: `# 出力ファイル:
+# task_status_chart.png  (円グラフ)
+# task_priority_chart.png (棒グラフ)`,
+    answer: `from python import Python
+
+def main():
+    var plt = Python.import_module("matplotlib.pyplot")
+    var np = Python.import_module("numpy")
+
+    # --- 円グラフ: ステータス別 ---
+    var statuses = Python.list()
+    statuses.append("todo")
+    statuses.append("doing")
+    statuses.append("done")
+    var status_counts = np.array([5, 3, 7])
+
+    plt.figure(figsize=Python.tuple([8, 6]))
+    plt.pie(status_counts, labels=statuses, autopct="%1.1f%%",
+            startangle=90)
+    plt.title("タスク ステータス分布")
+    plt.savefig("task_status_chart.png", dpi=150, bbox_inches="tight")
+    plt.close()
+    print("保存: task_status_chart.png")
+
+    # --- 棒グラフ: 優先度別 ---
+    var labels = Python.list()
+    for i in range(1, 6):
+        labels.append("P" + String(i))
+    var priority_counts = np.array([2, 3, 5, 3, 2])
+
+    plt.figure(figsize=Python.tuple([8, 6]))
+    var colors = Python.list()
+    colors.append("#4ade80")
+    colors.append("#a3e635")
+    colors.append("#facc15")
+    colors.append("#fb923c")
+    colors.append("#f87171")
+    plt.bar(labels, priority_counts, color=colors)
+    plt.xlabel("優先度")
+    plt.ylabel("タスク数")
+    plt.title("タスク 優先度分布")
+    plt.savefig("task_priority_chart.png", dpi=150, bbox_inches="tight")
+    plt.close()
+    print("保存: task_priority_chart.png")`
+  }],
+  ch11: [{
+    diff: 2,
+    q: "Displayable trait を定義し、Task と TaskList の両方に実装してください。\nジェネリック関数 print_displayable[T: Displayable](item: T) も書いてください。\n\n【ポイント】trait設計、複数structへの実装、ジェネリック関数",
+    code: `# trait Displayable: def display(self) -> String
+# print_displayable(task)     → タスク情報
+# print_displayable(task_list) → リスト概要`,
+    answer: `trait Displayable:
+    def display(self) -> String: ...
+
+struct Task(Displayable):
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title
+        self.status = other.status; self.priority = other.priority
+    def display(self) -> String:
+        return "[P" + String(self.priority) + "/" + self.status + "] #" + String(self.id) + ": " + self.title
+
+struct TaskList(Displayable):
+    var tasks: List[Task]
+    var name: String
+    def __init__(out self, name: String):
+        self.tasks = List[Task](); self.name = name
+    def add(mut self, task: Task):
+        self.tasks.append(task^)
+    def display(self) -> String:
+        var done = 0
+        for i in range(len(self.tasks)):
+            if self.tasks[i].status == "done":
+                done += 1
+        return self.name + ": " + String(len(self.tasks)) + "件 (完了: " + String(done) + "件)"
+
+def print_displayable[T: Displayable](item: T):
+    print(item.display())
+
+def main():
+    var t1 = Task(1, "買い物")
+    var t2 = Task(2, "レポート")
+    t2.status = "done"
+
+    print_displayable(t1)
+    print_displayable(t2)
+
+    var tl = TaskList("マイタスク")
+    tl.add(t1^)
+    tl.add(t2^)
+    print_displayable(tl)`
+  }, {
+    diff: 2,
+    q: "Serializable trait を定義し、Task に実装してください。\nserialize() → String と deserialize(String) → Self の2つのメソッドを持ちます。\nCSV形式とJSON風形式の2種類の実装を作ってください。\n\n【ポイント】traitによるインターフェース統一、複数の実装戦略",
+    code: `# trait Serializable:
+#     def serialize(self) -> String
+#     @staticmethod
+#     def deserialize(data: String) raises -> Self
+
+# CSVTask.serialize()  → "1,買い物,todo,1"
+# JSONTask.serialize() → "{id:1,title:買い物,...}"`,
+    answer: `struct CSVTask:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+    def __init__(out self, id: Int, title: String, status: String, priority: Int):
+        self.id = id; self.title = title
+        self.status = status; self.priority = priority
+
+    def serialize(self) -> String:
+        return String(self.id) + "," + self.title + "," + self.status + "," + String(self.priority)
+
+    @staticmethod
+    def deserialize(data: String) raises -> CSVTask:
+        var parts = data.split(",")
+        if len(parts) != 4: raise Error("bad CSV")
+        return CSVTask(Int(parts[0]), parts[1], parts[2], Int(parts[3]))
+
+struct TextTask:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+
+    def serialize(self) -> String:
+        return "id=" + String(self.id) + ";title=" + self.title + ";status=" + self.status + ";priority=" + String(self.priority)
+
+    @staticmethod
+    def deserialize(data: String) raises -> TextTask:
+        var t = TextTask(0, "")
+        var pairs = data.split(";")
+        for i in range(len(pairs)):
+            var kv = pairs[i].split("=")
+            if len(kv) != 2: continue
+            if kv[0] == "id": t.id = Int(kv[1])
+            elif kv[0] == "title": t.title = kv[1]
+            elif kv[0] == "status": t.status = kv[1]
+            elif kv[0] == "priority": t.priority = Int(kv[1])
+        return t
+
+def main():
+    var csv_task = CSVTask(1, "買い物")
+    var csv_str = csv_task.serialize()
+    print("CSV:", csv_str)
+
+    try:
+        var csv_restored = CSVTask.deserialize(csv_str)
+        print("CSV復元:", csv_restored.title)
+    except e:
+        print("Error:", e)
+
+    var txt_task = TextTask(2, "レポート")
+    var txt_str = txt_task.serialize()
+    print("Text:", txt_str)
+
+    try:
+        var txt_restored = TextTask.deserialize(txt_str)
+        print("Text復元:", txt_restored.title)
+    except e:
+        print("Error:", e)`
+  }, {
+    diff: 3,
+    q: "所有権パターンを意識してTaskListのメソッドをリファクタリングしてください。\n以下の操作で適切な引数規約（read / mut / var）を選んでください:\n1. display_task(task) — 表示のみ → read\n2. complete_task(mut task) — ステータス変更 → mut\n3. add_task(var task) — リストに追加（所有権移動）→ var\n4. transfer_task(TaskList, TaskList, id) — リスト間移動\n\n【ポイント】引数規約の使い分け、所有権移動の実践",
+    code: `# 各関数で適切な引数規約を選ぶ
+# ^ ムーブ演算子の活用`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title; self.status = "todo"
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title; self.status = other.status
+    def __moveinit__(out self, owned other: Self):
+        self.id = other.id; self.title = other.title^; self.status = other.status^
+
+# 1. read: 表示のみ（変更なし）
+def display_task(task: Task):
+    print("#" + String(task.id) + ": " + task.title + " [" + task.status + "]")
+
+# 2. mut: その場で変更
+def complete_task(mut task: Task):
+    task.status = "done"
+
+struct TaskList:
+    var tasks: List[Task]
+    var name: String
+
+    def __init__(out self, name: String):
+        self.tasks = List[Task](); self.name = name
+
+    # 3. owned (var): 所有権を受け取ってリストに追加
+    def add_task(mut self, owned task: Task):
+        print(self.name + " に追加: " + task.title)
+        self.tasks.append(task^)
+
+    # 4. リスト間移動
+    def remove_by_id(mut self, id: Int) raises -> Task:
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                return self.tasks.pop(i)
+        raise Error("not found: " + String(id))
+
+    def show_all(self):
+        print("--- " + self.name + " (" + String(len(self.tasks)) + "件) ---")
+        for i in range(len(self.tasks)):
+            display_task(self.tasks[i])
+
+def transfer_task(mut source: TaskList, mut dest: TaskList, id: Int) raises:
+    var task = source.remove_by_id(id)
+    dest.add_task(task^)
+
+def main():
+    var inbox = TaskList("受信箱")
+    var archive = TaskList("アーカイブ")
+
+    inbox.add_task(Task(1, "買い物")^)
+    inbox.add_task(Task(2, "レポート")^)
+    inbox.add_task(Task(3, "掃除")^)
+
+    # mut で完了に変更
+    complete_task(inbox.tasks[0])
+    inbox.show_all()
+
+    # 完了タスクをアーカイブに移動
+    try:
+        transfer_task(inbox, archive, 1)
+    except e:
+        print("Error:", e)
+
+    print("")
+    inbox.show_all()
+    archive.show_all()`
+  }],
+  ch12: [{
+    diff: 2,
+    q: "これまでの全章で学んだ要素を組み合わせて、\nタスク管理アプリの main.mojo を完成させてください。\n最低限の機能: add, list, done, delete, save, load, quit\n\n【ポイント】全章の知識の統合、実用的なアプリの完成",
+    code: `# 要件:
+# - Task struct（id, title, status, priority）
+# - TaskList struct（CRUD操作）
+# - CSV永続化（save/load）
+# - REPLインターフェース
+# - エラーハンドリング`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+    def __init__(out self, id: Int, title: String, status: String, priority: Int):
+        self.id = id; self.title = title
+        self.status = status; self.priority = priority
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title
+        self.status = other.status; self.priority = other.priority
+    def to_csv(self) -> String:
+        return String(self.id) + "," + self.title + "," + self.status + "," + String(self.priority)
+    @staticmethod
+    def from_csv(line: String) raises -> Task:
+        var parts = line.split(",")
+        if len(parts) != 4: raise Error("invalid CSV")
+        return Task(Int(parts[0]), parts[1], parts[2], Int(parts[3]))
+    def display(self) -> String:
+        return "[P" + String(self.priority) + "/" + self.status + "] #" + String(self.id) + ": " + self.title
+
+struct TaskApp:
+    var tasks: List[Task]
+    var next_id: Int
+    var filepath: String
+
+    def __init__(out self, filepath: String):
+        self.tasks = List[Task](); self.next_id = 1
+        self.filepath = filepath
+
+    def add(mut self, title: String) raises:
+        if len(title) == 0: raise Error("タイトルが空です")
+        self.tasks.append(Task(self.next_id, title)^)
+        print("追加: #" + String(self.next_id) + " " + title)
+        self.next_id += 1
+
+    def list_tasks(self, filter_status: String):
+        var count = 0
+        for i in range(len(self.tasks)):
+            if len(filter_status) == 0 or self.tasks[i].status == filter_status:
+                print(self.tasks[i].display())
+                count += 1
+        if count == 0: print("該当するタスクなし")
+        else: print("--- " + String(count) + "件 ---")
+
+    def mark_done(mut self, id: Int) raises:
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                self.tasks[i].status = "done"
+                print("完了: #" + String(id))
+                return
+        raise Error("ID " + String(id) + " が見つかりません")
+
+    def delete(mut self, id: Int) raises:
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                var t = self.tasks.pop(i)
+                print("削除: #" + String(id) + " " + t.title)
+                return
+        raise Error("ID " + String(id) + " が見つかりません")
+
+    def save(self) raises:
+        with open(self.filepath, "w") as f:
+            f.write("id,title,status,priority\\n")
+            for i in range(len(self.tasks)):
+                f.write(self.tasks[i].to_csv() + "\\n")
+        print("保存完了 (" + String(len(self.tasks)) + "件)")
+
+    def load(mut self) raises:
+        self.tasks.clear(); self.next_id = 1
+        with open(self.filepath, "r") as f:
+            var content = f.read()
+        var lines = content.split("\\n")
+        for i in range(1, len(lines)):
+            var line = lines[i].strip()
+            if len(line) > 0:
+                var t = Task.from_csv(line)
+                if t.id >= self.next_id: self.next_id = t.id + 1
+                self.tasks.append(t^)
+        print("読込完了 (" + String(len(self.tasks)) + "件)")
+
+    def show_help(self):
+        print("コマンド一覧:")
+        print("  add <タイトル>     タスク追加")
+        print("  list [status]     一覧表示")
+        print("  done <ID>         タスク完了")
+        print("  delete <ID>       タスク削除")
+        print("  save              ファイル保存")
+        print("  load              ファイル読込")
+        print("  help              ヘルプ表示")
+        print("  quit              終了")
+
+def main():
+    var app = TaskApp("tasks.csv")
+    print("=== タスク管理アプリ ===")
+    print("help でコマンド一覧\\n")
+    while True:
+        var line = input("> ")
+        var trimmed = line.strip()
+        if len(trimmed) == 0: continue
+        var parts = trimmed.split(" ")
+        var cmd = parts[0]
+        try:
+            if cmd == "quit":
+                print("終了します")
+                break
+            elif cmd == "add":
+                if len(parts) < 2:
+                    print("使い方: add <タイトル>"); continue
+                var title = parts[1]
+                for i in range(2, len(parts)):
+                    title = title + " " + parts[i]
+                app.add(title)
+            elif cmd == "list":
+                var filter = String("")
+                if len(parts) > 1: filter = parts[1]
+                app.list_tasks(filter)
+            elif cmd == "done":
+                if len(parts) < 2:
+                    print("使い方: done <ID>"); continue
+                app.mark_done(Int(parts[1]))
+            elif cmd == "delete":
+                if len(parts) < 2:
+                    print("使い方: delete <ID>"); continue
+                app.delete(Int(parts[1]))
+            elif cmd == "save": app.save()
+            elif cmd == "load": app.load()
+            elif cmd == "help": app.show_help()
+            else: print("不明なコマンド: " + cmd + " (help で一覧)")
+        except e:
+            print("エラー:", e)`
+  }, {
+    diff: 3,
+    q: "アプリに以下の拡張機能を追加してください:\n1. search <keyword> — タイトル検索\n2. stats — 統計情報（ステータス別件数、優先度分布）\n3. priority <ID> <1-5> — 優先度変更\n4. edit <ID> <新タイトル> — タイトル編集\n\n【ポイント】拡張性のある設計、全章の知識の総合活用",
+    code: `# 上の演習のTaskAppに追加メソッドを実装`,
+    answer: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+    def __init__(out self, id: Int, title: String, status: String, priority: Int):
+        self.id = id; self.title = title
+        self.status = status; self.priority = priority
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title
+        self.status = other.status; self.priority = other.priority
+    def display(self) -> String:
+        return "[P" + String(self.priority) + "/" + self.status + "] #" + String(self.id) + ": " + self.title
+
+struct TaskApp:
+    var tasks: List[Task]
+    var next_id: Int
+
+    def __init__(out self):
+        self.tasks = List[Task](); self.next_id = 1
+
+    def add(mut self, title: String) raises:
+        if len(title) == 0: raise Error("タイトルが空です")
+        self.tasks.append(Task(self.next_id, title)^)
+        print("追加: #" + String(self.next_id) + " " + title)
+        self.next_id += 1
+
+    def search(self, keyword: String):
+        var kw = keyword.lower()
+        var found = 0
+        for i in range(len(self.tasks)):
+            if self.tasks[i].title.lower().find(kw) != -1:
+                print(self.tasks[i].display())
+                found += 1
+        if found == 0:
+            print("\"" + keyword + "\" に一致するタスクなし")
+        else:
+            print("--- " + String(found) + "件ヒット ---")
+
+    def stats(self):
+        var total = len(self.tasks)
+        if total == 0:
+            print("タスクなし")
+            return
+        var todo = 0; var doing = 0; var done = 0
+        var p_counts = List[Int]()
+        for i in range(5): p_counts.append(0)
+        for i in range(total):
+            if self.tasks[i].status == "todo": todo += 1
+            elif self.tasks[i].status == "doing": doing += 1
+            elif self.tasks[i].status == "done": done += 1
+            var p = self.tasks[i].priority
+            if p >= 1 and p <= 5:
+                p_counts[p - 1] = p_counts[p - 1] + 1
+        print("=== 統計情報 ===")
+        print("全タスク:", total)
+        print("  todo:", todo, " doing:", doing, " done:", done)
+        if total > 0:
+            var pct = Float64(done) / Float64(total) * 100.0
+            print("  完了率: " + t"{pct:.1f}%")
+        print("優先度分布:")
+        for i in range(5):
+            var bar = ""
+            for j in range(p_counts[i]): bar = bar + "#"
+            print("  P" + String(i + 1) + ": " + bar + " (" + String(p_counts[i]) + ")")
+
+    def set_priority(mut self, id: Int, priority: Int) raises:
+        if priority < 1 or priority > 5:
+            raise Error("優先度は1〜5")
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                self.tasks[i].priority = priority
+                print("優先度変更: #" + String(id) + " → P" + String(priority))
+                return
+        raise Error("ID " + String(id) + " が見つかりません")
+
+    def edit_title(mut self, id: Int, new_title: String) raises:
+        if len(new_title) == 0: raise Error("タイトルが空です")
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                var old = self.tasks[i].title
+                self.tasks[i].title = new_title
+                print("編集: #" + String(id) + " \"" + old + "\" → \"" + new_title + "\"")
+                return
+        raise Error("ID " + String(id) + " が見つかりません")
+
+def main():
+    var app = TaskApp()
+    # テスト用データ
+    try:
+        app.add("買い物に行く")
+        app.add("レポートを書く")
+        app.add("買い物リスト作成")
+        app.set_priority(1, 3)
+        app.set_priority(2, 5)
+        app.tasks[2].status = "done"
+
+        print("\\n--- 検索テスト ---")
+        app.search("買い物")
+
+        print("\\n--- 統計テスト ---")
+        app.stats()
+
+        print("\\n--- 編集テスト ---")
+        app.edit_title(1, "スーパーで買い物")
+
+        print("\\n--- 全タスク ---")
+        for i in range(len(app.tasks)):
+            print(app.tasks[i].display())
+    except e:
+        print("Error:", e)`
+  }, {
+    diff: 3,
+    q: "最終仕上げとして、アプリ全体のコード品質をチェックしてください。\n以下のリファクタリングチェックリストに基づいて改善点を洗い出し、\n1つ以上を実際にリファクタリングしてください。\n\nチェックリスト:\n- 重複コードの排除（find_by_id が複数箇所にないか）\n- 適切な型の選択（全てIntで良いか）\n- エラー処理の統一（print vs raise の混在）\n- traitの活用（共通インターフェースの抽出）\n\n【ポイント】コード品質、リファクタリング実践",
+    code: `# Before → After のリファクタリングを示す`,
+    answer: `# リファクタリング例: find_by_id の重複排除 + 型安全性向上
+
+alias STATUS_TODO = "todo"
+alias STATUS_DOING = "doing"
+alias STATUS_DONE = "done"
+
+alias MIN_PRIORITY: Int = 1
+alias MAX_PRIORITY: Int = 5
+
+struct AppError:
+    var message: String
+    def __init__(out self, message: String):
+        self.message = message
+
+struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = STATUS_TODO; self.priority = MIN_PRIORITY
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title
+        self.status = other.status; self.priority = other.priority
+    def display(self) -> String:
+        return "[P" + String(self.priority) + "/" + self.status + "] #" + String(self.id) + ": " + self.title
+
+struct TaskApp:
+    var tasks: List[Task]
+    var next_id: Int
+
+    def __init__(out self):
+        self.tasks = List[Task](); self.next_id = 1
+
+    # 共通ヘルパー: IDからインデックスを取得（重複排除）
+    def _find_index(self, id: Int) raises AppError -> Int:
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                return i
+        raise AppError("ID " + String(id) + " が見つかりません")
+
+    # バリデーション（共通化）
+    @staticmethod
+    def _validate_title(title: String) raises AppError:
+        if len(title) == 0:
+            raise AppError("タイトルが空です")
+        if len(title) > 100:
+            raise AppError("タイトルは100文字以内")
+
+    @staticmethod
+    def _validate_priority(p: Int) raises AppError:
+        if p < MIN_PRIORITY or p > MAX_PRIORITY:
+            raise AppError("優先度は" + String(MIN_PRIORITY) + "〜" + String(MAX_PRIORITY))
+
+    def add(mut self, title: String) raises AppError:
+        Self._validate_title(title)
+        self.tasks.append(Task(self.next_id, title)^)
+        self.next_id += 1
+
+    def mark_done(mut self, id: Int) raises AppError:
+        var idx = self._find_index(id)
+        self.tasks[idx].status = STATUS_DONE
+
+    def delete(mut self, id: Int) raises AppError:
+        var idx = self._find_index(id)
+        _ = self.tasks.pop(idx)
+
+    def set_priority(mut self, id: Int, p: Int) raises AppError:
+        Self._validate_priority(p)
+        var idx = self._find_index(id)
+        self.tasks[idx].priority = p
+
+    def edit_title(mut self, id: Int, title: String) raises AppError:
+        Self._validate_title(title)
+        var idx = self._find_index(id)
+        self.tasks[idx].title = title
+
+def main():
+    var app = TaskApp()
+    try:
+        app.add("買い物")
+        app.add("レポート")
+        app.set_priority(1, 3)
+        app.mark_done(2)
+        app.edit_title(1, "スーパーで買い物")
+        for i in range(len(app.tasks)):
+            print(app.tasks[i].display())
+    except e: AppError:
+        print("AppError:", e.message)
+
+    # エラーケースのテスト
+    try:
+        app.add("")
+    except e: AppError:
+        print("Caught:", e.message)
+    try:
+        app.set_priority(1, 10)
+    except e: AppError:
+        print("Caught:", e.message)
+    try:
+        app.mark_done(999)
+    except e: AppError:
+        print("Caught:", e.message)`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "プロジェクト設計とモジュール構成",
+  est: "4時間",
+  sections: [{
+    title: "この講座の全体像",
+    body: "この初級コースでは、全12章を通じて1つのCLIタスク管理アプリを段階的に構築します。各章で新しい要素を1つずつ習得し、最終的に実用的なアプリケーションを完成させます。\n\n入門コースで学んだ基本文法・struct・trait・所有権の基礎知識を前提としています。",
+    afterCode: "重要な変更点（Mojo v26.2）:\n・fn は非推奨になりました。全て def を使います\n・def は暗黙的に raises しなくなりました（明示が必要）\n・引数規約: read（デフォルト）, mut, var（owned）, out, ref の5種類"
+  }, {
+    title: "Mojoプロジェクトの作成",
+    body: "magic init コマンドでプロジェクトを作成します。mojoproject.toml が設定ファイルとして生成されます。",
+    code: `# プロジェクト作成
+magic init my-task-app --format mojoproject
+cd my-task-app
+
+# ディレクトリ構造を作る
+mkdir -p src/models src/utils test
+
+# 各パッケージに __init__.mojo を作成
+touch src/__init__.mojo
+touch src/models/__init__.mojo
+touch src/utils/__init__.mojo`,
+    afterCode: "magic init は Mojo のパッケージマネージャ兼ビルドツールです。mojoproject.toml にはプロジェクト名、バージョン、依存関係などを記述します。"
+  }, {
+    title: "プロジェクト構造",
+    body: "タスク管理アプリのプロジェクト構造を設計します。\n関心の分離を意識し、データモデル・ユーティリティ・メインロジックを分けます。",
+    table: T.projStructure,
+    afterTable: "各ディレクトリに __init__.mojo を配置することで、そのディレクトリがMojoパッケージとして認識されます。これがないとインポートできません。"
+  }, {
+    title: "モジュールとパッケージ",
+    body: "Mojoのモジュールシステムは Python と似ていますが、コンパイル時に解決されるためより厳密です。\n\n・モジュール = 1つの .mojo ファイル\n・パッケージ = __init__.mojo を含むディレクトリ",
+    table: T.importStyles,
+    code: `# src/models/task.mojo
+struct Task:
+    var id: Int
+    var title: String
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id
+        self.title = title
+
+# src/main.mojo
+from models import Task
+
+def main():
+    var t = Task(1, "最初のタスク")
+    print(t.title)`,
+    afterCode: "Pythonとの違い: Mojoではインポートはコンパイル時に解決されるため、存在しないモジュールやシンボルを参照するとコンパイルエラーになります。実行時にModuleNotFoundErrorが出るPythonより安全です。"
+  }, {
+    title: "__init__.mojo の役割",
+    body: "パッケージの __init__.mojo は3つの役割を持ちます。",
+    table: T.initFileRole,
+    code: `# models/__init__.mojo の例
+from .task import Task
+from .task_list import TaskList
+
+# これにより、外部から以下のように書ける:
+# from models import Task, TaskList
+# （from models.task import Task と書かなくて良い）`,
+    afterCode: "__init__.mojo に何も書かなくても、from models.task import Task のように完全パスで指定すればインポートは可能です。再エクスポートは利便性のためのショートカットです。"
+  }, {
+    title: "公開と非公開",
+    body: "Mojoではアンダースコア始まりの名前は慣習的に非公開です。__init__.mojo で再エクスポートしないことで、外部からのアクセスを制限できます。\n\n現時点では言語レベルのアクセス修飾子（public/private）はありませんが、パッケージの __init__.mojo による再エクスポート管理が実質的なアクセス制御になります。",
+    code: `# models/task.mojo
+def _validate_title(title: String) raises:
+    """内部ヘルパー（外部に公開しない）"""
+    if len(title) == 0:
+        raise Error("title is empty")
+
+struct Task:
+    """公開するstruct"""
+    var id: Int
+    var title: String
+
+    def __init__(out self, id: Int, title: String) raises:
+        _validate_title(title)
+        self.id = id
+        self.title = title
+
+# models/__init__.mojo
+from .task import Task
+# _validate_title は再エクスポートしない`
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "データモデル設計",
+  est: "5時間",
+  sections: [{
+    title: "タスク管理アプリのデータモデル",
+    body: "アプリに必要なデータモデルを設計します。まずは要件を整理しましょう。\n\nタスクに必要な情報:\n・ID: 一意識別子（Int）\n・タイトル: タスクの名前（String）\n・ステータス: todo / doing / done（String）\n・優先度: 1〜5の数値（Int）\n・作成日時: タスク作成時の日時（String）",
+    table: T.structDesign
+  }, {
+    title: "@fieldwise_init と手動 __init__ の使い分け",
+    body: "@fieldwise_init は全フィールドを引数に取るコンストラクタを自動生成するデコレータです。\n単純なデータ構造には便利ですが、デフォルト値やバリデーションが必要な場合は手動で書きます。",
+    table: T.fieldwiseVsManual,
+    code: `# @fieldwise_init が適している例
+@fieldwise_init
+struct Color:
+    var r: UInt8
+    var g: UInt8
+    var b: UInt8
+
+# 手動 __init__ が必要な例
+struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    var created_at: String
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id
+        self.title = title
+        self.status = "todo"       # デフォルト値
+        self.priority = 1          # デフォルト値
+        self.created_at = "2026-04-14"  # 自動設定`,
+    afterCode: "@fieldwise_init は Color(r=255, g=128, b=0) のように全フィールドを指定して作成する場合に最適です。Task のようにデフォルト値を持つフィールドがある場合は手動の __init__ を書きましょう。"
+  }, {
+    title: "struct の実践的な設計",
+    body: "良い struct 設計のポイント:\n\n1. 単一責任: 1つの struct には1つの役割だけを持たせる\n2. 不変優先: 変更不要なフィールドは mut self メソッドを提供しない\n3. バリデーション: コンストラクタで不正な状態を防ぐ\n4. 意味のあるメソッド: get/set だけでなく、ドメインロジックをメソッドにする",
+    code: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+
+    def __init__(out self, id: Int, title: String) raises:
+        if len(title) == 0:
+            raise Error("title must not be empty")
+        self.id = id
+        self.title = title
+        self.status = "todo"
+        self.priority = 1
+
+    # 読み取り専用メソッド（read self）
+    def is_done(self) -> Bool:
+        return self.status == "done"
+
+    def summary(self) -> String:
+        return "[P" + String(self.priority) + "/" + self.status + "] " + String(self.id) + ": " + self.title
+
+    # 変更メソッド（mut self）
+    def mark_done(mut self):
+        self.status = "done"
+
+    def set_priority(mut self, p: Int) raises:
+        if p < 1 or p > 5:
+            raise Error("priority must be 1-5")
+        self.priority = p`,
+    afterCode: "ポイント: is_done() のようなドメイン固有のメソッドを提供することで、呼び出し元が status == \"done\" と直接比較するよりも意図が明確になります。"
+  }, {
+    title: "複数 struct の連携",
+    body: "実際のアプリケーションでは複数の struct が連携して動作します。struct 間の関係パターンを理解しましょう。",
+    table: T.structRelation,
+    code: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title; self.status = "todo"
+
+# TaskList は Task を「所有」している（has-a 関係）
+struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+
+    def __init__(out self):
+        self.tasks = List[Task]()
+        self.next_id = 1
+
+    def add(mut self, title: String) raises:
+        if len(title) == 0:
+            raise Error("empty title")
+        var task = Task(self.next_id, title)
+        self.tasks.append(task^)  # 所有権を移動
+        self.next_id += 1
+
+    def count(self) -> Int:
+        return len(self.tasks)`,
+    afterCode: "tasks.append(task^) の ^ はムーブ演算子です。Task の所有権を TaskList の内部リストに移動します。入門コースで学んだ通り、ムーブ後は元の変数は使えません。"
+  }, {
+    title: "オーバーロードコンストラクタ",
+    body: "Mojoではコンストラクタもオーバーロードできます。引数の組み合わせに応じて複数の __init__ を定義可能です。",
+    code: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+
+    # 最小限の初期化
+    def __init__(out self, id: Int, title: String):
+        self.id = id
+        self.title = title
+        self.status = "todo"
+        self.priority = 1
+
+    # 優先度指定付き
+    def __init__(out self, id: Int, title: String, priority: Int):
+        self.id = id
+        self.title = title
+        self.status = "todo"
+        self.priority = priority
+
+    # 全フィールド指定（CSV読込用）
+    def __init__(out self, id: Int, title: String, status: String, priority: Int):
+        self.id = id
+        self.title = title
+        self.status = status
+        self.priority = priority
+
+def main():
+    var t1 = Task(1, "買い物")           # デフォルト
+    var t2 = Task(2, "レポート", 5)      # 優先度指定
+    var t3 = Task(3, "掃除", "done", 2)  # 全指定`
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "コレクション操作",
+  est: "5時間",
+  sections: [{
+    title: "コレクション型の全体像",
+    body: "Mojoの主要なコレクション型を整理します。Pythonと似た使い方ですが、全て型パラメータが必要です。",
+    table: T.collectionTypes
+  }, {
+    title: "List の実践的な使い方",
+    body: "List[T] は最も頻繁に使うコレクションです。タスクの管理に欠かせません。",
+    table: T.listMethods,
+    code: `def main():
+    # 初期化
+    var tasks = List[String]()
+
+    # 追加
+    tasks.append("買い物")
+    tasks.append("レポート")
+    tasks.append("掃除")
+
+    # インデックスアクセス
+    print("先頭:", tasks[0])    # 買い物
+    print("末尾:", tasks[-1])   # 掃除
+
+    # 挿入
+    tasks.insert(1, "会議")     # インデックス1に挿入
+
+    # 削除
+    var removed = tasks.pop(0)  # 先頭を削除
+    print("削除:", removed)
+
+    # サイズ
+    print("残り:", len(tasks), "件")`,
+    afterCode: "List[T] の T には Movable を実装した型が必要です。自作 struct を List に入れる場合は __moveinit__ の実装が必要になることがあります（多くの場合は自動生成されます）。"
+  }, {
+    title: "Dict の実践的な使い方",
+    body: "Dict[K, V] はキーと値のペアを管理します。タスクの集計やキャッシュに便利です。",
+    table: T.dictMethods,
+    code: `def main():
+    # ステータス別カウント
+    var counts = Dict[String, Int]()
+    counts["todo"] = 0
+    counts["doing"] = 0
+    counts["done"] = 0
+
+    # 集計（仮のデータ）
+    var statuses = List[String]("todo", "todo", "done", "doing", "todo")
+    for i in range(len(statuses)):
+        var s = statuses[i]
+        counts[s] = counts[s] + 1
+
+    # 結果表示
+    for entry in counts.items():
+        print(entry[].key, ":", entry[].value)`,
+    afterCode: "Dict のキーには KeyElement を実装した型が使えます。String, Int などの基本型は最初から対応しています。自作structをキーにする場合は __hash__ と __eq__ の実装が必要です。"
+  }, {
+    title: "Optional の活用",
+    body: "Optional[T] は「値があるかもしれないし、ないかもしれない」を表現します。検索結果が見つからない場合などに使います。\n\nPython では None を返していた場面が、Mojo では Optional で型安全に表現できます。",
+    table: T.optionalUsage,
+    code: `def find_task_by_title(tasks: List[String], target: String) -> Optional[Int]:
+    """タイトルで検索し、見つかればインデックスを返す"""
+    for i in range(len(tasks)):
+        if tasks[i] == target:
+            return Optional[Int](i)
+    return Optional[Int](None)
+
+def main():
+    var tasks = List[String]("買い物", "レポート", "掃除")
+
+    var result = find_task_by_title(tasks, "レポート")
+    if result:
+        print("見つかった: インデックス", result.value())
+    else:
+        print("見つかりません")
+
+    var result2 = find_task_by_title(tasks, "洗濯")
+    var idx = result2.or_else(-1)
+    print("結果:", idx)  # -1`
+  }, {
+    title: "イテレーションパターン",
+    body: "コレクションの要素を順番に処理するパターンを整理します。",
+    table: T.iterPatterns,
+    code: `def main():
+    var items = List[String]("A", "B", "C")
+
+    # パターン1: インデックスループ（最も汎用的）
+    print("--- インデックスループ ---")
+    for i in range(len(items)):
+        print(i, ":", items[i])
+
+    # パターン2: 要素参照ループ
+    print("--- 要素参照ループ ---")
+    for ref in items:
+        print(ref[])
+
+    # Dict のイテレーション
+    var scores = Dict[String, Int]()
+    scores["math"] = 85
+    scores["english"] = 92
+    for entry in scores.items():
+        print(entry[].key, "→", entry[].value)`,
+    afterCode: "ref[] の [] はデリファレンス（参照外し）です。for ループで List の要素を取得すると参照が返されるため、実際の値にアクセスするには [] が必要です。"
+  }, {
+    title: "Set の活用",
+    body: "Set[T] は重複のない値の集合です。タグ管理やユニーク値の抽出に便利です。",
+    code: `def main():
+    var tags = Set[String]()
+    tags.add("urgent")
+    tags.add("work")
+    tags.add("urgent")  # 重複は無視される
+
+    print("タグ数:", len(tags))
+
+    if "urgent" in tags:
+        print("緊急タスクあり")
+
+    tags.remove("work")
+    print("work削除後:", len(tags))`
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "エラーハンドリング",
+  est: "5時間",
+  sections: [{
+    title: "Mojo v26.2 のエラーモデル",
+    body: "v26.2 での重要な変更: def は暗黙的に raises しなくなりました。\nエラーを送出する可能性がある関数は、明示的に raises を宣言する必要があります。\n\nこれにより、関数のシグネチャを見るだけでエラーの可能性が分かるようになりました。",
+    table: T.raisesDecl,
+    code: `# v26.2 の def: 暗黙的に raises しない
+def safe_func():
+    print("この関数はエラーを投げない")
+
+# エラーを投げる場合は明示的に raises を宣言
+def risky_func() raises:
+    raise Error("something went wrong")
+
+# 型付き raises
+def parse_int(s: String) raises Error -> Int:
+    return Int(s)`,
+    afterCode: "入門コースで学んだ fn は v26.2 で非推奨になりました。def で全て書きましょう。def の方が raises 宣言が明示的で分かりやすくなっています。"
+  }, {
+    title: "try/except の基本パターン",
+    body: "エラーをキャッチして処理するパターンを整理します。",
+    table: T.tryExceptPatterns,
+    code: `def divide(a: Float64, b: Float64) raises -> Float64:
+    if b == 0.0:
+        raise Error("division by zero")
+    return a / b
+
+def main():
+    # 基本パターン
+    try:
+        var result = divide(10.0, 3.0)
+        print("結果:", result)
+    except e:
+        print("エラー:", e)
+
+    # エラーケース
+    try:
+        var result = divide(10.0, 0.0)
+        print("結果:", result)
+    except e:
+        print("エラー:", e)`
+  }, {
+    title: "型付きエラー",
+    body: "Mojo v26.2 では独自のエラー型を定義し、raises で送出するエラーの型を指定できます。\nこれにより、呼び出し元はどの種類のエラーが来るか事前に分かります。",
+    table: T.errorTypes,
+    code: `struct ValidationError:
+    var message: String
+    var field: String
+
+    def __init__(out self, message: String, field: String):
+        self.message = message
+        self.field = field
+
+struct NotFoundError:
+    var message: String
+    var id: Int
+
+    def __init__(out self, id: Int):
+        self.message = "ID " + String(id) + " not found"
+        self.id = id
+
+# 特定のエラー型を送出
+def validate_priority(p: Int) raises ValidationError:
+    if p < 1 or p > 5:
+        raise ValidationError(
+            "priority must be 1-5, got " + String(p),
+            "priority"
+        )
+
+def main():
+    try:
+        validate_priority(10)
+    except e: ValidationError:
+        print("検証エラー [" + e.field + "]:", e.message)`,
+    afterCode: "型付きエラーのメリット:\n・コンパイル時にエラーの種類が保証される\n・except で特定の型だけキャッチできる\n・エラーに関連データ（field名、IDなど）を持たせられる"
+  }, {
+    title: "コンテキストマネージャ（with 文）",
+    body: "リソースの取得と解放を確実に行うための仕組みです。\nファイル、データベース接続、ログなどの管理に使います。",
+    table: T.contextManager,
+    code: `struct ResourceGuard:
+    var name: String
+    var is_acquired: Bool
+
+    def __init__(out self, name: String):
+        self.name = name
+        self.is_acquired = False
+
+    def __enter__(mut self) -> ref [self] Self:
+        self.is_acquired = True
+        print("取得:", self.name)
+        return self
+
+    def __exit__(mut self):
+        if self.is_acquired:
+            print("解放:", self.name)
+            self.is_acquired = False
+
+    def use(self):
+        if self.is_acquired:
+            print("使用中:", self.name)
+
+def main():
+    # with 文でリソースの取得/解放を自動管理
+    with ResourceGuard("DBコネクション") as guard:
+        guard.use()
+        guard.use()
+    # ここで自動的に __exit__ が呼ばれる
+    print("--- ブロック外 ---")`,
+    afterCode: "with 文を使うと、例外が発生しても __exit__ が確実に呼ばれます。入門コースの __del__ と似ていますが、with はスコープを明示的に制御できる点が異なります。"
+  }, {
+    title: "エラー処理の設計パターン",
+    body: "アプリケーション全体でのエラー処理戦略を考えます。\n\n基本方針:\n1. 低レベル関数: 具体的なエラーを raise する\n2. 中間層: エラーを変換/集約する\n3. 最上位（main/REPL）: 全エラーをキャッチしてユーザーに表示",
+    code: `# 低レベル: 具体的なエラーを送出
+def parse_priority(s: String) raises -> Int:
+    var p = Int(s)
+    if p < 1 or p > 5:
+        raise Error("priority out of range: " + s)
+    return p
+
+# 中間層: エラーを適切に処理
+def add_task_from_input(mut tasks: List[String], input: String) raises:
+    var parts = input.split(" ")
+    if len(parts) < 2:
+        raise Error("使い方: add <タイトル> [優先度]")
+    var title = parts[1]
+    tasks.append(title)
+
+# 最上位: 全てキャッチしてユーザーフレンドリーに表示
+def process_input(mut tasks: List[String], input: String):
+    try:
+        add_task_from_input(tasks, input)
+        print("タスク追加成功")
+    except e:
+        print("エラー:", e)
+    # ここでは絶対にクラッシュしない`
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "文字列処理とフォーマット",
+  est: "4時間",
+  sections: [{
+    title: "String の操作メソッド",
+    body: "タスク管理アプリでは文字列操作が頻繁に発生します。コマンドのパース、表示の整形、CSV変換など、様々な場面で String のメソッドを使います。",
+    table: T.stringMethods,
+    code: `def main():
+    var title = "  買い物に行く  "
+
+    # 前後の空白を除去
+    var trimmed = title.strip()
+    print("trimmed:", trimmed)
+
+    # 大文字/小文字
+    var s = "Hello World"
+    print("upper:", s.upper())
+    print("lower:", s.lower())
+
+    # 検索
+    var csv = "1,買い物,todo,3"
+    var pos = csv.find(",")
+    print("最初のカンマ位置:", pos)
+
+    # 分割
+    var parts = csv.split(",")
+    print("フィールド数:", len(parts))
+    for i in range(len(parts)):
+        print(" ", i, ":", parts[i])`
+  }, {
+    title: "文字列の連結と構築",
+    body: "文字列の連結にはいくつかの方法があります。",
+    table: T.stringConcat,
+    code: `def main():
+    var name = "太郎"
+    var id = 42
+
+    # + 演算子（基本）
+    var s1 = "ユーザー: " + name + " (ID:" + String(id) + ")"
+    print(s1)
+
+    # String() 変換
+    var priority = 3
+    var s2 = "優先度: " + String(priority) + "/5"
+    print(s2)`,
+    afterCode: "文字列連結で注意: Mojoでは Int や Float64 を直接 + で連結できません。必ず String() で変換してから連結します。print() 関数ではカンマ区切りで自動的に表示できますが、文字列として組み立てる場合は明示的な変換が必要です。"
+  }, {
+    title: "T-Strings（テンプレート文字列）",
+    body: "v26.2 の新機能。t\"...\" で式を埋め込んだテンプレート文字列を作成できます。\nPython の f-string に相当しますが、コンパイル時にチェックされます。",
+    table: T.tstringSyntax,
+    code: `def main():
+    var name = "太郎"
+    var score = 85
+    var rate = 0.945
+
+    # 基本的な埋め込み
+    print(t"名前: {name}")
+    print(t"スコア: {score}点")
+
+    # 式の埋め込み
+    print(t"合格: {score >= 60}")
+    print(t"倍のスコア: {score * 2}")
+
+    # フォーマット指定
+    print(t"正答率: {rate:.1%}")
+    print(t"スコア: {score:05d}")
+
+    # 波括弧のエスケープ
+    print(t"Dict形式: {{key: value}}")`,
+    afterCode: "T-Strings は + 演算子による連結より読みやすく、パフォーマンスも良好です。特に複数の変数を含む文字列の組み立てに威力を発揮します。"
+  }, {
+    title: "パース処理の実践",
+    body: "ユーザー入力やCSVデータを解析（パース）するテクニックです。",
+    table: T.parsePatterns,
+    code: `# CSV行のパース
+def parse_csv_line(line: String) raises -> List[String]:
+    var fields = line.split(",")
+    if len(fields) == 0:
+        raise Error("empty line")
+    return fields
+
+# コマンド入力のパース
+def parse_command(input: String) raises -> List[String]:
+    var trimmed = input.strip()
+    if len(trimmed) == 0:
+        raise Error("empty command")
+    return trimmed.split(" ")
+
+# キー=値 形式のパース
+def parse_key_value(s: String) raises -> Tuple[String, String]:
+    var eq_pos = s.find("=")
+    if eq_pos == -1:
+        raise Error("no '=' found in: " + s)
+    var key = s[:eq_pos].strip()
+    var value = s[eq_pos + 1:].strip()
+    return (key, value)
+
+def main():
+    try:
+        var fields = parse_csv_line("1,買い物,todo,3")
+        print("CSV fields:", len(fields))
+
+        var parts = parse_command("add 牛乳を買う")
+        print("Command:", parts[0])
+
+        var kv = parse_key_value("priority=3")
+        print("Key:", kv[0], "Value:", kv[1])
+    except e:
+        print("Error:", e)`
+  }, {
+    title: "Task の文字列表現",
+    body: "タスクを様々な形式で文字列に変換するメソッドを実装します。\n表示用、保存用、デバッグ用など用途に応じた変換が必要です。",
+    code: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+
+    # 一覧表示用
+    def to_list_string(self) -> String:
+        return t"[P{self.priority}/{self.status}] #{self.id}: {self.title}"
+
+    # CSV保存用
+    def to_csv(self) -> String:
+        return String(self.id) + "," + self.title + "," + self.status + "," + String(self.priority)
+
+    # 詳細表示用
+    def to_detail_string(self) -> String:
+        var lines = List[String]()
+        lines.append(t"ID:       #{self.id}")
+        lines.append(t"タイトル: {self.title}")
+        lines.append(t"ステータス: {self.status}")
+        lines.append(t"優先度:   {self.priority}/5")
+        var result = ""
+        for i in range(len(lines)):
+            if i > 0:
+                result = result + "\\n"
+            result = result + lines[i]
+        return result
+
+def main():
+    var t = Task(1, "買い物")
+    t.status = "doing"
+    t.priority = 3
+    print(t.to_list_string())
+    print("")
+    print(t.to_detail_string())
+    print("")
+    print("CSV:", t.to_csv())`
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "ファイルI/O",
+  est: "4時間",
+  sections: [{
+    title: "ファイル操作の基本",
+    body: "タスクデータを永続化するために、ファイルの読み書きを学びます。\nwith 文を使ってファイルを安全に扱います。",
+    table: T.fileOps,
+    code: `def main():
+    # 書き込み
+    with open("hello.txt", "w") as f:
+        f.write("Hello, Mojo!\\n")
+        f.write("ファイルI/Oのテスト\\n")
+    print("書き込み完了")
+
+    # 読み取り
+    with open("hello.txt", "r") as f:
+        var content = f.read()
+    print("内容:")
+    print(content)
+
+    # 追記
+    with open("hello.txt", "a") as f:
+        f.write("追記行\\n")
+
+    # 再読み取り
+    with open("hello.txt", "r") as f:
+        var content2 = f.read()
+    print("追記後:")
+    print(content2)`,
+    afterCode: "with open() を使うことで、処理後にファイルが自動的に閉じられます。例外が発生した場合でも確実にクローズされるため、リソースリークを防げます。"
+  }, {
+    title: "CSV形式でのデータ永続化",
+    body: "タスクデータをCSV（カンマ区切り値）形式で保存・読込します。\nCSVはシンプルで人間が読め、Excel等でも開けるのがメリットです。",
+    table: T.csvFormat,
+    code: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+
+    def __init__(out self, id: Int, title: String, status: String, priority: Int):
+        self.id = id; self.title = title
+        self.status = status; self.priority = priority
+
+    def to_csv(self) -> String:
+        return String(self.id) + "," + self.title + "," + self.status + "," + String(self.priority)
+
+    @staticmethod
+    def from_csv(line: String) raises -> Task:
+        var parts = line.split(",")
+        if len(parts) != 4:
+            raise Error("invalid CSV format")
+        return Task(
+            Int(parts[0]),    # id
+            parts[1],         # title
+            parts[2],         # status
+            Int(parts[3])     # priority
+        )`
+  }, {
+    title: "TaskList の永続化",
+    body: "TaskList 全体をCSVファイルに保存・復元する機能を実装します。\nヘッダー行を含めて、標準的なCSVファイル形式にします。",
+    code: `struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+
+    def __init__(out self):
+        self.tasks = List[Task]()
+        self.next_id = 1
+
+    def save(self, path: String) raises:
+        """タスクリストをCSVファイルに保存"""
+        with open(path, "w") as f:
+            # ヘッダー行
+            f.write("id,title,status,priority\\n")
+            # データ行
+            for i in range(len(self.tasks)):
+                f.write(self.tasks[i].to_csv() + "\\n")
+        print(t"保存完了: {path} ({len(self.tasks)}件)")
+
+    def load(mut self, path: String) raises:
+        """CSVファイルからタスクリストを読み込み"""
+        self.tasks.clear()
+        self.next_id = 1
+
+        with open(path, "r") as f:
+            var content = f.read()
+
+        var lines = content.split("\\n")
+        for i in range(1, len(lines)):  # ヘッダーをスキップ
+            var line = lines[i].strip()
+            if len(line) > 0:
+                var task = Task.from_csv(line)
+                if task.id >= self.next_id:
+                    self.next_id = task.id + 1
+                self.tasks.append(task^)
+        print(t"読込完了: {len(self.tasks)}件")`,
+    afterCode: "CSVの制限: タイトルにカンマが含まれる場合、正しくパースできません。本格的なCSVパーサーではフィールドをダブルクォートで囲む処理が必要ですが、この講座ではシンプルさを優先します。"
+  }, {
+    title: "データ保存形式の比較",
+    body: "アプリケーションデータの保存形式にはいくつかの選択肢があります。",
+    table: T.dataFormats,
+    afterTable: "この講座ではCSV形式を採用します。シンプルで実装が容易、タスクリストのようなフラットなデータに最適だからです。複雑なネスト構造が必要になった場合は、Python連携でJSON処理を行う方法を Ch10 で学びます。"
+  }, {
+    title: "ファイル操作のエラー処理",
+    body: "ファイル操作は多くのエラーが発生しうるため、適切なエラー処理が重要です。\nファイルが存在しない、権限がない、ディスク容量不足など、様々なケースに対応します。",
+    code: `from os.path import exists
+
+def safe_load(path: String) -> List[String]:
+    """安全にファイルを読み込む。エラー時は空リストを返す。"""
+    if not exists(path):
+        print(t"ファイルなし: {path}（新規作成されます）")
+        return List[String]()
+
+    try:
+        with open(path, "r") as f:
+            var content = f.read()
+        var lines = content.split("\\n")
+        var result = List[String]()
+        for i in range(len(lines)):
+            var line = lines[i].strip()
+            if len(line) > 0:
+                result.append(line)
+        return result
+    except e:
+        print(t"読込エラー: {e}")
+        return List[String]()
+
+def safe_save(path: String, lines: List[String]):
+    """安全にファイルに書き込む。エラー時はメッセージ表示。"""
+    try:
+        with open(path, "w") as f:
+            for i in range(len(lines)):
+                f.write(lines[i] + "\\n")
+        print(t"保存完了: {path}")
+    except e:
+        print(t"保存エラー: {e}")
+
+def main():
+    var lines = safe_load("data.txt")
+    lines.append("新しい行")
+    safe_save("data.txt", lines)`
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "コマンドラインインターフェース",
+  est: "5時間",
+  sections: [{
+    title: "CLIアプリのコマンド設計",
+    body: "タスク管理アプリのコマンド体系を設計します。\nシンプルで直感的、かつ拡張しやすいコマンド構造を目指します。",
+    table: T.cliCommands,
+    afterTable: "コマンド設計の原則:\n1. 動詞で始める（add, list, delete）\n2. 必須引数は位置引数、オプションはフラグ\n3. ヘルプは常に利用可能\n4. 不明コマンドにはエラーメッセージ"
+  }, {
+    title: "引数のパース",
+    body: "ユーザー入力をコマンドと引数に分解する処理です。",
+    table: T.argParsePattern,
+    code: `def parse_input(line: String) raises -> Tuple[String, List[String]]:
+    """入力をコマンドと引数に分解"""
+    var trimmed = line.strip()
+    if len(trimmed) == 0:
+        raise Error("empty input")
+
+    var parts = trimmed.split(" ")
+    var cmd = parts[0].lower()  # コマンドは小文字に統一
+    var args = List[String]()
+    for i in range(1, len(parts)):
+        if len(parts[i]) > 0:  # 空文字列をスキップ
+            args.append(parts[i])
+    return (cmd, args^)
+
+def main():
+    try:
+        var result = parse_input("ADD  買い物に行く  3")
+        print("cmd:", result[0])  # "add"
+        print("args:", len(result[1]))  # 3
+    except e:
+        print("Error:", e)`,
+    afterCode: "コマンドを小文字に統一することで、\"ADD\", \"Add\", \"add\" のいずれでも動作するようになります。ユーザビリティの小さいが重要な改善です。"
+  }, {
+    title: "REPLループの構築",
+    body: "REPL（Read-Eval-Print Loop）はCLIアプリの中核です。\n入力→処理→出力を繰り返します。",
+    table: T.replLoop,
+    code: `def main():
+    print("=== タスク管理アプリ v1.0 ===")
+    print("help でコマンド一覧を表示")
+    print("")
+
+    while True:
+        # Read: 入力を取得
+        var line = input("task> ")
+        var trimmed = line.strip()
+
+        # 空入力をスキップ
+        if len(trimmed) == 0:
+            continue
+
+        # コマンドを分離
+        var parts = trimmed.split(" ")
+        var cmd = parts[0].lower()
+
+        # Eval: コマンドに応じた処理
+        if cmd == "quit" or cmd == "exit":
+            print("さようなら！")
+            break
+        elif cmd == "help":
+            print("利用可能なコマンド:")
+            print("  add <タイトル>   タスクを追加")
+            print("  list            一覧表示")
+            print("  done <ID>       完了にする")
+            print("  help            ヘルプ")
+            print("  quit            終了")
+        elif cmd == "add":
+            if len(parts) < 2:
+                print("エラー: タイトルを指定してください")
+            else:
+                var title = parts[1]
+                for i in range(2, len(parts)):
+                    title = title + " " + parts[i]
+                print(t"追加: {title}")
+        else:
+            # Print: エラーメッセージ
+            print(t"不明なコマンド: {cmd}")
+            print("help でコマンド一覧を表示できます")`
+  }, {
+    title: "コマンドハンドラの分離",
+    body: "各コマンドの処理を個別の関数に分離すると、コードが整理され、テストもしやすくなります。",
+    code: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title; self.status = "todo"
+
+def handle_add(mut tasks: List[Task], mut next_id: Int, args: List[String]) raises:
+    if len(args) == 0:
+        raise Error("タイトルを指定してください")
+    var title = args[0]
+    for i in range(1, len(args)):
+        title = title + " " + args[i]
+    tasks.append(Task(next_id, title)^)
+    print(t"追加: #{next_id} {title}")
+    next_id += 1
+
+def handle_list(tasks: List[Task]):
+    if len(tasks) == 0:
+        print("タスクはありません")
+        return
+    for i in range(len(tasks)):
+        var t = tasks[i]
+        print(t"#{t.id}: {t.title} [{t.status}]")
+    print(t"--- {len(tasks)}件 ---")
+
+def handle_done(mut tasks: List[Task], args: List[String]) raises:
+    if len(args) == 0:
+        raise Error("IDを指定してください")
+    var id = Int(args[0])
+    for i in range(len(tasks)):
+        if tasks[i].id == id:
+            tasks[i].status = "done"
+            print(t"完了: #{id}")
+            return
+    raise Error(t"ID {id} が見つかりません")
+
+def main():
+    var tasks = List[Task]()
+    var next_id: Int = 1
+
+    while True:
+        var line = input("task> ")
+        var trimmed = line.strip()
+        if len(trimmed) == 0: continue
+
+        var parts = trimmed.split(" ")
+        var cmd = parts[0].lower()
+        var args = List[String]()
+        for i in range(1, len(parts)):
+            if len(parts[i]) > 0: args.append(parts[i])
+
+        if cmd == "quit": break
+
+        try:
+            if cmd == "add": handle_add(tasks, next_id, args)
+            elif cmd == "list": handle_list(tasks)
+            elif cmd == "done": handle_done(tasks, args)
+            elif cmd == "help":
+                print("add/list/done/quit")
+            else:
+                print(t"不明: {cmd}")
+        except e:
+            print(t"エラー: {e}")`
+  }, {
+    title: "ユーザー体験の改善",
+    body: "CLIアプリの使いやすさを向上させる工夫を施します。\n\n1. 起動時にデータを自動読込\n2. 変更時に自動保存\n3. 操作結果の明確なフィードバック\n4. エラー時の具体的なガイダンス",
+    code: `# 実用的なプロンプト
+def show_prompt(task_count: Int) -> String:
+    """タスク数を含むプロンプト文字列を生成"""
+    return t"task({task_count})> "
+
+# 確認プロンプト
+def confirm(message: String) -> Bool:
+    """ユーザーに確認を求める"""
+    var response = input(t"{message} (y/n): ")
+    return response.strip().lower() == "y"
+
+# 結果のフォーマット
+def show_success(message: String):
+    print(t"[OK] {message}")
+
+def show_error(message: String):
+    print(t"[Error] {message}")
+
+def show_info(message: String):
+    print(t"[Info] {message}")
+
+def main():
+    show_success("タスク追加: 買い物")
+    show_error("ID 99 が見つかりません")
+    show_info("3件のタスクを読み込みました")
+
+    if confirm("本当に削除しますか？"):
+        print("削除実行")
+    else:
+        print("キャンセル")`
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "テストの書き方",
+  est: "4時間",
+  sections: [{
+    title: "Mojo のテスト機能",
+    body: "Mojo には組み込みのテストフレームワークがあります。\ntest_ プレフィックスの関数がテストとして認識され、mojo test コマンドで実行できます。",
+    table: T.testFunctions,
+    code: `from testing import assert_equal, assert_true, assert_false
+
+# テスト対象のコード
+def add(a: Int, b: Int) -> Int:
+    return a + b
+
+def is_positive(n: Int) -> Bool:
+    return n > 0
+
+# テスト関数（test_ プレフィックス）
+def test_add_basic():
+    assert_equal(add(1, 2), 3)
+    assert_equal(add(0, 0), 0)
+    assert_equal(add(-1, 1), 0)
+
+def test_is_positive():
+    assert_true(is_positive(1))
+    assert_true(is_positive(100))
+    assert_false(is_positive(0))
+    assert_false(is_positive(-1))`,
+    afterCode: "テストの実行: mojo test test_file.mojo\n全テストが通ると PASS、1つでも失敗すると FAIL が表示されます。"
+  }, {
+    title: "テストのパターン",
+    body: "テストには様々なパターンがあります。正常系だけでなく、異常系・境界値もテストしましょう。",
+    table: T.testPatterns,
+    code: `from testing import assert_equal, assert_true, assert_raises
+
+struct Task:
+    var id: Int
+    var title: String
+    var priority: Int
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title; self.priority = 1
+    def set_priority(mut self, p: Int) raises:
+        if p < 1 or p > 5: raise Error("invalid priority")
+        self.priority = p
+
+# 正常系テスト
+def test_task_creation():
+    var t = Task(1, "テスト")
+    assert_equal(t.id, 1)
+    assert_equal(t.title, "テスト")
+    assert_equal(t.priority, 1)
+
+# 異常系テスト
+def test_invalid_priority():
+    var t = Task(1, "テスト")
+    with assert_raises():
+        t.set_priority(0)
+    with assert_raises():
+        t.set_priority(6)
+
+# 境界値テスト
+def test_priority_boundaries():
+    var t = Task(1, "テスト")
+    t.set_priority(1)  # 最小値: OK
+    assert_equal(t.priority, 1)
+    t.set_priority(5)  # 最大値: OK
+    assert_equal(t.priority, 5)
+
+# 状態変化テスト
+def test_priority_change():
+    var t = Task(1, "テスト")
+    assert_equal(t.priority, 1)  # 変更前
+    t.set_priority(3)
+    assert_equal(t.priority, 3)  # 変更後`
+  }, {
+    title: "テスト駆動開発（TDD）",
+    body: "テスト駆動開発では「テストを先に書く → 実装する → リファクタする」のサイクルを繰り返します。",
+    table: T.tddCycle,
+    code: `from testing import assert_equal, assert_true
+
+# === Step 1: Red — テストを先に書く ===
+# この時点では TaskList.search() は未実装 → テスト失敗
+
+def test_search_finds_matching_tasks():
+    var tl = TaskList()
+    tl.add("買い物に行く")
+    tl.add("レポートを書く")
+    tl.add("買い物リスト作成")
+    var results = tl.search("買い物")
+    assert_equal(len(results), 2)
+
+def test_search_returns_empty_for_no_match():
+    var tl = TaskList()
+    tl.add("買い物")
+    var results = tl.search("掃除")
+    assert_equal(len(results), 0)
+
+# === Step 2: Green — 最小実装 ===
+struct Task:
+    var id: Int
+    var title: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title
+
+struct TaskList:
+    var tasks: List[Task]
+    var next_id: Int
+    def __init__(out self):
+        self.tasks = List[Task](); self.next_id = 1
+    def add(mut self, title: String):
+        self.tasks.append(Task(self.next_id, title)^)
+        self.next_id += 1
+
+    # 最小実装（テストを通すだけ）
+    def search(self, keyword: String) -> List[Task]:
+        var results = List[Task]()
+        for i in range(len(self.tasks)):
+            if self.tasks[i].title.find(keyword) != -1:
+                results.append(self.tasks[i])
+        return results
+
+# === Step 3: Refactor — 改善 ===
+# 大文字小文字を区別しない検索に改善
+# → title.lower().find(keyword.lower())`,
+    afterCode: "TDDのメリット:\n・必要な機能だけを実装する（YAGNI原則）\n・リファクタリングの安全性が担保される\n・仕様がテストとして文書化される"
+  }, {
+    title: "テストの構造化",
+    body: "テストが増えてきたら、テストファイルを整理しましょう。\n\n推奨構造:\n・test/test_task.mojo — Task struct のテスト\n・test/test_task_list.mojo — TaskList のテスト\n・test/test_parser.mojo — パーサーのテスト\n・test/test_io.mojo — ファイルI/Oのテスト",
+    code: `# test/test_task.mojo
+from testing import assert_equal, assert_true, assert_raises
+
+# テストヘルパー: テスト用データを作成
+def make_test_task() -> Task:
+    return Task(1, "テストタスク")
+
+def make_test_list(count: Int) -> TaskList:
+    var tl = TaskList()
+    for i in range(count):
+        tl.add("タスク" + String(i + 1))
+    return tl
+
+# テスト実行:
+# mojo test test/                    # testディレクトリ全体
+# mojo test test/test_task.mojo      # 特定ファイル`
+  }]
+}, {
+  id: "ch9",
+  num: 9,
+  title: "パフォーマンス基礎",
+  est: "4時間",
+  sections: [{
+    title: "型選択による最適化",
+    body: "Mojoでは型の選択がパフォーマンスに直接影響します。\n適切な型を選ぶことで、メモリ使用量を削減し、演算速度を向上させられます。",
+    table: T.simdTypes,
+    afterTable: "基本方針: データの値域に合った最小の型を選ぶ。ただし、CPU のワードサイズ（64bit）に合わない型は逆に遅くなることもあるので、ホットパス（頻繁に実行される箇所）でのみ最適化を検討しましょう。"
+  }, {
+    title: "タスクアプリでの型最適化",
+    body: "タスク管理アプリのフィールドを最適化します。\n数十〜数百件のタスクでは大差ありませんが、大規模データで差が出ます。",
+    table: T.typeOptimization,
+    code: `# Before: 全て標準型
+struct TaskBefore:
+    var id: Int          # 8 bytes
+    var title: String
+    var status: String   # 24+ bytes（ヒープ割当）
+    var priority: Int    # 8 bytes
+
+# After: 最適化した型
+alias STATUS_TODO: UInt8 = 0
+alias STATUS_DOING: UInt8 = 1
+alias STATUS_DONE: UInt8 = 2
+
+struct TaskAfter:
+    var id: Int32        # 4 bytes
+    var title: String
+    var status: UInt8    # 1 byte
+    var priority: UInt8  # 1 byte
+
+    def is_done(self) -> Bool:
+        return self.status == STATUS_DONE  # UInt8比較: 高速
+
+    def status_string(self) -> String:
+        if self.status == STATUS_TODO: return "todo"
+        if self.status == STATUS_DOING: return "doing"
+        if self.status == STATUS_DONE: return "done"
+        return "unknown"`,
+    afterCode: "status を String → UInt8 に変更するだけで:\n・メモリ: 24+ bytes → 1 byte（24倍以上削減）\n・比較: 文字列比較 → 整数比較（数十倍高速）\n・ただし、表示時には変換関数が必要"
+  }, {
+    title: "SIMD による一括処理",
+    body: "SIMD（Single Instruction, Multiple Data）で複数のデータを同時に処理できます。\nタスクの統計計算など、同じ操作を多くのデータに適用する場面で威力を発揮します。",
+    code: `def main():
+    # 4つのタスクの優先度を一括処理
+    var priorities = SIMD[DType.uint8, 4](3, 1, 5, 2)
+
+    # 一括演算
+    print("優先度:", priorities)
+    print("合計:", priorities.reduce_add())
+    print("最大:", priorities.reduce_max())
+    print("最小:", priorities.reduce_min())
+
+    # 条件判定（マスク生成）
+    var threshold = SIMD[DType.uint8, 4](3)
+    var high = priorities >= threshold
+    print("P3以上:", high)  # [True, False, True, False]
+
+    # 8要素の SIMD
+    var scores = SIMD[DType.float32, 8](
+        85.0, 92.0, 78.0, 95.0, 88.0, 70.0, 91.0, 83.0
+    )
+    var avg = scores.reduce_add() / 8.0
+    print("平均点:", avg)`,
+    afterCode: "SIMD のポイント:\n・要素数は2のべき乗（2, 4, 8, 16, ...）\n・全要素に同じ演算を1命令で実行\n・reduce_add/max/min で集約演算\n・比較演算でマスク（Bool配列）を生成"
+  }, {
+    title: "ベンチマーク手法",
+    body: "最適化の効果を数値で確認するためのベンチマーク手法です。",
+    table: T.benchmarkApproach,
+    code: `from time import now
+
+def bench_loop(iterations: Int):
+    """ループ回数を指定してベンチマーク"""
+    # 方式A: 文字列連結
+    var start_a = now()
+    var s = String("")
+    for i in range(iterations):
+        s = s + "x"
+    var time_a = now() - start_a
+
+    # 方式B: Listで構築して結合
+    var start_b = now()
+    var parts = List[String]()
+    for i in range(iterations):
+        parts.append("x")
+    # join相当の処理
+    var result = String("")
+    for i in range(len(parts)):
+        result = result + parts[i]
+    var time_b = now() - start_b
+
+    print(t"文字列連結 ({iterations}回):")
+    print(t"  方式A (+=):  {time_a} ns")
+    print(t"  方式B (List): {time_b} ns")
+
+def main():
+    bench_loop(100)
+    bench_loop(1000)`,
+    afterCode: "ベンチマークの注意点:\n・初回実行はキャッシュの影響で遅い（ウォームアップが必要）\n・小さすぎるデータでは測定誤差が大きい\n・benchmark モジュールを使うと自動的にウォームアップ・統計処理が行われます"
+  }]
+}, {
+  id: "ch10",
+  num: 10,
+  title: "Python連携の実践",
+  est: "4時間",
+  sections: [{
+    title: "Python連携の基本",
+    body: "MojoはPythonのエコシステムをそのまま活用できます。\nNumPy, matplotlib, json など、豊富なPythonライブラリをMojoから呼び出せます。",
+    table: T.pythonInterop,
+    code: `from python import Python
+
+def main():
+    # Pythonモジュールのインポート
+    var json = Python.import_module("json")
+    var os = Python.import_module("os")
+
+    # Python関数の呼び出し
+    var cwd = os.getcwd()
+    print("作業ディレクトリ:", cwd)
+
+    # Mojo値 → PythonObject
+    var data = Python.dict()
+    data["name"] = "Mojo Task App"
+    data["version"] = "1.0"
+    data["tasks"] = 42
+
+    # JSON文字列に変換
+    var json_str = json.dumps(data, indent=2, ensure_ascii=False)
+    print(json_str)`,
+    afterCode: "Python連携の仕組み: MojoプロセスにCPythonインタプリタが組み込まれており、PythonObjectを通じて相互にデータをやり取りします。パフォーマンスクリティカルな部分はMojoネイティブで書き、可視化や外部ライブラリはPython経由で使うのが効果的です。"
+  }, {
+    title: "データの可視化",
+    body: "タスクの統計データを matplotlib で可視化します。\n数値計算は NumPy を活用します。",
+    table: T.vizLibraries,
+    code: `from python import Python
+
+def main():
+    var np = Python.import_module("numpy")
+    var plt = Python.import_module("matplotlib.pyplot")
+
+    # タスクデータ（Mojoで集計したデータをPythonに渡す）
+    var labels = Python.list()
+    labels.append("todo")
+    labels.append("doing")
+    labels.append("done")
+
+    var counts = np.array([5, 3, 7])
+
+    # 棒グラフ
+    plt.figure(figsize=Python.tuple([10, 6]))
+    var colors = Python.list()
+    colors.append("#60a5fa")
+    colors.append("#fbbf24")
+    colors.append("#34d399")
+    plt.bar(labels, counts, color=colors)
+    plt.title("タスク ステータス分布")
+    plt.ylabel("件数")
+    plt.savefig("status_chart.png", dpi=150)
+    plt.close()
+    print("グラフ保存: status_chart.png")`
+  }, {
+    title: "PythonObject の型変換",
+    body: "MojoネイティブとPythonの間でデータをやり取りするには、型変換が必要です。\n\n方向1: Mojo → Python（PythonObject に暗黙変換）\n方向2: Python → Mojo（明示的な変換が必要）",
+    code: `from python import Python
+
+def main():
+    var np = Python.import_module("numpy")
+
+    # Mojo → Python（暗黙変換）
+    var mojo_list = Python.list()
+    mojo_list.append(10)      # Int → PythonObject
+    mojo_list.append(3.14)    # Float64 → PythonObject
+    mojo_list.append("hello") # String → PythonObject
+
+    # Python → Mojo（明示変換）
+    var py_arr = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    var py_mean = py_arr.mean()
+    var py_sum = py_arr.sum()
+
+    # Float64に変換してMojoで計算
+    var mojo_mean: Float64 = Float64(py_mean)
+    var mojo_sum: Float64 = Float64(py_sum)
+    print(t"平均: {mojo_mean}")
+    print(t"合計: {mojo_sum}")
+    print(t"差分: {mojo_sum - mojo_mean * 5.0}")`,
+    afterCode: "変換のルール:\n・基本型（Int, Float64, String, Bool）は Int(py_val), Float64(py_val) 等で変換\n・リスト/辞書は要素単位で変換が必要\n・変換できない型の場合は実行時エラー"
+  }, {
+    title: "実践: タスクデータの分析レポート",
+    body: "Python連携を活用して、タスクデータの分析レポートを生成する実践例です。\nNumPyで統計計算、matplotlibでグラフ化、jsonで出力します。",
+    code: `from python import Python
+
+def main():
+    var np = Python.import_module("numpy")
+    var json = Python.import_module("json")
+
+    # タスクデータを用意
+    var priorities = np.array([3, 1, 5, 2, 4, 3, 1, 5, 3, 2, 4, 1])
+    var completion_days = np.array([2, 5, 1, 3, 7, 2, 4, 1, 3, 6, 2, 8])
+
+    # 統計分析
+    var report = Python.dict()
+    report["total_tasks"] = Int(np.size(priorities))
+    report["avg_priority"] = Float64(np.mean(priorities))
+    report["avg_completion_days"] = Float64(np.mean(completion_days))
+    report["max_completion_days"] = Int(np.max(completion_days))
+    report["min_completion_days"] = Int(np.min(completion_days))
+
+    # 相関分析（優先度と完了日数の関係）
+    var correlation = np.corrcoef(priorities, completion_days)
+    report["priority_completion_correlation"] = Float64(correlation[0][1])
+
+    # JSON形式でレポート出力
+    var output = json.dumps(report, indent=2)
+    print("=== タスク分析レポート ===")
+    print(output)`
+  }]
+}, {
+  id: "ch11",
+  num: 11,
+  title: "リファクタリングとコード品質",
+  est: "5時間",
+  sections: [{
+    title: "trait を活用したインターフェース設計",
+    body: "trait を使うことで、異なる struct に共通のインターフェースを定義できます。\nこれにより、ジェネリック関数やポリモーフィズムが実現します。",
+    table: T.traitDesignPatterns,
+    code: `# インターフェース分離の例
+trait Displayable:
+    def display(self) -> String: ...
+
+trait Searchable:
+    def matches(self, keyword: String) -> Bool: ...
+
+trait Persistable:
+    def to_csv(self) -> String: ...
+
+# 複数 trait の実装
+struct Task(Displayable, Searchable, Persistable):
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+
+    def display(self) -> String:
+        return t"[P{self.priority}/{self.status}] #{self.id}: {self.title}"
+
+    def matches(self, keyword: String) -> Bool:
+        return self.title.lower().find(keyword.lower()) != -1
+
+    def to_csv(self) -> String:
+        return String(self.id) + "," + self.title + "," + self.status + "," + String(self.priority)
+
+# ジェネリック関数: Displayable なら何でも表示できる
+def print_item[T: Displayable](item: T):
+    print(item.display())
+
+# ジェネリック関数: Searchable なら何でも検索できる
+def search_items[T: Searchable](items: List[T], keyword: String) -> List[T]:
+    var results = List[T]()
+    for i in range(len(items)):
+        if items[i].matches(keyword):
+            results.append(items[i])
+    return results`,
+    afterCode: "trait 設計の原則:\n・インターフェース分離原則（ISP）: 大きな trait より小さな trait を複数定義\n・依存性逆転原則（DIP）: 具体的な型ではなく trait に依存するコードを書く"
+  }, {
+    title: "所有権パターンの実践",
+    body: "引数規約（read / mut / var / out / ref）を適切に使い分けることで、安全で効率的なコードが書けます。",
+    table: T.ownershipPatterns,
+    code: `struct Task:
+    var id: Int
+    var title: String
+    var status: String
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title; self.status = "todo"
+    def __copyinit__(out self, other: Self):
+        self.id = other.id; self.title = other.title; self.status = other.status
+    def __moveinit__(out self, owned other: Self):
+        self.id = other.id; self.title = other.title^; self.status = other.status^
+
+# read: 表示のみ → 所有権不要
+def display(task: Task):
+    print(t"#{task.id}: {task.title}")
+
+# mut: 変更する → 可変参照
+def complete(mut task: Task):
+    task.status = "done"
+
+struct TaskList:
+    var tasks: List[Task]
+    def __init__(out self):
+        self.tasks = List[Task]()
+
+    # owned (var): 所有権を受け取る
+    def add(mut self, owned task: Task):
+        self.tasks.append(task^)  # ムーブで格納
+
+    # ref: 内部データへの参照を返す
+    def get(self, index: Int) -> ref [self.tasks] Task:
+        return self.tasks[index]
+
+def main():
+    var tl = TaskList()
+    var t = Task(1, "テスト")
+    display(t)       # read: コピーも移動もしない
+    complete(t)      # mut: その場で変更
+    display(t)       # status が "done" に変わっている
+    tl.add(t^)       # owned: 所有権を移動
+    # t はもう使えない
+
+    display(tl.get(0))  # ref: 内部の参照を直接読む`
+  }, {
+    title: "リファクタリングチェックリスト",
+    body: "コード品質を向上させるためのチェックリストです。\nアプリ全体を見直す際に使ってください。",
+    table: T.refactorChecklist,
+    code: `# Before: 重複コードの例
+struct TaskApp:
+    var tasks: List[Task]
+
+    # mark_done と delete で同じ検索ロジックが重複
+    def mark_done(mut self, id: Int) raises:
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                self.tasks[i].status = "done"
+                return
+        raise Error("not found")
+
+    def delete(mut self, id: Int) raises:
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                _ = self.tasks.pop(i)
+                return
+        raise Error("not found")
+
+# After: 共通ヘルパーに抽出
+struct TaskAppRefactored:
+    var tasks: List[Task]
+
+    def _find_index(self, id: Int) raises -> Int:
+        """共通: IDからインデックスを検索"""
+        for i in range(len(self.tasks)):
+            if self.tasks[i].id == id:
+                return i
+        raise Error(t"ID {id} not found")
+
+    def mark_done(mut self, id: Int) raises:
+        var idx = self._find_index(id)
+        self.tasks[idx].status = "done"
+
+    def delete(mut self, id: Int) raises:
+        var idx = self._find_index(id)
+        _ = self.tasks.pop(idx)`,
+    afterCode: "リファクタリングの鉄則:\n1. まずテストを書く（安全ネット）\n2. 小さなステップで変更する\n3. 各ステップでテストを実行する\n4. 動作が変わっていないことを確認する"
+  }, {
+    title: "コードの整理と命名規則",
+    body: "読みやすいコードを書くための規則です。\n\n命名規則:\n・struct名: PascalCase（Task, TaskList, ValidationError）\n・関数/メソッド名: snake_case（add_task, find_by_id）\n・変数名: snake_case（next_id, task_count）\n・定数（alias）: SCREAMING_SNAKE_CASE（MAX_PRIORITY, STATUS_DONE）\n・非公開: アンダースコア始まり（_validate, _find_index）",
+    code: `# 良い例
+alias MAX_PRIORITY: Int = 5
+alias STATUS_TODO = "todo"
+
+struct TaskManager:
+    var _tasks: List[Task]          # 非公開フィールド
+    var _next_id: Int
+
+    def __init__(out self):
+        self._tasks = List[Task]()
+        self._next_id = 1
+
+    # 公開メソッド
+    def add_task(mut self, title: String) raises:
+        self._validate_title(title)
+        self._tasks.append(Task(self._next_id, title)^)
+        self._next_id += 1
+
+    def get_task_count(self) -> Int:
+        return len(self._tasks)
+
+    # 非公開ヘルパー
+    def _validate_title(self, title: String) raises:
+        if len(title) == 0:
+            raise Error("empty title")
+        if len(title) > 100:
+            raise Error("title too long")`
+  }]
+}, {
+  id: "ch12",
+  num: 12,
+  title: "総合演習 — アプリの完成と拡張",
+  est: "6時間",
+  sections: [{
+    title: "アプリの全体像",
+    body: "12章にわたって段階的に構築してきたCLIタスク管理アプリの全体像を振り返ります。\n各章で学んだ要素がどのように組み合わさっているかを確認しましょう。",
+    table: T.finalFeatures
+  }, {
+    title: "アーキテクチャの振り返り",
+    body: "アプリケーション全体の構造を整理します。\n\nレイヤー構造:\n1. データ層: Task struct（データモデル）\n2. ビジネスロジック層: TaskApp struct（CRUD、検索、集計）\n3. 永続化層: CSV読み書き（ファイルI/O）\n4. プレゼンテーション層: REPL UI（コマンド処理、表示）\n5. 外部連携層: Python（可視化、分析）",
+    code: `# アプリケーションの起動フロー
+def main():
+    # 1. 初期化
+    var app = TaskApp("tasks.csv")
+
+    # 2. データ読込（永続化層）
+    try:
+        app.load()
+    except:
+        print("新規作成モード")
+
+    # 3. REPLループ（プレゼンテーション層）
+    print("=== タスク管理アプリ v1.0 ===")
+    while True:
+        var line = input("task> ")
+        if line.strip() == "quit":
+            break
+
+        # 4. コマンド実行（ビジネスロジック層）
+        try:
+            app.execute(line)
+        except e:
+            print(t"Error: {e}")
+
+    # 5. 終了時に保存
+    try:
+        app.save()
+        print("データを保存しました")
+    except e:
+        print(t"保存エラー: {e}")
+
+    print("さようなら！")`,
+    afterCode: "各レイヤーが明確に分離されているため:\n・Task のフィールド追加 → データ層のみ変更\n・保存形式の変更（CSV→JSON）→ 永続化層のみ変更\n・UI変更（CLI→Web）→ プレゼンテーション層のみ変更\nという柔軟な拡張が可能です。"
+  }, {
+    title: "学んだ知識のまとめ",
+    body: "全12章で学んだ主要なトピックを振り返ります。\n\nCh1: プロジェクト構造、モジュール/パッケージ、import\nCh2: struct設計、@fieldwise_init、コンストラクタオーバーロード\nCh3: List/Dict/Set/Optional、イテレーションパターン\nCh4: try/except/raise、型付きエラー、コンテキストマネージャ\nCh5: String操作、T-Strings、パース処理\nCh6: ファイルI/O、CSV永続化、with文\nCh7: CLIコマンド設計、REPL、引数パース\nCh8: テスト関数、assert、TDD\nCh9: 型最適化、SIMD、ベンチマーク\nCh10: Python連携、NumPy/matplotlib、型変換\nCh11: trait設計、所有権パターン、リファクタリング\nCh12: 総合演習、アプリ完成\n\nMojo v26.2 の重要な変更点:\n・fn 非推奨 → 全て def\n・def は暗黙 raises しない → 明示的な raises 宣言\n・T-Strings（t\"...\"）\n・型付きエラー（raises ValidationError）\n・コンテキストマネージャ（with文）\n・引数規約: read, mut, var, out, ref"
+  }, {
+    title: "拡張アイデア",
+    body: "アプリをさらに発展させるアイデアです。中級コースへのステップアップとして挑戦してみてください。\n\n1. サブタスク機能: タスクの中にサブタスクを持てるようにする（ツリー構造）\n2. タグ機能: タスクに複数のタグを付けてフィルタリング（Set活用）\n3. 期限管理: 締切日を設定し、期限切れを警告\n4. 繰り返しタスク: 毎日/毎週繰り返すタスクの自動生成\n5. マルチファイル: プロジェクトごとにタスクリストを分離\n6. エクスポート: HTML/Markdownレポートの生成（Python連携）\n7. undo機能: 直前の操作を取り消す（コマンドパターン）\n8. バッチ処理: ファイルからコマンドを読み込んで一括実行",
+    code: `# 拡張例: タグ機能の骨格
+struct TaggedTask:
+    var id: Int
+    var title: String
+    var status: String
+    var priority: Int
+    var tags: Set[String]
+
+    def __init__(out self, id: Int, title: String):
+        self.id = id; self.title = title
+        self.status = "todo"; self.priority = 1
+        self.tags = Set[String]()
+
+    def add_tag(mut self, tag: String):
+        self.tags.add(tag)
+
+    def has_tag(self, tag: String) -> Bool:
+        return tag in self.tags
+
+    def display(self) -> String:
+        var tag_str = ""
+        # タグを文字列に変換
+        for t in self.tags:
+            if len(tag_str) > 0:
+                tag_str = tag_str + ","
+            tag_str = tag_str + t[]
+        return t"#{self.id}: {self.title} [{self.status}] tags:[{tag_str}]"
+
+def main():
+    var t = TaggedTask(1, "レポート提出")
+    t.add_tag("仕事")
+    t.add_tag("急ぎ")
+    print(t.display())
+    print(t"急ぎ?", t.has_tag("急ぎ"))`
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, data.h.map((h, i) => /*#__PURE__*/React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, data.r.map((row, ri) => /*#__PURE__*/React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => /*#__PURE__*/React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return /*#__PURE__*/React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, /*#__PURE__*/React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, /*#__PURE__*/React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), /*#__PURE__*/React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && /*#__PURE__*/React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && /*#__PURE__*/React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function MojoBeginner() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: 760,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\uD83D\uDE80"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "\u5165\u9580\u30B3\u30FC\u30B9\u4FEE\u4E86\u8005\u5411\u3051"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "Mojo \u521D\u7D1A\u30B3\u30FC\u30B9"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB CLI\u30BF\u30B9\u30AF\u7BA1\u7406\u30A2\u30D7\u30EA\u3092\u6BB5\u968E\u7684\u306B\u69CB\u7BC9"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "\u25B2" : "\u25BC")), menuOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => /*#__PURE__*/React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` \u30FB \u6F14\u7FD2${exercises.length}\u554F` : ""))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => /*#__PURE__*/React.createElement(Section, {
+    key: i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554E\u984C"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Exercise, {
+    key: i,
+    ex: ex,
+    idx: i
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "Mojo v26.2 (2026\u5E743\u6708) \u6642\u70B9 \u30FB docs.modular.com/mojo/manual/")));
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(MojoBeginner));
+  </script>
+</body>
+</html>

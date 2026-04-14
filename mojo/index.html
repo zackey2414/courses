@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mojo 入門コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのMojo入門コース。全10章・31問の演習付き。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  compile: {
+    h: ["用語", "意味"],
+    r: [["インタプリタ", "コードを1行ずつ読みながら実行する方式。Pythonがこの方式。手軽だが遅い。"], ["コンパイル", "実行前にコード全体を機械語に変換する方式。C, C++, Rust 等。速い。"], ["JIT", "Just-In-Time。実行する直前にコンパイル。ビルド手順不要で手軽。"], ["AOT", "Ahead-Of-Time。実行前にバイナリを生成。起動が速く配布が簡単。"]]
+  },
+  runMode: {
+    h: ["方法", "コマンド", "特徴", "用途"],
+    r: [["JITモード", "mojo run hello.mojo", "その場でコンパイル＆実行。バイナリは残らない。", "開発・テスト"], ["AOTモード", "mojo build hello.mojo → ./hello", "事前にバイナリを生成。単体で実行可能。", "本番配布"]]
+  },
+  varDecl: {
+    h: ["方法", "書き方", "スコープ", "型の指定"],
+    r: [["① 暗黙宣言", "x = 10", "関数スコープ（関数全体で有効）", "推論 or 注釈"], ["② var 明示宣言", "var x = 10", "ブロックスコープ（if/for内のみ）", "推論 or 注釈"], ["③ alias 定数", "alias X = 10", "コンパイル時定数（変更不可）", "推論 or 注釈"]]
+  },
+  types: {
+    h: ["Python", "Mojo", "説明"],
+    r: [["int", "Int", "符号付き整数（通常64bit）"], ["(なし)", "UInt", "符号なし整数"], ["float", "Float64", "倍精度浮動小数点"], ["(なし)", "Float32 / Float16", "単精度 / 半精度"], ["bool", "Bool", "真偽値"], ["str", "String", "文字列"], ["None", "None", "値なし"], ["list", "List[型]", "可変長リスト"], ["dict", "Dict[K, V]", "辞書"], ["(なし)", "SIMD[DType, N]", "ベクトル演算用の型"]],
+    cap: "固定幅: Int8〜Int64 / UInt8〜UInt64 / Float16〜Float64 も使用可能。型名は全て先頭大文字（structだから）。"
+  },
+  conv: {
+    h: ["変換", "暗黙？", "理由"],
+    r: [["Int → Float64", "✅", "精度が増すだけ"], ["Float64 → Int", "❌", "小数部が消える"], ["Int → String", "❌", "型が全く違う"], ["String → Int", "❌", "失敗の可能性"], ["Bool → Int", "✅", "True=1, False=0"], ["Int → Bool", "❌", "Pythonと異なる"]]
+  },
+  defFn: {
+    h: ["キーワード", "エラー送出", "用途"],
+    r: [["def", "暗黙的に raises", "Pythonに近い柔軟な書き方"], ["fn", "raises を明示しないと投げられない", "厳密な制御が必要な場面"]],
+    cap: "それ以外の違いはなし。引数の型宣言は両方とも必須。"
+  },
+  argConv: {
+    h: ["規約", "意味", "Python類似"],
+    r: [["read（デフォルト・省略可）", "不変参照。読めるが変更不可。コピーなし。", "通常の引数"], ["mut", "可変参照。呼び出し元の値を直接変更。", "listを関数内で.append()"], ["var", "所有権の取得。関数が値を自分のものにする。", "対応概念なし"]]
+  },
+  truthy: {
+    h: ["Python", "Mojo"],
+    r: [["if my_list:", "if len(my_list) > 0:"], ["if name:", "if len(name) > 0:"], ["if count:", "if count != 0:"], ["if not x:", "if x == 0:"]]
+  },
+  unsup: {
+    h: ["Python構文", "Mojo", "代替"],
+    r: [["リスト内包表記", "❌", "forループ"], ["辞書内包表記", "❌", "forループ"], ["global文", "❌", "引数で渡す"], ["class", "❌", "struct"], ["yield/ジェネレータ", "❌", "Listで代替"], ["async/await", "❌", "1.0後に予定"], ["with文", "✅", "そのまま"], ["try/except/raise", "✅", "そのまま"]]
+  },
+  clsVsStr: {
+    h: ["機能", "Python class", "Mojo struct"],
+    r: [["メモリ配置", "ヒープ上に辞書的に格納", "スタック上に連続配置（高速）"], ["フィールド宣言", "不要。動的追加可。", "var+型注釈で全て事前宣言必須"], ["動的属性追加", "可能", "不可能"], ["継承", "あり", "なし（traitで代替）"], ["コピー", "参照コピー（共有）", "明示実装が必要。デフォルト不可。"], ["__init__", "全フィールドの初期化は任意", "全フィールド必須。さもなくばエラー。"]]
+  },
+  selfConv: {
+    h: ["規約", "使う場面"],
+    r: [["out self", "__init__のみ。未初期化のselfを全フィールド初期化する義務。"], ["self（= read self）", "読み取り専用メソッド。変更不可。get系・計算系。"], ["mut self", "フィールドを変更するメソッド。set系・increment系。"], ["owned self", "__del__や__moveinit__で使用。所有権を受け取る。"]]
+  },
+  traitAbc: {
+    h: ["項目", "Python ABC", "Mojo trait"],
+    r: [["チェック時点", "実行時", "コンパイル時"], ["実行時コスト", "あり", "ゼロ"], ["複数実装", "多重継承", "複数trait実装可"], ["フィールド定義", "可能", "不可（メソッドのみ）"]]
+  },
+  traits: {
+    h: ["トレイト", "使えるようになるもの"],
+    r: [["Copyable", "代入コピー可"], ["Movable", "^ でムーブ可"], ["Stringable", "String(値)変換可"], ["Writable", "print(値)出力可"], ["Sized", "len(値)可"], ["EqualityComparable", "== / != 可"], ["Comparable", "< > <= >= 可"]]
+  },
+  dtypes: {
+    h: ["DType", "説明"],
+    r: [["DType.int8/16/32/64", "符号付き整数"], ["DType.uint8/16/32/64", "符号なし整数"], ["DType.float16/32/64", "浮動小数点"], ["DType.bool", "真偽値"], ["DType.index", "ネイティブ幅"]]
+  }
+};
+
+/* ── Exercises: content-matched to each chapter. Only uses concepts taught up to that chapter. ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "以下のPythonコードをMojoに変換してください。\nポイント: def main() の中に書くこと。",
+    code: `# Python
+print("Hello, World!")`,
+    answer: `def main():
+    print("Hello, World!")`
+  }, {
+    diff: 1,
+    q: "複数のprintをMojoで書いてください。\nポイント: 全て main() の中に入れること。",
+    code: `# Python
+print("名前: Mojo")
+print("種類: コンパイル言語")
+print("拡張子: .mojo")`,
+    answer: `def main():
+    print("名前: Mojo")
+    print("種類: コンパイル言語")
+    print("拡張子: .mojo")`
+  }, {
+    diff: 2,
+    q: "変数を使って自己紹介を表示してください。\nポイント: Mojoでも暗黙宣言（Pythonと同じ書き方）で動きます。\n（var や型注釈は Ch2 で学びます）",
+    code: `# Python
+name = "太郎"
+age = 25
+print(name, "は", age, "歳です")`,
+    answer: `def main():
+    name = "太郎"
+    age = 25
+    print(name, "は", age, "歳です")`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "以下の4つの変数を var + 型注釈で宣言し、printで表示してください。\n・整数の点数 85\n・小数の体温 36.5\n・文字列の名前 \"Alice\"\n・真偽値 True\n\n【使う知識】var宣言、基本型（Int, Float64, String, Bool）",
+    code: `def main():
+    # ここに4つの変数を宣言して表示
+    pass`,
+    answer: `def main():
+    var score: Int = 85
+    var temp: Float64 = 36.5
+    var name: String = "Alice"
+    var active: Bool = True
+    print(score, temp, name, active)`
+  }, {
+    diff: 2,
+    q: "遅延初期化を使って、気温に応じたメッセージを表示してください。\n・30以上→\"暑い\" / 15以上→\"快適\" / それ以外→\"寒い\"\nmessage を var+型注釈だけで宣言し、if文の中で初期化すること。\n\n【使う知識】var宣言、遅延初期化、if/elif/else",
+    code: `def main():
+    var temperature: Int = 22
+    # message を遅延初期化で宣言
+    # ...
+    print("気温:", temperature, "→", message)`,
+    answer: `def main():
+    var temperature: Int = 22
+    var message: String
+    if temperature >= 30:
+        message = "暑い"
+    elif temperature >= 15:
+        message = "快適"
+    else:
+        message = "寒い"
+    print("気温:", temperature, "→", message)`
+  }, {
+    diff: 2,
+    q: "alias で円周率を定数定義し、半径(Int型で7)から面積を計算してください。\n半径を Float64 に型変換してから計算すること。\n\n【使う知識】alias、型変換（Int→Float64）、var宣言",
+    code: `# 出力例: 半径: 7 → 面積: 153.93791`,
+    answer: `alias PI = 3.14159
+
+def main():
+    var radius: Int = 7
+    var area: Float64 = PI * Float64(radius) * Float64(radius)
+    print("半径:", radius, "→ 面積:", area)`
+  }, {
+    diff: 3,
+    q: "var と暗黙宣言のスコープの違いを確認するプログラムを書いてください。\n\n1. 暗黙宣言の変数を if の中で変更 → 外でも変わっている\n2. var宣言の変数を if の中で別途 var → 外は変わらない\n\n【使う知識】暗黙宣言 vs var、スコープ、if文",
+    code: `def main():
+    # 1. 暗黙宣言のスコープ確認
+    # 2. var のスコープ確認`,
+    answer: `def main():
+    # 暗黙宣言: 関数スコープ
+    x = 10
+    if True:
+        x = 99
+    print("暗黙 x =", x)     # → 99
+
+    # var: ブロックスコープ
+    var y = 10
+    if True:
+        var y = 99
+        print("内側 y =", y)  # → 99
+    print("外側 y =", y)      # → 10`
+  }],
+  ch3: [{
+    diff: 1,
+    q: "2つの Int を受け取り大きい方を返す fn 関数 max_of を書いてください。\nmain() から呼び出して結果を表示すること。\n\n【使う知識】fn、引数の型宣言、戻り値型 -> Int",
+    code: `# max_of(3, 7) → 7
+# max_of(10, 2) → 10`,
+    answer: `fn max_of(a: Int, b: Int) -> Int:
+    if a > b:
+        return a
+    return b
+
+def main():
+    print(max_of(3, 7))
+    print(max_of(10, 2))`
+  }, {
+    diff: 2,
+    q: "引数規約 mut を使い、変数を3倍にする関数 triple を書いてください。\nまた read（デフォルト）で表示する関数 show も書き、\nshow → triple → show の順で呼んで値の変化を確認。\n\n【使う知識】fn、read引数（デフォルト）、mut引数",
+    code: `# 期待する出力:
+# 値: 5
+# 値: 15`,
+    answer: `fn show(value: Int):
+    print("値:", value)
+
+fn triple(mut value: Int):
+    value *= 3
+
+def main():
+    var x = 5
+    show(x)
+    triple(x)
+    show(x)`
+  }, {
+    diff: 2,
+    q: "デフォルト引数を持つ fn 関数 power を書いてください。\n・base: Int と exp: Int = 2\nキーワード引数での呼び出しも試すこと。\n\n【使う知識】fn、デフォルト引数、キーワード引数",
+    code: `# power(3) → 9
+# power(2, 10) → 1024
+# power(exp=3, base=5) → 125`,
+    answer: `fn power(base: Int, exp: Int = 2) -> Int:
+    return base ** exp
+
+def main():
+    print(power(3))
+    print(power(2, 10))
+    print(power(exp=3, base=5))`
+  }, {
+    diff: 3,
+    q: "同名の関数 abs_val を Int版 と Float64版 でオーバーロードしてください。\n\n【使う知識】fn、オーバーロード、型注釈",
+    code: `# abs_val(-5) → 5       (Int版)
+# abs_val(-3.14) → 3.14  (Float64版)`,
+    answer: `fn abs_val(x: Int) -> Int:
+    if x < 0:
+        return -x
+    return x
+
+fn abs_val(x: Float64) -> Float64:
+    if x < 0.0:
+        return -x
+    return x
+
+def main():
+    print(abs_val(-5))
+    print(abs_val(-3.14))`
+  }],
+  ch4: [{
+    diff: 1,
+    q: "for と range を使って、1から10までの整数を表示してください。\n\n【使う知識】def main()（Ch1）、for、range()",
+    code: `# 出力: 1 2 3 4 5 6 7 8 9 10（各行1つ）`,
+    answer: `def main():
+    for i in range(1, 11):
+        print(i)`
+  }, {
+    diff: 1,
+    q: "for と if を組み合わせて、1〜20の偶数だけ表示してください。\nPythonの truthy/falsy は使えないことに注意。\n\n【使う知識】for、if、%演算子、== 比較",
+    code: `# 出力: 2 4 6 8 10 12 14 16 18 20`,
+    answer: `def main():
+    for i in range(1, 21):
+        if i % 2 == 0:
+            print(i)`
+  }, {
+    diff: 2,
+    q: "FizzBuzz（1〜30）を書いてください。\n3の倍数→\"Fizz\"、5の倍数→\"Buzz\"、両方→\"FizzBuzz\"、それ以外→数値。\n\n【使う知識】for、if/elif/else、%演算子",
+    code: `def main():
+    # ここに書いてください`,
+    answer: `def main():
+    for n in range(1, 31):
+        if n % 15 == 0:
+            print("FizzBuzz")
+        elif n % 3 == 0:
+            print("Fizz")
+        elif n % 5 == 0:
+            print("Buzz")
+        else:
+            print(n)`
+  }, {
+    diff: 3,
+    q: "Ch3の fn と組み合わせて、素数判定プログラムを書いてください。\n・fn is_prime(n: Int) -> Bool を定義\n・main() で1〜50の素数を全て表示\n\n【使う知識】fn（Ch3）+ for/if（Ch4）",
+    code: `# 出力: 2 3 5 7 11 13 17 19 23 29 31 37 41 43 47`,
+    answer: `fn is_prime(n: Int) -> Bool:
+    if n < 2:
+        return False
+    for i in range(2, n):
+        if n % i == 0:
+            return False
+    return True
+
+def main():
+    for n in range(1, 51):
+        if is_prime(n):
+            print(n)`
+  }],
+  ch5: [{
+    diff: 1,
+    q: "struct Point を定義してください。\n・フィールド: x, y（Float64）\n・__init__ で初期化\n・main()でインスタンスを作りフィールドを表示\n\n【使う知識】struct、var フィールド、__init__(out self, ...)",
+    code: `# var p = Point(3.0, 4.0)
+# print(p.x, p.y)  → 3.0 4.0`,
+    answer: `struct Point:
+    var x: Float64
+    var y: Float64
+
+    def __init__(out self, x: Float64, y: Float64):
+        self.x = x
+        self.y = y
+
+def main():
+    var p = Point(3.0, 4.0)
+    print(p.x, p.y)`
+  }, {
+    diff: 2,
+    q: "Counter struct を定義してください。\n・初期値0、get(self)→現在値、increment(mut self)→+1、add(mut self, n)→+n\nread self と mut self の使い分けがポイント。\n\n【使う知識】struct、self規約（read/mut）、fn メソッド（Ch3）",
+    code: `# var c = Counter()
+# c.increment(); c.add(10)
+# print(c.get())  → 11`,
+    answer: `struct Counter:
+    var count: Int
+
+    def __init__(out self):
+        self.count = 0
+
+    fn get(self) -> Int:
+        return self.count
+
+    fn increment(mut self):
+        self.count += 1
+
+    fn add(mut self, n: Int):
+        self.count += n
+
+def main():
+    var c = Counter()
+    c.increment()
+    c.add(10)
+    print(c.get())`
+  }, {
+    diff: 3,
+    q: "Rectangle struct に __add__ と __str__ を実装してください。\n・area(self)、scale(mut self, factor) も定義\n\n【使う知識】struct、全self規約、演算子オーバーロード、fn（Ch3）",
+    code: `# var r1 = Rectangle(3.0, 4.0)
+# print(r1.area())  → 12.0
+# r1.scale(2.0)
+# print(r1.__str__())  → "Rect(6.0 x 8.0)"`,
+    answer: `struct Rectangle:
+    var w: Float64
+    var h: Float64
+
+    def __init__(out self, w: Float64, h: Float64):
+        self.w = w; self.h = h
+
+    fn area(self) -> Float64:
+        return self.w * self.h
+
+    fn scale(mut self, factor: Float64):
+        self.w *= factor; self.h *= factor
+
+    fn __add__(self, other: Rectangle) -> Rectangle:
+        return Rectangle(self.w + other.w, self.h + other.h)
+
+    fn __str__(self) -> String:
+        return "Rect(" + String(self.w) + " x " + String(self.h) + ")"
+
+def main():
+    var r1 = Rectangle(3.0, 4.0)
+    print("面積:", r1.area())
+    r1.scale(2.0)
+    print(r1.__str__())`
+  }, {
+    diff: 3,
+    q: "MyData struct に __copyinit__ を実装し、コピーの独立性を確認してください。\nコピー後に片方を変更し、もう片方が変わらないことを print 確認。\n\n【使う知識】struct、__copyinit__、mut self、値セマンティクス",
+    code: `# var a = MyData(42)
+# var b = a   ← コピー
+# b を変更しても a は変わらないことを確認`,
+    answer: `struct MyData:
+    var value: Int
+
+    def __init__(out self, value: Int):
+        self.value = value
+
+    def __copyinit__(out self, existing: Self):
+        self.value = existing.value
+
+    fn set(mut self, v: Int):
+        self.value = v
+
+def main():
+    var a = MyData(42)
+    var b = a
+    b.set(999)
+    print("a:", a.value)
+    print("b:", b.value)`
+  }],
+  ch6: [{
+    diff: 1,
+    q: "Greetable \u30C8\u30EC\u30A4\u30C8\uFF08fn greet(self) -> String\uFF09\u3092\u5B9A\u7FA9\u3057\u3001\nPerson struct \u306B\u5B9F\u88C5\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011trait\u5B9A\u7FA9\u3001struct(\u30C8\u30EC\u30A4\u30C8\u540D)\u3001\u30E1\u30BD\u30C3\u30C9\u5B9F\u88C5\uFF08Ch5\uFF09",
+    code: `# var p = Person("\u592A\u90CE")
+# print(p.greet())  \u2192 "\u3053\u3093\u306B\u3061\u306F\u3001\u592A\u90CE\u3067\u3059"`,
+    answer: `trait Greetable:
+    fn greet(self) -> String: ...
+
+struct Person(Greetable):
+    var name: String
+    def __init__(out self, name: String): self.name = name
+    fn greet(self) -> String:
+        return "\u3053\u3093\u306B\u3061\u306F\u3001" + self.name + "\u3067\u3059"
+
+def main():
+    var p = Person("\u592A\u90CE")
+    print(p.greet())`
+  }, {
+    diff: 2,
+    q: "Shape \u30C8\u30EC\u30A4\u30C8(area, name)\u3092\u5B9A\u7FA9\u3057 Circle \u3068 Square \u306B\u5B9F\u88C5\u3002\n\u30B8\u30A7\u30CD\u30EA\u30C3\u30AF\u95A2\u6570 print_shape[T: Shape](s: T) \u3082\u66F8\u3044\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011trait\u3001\u30B8\u30A7\u30CD\u30EA\u30C3\u30AF\u95A2\u6570\u3001struct\uFF08Ch5\uFF09\u3001alias\uFF08Ch2\uFF09",
+    code: `# print_shape(Circle(5.0))  \u2192 "Circle: \u9762\u7A4D=78.5..."`,
+    answer: `alias PI = 3.14159
+
+trait Shape:
+    fn area(self) -> Float64: ...
+    fn name(self) -> String: ...
+
+struct Circle(Shape):
+    var radius: Float64
+    def __init__(out self, r: Float64): self.radius = r
+    fn area(self) -> Float64: return PI * self.radius * self.radius
+    fn name(self) -> String: return "Circle"
+
+struct Square(Shape):
+    var side: Float64
+    def __init__(out self, s: Float64): self.side = s
+    fn area(self) -> Float64: return self.side * self.side
+    fn name(self) -> String: return "Square"
+
+fn print_shape[T: Shape](s: T):
+    print(s.name() + ": \u9762\u7A4D=" + String(s.area()))
+
+def main():
+    print_shape(Circle(5.0))
+    print_shape(Square(4.0))`
+  }, {
+    diff: 3,
+    q: "Measurable \u30C8\u30EC\u30A4\u30C8\u3092\u5B9A\u7FA9\u3057 Temperature, Weight \u306B\u5B9F\u88C5\u3002\nfind_max[T: Measurable](a, b) \u3067\u5927\u304D\u3044\u65B9\u306E value() \u3092\u8FD4\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011trait\u3001\u30B8\u30A7\u30CD\u30EA\u30C3\u30AF\u95A2\u6570\u3001if\uFF08Ch4\uFF09\u3001fn\uFF08Ch3\uFF09",
+    code: `# find_max(Temperature(36.5), Temperature(38.2)) \u2192 38.2`,
+    answer: `trait Measurable:
+    fn value(self) -> Float64: ...
+
+struct Temperature(Measurable):
+    var celsius: Float64
+    def __init__(out self, c: Float64): self.celsius = c
+    fn value(self) -> Float64: return self.celsius
+
+struct Weight(Measurable):
+    var kg: Float64
+    def __init__(out self, kg: Float64): self.kg = kg
+    fn value(self) -> Float64: return self.kg
+
+fn find_max[T: Measurable](a: T, b: T) -> Float64:
+    if a.value() > b.value(): return a.value()
+    return b.value()
+
+def main():
+    print(find_max(Temperature(36.5), Temperature(38.2)))
+    print(find_max(Weight(60.0), Weight(75.5)))`
+  }],
+  ch7: [{
+    diff: 1,
+    q: "\u30E0\u30FC\u30D6\u6F14\u7B97\u5B50 ^ \u3067 String \u306E\u6240\u6709\u6A29\u3092\u79FB\u52D5\u3057\u3066\u304F\u3060\u3055\u3044\u3002\nmoved \u3092\u8868\u793A\u3057\u3001original \u304C\u4F7F\u3048\u306A\u3044\u3053\u3068\u3092\u30B3\u30E1\u30F3\u30C8\u3067\u793A\u3059\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011var\uFF08Ch2\uFF09\u3001^\uFF08\u30E0\u30FC\u30D6\u6F14\u7B97\u5B50\uFF09",
+    code: `def main():
+    var original = String("\u91CD\u8981\u306A\u30C7\u30FC\u30BF")
+    # \u6240\u6709\u6A29\u3092 moved \u306B\u79FB\u52D5\u3057\u3066\u8868\u793A`,
+    answer: `def main():
+    var original = String("\u91CD\u8981\u306A\u30C7\u30FC\u30BF")
+    var moved = original^
+    print(moved)
+    # print(original)  # \u274C \u30B3\u30F3\u30D1\u30A4\u30EB\u30A8\u30E9\u30FC\uFF01`
+  }, {
+    diff: 2,
+    q: "__del__ \u3092\u6301\u3064 Resource struct \u3092\u5B9A\u7FA9\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\u30FB__init__ \u3067 \"\u53D6\u5F97: name\" \u3068\u8868\u793A\n\u30FB__del__ \u3067 \"\u89E3\u653E: name\" \u3068\u8868\u793A\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011struct\uFF08Ch5\uFF09\u3001__del__(owned self)\u3001\u6240\u6709\u6A29",
+    code: `# \u51FA\u529B:
+# \u53D6\u5F97: DB\u63A5\u7D9A
+# \u4F5C\u696D\u4E2D...
+# \u89E3\u653E: DB\u63A5\u7D9A  \u2190 \u81EA\u52D5`,
+    answer: `struct Resource:
+    var name: String
+    def __init__(out self, name: String):
+        self.name = name; print("\u53D6\u5F97:", self.name)
+    fn __del__(owned self):
+        print("\u89E3\u653E:", self.name)
+
+def main():
+    var r = Resource("DB\u63A5\u7D9A")
+    print("\u4F5C\u696D\u4E2D...")`
+  }, {
+    diff: 3,
+    q: "__copyinit__ \u3068 ^ \u30E0\u30FC\u30D6\u306E\u4E21\u65B9\u3092\u8A66\u3059 Box struct \u3092\u5B9A\u7FA9\u3002\n\u30B3\u30D4\u30FC\u5F8C\u306F\u4E21\u65B9\u4F7F\u3048\u3001\u30E0\u30FC\u30D6\u5F8C\u306F\u5143\u304C\u4F7F\u3048\u306A\u3044\u3053\u3068\u3092\u78BA\u8A8D\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011struct\uFF08Ch5\uFF09\u3001__copyinit__\u3001__moveinit__\u3001^",
+    code: `# var b = a   \u2190 \u30B3\u30D4\u30FC\uFF08\u4E21\u65B9\u4F7F\u3048\u308B\uFF09
+# var c = a^  \u2190 \u30E0\u30FC\u30D6\uFF08a \u306F\u4F7F\u3048\u306A\u3044\uFF09`,
+    answer: `struct Box:
+    var label: String; var value: Int
+    def __init__(out self, label: String, value: Int):
+        self.label = label; self.value = value
+    def __copyinit__(out self, existing: Self):
+        self.label = existing.label; self.value = existing.value
+    def __moveinit__(out self, owned existing: Self):
+        self.label = existing.label^; self.value = existing.value
+
+def main():
+    var a = Box("A", 10)
+    var b = a
+    print("a:", a.label, a.value)
+    print("b:", b.label, b.value)
+    var c = a^
+    print("c:", c.label, c.value)
+    # print(a.label)  # \u274C a \u306F\u4F7F\u3048\u306A\u3044`
+  }],
+  ch8: [{
+    diff: 1,
+    q: "Python.import_module \u3067 math \u3092\u30A4\u30F3\u30DD\u30FC\u30C8\u3057 sqrt(2) \u3092\u8868\u793A\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011from python import Python\u3001import_module",
+    code: `# \u51FA\u529B: 1.4142135623730951`,
+    answer: `from python import Python
+
+def main():
+    var math = Python.import_module("math")
+    print(math.sqrt(2))`
+  }, {
+    diff: 2,
+    q: "NumPy \u3067\u914D\u5217 [10, 20, 30, 40, 50] \u306E\u5408\u8A08\u30FB\u5E73\u5747\u30FB\u6700\u5927\u5024\u3092\u8868\u793A\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011import_module\u3001PythonObject \u306E\u30E1\u30BD\u30C3\u30C9\u547C\u3073\u51FA\u3057",
+    code: `# \u51FA\u529B: \u5408\u8A08: 150 / \u5E73\u5747: 30.0 / \u6700\u5927: 50`,
+    answer: `from python import Python
+
+def main():
+    var np = Python.import_module("numpy")
+    var arr = np.array([10, 20, 30, 40, 50])
+    print("\u5408\u8A08:", arr.sum())
+    print("\u5E73\u5747:", arr.mean())
+    print("\u6700\u5927:", arr.max())`
+  }, {
+    diff: 3,
+    q: "PythonObject \u3092 Float64 \u306B\u5909\u63DB\u3057 Mojo \u5074\u3067\u5186\u306E\u9762\u7A4D\u3092\u8A08\u7B97\u3002\nNumPy \u304B\u3089 pi \u3092\u53D6\u5F97\u2192Float64 \u5909\u63DB\u2192\u6F14\u7B97\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011PythonObject\u3001Float64()\u5909\u63DB\u3001var\uFF08Ch2\uFF09",
+    code: `# Mojo\u30CD\u30A4\u30C6\u30A3\u30D6\u306E Float64 \u3067\u8A08\u7B97`,
+    answer: `from python import Python
+
+def main():
+    var np = Python.import_module("numpy")
+    var pi: Float64 = Float64(np.pi)
+    var radius: Float64 = 5.0
+    var area: Float64 = pi * radius * radius
+    print("\u5186\u5468\u7387:", pi)
+    print("\u9762\u7A4D:", area)`
+  }],
+  ch9: [{
+    diff: 1,
+    q: "SIMD[DType.float32, 4] \u30672\u3064\u306E\u30D9\u30AF\u30C8\u30EB\u3092\u4F5C\u308A\u52A0\u7B97\u30FB\u4E57\u7B97\u3092\u8868\u793A\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011SIMD \u578B\u306E\u5BA3\u8A00\u3001\u57FA\u672C\u6F14\u7B97",
+    code: `# a = [1.0, 2.0, 3.0, 4.0]
+# b = [10.0, 20.0, 30.0, 40.0]`,
+    answer: `def main():
+    var a = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)
+    var b = SIMD[DType.float32, 4](10.0, 20.0, 30.0, 40.0)
+    print("\u52A0\u7B97:", a + b)
+    print("\u4E57\u7B97:", a * b)`
+  }, {
+    diff: 2,
+    q: "float32 \u3068 int32 \u306E SIMD \u30D9\u30AF\u30C8\u30EB\u3092\u305D\u308C\u305E\u308C\u30B9\u30AB\u30E9\u30FC\u500D\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011SIMD\u3001DType.float32 / int32",
+    code: `# float: [1,2,3,4] * 3.0 \u2192 ?
+# int: [10,20,30,40] * 2 \u2192 ?`,
+    answer: `def main():
+    var f = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)
+    print("float * 3:", f * 3.0)
+    var n = SIMD[DType.int32, 4](10, 20, 30, 40)
+    print("int * 2:", n * 2)`
+  }, {
+    diff: 3,
+    q: "SIMD[DType.float64, 1] \u3068\u901A\u5E38\u306E Float64 \u304C\u540C\u3058\u578B\u3067\u3042\u308B\u3053\u3068\u3092\u78BA\u8A8D\u3057\u3001\n\u8981\u7D20\u65704\u306E\u30D9\u30AF\u30C8\u30EB\u3068\u3082\u6BD4\u8F03\u8868\u793A\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011Scalar = SIMD[.., 1] \u306E\u6B63\u4F53",
+    code: `# \u30B9\u30AB\u30E9\u30FC\u3068\u30D9\u30AF\u30C8\u30EB\u306E\u4E21\u65B9\u3092\u8A66\u3059`,
+    answer: `def main():
+    var scalar = SIMD[DType.float64, 1](3.14)
+    var normal: Float64 = 3.14
+    print("scalar:", scalar, "/ normal:", normal)
+    var vec = SIMD[DType.float64, 4](1.0, 2.0, 3.0, 4.0)
+    print("vector:", vec)
+    print("vector * 2:", vec * 2.0)`
+  }],
+  ch10: [{
+    diff: 2,
+    q: "Stats struct: List[Float64] \u3092\u53D7\u3051\u53D6\u308A mean() \u3092\u8FD4\u3059\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011struct(Ch5)\u3001fn(Ch3)\u3001for(Ch4)\u3001\u578B\u5909\u63DB(Ch2)\u3001owned+^(Ch7)",
+    code: `# Stats([4.0, 8.0, 15.0, 16.0]).mean() \u2192 10.75`,
+    answer: `struct Stats:
+    var data: List[Float64]
+    var size: Int
+    def __init__(out self, owned data: List[Float64]):
+        self.size = len(data); self.data = data^
+    fn mean(self) -> Float64:
+        var t: Float64 = 0.0
+        for i in range(self.size): t += self.data[i]
+        return t / Float64(self.size)
+
+def main():
+    var d = List[Float64](4.0, 8.0, 15.0, 16.0)
+    var s = Stats(d^)
+    print("\u5E73\u5747:", s.mean())`
+  }, {
+    diff: 3,
+    q: "Stats \u306B variance, std_dev, min_val, max_val \u3092\u8FFD\u52A0\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011\u4E0A\u8A18 + \u8907\u6570\u30E1\u30BD\u30C3\u30C9\u306E\u7D44\u307F\u5408\u308F\u305B",
+    code: `# s.mean(), s.std_dev(), s.min_val(), s.max_val()`,
+    answer: `struct Stats:
+    var data: List[Float64]
+    var size: Int
+    def __init__(out self, owned data: List[Float64]):
+        self.size = len(data); self.data = data^
+    fn mean(self) -> Float64:
+        var t: Float64 = 0.0
+        for i in range(self.size): t += self.data[i]
+        return t / Float64(self.size)
+    fn variance(self) -> Float64:
+        var avg = self.mean(); var t: Float64 = 0.0
+        for i in range(self.size):
+            var d = self.data[i] - avg; t += d * d
+        return t / Float64(self.size)
+    fn std_dev(self) -> Float64: return self.variance() ** 0.5
+    fn min_val(self) -> Float64:
+        var m = self.data[0]
+        for i in range(1, self.size):
+            if self.data[i] < m: m = self.data[i]
+        return m
+    fn max_val(self) -> Float64:
+        var m = self.data[0]
+        for i in range(1, self.size):
+            if self.data[i] > m: m = self.data[i]
+        return m
+
+def main():
+    var d = List[Float64](4.0,8.0,15.0,16.0,23.0,42.0)
+    var s = Stats(d^)
+    print("\u5E73\u5747:", s.mean(), "\u504F\u5DEE:", s.std_dev())
+    print("\u6700\u5C0F:", s.min_val(), "\u6700\u5927:", s.max_val())`
+  }, {
+    diff: 3,
+    q: "Matrix struct + Describable trait(Ch6) \u3067\u884C\u5217\u7A4D\u3092\u5B9F\u88C5\u3002\n\n\u3010\u4F7F\u3046\u77E5\u8B58\u3011struct(Ch5)\u3001trait(Ch6)\u3001for(Ch4)\u3001mut self\u3001List",
+    code: `# [[1,2],[3,4]] \u00D7 [[5,6],[7,8]] = [[19,22],[43,50]]`,
+    answer: `trait Describable:
+    fn describe(self) -> String: ...
+
+struct Matrix(Describable):
+    var rows: Int; var cols: Int; var data: List[Float64]
+    def __init__(out self, rows: Int, cols: Int):
+        self.rows = rows; self.cols = cols
+        self.data = List[Float64]()
+        for i in range(rows * cols): self.data.append(0.0)
+    fn get(self, r: Int, c: Int) -> Float64:
+        return self.data[r * self.cols + c]
+    fn set(mut self, r: Int, c: Int, v: Float64):
+        self.data[r * self.cols + c] = v
+    fn matmul(self, other: Matrix) -> Matrix:
+        var result = Matrix(self.rows, other.cols)
+        for i in range(self.rows):
+            for j in range(other.cols):
+                var s: Float64 = 0.0
+                for k in range(self.cols):
+                    s += self.get(i, k) * other.get(k, j)
+                result.set(i, j, s)
+        return result
+    fn describe(self) -> String:
+        return "Matrix(" + String(self.rows) + "x" + String(self.cols) + ")"
+
+fn print_info[T: Describable](item: T):
+    print(item.describe())
+
+def main():
+    var a = Matrix(2, 2)
+    a.set(0,0,1.0); a.set(0,1,2.0); a.set(1,0,3.0); a.set(1,1,4.0)
+    var b = Matrix(2, 2)
+    b.set(0,0,5.0); b.set(0,1,6.0); b.set(1,0,7.0); b.set(1,1,8.0)
+    var c = a.matmul(b)
+    print_info(c)
+    for i in range(2):
+        for j in range(2):
+            print(c.get(i, j))`
+  }]
+};
+
+/* ── Chapter data (lectures only — exercises are in EX) ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "はじめに — Mojoの全体像",
+  est: "20分",
+  sections: [{
+    title: "そもそも「コンパイル」って何？",
+    body: "Pythonは「インタプリタ」、Mojoは「コンパイル言語」です。",
+    table: T.compile,
+    afterTable: "Mojoは JIT と AOT の両方をサポートしています。"
+  }, {
+    title: "2つの実行モード",
+    body: "同じコードを2通りで実行できます。",
+    table: T.runMode,
+    code: `# JIT（開発用）
+mojo run hello.mojo
+
+# AOT（配布用）
+mojo build hello.mojo
+./hello`
+  }, {
+    title: "環境構築",
+    body: "pip でインストール可能（Linux/macOS、Windowsは WSL2）。",
+    code: `pip install mojo
+mojo --version
+mojo   # REPL起動`
+  }, {
+    title: "main() の必須ルール",
+    body: "Mojoではトップレベルにコードを書けません。必ず def main() の中に書きます。\n\nなぜ？ → コンパイラが実行開始点（エントリポイント）を知る必要があるためです。",
+    code: `# ❌ エラー
+# print("hello")
+
+# ✅ 正しい
+def main():
+    print("Hello, Mojo! 🔥")`
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "変数 — 宣言・型・スコープ",
+  est: "35分",
+  sections: [{
+    title: "静的型付け",
+    body: "Pythonは動的型付け（型が自由に変わる）。Mojoは静的型付け（一度決まると変更不可）。\n\nメリット: バグの早期発見、高速化、意図が明確。",
+    code: `# Mojo
+def main():
+    x = 10
+    # x = "hello"  # ❌ コンパイルエラー！`
+  }, {
+    title: "変数宣言の3つの方法",
+    table: T.varDecl,
+    code: `def main():
+    name = "Alice"           # ① 暗黙宣言
+    var score: Float64 = 95.5 # ② var 明示宣言
+    alias PI = 3.14159       # ③ alias 定数`
+  }, {
+    title: "スコープの違い",
+    body: "暗黙宣言 = 関数スコープ（if内外で同じ変数）\nvar = ブロックスコープ（if内のvarは外と別物）",
+    code: `def main():
+    x = 10
+    if True:
+        x = 20         # 同じ x
+    print(x)           # → 20
+
+    var a = 10
+    if True:
+        var a = 20     # 別の a
+    print(a)           # → 10（変わらない）`
+  }, {
+    title: "遅延初期化",
+    body: "「型だけ宣言して値は後から」が可能。初期化前に使うとコンパイルエラー（安全）。",
+    code: `def main():
+    var grade: String    # 型だけ宣言
+    var score = 85
+    if score >= 70:
+        grade = "合格"
+    else:
+        grade = "不合格"
+    print(grade)         # 必ず初期化済み`
+  }, {
+    title: "型の一覧と命名規則",
+    body: "型名は全て先頭大文字。言語組み込みの型はなく、全てstructで定義されています。",
+    table: T.types
+  }, {
+    title: "型変換ルール",
+    body: "暗黙変換（自動）と明示変換（手動）の2種類。",
+    table: T.conv,
+    code: `def main():
+    var temp: Float64 = 99     # Int→Float64 は暗黙OK
+    var n: Int = Int(3.14)     # Float64→Int は明示が必要
+    var s: String = String(42) # Int→String も明示`
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "関数 — def, fn, 引数規約",
+  est: "40分",
+  sections: [{
+    title: "def と fn",
+    table: T.defFn,
+    code: `def parse(s: String) -> Int:     # raises暗黙
+    return Int(s)
+
+fn add(a: Int, b: Int) -> Int:   # raisesなし
+    return a + b
+
+fn parse2(s: String) raises -> Int: # raises明示
+    return Int(s)`
+  }, {
+    title: "引数の型宣言",
+    body: "全引数に型が必須。戻り値がある場合は戻り値型も必須。",
+    code: `# 戻り値なし（-> None 省略可）
+def greet(name: String):
+    print("Hello,", name)
+
+# 戻り値あり（-> 型 必須）
+fn add(a: Int, b: Int) -> Int:
+    return a + b`
+  }, {
+    title: "引数規約 read / mut / var",
+    body: "Pythonにはない概念。関数が引数をどう扱うかの約束事。",
+    table: T.argConv,
+    code: `fn show(value: Int):          # read（省略）
+    print(value)
+
+fn double_it(mut value: Int): # mut
+    value *= 2
+
+def main():
+    var x = 5
+    show(x)       # → 5
+    double_it(x)
+    show(x)       # → 10`
+  }, {
+    title: "デフォルト引数・可変長引数",
+    code: `fn power(base: Int, exp: Int = 2) -> Int:
+    return base ** exp
+
+fn total(*values: Int) -> Int:
+    var s: Int = 0
+    for v in values:
+        s += v
+    return s
+
+def main():
+    print(power(3))            # → 9
+    print(power(exp=3, base=5))  # → 125
+    print(total(1, 2, 3, 4))    # → 10`
+  }, {
+    title: "オーバーロード",
+    body: "引数の型が異なれば同名の関数を複数定義可能。",
+    code: `fn describe(v: Int):     print("整数:", v)
+fn describe(v: Float64): print("小数:", v)
+fn describe(v: String):  print("文字列:", v)
+
+def main():
+    describe(42)       # → 整数: 42
+    describe(3.14)     # → 小数: 3.14
+    describe("hello")  # → 文字列: hello`
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "制御構文とPythonとの違い",
+  est: "25分",
+  sections: [{
+    title: "truthy/falsy が使えない",
+    body: "条件式は必ず Bool 型を返す必要があります。",
+    table: T.truthy,
+    code: `def main():
+    var name = "Alice"
+    if len(name) > 0:   # ✅
+        print("名前あり")`
+  }, {
+    title: "for / while ループ",
+    code: `def main():
+    for i in range(5):       print(i)
+    for i in range(0,10,2):  print(i)
+
+    var nums = List[Int](10, 20, 30)
+    for i in range(len(nums)):
+        print(nums[i])`
+  }, {
+    title: "未サポートのPython構文",
+    table: T.unsup,
+    code: `# リスト内包表記の代替
+def main():
+    var sq = List[Int]()
+    for x in range(10):
+        sq.append(x ** 2)`
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "struct — classに代わるもの",
+  est: "45分",
+  sections: [{
+    title: "class vs struct",
+    table: T.clsVsStr,
+    afterTable: "Python class: ポインタを何度も辿る（遅い）\nMojo struct: メモリ上に連続配置（直接アクセス・高速）"
+  }, {
+    title: "structの定義",
+    code: `struct Point:
+    var x: Float64
+    var y: Float64
+
+    def __init__(out self, x: Float64, y: Float64):
+        self.x = x
+        self.y = y
+
+@fieldwise_init  # コンストラクタ自動生成
+struct Color:
+    var r: UInt8
+    var g: UInt8
+    var b: UInt8`
+  }, {
+    title: "selfの規約",
+    body: "メソッドのselfにも規約があります。",
+    table: T.selfConv,
+    code: `struct BankAccount:
+    var balance: Float64
+    def __init__(out self, b: Float64):     # out self
+        self.balance = b
+    fn get(self) -> Float64:                # read self
+        return self.balance
+    fn deposit(mut self, amt: Float64):     # mut self
+        self.balance += amt`
+  }, {
+    title: "演算子オーバーロード",
+    body: "__add__, __eq__, __str__ 等でPythonと同様に演算子を定義。",
+    code: `struct Vec2:
+    var x: Float64; var y: Float64
+    def __init__(out self, x: Float64, y: Float64):
+        self.x = x; self.y = y
+    fn __add__(self, o: Vec2) -> Vec2:
+        return Vec2(self.x + o.x, self.y + o.y)
+    fn __str__(self) -> String:
+        return "(" + String(self.x) + "," + String(self.y) + ")"`
+  }, {
+    title: "コピーとムーブ",
+    body: "デフォルトはコピーもムーブも不可。\nコピー → __copyinit__ 実装\nムーブ → __moveinit__ 実装、^ 演算子で所有権移動",
+    code: `def main():
+    var a = MyData(42)
+    var b = a       # コピー（両方使える）
+    var c = a^      # ムーブ（a は使えなくなる）`
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "トレイト — 継承のない世界",
+  est: "25分",
+  sections: [{
+    title: "traitとは",
+    body: "継承の代わりに「型が持つべきメソッド仕様」を定義。",
+    table: T.traitAbc,
+    code: `trait Shape:
+    fn area(self) -> Float64: ...
+
+struct Circle(Shape):
+    var radius: Float64
+    def __init__(out self, r: Float64): self.radius = r
+    fn area(self) -> Float64:
+        return 3.14159 * self.radius * self.radius`
+  }, {
+    title: "ジェネリック関数",
+    code: `fn print_info[T: Describable](item: T):
+    print(item.describe())
+# T はDescribableを実装する任意の型`
+  }, {
+    title: "組み込みトレイト",
+    table: T.traits
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "所有権とメモリ管理",
+  est: "20min",
+  sections: [{
+    title: "所有権の3ルール",
+    body: "1. 値の所有者は1つだけ\n2. 所有者のスコープ終了で自動破棄\n3. 参照がある間は寿命延長"
+  }, {
+    title: "ムーブ演算子 ^",
+    code: `def main():
+    var a = String("data")
+    var b = a^      # 所有権移動
+    print(b)        # ✅
+    # print(a)      # ❌ エラー`
+  }, {
+    title: "デストラクタ __del__",
+    code: `struct Conn:
+    var host: String
+    def __init__(out self, h: String):
+        self.host = h; print("接続:", h)
+    fn __del__(owned self):
+        print("切断:", self.host)`
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "Python連携",
+  est: "15分",
+  sections: [{
+    title: "Pythonライブラリを使う",
+    code: `from python import Python
+def main():
+    var np = Python.import_module("numpy")
+    var arr = np.array([1, 2, 3])
+    print(arr.mean())`
+  }, {
+    title: "PythonObject型",
+    code: `from python import Python, PythonObject
+def main():
+    var np = Python.import_module("numpy")
+    var py_v: PythonObject = np.float64(3.14)
+    var mojo_v: Float64 = Float64(py_v)  # 明示変換`
+  }]
+}, {
+  id: "ch9",
+  num: 9,
+  title: "SIMD — 高速数値計算",
+  est: "20min",
+  sections: [{
+    title: "SIMDとは",
+    body: "1命令で複数データを同時処理するCPU機能。Int, Float64 も内部的には SIMD[DType,1]。",
+    code: `def main():
+    var a = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)
+    var b = SIMD[DType.float32, 4](5.0, 6.0, 7.0, 8.0)
+    print(a + b)    # [6.0, 8.0, 10.0, 12.0]
+    print(a * b)    # [5.0, 12.0, 21.0, 32.0]`
+  }, {
+    title: "DType一覧",
+    table: T.dtypes
+  }]
+}, {
+  id: "ch10",
+  num: 10,
+  title: "総合演習 — Python→Mojo移植",
+  est: "35分",
+  sections: [{
+    title: "演習の進め方",
+    body: "ここまでの全知識を使って、PythonコードをMojoに移植します。\n段階的に難しくなる3問を用意しました。\nまず自分で書いてから解答を確認してください。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, data.h.map((h, i) => /*#__PURE__*/React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, data.r.map((row, ri) => /*#__PURE__*/React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => /*#__PURE__*/React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return /*#__PURE__*/React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, /*#__PURE__*/React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "⭐ 基本" : d === 2 ? "⭐⭐ 応用" : "⭐⭐⭐ 発展";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, /*#__PURE__*/React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "🙈 解答を隠す" : "👀 解答例を見る"), showAnswer && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), /*#__PURE__*/React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && /*#__PURE__*/React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && /*#__PURE__*/React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function MojoCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: 760,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\uD83D\uDD25"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "Mojo \u30CF\u30F3\u30BA\u30AA\u30F3\u5B8C\u5168\u30B3\u30FC\u30B9"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "▲" : "▼")), menuOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => /*#__PURE__*/React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : ""))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => /*#__PURE__*/React.createElement(Section, {
+    key: i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Exercise, {
+    key: i,
+    ex: ex,
+    idx: i
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "docs.modular.com/mojo/manual/ \u30FB 2026\u5E744\u6708\u6642\u70B9")));
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(MojoCourse));
+  </script>
+</body>
+</html>
