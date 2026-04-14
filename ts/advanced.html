@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeScript 上級コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのTypeScript上級コース。コンパイラAPI・型レベルプログラミング・ライブラリ設計・モノレポなど全8章。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+/* ── Table definitions ── */
+const T = {
+  compilerApiOverview: {
+    h: ["API", "役割", "対応Python概念"],
+    r: [
+      ["ts.createProgram()", "コンパイルプログラムを生成", "ast.parse() のエントリ"],
+      ["program.getTypeChecker()", "型チェッカーを取得", "mypy の型推論エンジン"],
+      ["sourceFile.forEachChild()", "ASTノードを巡回", "ast.walk()"],
+      ["checker.getTypeAtLocation()", "ノードの型情報を取得", "型推論結果の取得"],
+      ["ts.isCallExpression()", "ノード種別を判定", "isinstance(node, ast.Call)"],
+      ["ts.factory.createXxx()", "ASTノードを生成", "ast.Xxx() コンストラクタ"]
+    ]
+  },
+  recursiveTypes: {
+    h: ["パターン", "用途", "例"],
+    r: [
+      ["Recursive Conditional", "JSONや木構造の型表現", "type JSON = string | number | JSON[]"],
+      ["Variadic Tuple", "可変長タプルの型安全", "type Concat<A,B> = [...A,...B]"],
+      ["infer in Conditional", "型の一部を抽出", "type Ret<T> = T extends ()=>infer R ? R : never"],
+      ["Template Literal", "文字列パターンの型", "type Route = `/${string}`"],
+      ["Mapped + Conditional", "型変換の合成", "{ [K in keyof T]: T[K] extends X ? Y : Z }"]
+    ]
+  },
+  templateLiteralDSL: {
+    h: ["構文", "マッチする文字列", "用途"],
+    r: [
+      ["`${string}`", "任意の文字列", "汎用パターン"],
+      ["`/${string}`", "/foo, /bar など", "ルートパス型"],
+      ["`on${Capitalize<string>}`", "onClick, onChange など", "イベントハンドラ名"],
+      ["`${string}:${string}`", "name:value 形式", "ヘッダー・属性DSL"],
+      ["`SELECT ${string} FROM ${string}`", "SQL-like クエリ", "型安全SQL DSL"]
+    ]
+  },
+  dtPackageDesign: {
+    h: ["項目", "DefinitelyTyped (@types)", "バンドル型定義"],
+    r: [
+      ["管理場所", "DefinitelyTyped/DefinitelyTyped", "パッケージ本体の dist/"],
+      ["メンテナ", "コミュニティ", "ライブラリ作者"],
+      ["型バージョン", "独立してバージョン管理", "パッケージバージョンと同期"],
+      ["適用場面", "型定義が付属しないJSライブラリ", "TypeScript製ライブラリ"],
+      ["利用方法", "npm i -D @types/xxx", "追加インストール不要"]
+    ]
+  },
+  fpTypes: {
+    h: ["型/概念", "意味", "Python対応"],
+    r: [
+      ["Option<A>", "値があるかNoneか", "Optional[A]"],
+      ["Either<E,A>", "失敗(Left)か成功(Right)か", "Result型 / Union"],
+      ["Task<A>", "非同期の遅延計算", "asyncio.coroutine"],
+      ["Effect<R,E,A>", "依存R・エラーE・値Aを持つ計算", "対応なし（Haskell IO相当）"],
+      ["pipe(a, f, g)", "左から右へ関数合成", "functools.reduce"]
+    ]
+  },
+  monorepoTools: {
+    h: ["ツール", "特徴", "得意領域"],
+    r: [
+      ["Turborepo", "ビルドキャッシュ・タスクグラフ最適化", "Next.js系モノレポ"],
+      ["Nx", "プラグインエコシステム・コードジェネレータ", "大規模企業モノレポ"],
+      ["pnpm workspaces", "ディスク効率よいパッケージ管理", "あらゆるモノレポの基盤"],
+      ["Lerna", "パッケージのバージョン管理・公開", "複数パッケージ公開"],
+      ["Changesets", "変更ログ管理・セマンティックバージョン", "OSS公開フロー"]
+    ]
+  },
+  zodAdvanced: {
+    h: ["機能", "API", "説明"],
+    r: [
+      ["変換", ".transform(fn)", "バリデーション後に値を変換"],
+      ["前処理", ".preprocess(fn, schema)", "パース前にデータを整形"],
+      ["refinement", ".refine(fn, msg)", "カスタム検証ロジックを追加"],
+      ["superRefine", ".superRefine(fn)", "複数エラーを同時に返す"],
+      ["スキーマ合成", "z.union / z.intersection", "複数スキーマを組み合わせる"],
+      ["ブランド型", ".brand<'MyBrand'>()", "名前付き型を作る"]
+    ]
+  },
+  nextGenTools: {
+    h: ["ツール", "言語", "tscとの比較"],
+    r: [
+      ["SWC", "Rust", "型チェックなし・20x高速トランスパイル"],
+      ["oxc", "Rust", "Linter/Formatter統合・超高速"],
+      ["esbuild", "Go", "バンドル最特化・型チェックなし"],
+      ["Bun", "Zig/Rust", "ランタイム+バンドラ統合"],
+      ["tsc --incremental", "TS", "差分ビルドで型チェック高速化"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 2,
+    q: "TypeScript Compiler API を使って、指定ファイル内の全 console.log 呼び出しの行番号を出力するスクリプトを書いてください。\nts.createProgram でプログラムを作成し、ASTを再帰的に巡回すること。",
+    code: `// find-console-log.ts
+import ts from 'typescript';
+
+function findConsoleLogs(filePath: string): void {
+  // ここを実装
+}
+
+findConsoleLogs('./src/index.ts');`,
+    answer: `import ts from 'typescript';
+
+function findConsoleLogs(filePath: string): void {
+  const program = ts.createProgram([filePath], {});
+  const sourceFile = program.getSourceFile(filePath);
+  if (!sourceFile) return;
+
+  function visit(node: ts.Node): void {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression) &&
+      node.expression.expression.text === 'console' &&
+      node.expression.name.text === 'log'
+    ) {
+      const { line } = sourceFile!.getLineAndCharacterOfPosition(
+        node.getStart()
+      );
+      console.log(\`console.log found at line \${line + 1}\`);
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+}
+
+findConsoleLogs('./src/index.ts');`
+  }, {
+    diff: 3,
+    q: "カスタムトランスフォーマーを作成してください。\n全ての console.log 呼び出しを、ファイル名と行番号を先頭に付けた形に変換する transformer を実装すること。\n例: console.log('hi') → console.log('[index.ts:5]', 'hi')",
+    code: `import ts from 'typescript';
+
+function createLogTransformer(
+  program: ts.Program
+): ts.TransformerFactory<ts.SourceFile> {
+  // ここを実装
+  return context => sourceFile => sourceFile;
+}`,
+    answer: `import ts from 'typescript';
+import path from 'path';
+
+function createLogTransformer(
+  program: ts.Program
+): ts.TransformerFactory<ts.SourceFile> {
+  return (context) => (sourceFile) => {
+    function visit(node: ts.Node): ts.Node {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.expression) &&
+        node.expression.expression.text === 'console' &&
+        node.expression.name.text === 'log'
+      ) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(
+          node.getStart()
+        );
+        const fileName = path.basename(sourceFile.fileName);
+        const prefix = ts.factory.createStringLiteral(
+          \`[\${fileName}:\${line + 1}]\`
+        );
+        return ts.factory.updateCallExpression(
+          node,
+          node.expression,
+          node.typeArguments,
+          [prefix, ...node.arguments]
+        );
+      }
+      return ts.visitEachChild(node, visit, context);
+    }
+    return ts.visitNode(sourceFile, visit) as ts.SourceFile;
+  };
+}
+
+// 使用例
+const program = ts.createProgram(['./src/index.ts'], { strict: true });
+const result = ts.transpileModule(
+  'console.log("hello")',
+  { transformers: { before: [createLogTransformer(program)] } }
+);
+console.log(result.outputText);`
+  }],
+  ch2: [{
+    diff: 2,
+    q: "再帰的条件型を使って、ネストされたオブジェクトの全プロパティを Readonly にする DeepReadonly<T> 型を定義してください。\nプリミティブ型・配列・オブジェクトを正しく処理すること。",
+    code: `// DeepReadonly<T> を定義
+type DeepReadonly<T> = // ここを実装
+
+// テスト
+type Config = DeepReadonly<{
+  server: { host: string; port: number };
+  features: string[];
+}>;
+// config.server.host = 'x' → エラーになること`,
+    answer: `type DeepReadonly<T> =
+  T extends (infer U)[]
+    ? ReadonlyArray<DeepReadonly<U>>
+    : T extends object
+    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+    : T;
+
+// テスト
+type Config = DeepReadonly<{
+  server: { host: string; port: number };
+  features: string[];
+}>;
+
+declare const cfg: Config;
+// cfg.server.host = 'x';   // ← Error: readonly
+// cfg.features.push('x');  // ← Error: ReadonlyArray
+
+// 別の再帰型: パス文字列の型
+type Paths<T, Prefix extends string = ''> =
+  T extends object
+    ? { [K in keyof T & string]:
+        | \`\${Prefix}\${K}\`
+        | Paths<T[K], \`\${Prefix}\${K}.\`>
+      }[keyof T & string]
+    : never;
+
+type P = Paths<{ a: { b: string; c: number }; d: boolean }>;
+// 'a' | 'a.b' | 'a.c' | 'd'`
+  }, {
+    diff: 3,
+    q: "Variadic Tuple Types を使って、複数の Promise を受け取り、全結果をタプルで返す型安全な promiseAll<T> 関数を実装してください。\nPromise.all と同じ動作ですが、戻り値の型が正確にタプルになること。",
+    code: `// 型安全な promiseAll を実装
+type Awaited<T> = T extends Promise<infer U> ? U : T;
+type AwaitedTuple<T extends readonly unknown[]> = // ここを実装
+
+async function promiseAll<T extends readonly Promise<unknown>[]>(
+  promises: [...T]
+): Promise<AwaitedTuple<T>> {
+  // ここを実装
+}`,
+    answer: `type AwaitedAll<T extends readonly unknown[]> = {
+  [K in keyof T]: T[K] extends Promise<infer U> ? U : T[K]
+};
+
+async function promiseAll<T extends readonly Promise<unknown>[]>(
+  promises: [...T]
+): Promise<AwaitedAll<T>> {
+  return Promise.all(promises) as Promise<AwaitedAll<T>>;
+}
+
+// 使用例
+async function main() {
+  const [n, s, b] = await promiseAll([
+    Promise.resolve(42),
+    Promise.resolve('hello'),
+    Promise.resolve(true),
+  ] as const);
+  // n: number, s: string, b: boolean — 正確に推論される
+  console.log(n, s, b);
+}
+
+// Concat でタプルを結合
+type Concat<A extends unknown[], B extends unknown[]> = [...A, ...B];
+type R = Concat<[1, 2], [3, 4]>; // [1, 2, 3, 4]`
+  }],
+  ch3: [{
+    diff: 2,
+    q: "Template Literal Types を使って、CSS プロパティのような DSL 型を定義してください。\n`margin-top`, `padding-left` のような `${Side}-${Direction}` パターンを型として表現し、不正な値をコンパイルエラーにしてください。",
+    code: `type Side = 'margin' | 'padding' | 'border';
+type Direction = 'top' | 'right' | 'bottom' | 'left';
+
+// SpacingProp 型を定義
+type SpacingProp = // ここを実装
+
+function setStyle(prop: SpacingProp, value: string): void {
+  // ...
+}
+
+setStyle('margin-top', '10px');    // OK
+setStyle('padding-left', '5px');   // OK
+// setStyle('color', '10px');      // Error`,
+    answer: `type Side = 'margin' | 'padding' | 'border';
+type Direction = 'top' | 'right' | 'bottom' | 'left';
+
+type SpacingProp = \`\${Side}-\${Direction}\`;
+// 'margin-top' | 'margin-right' | ... | 'border-left' (12パターン)
+
+function setStyle(prop: SpacingProp, value: string): void {
+  document.documentElement.style.setProperty(\`--\${prop}\`, value);
+}
+
+// 型安全なイベントマップ DSL
+type EventMap = {
+  [K in string as \`on\${Capitalize<K>}\`]: (e: Event) => void
+};
+
+// SQL DSL 型の例
+type TableName = 'users' | 'posts' | 'comments';
+type SelectQuery = \`SELECT * FROM \${TableName}\`;
+
+function query(sql: SelectQuery): void {
+  console.log('Executing:', sql);
+}
+
+query('SELECT * FROM users');   // OK
+// query('SELECT * FROM hacks'); // Error`
+  }, {
+    diff: 3,
+    q: "型安全なルーターを設計してください。\nパスパラメータ `:id` を自動的に型として抽出し、handler に params が型付きで渡されるようにしてください。\n例: route('/users/:id/posts/:postId', handler) の handler は { id: string; postId: string } を受け取る。",
+    code: `// パスパラメータを型で抽出
+type ExtractParams<Path extends string> = // ここを実装
+
+function route<P extends string>(
+  path: P,
+  handler: (params: ExtractParams<P>) => void
+): void {
+  // 実際のルーティングロジック（省略）
+}
+
+// 使用例
+route('/users/:id/posts/:postId', (params) => {
+  // params.id, params.postId が string 型で参照できること
+});`,
+    answer: `type ExtractParams<Path extends string> =
+  Path extends \`\${infer _Before}:\${infer Param}/\${infer Rest}\`
+    ? { [K in Param | keyof ExtractParams<\`/\${Rest}\`>]: string }
+    : Path extends \`\${infer _Before}:\${infer Param}\`
+    ? { [K in Param]: string }
+    : Record<never, never>;
+
+function route<P extends string>(
+  path: P,
+  handler: (params: ExtractParams<P>) => void
+): void {
+  // 実際のルーティングではパスパターンをパースして params を構築
+  const segments = path.split('/');
+  const params: Record<string, string> = {};
+  segments.forEach(seg => {
+    if (seg.startsWith(':')) params[seg.slice(1)] = 'demo';
+  });
+  handler(params as ExtractParams<P>);
+}
+
+// 使用例
+route('/users/:id/posts/:postId', (params) => {
+  console.log(params.id, params.postId); // 型安全
+});`
+  }],
+  ch4: [{
+    diff: 2,
+    q: "ライブラリの型定義ファイル (.d.ts) を手動で書いてください。\n以下の JavaScript ライブラリ `simple-cache` の型定義を作成してください:\n- `createCache(options?)` 関数: ttl?: number を受け取り Cache オブジェクトを返す\n- Cache: `get<T>(key: string): T | undefined`, `set(key: string, value: unknown): void`, `clear(): void`",
+    code: `// @types/simple-cache/index.d.ts を作成してください
+// declare module 'simple-cache' { ... }`,
+    answer: `// @types/simple-cache/index.d.ts
+declare module 'simple-cache' {
+  interface CacheOptions {
+    ttl?: number;        // milliseconds
+    maxSize?: number;
+  }
+
+  interface Cache {
+    get<T>(key: string): T | undefined;
+    set(key: string, value: unknown, ttl?: number): void;
+    has(key: string): boolean;
+    delete(key: string): boolean;
+    clear(): void;
+    readonly size: number;
+  }
+
+  function createCache(options?: CacheOptions): Cache;
+
+  export { createCache, Cache, CacheOptions };
+  export default createCache;
+}
+
+// tsconfig.json での設定
+// {
+//   "compilerOptions": {
+//     "typeRoots": ["./node_modules/@types", "./@types"]
+//   }
+// }
+
+// 使用例
+import createCache from 'simple-cache';
+const cache = createCache({ ttl: 60000 });
+cache.set('key', { value: 42 });
+const v = cache.get<{ value: number }>('key'); // v: { value: number } | undefined`
+  }, {
+    diff: 3,
+    q: "ESM/CJS dual package を tsup で設定し、package.json の exports フィールドを完全に設定してください。\nさらに、サブパス exports (`import { util } from 'mylib/utils'`) も対応すること。",
+    code: `// tsup.config.ts と package.json を書いてください
+// エントリ: src/index.ts, src/utils.ts`,
+    answer: `// tsup.config.ts
+import { defineConfig } from 'tsup';
+
+export default defineConfig([
+  {
+    entry: { index: 'src/index.ts', utils: 'src/utils.ts' },
+    format: ['cjs', 'esm'],
+    dts: true,
+    clean: true,
+    splitting: false,
+    sourcemap: true,
+  }
+]);
+
+// package.json
+{
+  "name": "mylib",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+    },
+    "./utils": {
+      "import": { "types": "./dist/utils.d.ts", "default": "./dist/utils.js" },
+      "require": { "types": "./dist/utils.d.cts", "default": "./dist/utils.cjs" }
+    }
+  },
+  "files": ["dist"]
+}`
+  }],
+  ch5: [{
+    diff: 2,
+    q: "fp-ts の pipe と Option を使って、ユーザーIDからユーザー名を取得し、大文字に変換する処理をモナディックスタイルで書いてください。\nユーザーが存在しない場合は None を返すこと。",
+    code: `import { pipe } from 'fp-ts/function';
+import * as O from 'fp-ts/Option';
+
+const users: Record<string, { name: string }> = {
+  '1': { name: 'alice' },
+  '2': { name: 'bob' },
+};
+
+function getUserName(id: string): O.Option<string> {
+  // pipe と O.fromNullable, O.map を使って実装
+}`,
+    answer: `import { pipe } from 'fp-ts/function';
+import * as O from 'fp-ts/Option';
+
+const users: Record<string, { name: string }> = {
+  '1': { name: 'alice' },
+  '2': { name: 'bob' },
+};
+
+function getUserName(id: string): O.Option<string> {
+  return pipe(
+    O.fromNullable(users[id]),           // Record にあれば Some、なければ None
+    O.map(user => user.name),            // Some の中の値を変換
+    O.map(name => name.toUpperCase())    // さらに変換
+  );
+}
+
+// 使用例
+const result1 = getUserName('1');
+// O.some('ALICE')
+
+const result2 = getUserName('99');
+// O.none
+
+// Either でエラー情報を保持
+import * as E from 'fp-ts/Either';
+
+function getUserEither(id: string): E.Either<string, string> {
+  return pipe(
+    O.fromNullable(users[id]),
+    O.map(u => u.name.toUpperCase()),
+    O.match(
+      () => E.left(\`User \${id} not found\`),
+      (name) => E.right(name)
+    )
+  );
+}
+
+console.log(getUserEither('1'));  // Right('ALICE')
+console.log(getUserEither('x'));  // Left('User x not found')`
+  }, {
+    diff: 3,
+    q: "TaskEither を使って、非同期でユーザーをAPIから取得し、データを変換してDBに保存するパイプラインを書いてください。\nエラーは文字列の Left として返し、全体を pipe で合成すること。",
+    code: `import { pipe } from 'fp-ts/function';
+import * as TE from 'fp-ts/TaskEither';
+
+interface User { id: string; name: string; email: string; }
+interface UserRecord { userId: string; displayName: string; }
+
+// fetchUser, transformUser, saveUser を TE で定義し、pipe で合成`,
+    answer: `import { pipe } from 'fp-ts/function';
+import * as TE from 'fp-ts/TaskEither';
+
+interface User { id: string; name: string; email: string; }
+interface UserRecord { userId: string; displayName: string; }
+
+const fetchUser = (id: string): TE.TaskEither<string, User> =>
+  TE.tryCatch(
+    async () => {
+      const res = await fetch(\`https://api.example.com/users/\${id}\`);
+      if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+      return res.json() as Promise<User>;
+    },
+    (e) => \`Fetch failed: \${e instanceof Error ? e.message : String(e)}\`
+  );
+
+const transformUser = (user: User): TE.TaskEither<string, UserRecord> =>
+  TE.right({
+    userId: user.id,
+    displayName: user.name.trim(),
+  });
+
+const saveUser = (record: UserRecord): TE.TaskEither<string, void> =>
+  TE.tryCatch(
+    async () => {
+      // DB保存処理
+      console.log('Saved:', record);
+    },
+    (e) => \`Save failed: \${e instanceof Error ? e.message : String(e)}\`
+  );
+
+// パイプライン合成
+const processUser = (id: string): TE.TaskEither<string, void> =>
+  pipe(
+    fetchUser(id),
+    TE.chain(transformUser),
+    TE.chain(saveUser)
+  );
+
+// 実行
+processUser('123')().then(result => {
+  if (result._tag === 'Left') console.error('Error:', result.left);
+  else console.log('Done');
+});`
+  }],
+  ch6: [{
+    diff: 2,
+    q: "pnpm workspaces を使ったモノレポを設計してください。\n`packages/ui`, `packages/utils`, `apps/web` の3パッケージ構成で、ui と utils が web から参照できるように設定してください。",
+    code: `# pnpm-workspace.yaml と各 package.json を書いてください`,
+    answer: `# pnpm-workspace.yaml
+packages:
+  - 'packages/*'
+  - 'apps/*'
+
+# packages/utils/package.json
+{
+  "name": "@myorg/utils",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": { "typecheck": "tsc --noEmit" }
+}
+
+# packages/ui/package.json
+{
+  "name": "@myorg/ui",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": { "@myorg/utils": "workspace:*" }
+}
+
+# apps/web/package.json
+{
+  "name": "web",
+  "dependencies": {
+    "@myorg/ui": "workspace:*",
+    "@myorg/utils": "workspace:*"
+  }
+}
+
+# apps/web/tsconfig.json
+{
+  "compilerOptions": {
+    "paths": {
+      "@myorg/ui": ["../../packages/ui/src/index.ts"],
+      "@myorg/utils": ["../../packages/utils/src/index.ts"]
+    }
+  }
+}
+
+# インストール・実行
+# pnpm install
+# pnpm --filter web dev`
+  }, {
+    diff: 3,
+    q: "Turborepo の turbo.json を設定してください。\nbuild タスクは utils → ui → web の順に実行され、test は並列実行、lint はキャッシュを無効にして常に再実行されるようにしてください。",
+    code: `// turbo.json を設計`,
+    answer: `// turbo.json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["tsconfig.json"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tsconfig.json"],
+      "outputs": ["dist/**"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tests/**"],
+      "outputs": ["coverage/**"]
+    },
+    "lint": {
+      "dependsOn": [],
+      "cache": false
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tsconfig.json"]
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "persistent": true,
+      "cache": false
+    }
+  }
+}
+
+// 実行例
+// pnpm turbo build           ← 依存順にビルド（キャッシュあり）
+// pnpm turbo test --parallel ← 並列テスト
+// pnpm turbo lint            ← キャッシュなし lint
+// pnpm turbo build --filter=web... ← web と依存パッケージだけビルド`
+  }],
+  ch7: [{
+    diff: 2,
+    q: "Zod のカスタムバリデーターを作って、日本の郵便番号（〒000-0000形式）と電話番号（ハイフン区切り）を検証するスキーマを定義してください。\nエラーメッセージも日本語で設定すること。",
+    code: `import { z } from 'zod';
+
+const ContactSchema = z.object({
+  zipCode: z.string(),    // 〒000-0000 形式
+  phone: z.string(),      // 000-0000-0000 形式
+  email: z.string().email(),
+});`,
+    answer: `import { z } from 'zod';
+
+const zipCodeSchema = z.string()
+  .regex(/^\d{3}-\d{4}$/, '郵便番号は 000-0000 形式で入力してください');
+
+const phoneSchema = z.string()
+  .regex(
+    /^(0\d{1,4})-(\d{1,4})-(\d{4})$/,
+    '電話番号は 00-0000-0000 形式で入力してください'
+  );
+
+const ContactSchema = z.object({
+  zipCode: zipCodeSchema,
+  phone: phoneSchema,
+  email: z.string().email('有効なメールアドレスを入力してください'),
+  // ブランド型でIDを区別
+  userId: z.string().uuid().brand<'UserId'>(),
+});
+
+type Contact = z.infer<typeof ContactSchema>;
+type UserId = z.infer<typeof ContactSchema.shape.userId>;
+
+// superRefine で相関バリデーション
+const PasswordSchema = z.object({
+  password: z.string().min(8),
+  confirm: z.string(),
+}).superRefine(({ password, confirm }, ctx) => {
+  if (password !== confirm) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'パスワードが一致しません',
+      path: ['confirm'],
+    });
+  }
+});`
+  }, {
+    diff: 3,
+    q: "zod-to-openapi (または @asteasolutions/zod-to-openapi) を使って、User スキーマから OpenAPI 3.0 の定義を自動生成するコードを書いてください。\nGET /users/:id のエンドポイント定義も含めること。",
+    code: `import { z } from 'zod';
+// zod-to-openapi を使って OpenAPI 定義を生成`,
+    answer: `import { z } from 'zod';
+import {
+  OpenAPIRegistry,
+  OpenApiGeneratorV3,
+  extendZodWithOpenApi,
+} from '@asteasolutions/zod-to-openapi';
+
+extendZodWithOpenApi(z);
+
+const registry = new OpenAPIRegistry();
+
+// スキーマ定義（OpenAPI メタデータ付き）
+const UserSchema = registry.register(
+  'User',
+  z.object({
+    id: z.string().uuid().openapi({ description: 'ユーザーID', example: 'abc-123' }),
+    name: z.string().min(1).openapi({ description: '表示名', example: '田中 太郎' }),
+    email: z.string().email().openapi({ example: 'taro@example.com' }),
+    role: z.enum(['admin', 'user']).openapi({ default: 'user' }),
+    createdAt: z.string().datetime().openapi({ description: '作成日時' }),
+  })
+);
+
+// エンドポイント定義
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}',
+  summary: 'ユーザーを取得',
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+  },
+  responses: {
+    200: { description: '取得成功', content: { 'application/json': { schema: UserSchema } } },
+    404: { description: 'ユーザーが見つからない' },
+  },
+});
+
+// OpenAPI ドキュメントを生成
+const generator = new OpenApiGeneratorV3(registry.definitions);
+const doc = generator.generateDocument({
+  openapi: '3.0.0',
+  info: { title: 'My API', version: '1.0.0' },
+});
+
+console.log(JSON.stringify(doc, null, 2));`
+  }],
+  ch8: [{
+    diff: 2,
+    q: "tsc の型チェックが遅い場合のパフォーマンス改善手順を実施してください。\n--diagnostics フラグで計測し、Project References を設定して差分ビルドを有効にしてください。\n3パッケージ構成（utils, lib, app）を想定して tsconfig を設計すること。",
+    code: `# 計測コマンドと各 tsconfig.json の設計を示してください`,
+    answer: `# 1. 現状計測
+npx tsc --noEmit --diagnostics 2>&1 | grep -E "Check time|Files"
+
+# 2. Project References の設定
+
+# packages/utils/tsconfig.json
+{
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "outDir": "./dist"
+  },
+  "include": ["src"]
+}
+
+# packages/lib/tsconfig.json
+{
+  "compilerOptions": { "composite": true, "outDir": "./dist" },
+  "references": [{ "path": "../utils" }],
+  "include": ["src"]
+}
+
+# apps/app/tsconfig.json
+{
+  "compilerOptions": { "incremental": true, "outDir": "./dist" },
+  "references": [
+    { "path": "../../packages/utils" },
+    { "path": "../../packages/lib" }
+  ],
+  "include": ["src"]
+}
+
+# ルート tsconfig.json
+{
+  "references": [
+    { "path": "packages/utils" },
+    { "path": "packages/lib" },
+    { "path": "apps/app" }
+  ],
+  "files": []
+}
+
+# 3. ビルド（差分のみ再チェック）
+npx tsc --build --incremental
+# 2回目以降は大幅に高速化される`
+  }, {
+    diff: 3,
+    q: "SWC を使って TypeScript をトランスパイルするカスタムビルドスクリプトを書いてください。\n型チェックは tsc --noEmit で別途実行し、ビルドは @swc/core を使うことで両工程を並列化してください。",
+    code: `// build.ts — tsc 型チェック + SWC トランスパイルを並列実行`,
+    answer: `// build.ts
+import { transform } from '@swc/core';
+import { execFile } from 'child_process';
+import { readdir, readFile, writeFile, mkdir } from 'fs/promises';
+import { promisify } from 'util';
+import path from 'path';
+
+const exec = promisify(execFile);
+
+async function typecheck(): Promise<void> {
+  console.log('[typecheck] 開始...');
+  try {
+    await exec('npx', ['tsc', '--noEmit']);
+    console.log('[typecheck] OK');
+  } catch (e: any) {
+    console.error('[typecheck] エラー:');
+    console.error(e.stdout);
+    process.exit(1);
+  }
+}
+
+async function transpileFile(src: string, out: string): Promise<void> {
+  const code = await readFile(src, 'utf-8');
+  const result = await transform(code, {
+    filename: src,
+    sourceMaps: true,
+    jsc: {
+      parser: { syntax: 'typescript', decorators: true },
+      target: 'es2022',
+    },
+    module: { type: 'es6' },
+  });
+  await mkdir(path.dirname(out), { recursive: true });
+  await writeFile(out, result.code, 'utf-8');
+}
+
+async function build(): Promise<void> {
+  console.log('[build] SWCトランスパイル開始...');
+  const files = await readdir('./src', { recursive: true });
+  const tsFiles = files.filter((f): f is string =>
+    typeof f === 'string' && f.endsWith('.ts')
+  );
+  await Promise.all(
+    tsFiles.map(f =>
+      transpileFile(\`./src/\${f}\`, \`./dist/\${f.replace(/\\.ts$/, '.js')}\`)
+    )
+  );
+  console.log(\`[build] \${tsFiles.length}ファイル完了\`);
+}
+
+// 型チェックとビルドを並列実行
+await Promise.all([typecheck(), build()]);
+console.log('完了');`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "TypeScriptコンパイラAPI",
+  est: "65分",
+  goal: "TypeScript Compiler API を使って、ソースコードを AST として解析し、カスタムトランスフォーマーで変換できるようになる。型チェッカー API で型情報を取得する方法を理解し、Babel プラグインや Python の ast モジュールと同等のコード変換ツールを自作できる状態を目指す。",
+  sections: [{
+    title: "Compiler API の全体像",
+    body: "TypeScript はコンパイラ自体をライブラリとして公開しており、`typescript` パッケージをインポートするだけで AST 解析・型チェック・コード変換の全機能を利用できます。Python の `ast` モジュールや `astroid` に相当しますが、TS の場合はコンパイラ本体と型チェッカーが統合されているため、ASTノードに型情報を紐付けて取得できる点が強力です。\n\n主要な API の流れは「ts.createProgram() でプログラムを生成 → program.getTypeChecker() で型チェッカーを取得 → sourceFile を取得 → ts.forEachChild() でノードを巡回」です。Python の ast.walk() と構造は同じですが、TS では各ノードに is 系のナローイング関数（ts.isCallExpression() など）が用意されており、型安全にノードを絞り込めます。",
+    table: T.compilerApiOverview,
+    afterTable: "Compiler API はバージョン間での変更が多いため、利用するときは typescript パッケージのバージョンを固定し、型定義（typescript/lib/typescript.d.ts）を参照しながら開発することを推奨します。"
+  }, {
+    title: "ASTトラバーサルと型情報の取得",
+    body: "AST トラバーサルの基本は `ts.forEachChild(node, callback)` か `ts.visitEachChild(node, visitor, context)` を再帰的に呼ぶことです。前者はシンプルな探索向き、後者はトランスフォーマー（ノード変換）向きです。Python の `ast.NodeVisitor` パターンと同様ですが、TS では各ノード型に対応する is 関数で型を絞り込んでから安全にプロパティを参照します。\n\n型情報を取得するには `program.getTypeChecker()` で得た TypeChecker を使います。`checker.getTypeAtLocation(node)` はノードの型を返し、`checker.typeToString(type)` で人間が読める文字列に変換できます。これにより「この変数の型が string かどうか」といったチェックや、「この関数の戻り値型」を実行時に取得して、それに基づいたコード変換が可能になります。",
+    code: `import ts from 'typescript';
+
+const fileName = './src/index.ts';
+const program = ts.createProgram([fileName], {
+  target: ts.ScriptTarget.ES2022,
+  strict: true,
+});
+const checker = program.getTypeChecker();
+const sourceFile = program.getSourceFile(fileName)!;
+
+// 全ての識別子の型を出力
+function printIdentifierTypes(node: ts.Node): void {
+  if (ts.isIdentifier(node)) {
+    const symbol = checker.getSymbolAtLocation(node);
+    if (symbol) {
+      const type = checker.getTypeOfSymbolAtLocation(
+        symbol, node
+      );
+      console.log(node.text, ':', checker.typeToString(type));
+    }
+  }
+  ts.forEachChild(node, printIdentifierTypes);
+}
+
+printIdentifierTypes(sourceFile);`,
+    afterCode: "ポイント: checker.getSymbolAtLocation() は宣言元のシンボルを返します。シンボルから型を取得することで、参照側ではなく宣言元の型情報が得られます。型推論結果ではなく宣言型が必要な場合はこちらを使います。"
+  }, {
+    title: "カスタムトランスフォーマー",
+    body: "トランスフォーマーは「ASTノードを受け取り、変換後のノードを返す関数」です。TypeScript では `ts.TransformerFactory<ts.SourceFile>` 型で表現され、`ts.transpileModule()` や `ts.transform()` に渡すことでコード変換を行えます。Babel のプラグインや Python の ast.NodeTransformer と同じ発想です。\n\n変換のポイントは「必ず ts.factory.createXxx() か ts.factory.updateXxx() で新しいノードを生成し、元のノードを直接変更しない」ことです。AST は不変（イミュータブル）で扱い、ts.visitEachChild() に変換関数を渡すことで、変更したノードだけを差し替えた新しいツリーを得られます。この「変更箇所以外はそのまま通す」設計がトランスフォーマーの核心です。",
+    code: `import ts from 'typescript';
+
+// 全 string リテラルを大文字に変換するトランスフォーマー
+function upperCaseStringTransformer(
+  ctx: ts.TransformationContext
+): ts.Transformer<ts.SourceFile> {
+  return (sourceFile) => {
+    function visit(node: ts.Node): ts.Node {
+      if (ts.isStringLiteral(node)) {
+        return ts.factory.createStringLiteral(
+          node.text.toUpperCase()
+        );
+      }
+      // 変更なしのノードはそのまま子を巡回
+      return ts.visitEachChild(node, visit, ctx);
+    }
+    return ts.visitNode(sourceFile, visit) as ts.SourceFile;
+  };
+}
+
+// 使用例
+const code = \`const msg = "hello world";\`;
+const result = ts.transpileModule(code, {
+  transformers: {
+    before: [
+      (ctx) => upperCaseStringTransformer(ctx)
+    ]
+  }
+});
+console.log(result.outputText);
+// → const msg = "HELLO WORLD";`,
+    afterCode: "ポイント: ts.transpileModule() は単一ファイルを変換する手軽な API です。型チェックは行わないため高速ですが、型情報が必要なトランスフォーマーでは ts.createProgram() からの本格的なパイプラインを使う必要があります。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "型レベルプログラミング",
+  est: "60分",
+  goal: "再帰的条件型・Variadic Tuple Types・infer キーワードを組み合わせて、複雑なデータ構造の型を正確に表現できるようになる。「型が通れば実装も正しい」という確信を持ってコードが書けるレベルを目指す。TypeScriptの型システムがチューリング完全であることの意味と限界も理解する。",
+  sections: [{
+    title: "再帰的条件型とinfer",
+    body: "TypeScript の条件型（`T extends U ? X : Y`）は再帰的に適用でき、JSON や木構造のような入れ子データの型を正確に表現できます。Python の型ヒントでは Union と Optional の組み合わせで再帰型を書けますが、TS の方が型の「形状」に対するパターンマッチが強力です。\n\n`infer` キーワードは条件型の中で「型の一部を変数として束縛する」機能です。`T extends Array<infer U>` と書くと、T が配列型のとき U に要素の型が入ります。`T extends Promise<infer R>` なら Promise の解決値型を R として取り出せます。これにより「型の分解・再構築」が可能になり、ライブラリの型推論の多くがこのパターンで実装されています。",
+    table: T.recursiveTypes,
+    afterTable: "型の再帰には深さ制限があります。TypeScript はデフォルトで約100レベルの再帰までサポートしますが、それを超えると「型が循環しています」エラーになります。深すぎる再帰型は意図的にホップ数を制限する工夫が必要です。"
+  }, {
+    title: "Variadic Tuple Types と型推論",
+    body: "TypeScript 4.0 で導入された Variadic Tuple Types（可変長タプル型）は、`[...A, ...B]` という構文でタプル型を連結したり、先頭・末尾の要素を取り出したりできます。Python の `*args` に型を付けたような概念ですが、型レベルで長さと各要素の型が保持される点が異なります。\n\nこの機能の最大の恩恵は「関数合成の型推論」です。`pipe(a, f, g, h)` のような左から右に値を渡す関数合成において、各関数の入力・出力型が連鎖して正確に推論されるようになりました。fp-ts や Effect-TS の pipe 実装はこれを活用しています。Variadic Tuple と infer を組み合わせると、可変個の型パラメータを持つジェネリック関数を正確に型付けできます。",
+    code: `// 先頭・末尾の取り出し
+type Head<T extends unknown[]> =
+  T extends [infer H, ...unknown[]] ? H : never;
+
+type Tail<T extends unknown[]> =
+  T extends [unknown, ...infer T] ? T : never;
+
+type H = Head<[string, number, boolean]>; // string
+type T = Tail<[string, number, boolean]>; // [number, boolean]
+
+// 関数のパラメータ型を反転
+type Reverse<T extends unknown[]> =
+  T extends [...infer Init, infer Last]
+    ? [Last, ...Reverse<Init>]
+    : T;
+
+type Rev = Reverse<[1, 2, 3]>; // [3, 2, 1]
+
+// Promise.all の型を自前で実装
+type AwaitAll<T extends Promise<unknown>[]> = {
+  [K in keyof T]: T[K] extends Promise<infer U> ? U : never
+};`,
+    afterCode: "ポイント: [infer H, ...unknown[]] のように rest が unknown[] なら後続の型は無視されます。[infer H, ...infer Rest] にすれば Rest に残りの型が入ります。この違いが Head と再帰的Tail実装の鍵です。"
+  }, {
+    title: "型の停止問題と実用上の限界",
+    body: "TypeScript の型システムはチューリング完全です。つまり、型レベルで任意の計算を表現できる反面、「型チェックが終わらない（型が発散する）」問題が理論上存在します。実際には TypeScript コンパイラが再帰深度の上限を設けているため無限ループにはなりませんが、複雑な再帰型はコンパイル時間を著しく増加させます。\n\n実務では「型の複雑さと開発体験のトレードオフ」を常に意識する必要があります。型で全てを表現しようとすると IDE のホバー表示が巨大になり、エラーメッセージが読めなくなります。ライブラリ設計では「内部実装は複雑でも、公開 API の型はシンプルに見せる」ことが重要です。`type` エイリアスに適切な名前を付け、`// @internal` で内部型を隠す設計が求められます。",
+    code: `// 過剰な型計算の例（避けるべき）
+type DeepPath<T> =
+  T extends object
+    ? { [K in keyof T & string]:
+        K | \`\${K}.\${DeepPath<T[K]>}\`
+      }[keyof T & string]
+    : never;
+// 深いオブジェクトでは型チェックが数秒かかる
+
+// 実用的な折衷案: 深さを制限
+type DeepPath2<T, Depth extends number[] = []> =
+  Depth['length'] extends 3  // 3階層まで
+    ? never
+    : T extends object
+    ? { [K in keyof T & string]:
+        K | \`\${K}.\${DeepPath2<T[K], [0, ...Depth]>}\`
+      }[keyof T & string]
+    : never;
+
+// 型エイリアスで公開APIをシンプルに見せる
+type UserPath = DeepPath2<{
+  name: string;
+  address: { city: string; zip: string };
+}>;
+// 'name' | 'address' | 'address.city' | 'address.zip'`,
+    afterCode: "ポイント: 型パラメータに depth カウンタ（Depth extends number[] で長さを制限）を追加するパターンは再帰型の深さ制限に広く使われるテクニックです。Depth['length'] extends N で打ち切ります。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "高度なパターンマッチング型",
+  est: "60分",
+  goal: "Template Literal Types を活用して、SQL・GraphQL・CSS など様々な DSL を型安全に表現できるようになる。型レベルのパーサーを実装し、文字列から構造化された型情報を抽出するテクニックを習得する。実際のライブラリ（Prisma, tRPC など）がどのようにこれらを活用しているかを理解する。",
+  sections: [{
+    title: "Template Literal Types によるDSL設計",
+    body: "TypeScript 4.1 で導入された Template Literal Types は、文字列リテラル型を組み合わせて新しい文字列型を生成します。`type Route = \`/\${string}\`` のように書くと、スラッシュで始まる任意の文字列を表す型になります。これにより、URL パターン・CSS プロパティ・SQL クエリなど、文字列ベースの DSL に型安全性を持たせられます。\n\n最も実用的な活用は「プロパティ名の変換」です。`Capitalize<T>`・`Lowercase<T>` などの組み込みユーティリティと組み合わせると、`onClick` のようなイベントハンドラ名を型レベルで生成したり、camelCase を snake_case に変換した型を作ったりできます。Prisma の `where` 句の型（`{ name_contains: string }`）や tRPC のルーター型もこの技術で実装されています。",
+    table: T.templateLiteralDSL,
+    afterTable: "Template Literal Types はユニオンに対して分配されます。`type T = 'a' | 'b'` に対して `` `get${Capitalize<T>}` `` は `'getA' | 'getB'` になります。この分配特性を使うと、大きな型のカタログを一気に生成できます。"
+  }, {
+    title: "型安全なSQL/GraphQL DSL",
+    body: "Template Literal Types と条件型・infer を組み合わせると、文字列を「型レベルでパース」できます。例えば `` `SELECT ${infer Cols} FROM ${infer Table}` `` というパターンマッチで、SELECT クエリから列名とテーブル名を型として抽出できます。これが Kysely や Prisma Raw Query などが採用するアプローチの基礎です。\n\n実際のライブラリほど完全ではありませんが、型レベルパーサーのコアロジックは「infer で文字列を分割し、分割した部分を再帰的に処理する」ことです。Python で正規表現のグループを使って文字列を分解するイメージですが、TS では型レベルで行うため実行時コストはゼロです。コンパイル時だけに存在する型情報として、間違ったクエリ文字列を書いたらビルド前にエラーにできます。",
+    code: `// 型レベルの CSV パーサー（カンマ区切りを分割）
+type SplitCSV<S extends string> =
+  S extends \`\${infer Col},\${infer Rest}\`
+    ? [Col, ...SplitCSV<Rest>]
+    : [S];
+
+type Cols = SplitCSV<'id,name,email'>;
+// ['id', 'name', 'email']
+
+// SELECT 文から列を抽出
+type ParseSelect<Q extends string> =
+  Q extends \`SELECT \${infer Cols} FROM \${string}\`
+    ? SplitCSV<Cols>
+    : never;
+
+type Selected = ParseSelect<'SELECT id,name FROM users'>;
+// ['id', 'name']
+
+// 型安全なクエリビルダー
+type TableSchema = {
+  users: { id: number; name: string; email: string };
+  posts: { id: number; title: string; body: string };
+};
+
+type SelectFrom<
+  T extends keyof TableSchema,
+  K extends keyof TableSchema[T]
+> = Pick<TableSchema[T], K>;
+
+function select<
+  T extends keyof TableSchema,
+  K extends keyof TableSchema[T]
+>(table: T, cols: K[]): SelectFrom<T, K>[] {
+  // 実装は省略
+  return [] as SelectFrom<T, K>[];
+}
+
+const rows = select('users', ['id', 'name']);
+// rows: { id: number; name: string }[]`,
+    afterCode: "ポイント: 型レベルパーサーはコンパイル時間に影響します。複雑な DSL を型で表現する場合、実際の開発では Prisma や Kysely など実績あるライブラリを使い、そのソースコードを参考にするのが現実的です。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "ライブラリ設計と型定義公開",
+  est: "55分",
+  goal: "TypeScript ライブラリとして公開できる品質のパッケージを設計できるようになる。DefinitelyTyped の仕組みを理解し、@types パッケージを自作できる。ESM/CJS dual package の exports 設定、API Surface の設計、型定義のバージョン管理まで含めた公開フロー全体を把握する。",
+  sections: [{
+    title: "DefinitelyTyped と @types パッケージ",
+    body: "JavaScript で書かれたライブラリを TypeScript から使う場合、型定義ファイル（.d.ts）が必要です。ライブラリ本体に型定義が含まれていない場合、DefinitelyTyped リポジトリが管理する `@types/xxx` パッケージをインストールします。Python で言えば `typeshed` に stubs を追加するのに相当しますが、TS の場合はコミュニティ主導で npm に公開されています。\n\n自分でサードパーティライブラリの型定義を書く場面は、DefinitelyTyped にまだ登録されていないライブラリを使うときや、既存定義を拡張（Declaration Merging）するときです。型定義ファイルは `declare module 'xxx' { ... }` の形式で書き、`typeRoots` または `types` の tsconfig 設定で読み込みます。Express のリクエストオブジェクトに独自フィールドを追加するミドルウェアの場合、Declaration Merging で既存の型を拡張するパターンが頻繁に使われます。",
+    table: T.dtPackageDesign,
+    afterTable: "DefinitelyTyped に PR を出す場合は、dtslint や @definitelytyped/header-parser のルールに従ったヘッダーコメントが必要です。型定義のテストには tsd パッケージを使い、期待する型推論が壊れていないことを CI で確認します。"
+  }, {
+    title: "API Surface の設計",
+    body: "ライブラリを公開する際、「何を外部に公開し、何を内部実装として隠蔽するか」を明確にすることが重要です。これを API Surface と呼びます。TypeScript では `export` したものが全て公開 API になるため、内部で使うユーティリティ型や実装詳細は `export` しないか、`@internal` JSDoc タグで明示します。\n\n優れたライブラリ型設計のポイントは三つです。第一に「型推論が自然に働くようにする」こと。呼び出し側が型引数を明示しなくても正しく推論されるよう、関数のシグネチャを設計します。第二に「エラーメッセージが読みやすい型を選ぶ」こと。型が複雑でもエラー時には具体的なメッセージが出るよう、`type` エイリアスで中間型に名前を付けます。第三に「将来の拡張を妨げない」こと。現在のバージョンで全ての型パラメータを固定しすぎると、後方互換性を破らずに新機能を追加できなくなります。",
+    code: `// 良い API Surface の例
+
+// ❌ 内部実装の詳細が漏れている
+export type InternalNode<T> = {
+  _ref: WeakRef<T>;
+  _generation: number;
+};
+
+// ✅ 公開APIはシンプルに見せる
+export interface NodeHandle<T> {
+  readonly id: string;
+  getValue(): T | undefined;
+}
+
+// ❌ 型引数を明示しないと使えない
+function create<T extends object>(
+  factory: () => T,
+  options: CacheOptions<T>
+): Cache<T> { /* ... */ }
+
+// ✅ 引数から型が推論される
+function createCache<T extends object>(
+  factory: () => T,
+  options?: { ttl?: number }
+): Cache<T> { /* ... */ }
+
+// const c = createCache(() => ({ id: '1' }));
+// c の型は Cache<{ id: string }> と推論される
+
+// @internal で隠蔽（APIExtractorが除外する）
+/** @internal */
+export function _internalHelper(): void { /* ... */ }`,
+    afterCode: "ポイント: Microsoft の API Extractor ツールを使うと、@internal タグの付いたものを自動除外した公開用 d.ts を生成できます。大規模ライブラリでは必須のツールです。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "Effect-TS / fp-ts",
+  est: "60分",
+  goal: "関数型プログラミングの代表的な型（Option, Either, Task, Effect）を使いこなし、副作用を型で表現する設計を理解できるようになる。Python の例外ベースのエラー処理との根本的な違いを説明でき、パイプライン設計でビジネスロジックを副作用から分離して書ける状態を目指す。",
+  sections: [{
+    title: "Option/Either — 型で表す失敗",
+    body: "fp-ts は Haskell・Scala の型クラス体系を TypeScript に持ち込んだライブラリです。中心的な型は Option（値があるかないか）と Either（成功か失敗か）の2つで、Python の Optional と例外ベースのエラー処理を「型で表現する」代替手段です。\n\nPython では None チェックを怠っても実行時まで気づけませんが、fp-ts の Option<A> は None か Some<A> かを明示的に扱わない限りコンパイルが通りません。Either<E, A> は Left<E>（失敗）か Right<A>（成功）を判別でき、エラー型 E が関数シグネチャに現れます。これは「例外が型に現れない Python の try/except」との根本的な違いです。`pipe()` で処理を連鎖させると、途中で失敗した場合の処理が自動的にショートサーキットされ、全ての分岐をハンドリングする構造が強制されます。",
+    table: T.fpTypes,
+    afterTable: "fp-ts は学習曲線が急ですが、Effect-TS（旧 @effect/core）はより洗練された API と豊富なドキュメントを提供しており、新規プロジェクトでは Effect-TS が推奨されます。"
+  }, {
+    title: "pipe によるパイプライン設計",
+    body: "fp-ts の `pipe(value, f1, f2, f3)` は Python の `functools.reduce(lambda v,f: f(v), [f1,f2,f3], value)` と同じ動作ですが、TypeScript の型推論が各ステップの型を追跡するため、パイプラインのどこかで型が合わない場合に正確なエラーが出ます。\n\nパイプライン設計の核心は「副作用（外部APIの呼び出し・DB書き込み）を端に追い出し、中間の変換ロジックを純粋関数で表現する」ことです。Python でも同じ設計は可能ですが、fp-ts + TaskEither では「非同期処理かつ型安全なエラー処理」を `pipe` で一直線に書けます。失敗パスと成功パスを `TE.chain`（成功時のみ次へ）と `TE.mapLeft`（失敗側の変換）で制御することで、try/catch のネストを避けたフラットな処理フローが実現できます。",
+    code: `import { pipe } from 'fp-ts/function';
+import * as O from 'fp-ts/Option';
+import * as E from 'fp-ts/Either';
+
+// Option の連鎖
+const result = pipe(
+  O.fromNullable(process.env['PORT']),   // string | undefined → Option<string>
+  O.map(s => parseInt(s, 10)),           // Option<string> → Option<number>
+  O.filter(n => !isNaN(n) && n > 0),    // 不正値をNoneに
+  O.getOrElse(() => 3000)               // None のデフォルト値
+);
+// result: number (3000 or parsed PORT)
+
+// Either の連鎖
+function parseJson(s: string): E.Either<Error, unknown> {
+  return E.tryCatch(() => JSON.parse(s), e => e as Error);
+}
+
+function validateUser(data: unknown): E.Either<string, { name: string }> {
+  if (typeof data === 'object' && data !== null && 'name' in data) {
+    return E.right(data as { name: string });
+  }
+  return E.left('Invalid user data');
+}
+
+const user = pipe(
+  parseJson('{"name":"alice"}'),
+  E.mapLeft(e => e.message),  // Error → string
+  E.chain(validateUser)       // 成功時のみ次へ
+);`,
+    afterCode: "ポイント: E.chain は「前のステップが Right のときだけ次の関数を呼ぶ」モナディックバインドです。Left が出た時点でパイプラインは短絡し、以降のステップは全てスキップされます。Python の例外 re-raise と同等の効果を型安全に実現します。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "モノレポとワークスペース",
+  est: "55分",
+  goal: "pnpm workspaces を使って複数パッケージを管理するモノレポを構築し、Turborepo でビルドグラフを最適化できるようになる。型定義の共有戦略（Project References vs TypeScript Paths）を理解し、パッケージ間の依存関係を適切に型安全に管理できる状態を目指す。",
+  sections: [{
+    title: "モノレポの構造とツール選択",
+    body: "モノレポとは、複数の関連パッケージを単一リポジトリで管理する手法です。Python でも `packages` ディレクトリに複数モジュールを置く構成はありますが、Node.js のモノレポは pnpm/yarn workspaces による依存解決の統合、Turborepo/Nx によるビルドの並列化・キャッシュが発達しています。\n\npnpm workspaces が優れている点はディスク効率です。同じパッケージのバージョンはコンテンツアドレスで一元管理され、各パッケージの node_modules にはシンボリックリンクが置かれます。Python の pip で同じパッケージを複数 venv にインストールするのと違い、ストレージを節約しながら厳密な依存分離が実現できます。Turborepo はタスク間の依存関係（ビルドしてからテスト、など）を `turbo.json` に記述し、変更のあったパッケージだけを再ビルドするリモートキャッシュも提供します。",
+    table: T.monorepoTools,
+    afterTable: "モノレポの規模が小さいうちは Turborepo + pnpm workspaces の組み合わせが最も導入コストが低く、プロジェクトが成長したら Nx への移行を検討するのが実践的な判断です。"
+  }, {
+    title: "型定義の共有とProject References",
+    body: "モノレポで最も注意が必要なのが「型定義の共有方法」です。パッケージ間で型を共有するには二つのアプローチがあります。第一は「パッケージを workspace:* で参照し、`paths` 設定でソースを直接見る」方法です。ビルド前でも型チェックが動き、開発体験が良い反面、本番ビルドでのパス解決に別途設定が必要です。\n\n第二は TypeScript の Project References（`composite: true`）を使う方法です。各パッケージが .d.ts を生成し、依存パッケージはその .d.ts を参照します。ビルド順が明示的で、`tsc --build` コマンドが依存順を自動解決します。初回ビルドが必要ですが、差分ビルドが効き大規模プロジェクトで有利です。小規模モノレポでは paths アプローチ、CI/大規模では Project References が向いています。",
+    code: `// パッケージ間の型共有 — paths アプローチ
+// apps/web/tsconfig.json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@myorg/*": ["../../packages/*/src/index.ts"]
+    }
+  }
+}
+
+// packages/utils/src/index.ts
+export function formatDate(d: Date): string {
+  return d.toISOString().split('T')[0]!;
+}
+
+// apps/web/src/page.ts — 型付きで参照できる
+import { formatDate } from '@myorg/utils';
+const s: string = formatDate(new Date()); // 型チェック OK
+
+// Project References アプローチ
+// packages/utils/tsconfig.json
+{
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "./dist"
+  }
+}
+
+// apps/web/tsconfig.json
+{
+  "references": [{ "path": "../../packages/utils" }]
+}`,
+    afterCode: "ポイント: declarationMap: true を設定すると、.d.ts から元のソース .ts へのソースマップが生成されます。IDE で「定義に移動」したとき、dist/ の .d.ts ではなく src/ の実装ファイルに飛べるようになり開発体験が向上します。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "実行時型安全（Zod深化）",
+  est: "55分",
+  goal: "Zod の高度な機能（transform, refine, superRefine, ブランド型, スキーマ合成）を使いこなし、複雑なビジネスルールをバリデーションとして表現できるようになる。zodから OpenAPI スキーマを自動生成するパターンを理解し、フロントエンド・バックエンド・APIドキュメントを単一のスキーマ定義から派生させる設計が実装できる状態を目指す。",
+  sections: [{
+    title: "Zodスキーマから型推論のしくみ",
+    body: "Zod の最大の特徴は「スキーマが型の唯一の真実（Single Source of Truth）」であることです。`z.object({...})` でスキーマを定義すると、バリデーションロジックと TypeScript 型の両方がそこから導出され、二重管理が不要になります。Python の pydantic と同じ発想ですが、TS の場合はコンパイラが型を完全に理解するため、インテリセンスや型エラーが即座に反映されます。\n\nZod が `z.infer<typeof Schema>` で型を導出できる仕組みは、各スキーマクラスが `_output` という型パラメータを持ち、`parse()` の戻り値型に使われているためです。`ZodString._output = string`、`ZodObject<T>._output = { [K in keyof T]: T[K]['_output'] }` という形で再帰的に型が構築されます。`.transform()` を使うと `_output` の型が変わり、`.optional()` を付けると `_output | undefined` になります。この型計算がコンパイル時に行われ、実行時には `.parse()` でバリデーションが走ります。",
+    table: T.zodAdvanced,
+    afterTable: "ブランド型（`.brand<'UserId'>()`）は実行時には string と同一ですが、型レベルで UserId と string を区別します。関数が `UserId` を要求するとき、生の `string` を渡せないようにすることで、IDの取り違えバグを型でガードできます。"
+  }, {
+    title: "スキーマ合成とカスタムバリデーター",
+    body: "実務では単純なフィールドバリデーションだけでなく「パスワードと確認パスワードが一致する」「開始日が終了日より前」のような相関バリデーションが必要です。Zod の `.superRefine()` は複数のエラーを同時に返せる高機能バリデーター追加メソッドで、このような複雑なビジネスルールを表現します。\n\nスキーマの合成も重要なパターンです。`z.union([A, B])` でユニオン、`z.intersection(A, B)` で交差型（両方のバリデーションを通過）を作れます。`z.discriminatedUnion('type', [A, B])` を使うと判別フィールドで分岐するバリデーションが高速になります。Python の pydantic では `model_validator` や `field_validator` に相当する機能ですが、Zod はこれらをスキーマチェーンとして構成できるため、バリデーションロジックが再利用しやすくなっています。",
+    code: `import { z } from 'zod';
+
+// 相関バリデーション
+const DateRangeSchema = z.object({
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+}).superRefine((data, ctx) => {
+  if (new Date(data.startDate) >= new Date(data.endDate)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: '開始日は終了日より前でなければなりません',
+      path: ['startDate'],
+    });
+  }
+});
+
+// スキーマの変換と合成
+const RawUserSchema = z.object({
+  id: z.string(),
+  age: z.string().transform(s => parseInt(s, 10)),
+  tags: z.string().transform(s => s.split(',').map(t => t.trim())),
+});
+
+type User = z.infer<typeof RawUserSchema>;
+// { id: string; age: number; tags: string[] }
+
+// Discriminated union バリデーション
+const EventSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('click'), x: z.number(), y: z.number() }),
+  z.object({ type: z.literal('keydown'), key: z.string() }),
+  z.object({ type: z.literal('scroll'), delta: z.number() }),
+]);
+
+type Event = z.infer<typeof EventSchema>;`,
+    afterCode: "ポイント: `.transform()` は `_input` と `_output` の型を変えます。変換後の型は `.parse()` の戻り値に反映されますが、`.safeParse()` の input 側には変換前の型が使われます。フォームの raw 値を受け取って変換するパターンで特に有効です。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "次世代TSエコシステム",
+  est: "55分",
+  goal: "SWC・oxc などの Rust/Go 製ツールチェーンの仕組みと役割を理解し、型チェックパフォーマンスの計測・改善ができるようになる。WebAssembly での TypeScript 活用、TC39 Type Annotations 提案の現状と将来像を把握し、2026年以降のエコシステム動向を見据えた技術選定ができる状態を目指す。",
+  sections: [{
+    title: "SWC/oxcと型チェックの分離",
+    body: "TypeScript の tsc は型チェックとトランスパイルを同時に行いますが、これがビルド時間のボトルネックになります。SWC（Rust 製）と oxc（Rust 製）は「型チェックを省略してトランスパイルだけを超高速で行う」ツールです。Babel と同じ役割ですが Rust で実装されているため 10〜20 倍高速です。Next.js・Vite・Bun が内部でこれらを使っています。\n\n重要なのは「これらは型チェックをしない」点です。型の安全性は tsc --noEmit で別途確認する必要があります。実務では「コミット時に tsc で型チェック、開発中のホットリロードは SWC/oxc で高速トランスパイル」という役割分担が標準になっています。Python でいえば「mypy で型チェック、実行は CPython（または PyPy）」の分離と同じ思想です。",
+    table: T.nextGenTools,
+    afterTable: "oxc はトランスパイラだけでなく Linter（oxlint）も提供しており、ESLint の 50〜100 倍の速度で動作します。2025年時点で ESLint ルールとの互換性が急速に向上しており、大規模プロジェクトでの採用事例が増えています。"
+  }, {
+    title: "型チェックパフォーマンスの最適化",
+    body: "大規模プロジェクトでは tsc の型チェックが数十秒〜数分かかることがあります。最適化の第一歩は計測です。`tsc --noEmit --diagnostics` で「チェック時間」「ファイル数」「型計算の負荷」が確認できます。`--generateTrace` フラグを使うと Chrome DevTools で型チェックのフレームグラフが表示され、どの型計算がボトルネックかを特定できます。\n\n改善策は主に三つです。第一は Project References による差分ビルドです。前章で解説したように `composite: true` を設定すると、変更のあったパッケージだけを再チェックします。第二は `skipLibCheck: true` で node_modules の .d.ts 検査を省略することです。第三は型の複雑さを下げることです。`--generateTrace` で特定した重い型に対して、中間の型エイリアスを増やして計算を分割したり、条件型の深さを制限したりします。",
+    code: `// 型チェック計測
+// npx tsc --noEmit --diagnostics
+// Files:     120
+// Lines of Library:   45823
+// Check time:         8.32s  ← ここが遅い
+
+// プロファイリング
+// npx tsc --generateTrace trace_output
+// → Chrome で chrome://tracing を開いてtrace_output/trace.json をロード
+
+// 改善1: skipLibCheck
+// tsconfig.json
+{ "compilerOptions": { "skipLibCheck": true } }
+
+// 改善2: isolatedDeclarations (TS 5.5+)
+// 各ファイルの型を独立して推論可能にする（並列化の鍵）
+{ "compilerOptions": { "isolatedDeclarations": true } }
+
+// 改善3: 重い型を単純化
+// ❌ 遅い: 深い再帰型
+type DeepPaths<T> = T extends object
+  ? { [K in keyof T & string]: K | \`\${K}.\${DeepPaths<T[K]>}\` }[keyof T & string]
+  : never;
+
+// ✅ 速い: 深さを制限 + 中間型に名前を付ける
+type Level1<T> = keyof T & string;
+type Level2<T> = {
+  [K in keyof T & string]: \`\${K}.\${keyof T[K] & string}\`
+}[keyof T & string];
+type ShallowPaths<T> = Level1<T> | Level2<T>;`,
+    afterCode: "ポイント: TypeScript 5.5 で導入された `isolatedDeclarations` は、各ファイルの型を他のファイルの型推論に依存させず、独立して .d.ts を生成できることを強制するモードです。これにより並列型チェックが可能になり、将来の Language Server 高速化の布石になっています。"
+  }, {
+    title: "TC39 Type Annotations と将来の TypeScript",
+    body: "TC39（JavaScript の標準化委員会）では「Type Annotations」提案が進行中です。これは JavaScript エンジンが型注釈をコメント扱い（パース可能だが無視する）にすることで、tsc によるトランスパイルなしに型注釈付き JS を実行できるようにするものです。Python の型ヒントが実行時に `__annotations__` として存在するのに似た発想ですが、より軽量です。\n\n2026年現在、この提案は Stage 1 から前進が緩やかですが、Node.js 23+ が `--experimental-strip-types` フラグで TypeScript ファイルを直接実行できるようになっており、実用化の流れは着実に進んでいます。Deno は当初から TypeScript をネイティブ実行し、Bun も同様です。「TypeScript のトランスパイルが不要になる世界」は近づいており、その準備として型チェックと実行のさらなる分離が重要性を増しています。コードを書く際は「型情報は消える前提」を意識し、実行時の型チェックには引き続き Zod 等を使う設計を維持することが現実的です。",
+    code: `// TC39 Type Annotations 提案のイメージ
+// (2026年時点では実験的機能)
+
+// 将来こう書けるかもしれない
+function greet(name: string): string {
+  return \`Hello, \${name}\`;
+}
+// → Node.js / ブラウザが型注釈を無視して直接実行
+
+// 現時点で使える: Node.js --experimental-strip-types
+// node --experimental-strip-types ./src/index.ts
+
+// Bun / Deno は既にトランスパイル不要
+// bun run ./src/index.ts
+// deno run ./src/index.ts
+
+// 現実的な準備: 型と実行時バリデーションの分離を徹底
+// 型は消えても zod が守る
+import { z } from 'zod';
+
+const ConfigSchema = z.object({
+  host: z.string(),
+  port: z.number().int().positive(),
+});
+
+// TS型: コンパイル時のみ存在
+type Config = z.infer<typeof ConfigSchema>;
+
+// 実行時バリデーション: 型がなくても機能する
+export function loadConfig(raw: unknown): Config {
+  return ConfigSchema.parse(raw);
+}`,
+    afterCode: "ポイント: `isolatedDeclarations` と `--experimental-strip-types` はどちらも「型チェックを別工程に切り出す」方向性です。今後の TypeScript エコシステムは「型チェック（型の安全性）」と「実行（トランスパイル・ランタイム）」の分離がさらに明確になっていきます。設計時にこの軸を意識しておくことが、将来のツール移行に備えることになります。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({ data }) {
+  return React.createElement("div", {
+    style: {
+      overflowX: "auto", margin: "12px 0", borderRadius: 10,
+      border: "1px solid #d1d5db", background: "#fff"
+    }
+  }, React.createElement("table", {
+    style: { width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }
+  }, React.createElement("thead", null, React.createElement("tr", null,
+    data.h.map((h, i) => React.createElement("th", {
+      key: i,
+      style: {
+        background: "linear-gradient(180deg,#eef2ff,#e0e7ff)", color: "#312e81",
+        fontWeight: 800, fontSize: 12.5, padding: "10px 14px", textAlign: "left",
+        borderBottom: "2px solid #a5b4fc",
+        borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+      }
+    }, h))
+  )), React.createElement("tbody", null,
+    data.r.map((row, ri) => React.createElement("tr", { key: ri },
+      row.map((cell, ci) => React.createElement("td", {
+        key: ci,
+        style: {
+          padding: "9px 14px",
+          borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+          borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+          color: ci === 0 ? "#1e1b4b" : "#374151",
+          fontWeight: ci === 0 ? 700 : 400, fontSize: 13, lineHeight: 1.65,
+          verticalAlign: "top", whiteSpace: "pre-line",
+          background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+        }
+      }, cell))
+    ))
+  )));
+}
+
+function Code({ code, hl }) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a", color: "#d0d0f0",
+      padding: "14px 16px", borderRadius: 10, fontSize: 12, lineHeight: 1.65,
+      overflowX: "auto", margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap", wordBreak: "break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+
+const diffLabel = d => d === 1 ? "\u2B50 基本" : d === 2 ? "\u2B50\u2B50 応用" : "\u2B50\u2B50\u2B50 発展";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+
+function Exercise({ ex, idx }) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: { borderRadius: 12, border: "2px solid #f59e0b", overflow: "hidden", background: "#fff", marginBottom: 8 }
+  },
+    React.createElement("div", {
+      style: { padding: "12px 16px", background: "linear-gradient(135deg,#fffbeb,#fef3c7)" }
+    },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } },
+        React.createElement("span", {
+          style: { background: "#f59e0b", color: "#fff", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 6 }
+        }, "\u554F", idx + 1),
+        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: diffColor(ex.diff) } }, diffLabel(ex.diff))
+      ),
+      React.createElement("p", {
+        style: { margin: 0, fontSize: 13.5, lineHeight: 1.8, color: "#92400e", whiteSpace: "pre-line" }
+      }, ex.q)
+    ),
+    React.createElement("div", { style: { padding: "0 16px 12px" } },
+      React.createElement(Code, { code: ex.code, hl: true })
+    ),
+    React.createElement("div", { style: { borderTop: "1px dashed #fcd34d", padding: "10px 16px" } },
+      React.createElement("button", {
+        onClick: () => setShowAnswer(!showAnswer),
+        style: {
+          background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+          color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px",
+          fontSize: 13, fontWeight: 700, cursor: "pointer", width: "100%"
+        }
+      }, showAnswer ? "\uD83D\uDE48 解答を隠す" : "\uD83D\uDC40 解答例を見る"),
+      showAnswer && React.createElement("div", { style: { marginTop: 10 } },
+        React.createElement("div", {
+          style: { fontSize: 11, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }
+        }, "\u2705 解答例"),
+        React.createElement(Code, { code: ex.answer })
+      )
+    )
+  );
+}
+
+function Section({ section, idx, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: { borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", background: "#fff" }
+  },
+    React.createElement("button", {
+      onClick: () => setOpen(!open),
+      style: {
+        width: "100%", display: "flex", alignItems: "center", gap: 10,
+        padding: "12px 16px", border: "none", background: "#fafafa",
+        cursor: "pointer", textAlign: "left", fontSize: 14, fontWeight: 700, color: "#1e1b4b"
+      }
+    },
+      React.createElement("span", {
+        style: {
+          flexShrink: 0, width: 24, height: 24, borderRadius: 6,
+          background: "#6366f1", color: "#fff", display: "flex",
+          alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800
+        }
+      }, idx + 1),
+      React.createElement("span", { style: { flex: 1 } }, section.title),
+      React.createElement("span", {
+        style: { fontSize: 18, color: "#9ca3af", transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0)" }
+      }, "\u203A")
+    ),
+    open && React.createElement("div", { style: { padding: "12px 16px 16px" } },
+      section.body && React.createElement("p", {
+        style: { margin: "0 0 8px", fontSize: 13.5, lineHeight: 1.85, color: "#374151", whiteSpace: "pre-line" }
+      }, section.body),
+      section.table && React.createElement(DataTable, { data: section.table }),
+      section.afterTable && React.createElement("p", {
+        style: { margin: "8px 0", fontSize: 13.5, lineHeight: 1.85, color: "#374151", whiteSpace: "pre-line" }
+      }, section.afterTable),
+      section.code && React.createElement(Code, { code: section.code }),
+      section.afterCode && React.createElement("p", {
+        style: {
+          margin: "10px 0 0", fontSize: 13, lineHeight: 1.8, color: "#555",
+          whiteSpace: "pre-line", background: "#f9fafb", padding: "10px 14px",
+          borderRadius: 8, border: "1px solid #e5e7eb"
+        }
+      }, section.afterCode)
+    )
+  );
+}
+
+/* ─── Main App ─── */
+function TSAdvancedCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return React.createElement("div", {
+    style: { minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif" }
+  },
+    React.createElement("div", { style: { maxWidth: 1100, margin: "0 auto", padding: "20px 14px" } },
+      /* Hero */
+      React.createElement("div", {
+        style: {
+          background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+          borderRadius: 16, padding: "24px 20px", marginBottom: 16,
+          position: "relative", overflow: "hidden"
+        }
+      },
+        React.createElement("div", {
+          style: { position: "absolute", top: -30, right: -10, fontSize: 140, opacity: 0.05 }
+        }, "\uD83D\uDD37"),
+        React.createElement("div", {
+          style: { fontSize: 11, fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }
+        }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"),
+        React.createElement("h1", {
+          style: { margin: 0, fontSize: 22, fontWeight: 900, color: "#fff" }
+        }, "TypeScript \u4E0A\u7D1A\u30B3\u30FC\u30B9"),
+        React.createElement("p", {
+          style: { margin: "6px 0 0", fontSize: 12.5, color: "#c4b5fd" }
+        }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u2B50\u301C\u2B50\u2B50\u2B50"),
+        React.createElement("p", {
+          style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+        }, "TypeScript\u30B3\u30F3\u30D1\u30A4\u30E9API\u30FB\u578B\u30EC\u30D9\u30EB\u30D7\u30ED\u30B0\u30E9\u30DF\u30F3\u30B0\u30FB\u30E9\u30A4\u30D6\u30E9\u30EA\u8A2D\u8A08\u30FB\u95A2\u6570\u578B\u30D7\u30ED\u30B0\u30E9\u30DF\u30F3\u30B0\u30FB\u30E2\u30CE\u30EC\u30DD\u69CB\u7BC9\u306A\u3069\u3001\u5B9F\u52D9\u30EC\u30D9\u30EB\u306ETypeScript\u30A8\u30F3\u30B8\u30CB\u30A2\u304C\u77E5\u308B\u3079\u304D\u6280\u8853\u3092\u5C71\u5C3B\u304B\u3089\u5BE6\u8E0F\u307E\u3067\u5B66\u3073\u307E\u3059\u3002\u578B\u30B7\u30B9\u30C6\u30E0\u306E\u53EF\u80FD\u6027\u3092\u5F95\u304D\u51FA\u3057\u3001\u5927\u898F\u6A21\u30B3\u30FC\u30C9\u30D9\u30FC\u30B9\u3067\u4FE1\u983C\u6027\u306E\u9AD8\u3044\u30BD\u30D5\u30C8\u30A6\u30A7\u30A2\u3092\u8A2D\u8A08\u3067\u304D\u308B\u72B6\u614B\u3092\u76EE\u6307\u3057\u307E\u3059\u3002"),
+        React.createElement("div", { style: { marginTop: 14, display: "flex", gap: 3 } },
+          chapters.map((_, i) => React.createElement("div", {
+            key: i,
+            onClick: () => { setCh(i); setMenuOpen(false); },
+            style: {
+              flex: 1, height: 5, borderRadius: 3,
+              background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)", cursor: "pointer"
+            }
+          }))
+        )
+      ),
+      /* Chapter selector */
+      React.createElement("div", { style: { marginBottom: 14 } },
+        React.createElement("button", {
+          onClick: () => setMenuOpen(!menuOpen),
+          style: {
+            width: "100%", padding: "10px 16px", border: "1px solid #d1d5db",
+            borderRadius: 10, background: "#fff", fontSize: 14, fontWeight: 700,
+            color: "#1e1b4b", cursor: "pointer", display: "flex", justifyContent: "space-between"
+          }
+        },
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", { style: { fontSize: 12, color: "#9ca3af" } }, menuOpen ? "\u25B2" : "\u25BC")
+        ),
+        menuOpen && React.createElement("div", {
+          style: {
+            marginTop: 4, border: "1px solid #e5e7eb", borderRadius: 10,
+            overflow: "hidden", background: "#fff", boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+          }
+        },
+          chapters.map((c, i) => React.createElement("button", {
+            key: c.id,
+            onClick: () => { setCh(i); setMenuOpen(false); },
+            style: {
+              width: "100%", padding: "10px 16px", border: "none",
+              borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+              background: i === ch ? "#eef2ff" : "#fff", fontSize: 13,
+              fontWeight: i === ch ? 700 : 500,
+              color: i === ch ? "#4338ca" : "#374151", cursor: "pointer",
+              textAlign: "left", display: "flex", alignItems: "center", gap: 10
+            }
+          },
+            React.createElement("span", {
+              style: {
+                width: 22, height: 22, borderRadius: "50%",
+                background: i === ch ? "#6366f1" : "#e5e7eb",
+                color: i === ch ? "#fff" : "#6b7280",
+                fontWeight: 800, fontSize: 11, display: "flex",
+                alignItems: "center", justifyContent: "center", flexShrink: 0
+              }
+            }, c.num),
+            React.createElement("span", { style: { flex: 1 } }, c.title),
+            EX[c.id] && React.createElement("span", {
+              style: { fontSize: 11, color: "#f59e0b", fontWeight: 700 }
+            }, EX[c.id].length, "\u554F")
+          ))
+        )
+      ),
+      /* Chapter header */
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } },
+        React.createElement("span", {
+          style: {
+            width: 36, height: 36, borderRadius: "50%",
+            background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+            color: "#fff", fontWeight: 900, fontSize: 16,
+            display: "flex", alignItems: "center", justifyContent: "center"
+          }
+        }, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontWeight: 800, fontSize: 18, color: "#1e1b4b" } }, chapter.title),
+          React.createElement("div", { style: { fontSize: 12, color: "#6b7280" } },
+            "\u76EE\u5B89: ", chapter.est,
+            exercises.length > 0 ? ` \u30FB \u6F14\u7FD2${exercises.length}\u554F` : ""
+          )
+        )
+      ),
+      /* Goal */
+      chapter.goal && React.createElement("div", {
+        style: {
+          background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+          border: "1px solid #c7d2fe", borderLeft: "4px solid #6366f1",
+          borderRadius: 10, padding: "12px 16px", marginBottom: 14
+        }
+      },
+        React.createElement("div", {
+          style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+        }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"),
+        React.createElement("div", {
+          style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+        }, chapter.goal)
+      ),
+      /* Sections */
+      React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+        chapter.sections.map((sec, i) => React.createElement(Section, {
+          key: ch + "-" + i, section: sec, idx: i, defaultOpen: false
+        }))
+      ),
+      /* Exercises */
+      exercises.length > 0 && React.createElement("div", { style: { marginTop: 20 } },
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
+          React.createElement("span", {
+            style: { background: "#f59e0b", color: "#fff", fontWeight: 800, fontSize: 13, padding: "4px 14px", borderRadius: 8 }
+          }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"),
+          React.createElement("span", { style: { fontSize: 13, color: "#92400e" } }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")
+        ),
+        exercises.map((ex, i) => React.createElement(Exercise, { key: ch + "-" + i, ex: ex, idx: i }))
+      ),
+      /* Navigation */
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 20, gap: 10 } },
+        ch > 0
+          ? React.createElement("button", {
+              onClick: () => { setCh(ch - 1); window.scrollTo(0, 0); },
+              style: {
+                flex: 1, padding: "12px 16px", border: "1px solid #d1d5db",
+                borderRadius: 10, background: "#fff", cursor: "pointer",
+                fontWeight: 600, fontSize: 13, color: "#6b7280"
+              }
+            }, "\u2190 Ch.", chapters[ch - 1].num)
+          : React.createElement("div", { style: { flex: 1 } }),
+        ch < chapters.length - 1
+          ? React.createElement("button", {
+              onClick: () => { setCh(ch + 1); window.scrollTo(0, 0); },
+              style: {
+                flex: 1, padding: "12px 16px", border: "none", borderRadius: 10,
+                background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#fff"
+              }
+            }, "Ch.", chapters[ch + 1].num, " \u2192")
+          : React.createElement("a", {
+              href: "../index.html",
+              style: {
+                flex: 1, padding: "12px 16px", borderRadius: 10,
+                background: "linear-gradient(135deg,#22c55e,#16a34a)",
+                color: "#fff", fontWeight: 700, fontSize: 13,
+                textAlign: "center", textDecoration: "none"
+              }
+            }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")
+      ),
+      /* Footer */
+      React.createElement("p", {
+        style: { textAlign: "center", fontSize: 11, color: "#9ca3af", marginTop: 20 }
+      }, "typescriptlang.org \u30FB TypeScript 5.x \u6642\u70B9 \u30FB 2026\u5E744\u6708")
+    )
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(TSAdvancedCourse));
+  </script>
+</body>
+</html>
