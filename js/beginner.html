@@ -1,0 +1,3144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JavaScript 初級コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのJavaScript初級コース。全10章・30問の演習付き。Todoアプリを段階的に構築。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  packageJson: {
+    h: ["フィールド", "説明", "例"],
+    r: [["name", "パッケージ名。npm publish 時の公開名にもなる。", "\"todo-app\""], ["version", "セマンティックバージョニング。major.minor.patch。", "\"1.0.0\""], ["type", "\"module\" で ESM を有効化。省略すると CJS 扱い。", "\"module\""], ["main", "エントリポイント。require() で読まれるファイル。", "\"src/index.js\""], ["scripts", "npm run で実行できるコマンド群。", "{\"start\": \"node src/index.js\"}"], ["dependencies", "本番で必要なパッケージ。npm install 時に入る。", "{\"express\": \"^4.18.0\"}"], ["devDependencies", "開発時のみ必要。テスト・lint など。", "{\"jest\": \"^29.0.0\"}"]]
+  },
+  cjsVsEsm: {
+    h: ["項目", "CommonJS (CJS)", "ES Modules (ESM)"],
+    r: [["読み込み", "const x = require('./x')", "import x from './x'"], ["書き出し", "module.exports = x", "export default x"], ["実行タイミング", "同期・逐次", "非同期・静的解析可"], ["Tree Shaking", "困難", "バンドラが不要コードを除去可能"], ["設定", "デフォルト（type 省略時）", "package.json に \"type\": \"module\""], ["拡張子", ".js または .cjs", ".js（type:module時）または .mjs"]]
+  },
+  fsMethod: {
+    h: ["メソッド", "説明", "Python対応"],
+    r: [["readFile(path, enc)", "ファイル全体を文字列/Bufferで読む", "open(f).read()"], ["writeFile(path, data)", "ファイルを新規作成 or 上書き", "open(f,'w').write(d)"], ["appendFile(path, data)", "ファイル末尾に追記", "open(f,'a').write(d)"], ["mkdir(path, {recursive})", "ディレクトリ作成。recursive で深い階層も一括。", "os.makedirs()"], ["readdir(path)", "ディレクトリ内のファイル一覧を取得", "os.listdir()"], ["stat(path)", "ファイル情報（サイズ・更新日時等）取得", "os.stat()"], ["unlink(path)", "ファイル削除", "os.remove()"], ["access(path, mode)", "ファイルの存在・読み書き権限チェック", "os.access()"]]
+  },
+  jsonMethod: {
+    h: ["メソッド", "説明", "Python対応"],
+    r: [["JSON.parse(str)", "JSON文字列 → JSオブジェクト", "json.loads(s)"], ["JSON.stringify(obj)", "JSオブジェクト → JSON文字列", "json.dumps(o)"], ["JSON.stringify(obj, null, 2)", "整形付き（インデント2）", "json.dumps(o, indent=2)"]]
+  },
+  processArgv: {
+    h: ["インデックス", "値", "説明"],
+    r: [["process.argv[0]", "/usr/bin/node", "Node.js 実行ファイルパス"], ["process.argv[1]", "/path/to/app.js", "実行中のスクリプトパス"], ["process.argv[2]", "add", "第1引数（ユーザ指定）"], ["process.argv[3]", "\"買い物する\"", "第2引数（ユーザ指定）"]]
+  },
+  httpMethod: {
+    h: ["HTTPメソッド", "用途", "Express", "Python (Flask)"],
+    r: [["GET", "リソース取得", "app.get(path, handler)", "@app.route(path)"], ["POST", "リソース作成", "app.post(path, handler)", "@app.route(path, methods=['POST'])"], ["PUT", "リソース全体更新", "app.put(path, handler)", "@app.route(path, methods=['PUT'])"], ["PATCH", "リソース部分更新", "app.patch(path, handler)", "@app.route(path, methods=['PATCH'])"], ["DELETE", "リソース削除", "app.delete(path, handler)", "@app.route(path, methods=['DELETE'])"]]
+  },
+  middleware: {
+    h: ["ミドルウェア", "役割", "Python対応"],
+    r: [["express.json()", "リクエストボディのJSON自動パース", "Flask: request.get_json()"], ["express.static('public')", "静的ファイル配信", "Flask: send_from_directory"], ["cors()", "CORS ヘッダ自動付与", "flask-cors"], ["morgan('dev')", "アクセスログ出力", "logging module"], ["express.urlencoded()", "フォームデータのパース", "Flask: request.form"]]
+  },
+  fetchOption: {
+    h: ["オプション", "説明", "デフォルト"],
+    r: [["method", "HTTPメソッド（GET/POST/PUT/DELETE等）", "\"GET\""], ["headers", "リクエストヘッダ（Content-Type等）", "{}"], ["body", "リクエストボディ（JSON.stringify必要）", "undefined"], ["mode", "CORS モード（cors/no-cors/same-origin）", "\"cors\""], ["credentials", "Cookie送信（include/same-origin/omit）", "\"same-origin\""]]
+  },
+  domMethod: {
+    h: ["メソッド", "説明", "用途"],
+    r: [["document.getElementById(id)", "ID で単一要素を取得", "フォーム要素の取得"], ["document.querySelector(sel)", "CSSセレクタで最初の1要素", "柔軟な要素指定"], ["document.querySelectorAll(sel)", "CSSセレクタで全要素（NodeList）", "複数要素の一括処理"], ["document.createElement(tag)", "新しいHTML要素を生成", "動的な要素追加"], ["element.appendChild(child)", "子要素を末尾に追加", "リスト項目の追加"], ["element.remove()", "要素をDOMから削除", "Todo項目の削除"], ["element.innerHTML", "HTML文字列で中身を設定/取得", "一括描画（XSS注意）"], ["element.textContent", "テキストのみ設定/取得（安全）", "表示テキスト更新"]]
+  },
+  eventType: {
+    h: ["イベント", "発火タイミング", "主な用途"],
+    r: [["click", "要素がクリックされた", "ボタン押下"], ["submit", "フォームが送信された", "データ送信"], ["input", "入力値が変わった（リアルタイム）", "リアルタイム検索"], ["change", "入力値が確定した（フォーカス外れ時）", "セレクトボックス"], ["keydown", "キーが押された", "ショートカットキー"], ["DOMContentLoaded", "HTML解析完了", "初期化処理"]]
+  },
+  ejsSyntax: {
+    h: ["構文", "説明", "例"],
+    r: [["<%= expr %>", "値を出力（HTMLエスケープあり・安全）", "<%= todo.title %>"], ["<%- expr %>", "値を出力（エスケープなし・XSS注意）", "<%- include('header') %>"], ["<% code %>", "JS実行（出力なし）", "<% if (done) { %>"], ["<%# comment %>", "コメント（出力されない）", "<%# TODO: 修正 %>"], ["<%- include(path) %>", "別テンプレートを埋め込み", "<%- include('partials/nav') %>"]]
+  },
+  validatorMethod: {
+    h: ["バリデータ", "説明", "使用例"],
+    r: [["body('field').notEmpty()", "空でないことを検証", "タイトル必須チェック"], ["body('field').isLength({min,max})", "文字数の範囲チェック", "タイトル1〜100文字"], ["body('field').isBoolean()", "真偽値であることを検証", "done フラグ"], ["body('field').trim()", "前後の空白を除去（サニタイズ）", "入力値の正規化"], ["body('field').escape()", "HTMLエンティティにエスケープ", "XSS対策"], ["body('field').isIn(array)", "許可値リストに含まれるか", "優先度 low/med/high"]]
+  },
+  httpStatus: {
+    h: ["ステータスコード", "意味", "使う場面"],
+    r: [["200 OK", "成功", "GET/PUT/PATCH 成功時"], ["201 Created", "リソース作成成功", "POST 成功時"], ["204 No Content", "成功（レスポンスボディなし）", "DELETE 成功時"], ["400 Bad Request", "リクエスト不正", "バリデーションエラー"], ["404 Not Found", "リソースが見つからない", "存在しないTodo ID"], ["422 Unprocessable Entity", "構文は正しいが意味的に不正", "ビジネスロジックエラー"], ["500 Internal Server Error", "サーバ内部エラー", "予期しない例外"]]
+  },
+  jestMatcher: {
+    h: ["マッチャー", "説明", "Python (pytest)"],
+    r: [["toBe(val)", "厳密等価（===）", "assert x == val"], ["toEqual(obj)", "オブジェクトの深い等価", "assert x == obj"], ["toBeTruthy()", "truthy であること", "assert x"], ["toBeFalsy()", "falsy であること", "assert not x"], ["toContain(item)", "配列/文字列に含まれる", "assert item in x"], ["toThrow()", "例外が投げられる", "pytest.raises()"], ["toHaveLength(n)", "配列/文字列の長さ", "assert len(x) == n"], ["toHaveProperty(key)", "オブジェクトにプロパティがある", "assert hasattr(x, key)"]]
+  },
+  supertestMethod: {
+    h: ["メソッド", "説明", "例"],
+    r: [["request(app).get(path)", "GETリクエスト", "request(app).get('/api/todos')"], ["request(app).post(path)", "POSTリクエスト", "request(app).post('/api/todos')"], [".send(body)", "リクエストボディを設定", ".send({ title: 'Test' })"], [".expect(status)", "ステータスコード検証", ".expect(200)"], [".expect('Content-Type', /json/)", "ヘッダ検証", "レスポンス形式チェック"], [".set('Header', 'value')", "リクエストヘッダ設定", ".set('Authorization', 'Bearer ...')"]]
+  },
+  authCompare: {
+    h: ["方式", "仕組み", "メリット", "デメリット"],
+    r: [["セッション", "サーバ側にセッションデータ保存。Cookie にセッションIDを格納。", "サーバ側で無効化が容易。実装がシンプル。", "サーバのメモリ/DBを消費。スケールアウト時に共有ストアが必要。"], ["JWT", "トークンにユーザ情報を含めてクライアント側で保持。署名で改ざん検知。", "ステートレス。マイクロサービス向き。", "トークン無効化が困難。ペイロードが大きくなりがち。"]]
+  },
+  deployCompare: {
+    h: ["サービス", "特徴", "向いている用途"],
+    r: [["Render", "Docker/Node.js 直デプロイ。無料枠あり。自動HTTPS。", "バックエンド API、フルスタック"], ["Vercel", "サーバレス関数 + CDN。Git push でデプロイ。", "フロントエンド、Next.js"], ["Railway", "DB 込みで簡単構築。従量課金。", "DB付きアプリ"], ["Fly.io", "Docker ベース。エッジデプロイ。", "低レイテンシ API"], ["AWS/GCP", "フルコントロール。学習コスト高。", "大規模プロダクション"]]
+  },
+  pm2Command: {
+    h: ["コマンド", "説明"],
+    r: [["pm2 start app.js", "アプリ起動"], ["pm2 start app.js -i max", "CPU数に応じてクラスタ起動"], ["pm2 list", "実行中プロセス一覧"], ["pm2 logs", "全プロセスのログ表示"], ["pm2 restart app", "アプリ再起動"], ["pm2 stop app", "アプリ停止"], ["pm2 delete app", "プロセスリストから削除"], ["pm2 monit", "リアルタイム監視ダッシュボード"]]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "npm init -y で package.json を生成し、\"type\": \"module\" を追加してください。\nさらに scripts に \"start\": \"node src/index.js\" を追加し、\nsrc/index.js で console.log(\"Todo App 起動!\") と表示するプログラムを作成してください。",
+    code: `// package.json を編集して ESM を有効化
+// src/index.js を作成`,
+    answer: `// package.json
+{
+  "name": "todo-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js"
+  }
+}
+
+// src/index.js
+console.log("Todo App 起動!");
+
+// 実行: npm start`
+  }, {
+    diff: 1,
+    q: "ESM の import/export を使い、src/utils.js に greet(name) 関数を定義して\nsrc/index.js から呼び出してください。\ngreet は `こんにちは、${name}さん！` を返すこと。",
+    code: `// src/utils.js
+// greet 関数を export
+
+// src/index.js
+// greet を import して呼び出し`,
+    answer: `// src/utils.js
+export function greet(name) {
+  return \`こんにちは、\${name}さん！\`;
+}
+
+// src/index.js
+import { greet } from './utils.js';
+console.log(greet("太郎"));`
+  }, {
+    diff: 2,
+    q: "以下の CJS コードを ESM に書き換えてください。\nnamed export と default export の両方を使い分けること。",
+    code: `// CJS版 (config.js)
+const PORT = 3000;
+const HOST = 'localhost';
+function getUrl() {
+  return \`http://\${HOST}:\${PORT}\`;
+}
+module.exports = { PORT, HOST, getUrl };
+module.exports.default = getUrl;`,
+    answer: `// ESM版 (config.js)
+export const PORT = 3000;
+export const HOST = 'localhost';
+
+export function getUrl() {
+  return \`http://\${HOST}:\${PORT}\`;
+}
+
+export default getUrl;
+
+// 使う側 (index.js)
+import getUrl, { PORT, HOST } from './config.js';
+console.log(getUrl());       // http://localhost:3000
+console.log(PORT, HOST);     // 3000 localhost`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "fs/promises を使って data/todos.json にTodo配列を書き出し、\n読み戻して表示するプログラムを書いてください。\nディレクトリが存在しない場合は自動作成すること。",
+    code: `// src/storage.js
+import fs from 'fs/promises';
+
+const DATA_DIR = './data';
+const FILE_PATH = './data/todos.json';
+
+// saveTodos(todos) と loadTodos() を実装`,
+    answer: `// src/storage.js
+import fs from 'fs/promises';
+import path from 'path';
+
+const DATA_DIR = './data';
+const FILE_PATH = path.join(DATA_DIR, 'todos.json');
+
+export async function saveTodos(todos) {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(FILE_PATH, JSON.stringify(todos, null, 2));
+}
+
+export async function loadTodos() {
+  try {
+    const data = await fs.readFile(FILE_PATH, 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  }
+}
+
+// src/index.js
+import { saveTodos, loadTodos } from './storage.js';
+
+const todos = [
+  { id: 1, title: "買い物", done: false },
+  { id: 2, title: "掃除", done: true }
+];
+await saveTodos(todos);
+const loaded = await loadTodos();
+console.log(loaded);`
+  }, {
+    diff: 2,
+    q: "loadTodos にエラーハンドリングを追加してください。\n・ファイルが存在しない → 空配列を返す\n・JSONが壊れている → エラーログを出して空配列を返す\n・それ以外のエラー → throw して呼び出し元に任せる",
+    code: `export async function loadTodos() {
+  // 3パターンのエラーハンドリングを実装
+}`,
+    answer: `export async function loadTodos() {
+  try {
+    const data = await fs.readFile(FILE_PATH, 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    // ファイルが存在しない
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    // JSON パースエラー
+    if (err instanceof SyntaxError) {
+      console.error('警告: todos.json が壊れています。空リストで初期化します。');
+      return [];
+    }
+    // その他のエラー（権限不足等）は再スロー
+    throw err;
+  }
+}`
+  }, {
+    diff: 3,
+    q: "Todo の追加・削除・完了切り替え・一覧取得を行う TodoStore クラスを作成してください。\n内部で loadTodos / saveTodos を使い、操作ごとにファイルに自動保存すること。\nID は既存の最大値 + 1 で自動採番すること。",
+    code: `// src/TodoStore.js
+export class TodoStore {
+  // constructor, add, remove, toggle, list を実装
+}`,
+    answer: `// src/TodoStore.js
+import { loadTodos, saveTodos } from './storage.js';
+
+export class TodoStore {
+  #todos = [];
+
+  async init() {
+    this.#todos = await loadTodos();
+    return this;
+  }
+
+  #nextId() {
+    if (this.#todos.length === 0) return 1;
+    return Math.max(...this.#todos.map(t => t.id)) + 1;
+  }
+
+  async add(title) {
+    const todo = {
+      id: this.#nextId(),
+      title,
+      done: false,
+      createdAt: new Date().toISOString()
+    };
+    this.#todos.push(todo);
+    await saveTodos(this.#todos);
+    return todo;
+  }
+
+  async remove(id) {
+    const idx = this.#todos.findIndex(t => t.id === id);
+    if (idx === -1) throw new Error(\`Todo id=\${id} not found\`);
+    const [removed] = this.#todos.splice(idx, 1);
+    await saveTodos(this.#todos);
+    return removed;
+  }
+
+  async toggle(id) {
+    const todo = this.#todos.find(t => t.id === id);
+    if (!todo) throw new Error(\`Todo id=\${id} not found\`);
+    todo.done = !todo.done;
+    await saveTodos(this.#todos);
+    return todo;
+  }
+
+  list() {
+    return [...this.#todos];
+  }
+}`
+  }],
+  ch3: [{
+    diff: 1,
+    q: "process.argv を使って、コマンドライン引数からサブコマンド（list/add/done/remove）を\n読み取り、switch文で分岐するCLIの骨格を作ってください。\n不明なコマンドにはヘルプを表示すること。",
+    code: `// src/cli.js
+const [,, command, ...args] = process.argv;
+// switch 文で分岐`,
+    answer: `// src/cli.js
+import { TodoStore } from './TodoStore.js';
+
+const [,, command, ...args] = process.argv;
+const store = await new TodoStore().init();
+
+switch (command) {
+  case 'list': {
+    const todos = store.list();
+    if (todos.length === 0) {
+      console.log('Todoはありません。');
+    } else {
+      todos.forEach(t => {
+        const mark = t.done ? '[x]' : '[ ]';
+        console.log(\`  \${mark} #\${t.id} \${t.title}\`);
+      });
+    }
+    break;
+  }
+  case 'add': {
+    const title = args.join(' ');
+    if (!title) { console.error('タイトルを指定してください。'); break; }
+    const todo = await store.add(title);
+    console.log(\`追加: #\${todo.id} \${todo.title}\`);
+    break;
+  }
+  case 'done': {
+    const id = Number(args[0]);
+    if (isNaN(id)) { console.error('IDを指定してください。'); break; }
+    const todo = await store.toggle(id);
+    console.log(\`更新: #\${todo.id} → \${todo.done ? '完了' : '未完了'}\`);
+    break;
+  }
+  case 'remove': {
+    const id = Number(args[0]);
+    if (isNaN(id)) { console.error('IDを指定してください。'); break; }
+    const removed = await store.remove(id);
+    console.log(\`削除: #\${removed.id} \${removed.title}\`);
+    break;
+  }
+  default:
+    console.log(\`使い方:
+  node src/cli.js list          — Todo一覧
+  node src/cli.js add <title>   — 追加
+  node src/cli.js done <id>     — 完了切替
+  node src/cli.js remove <id>   — 削除\`);
+}`
+  }, {
+    diff: 2,
+    q: "readline/promises を使って対話型のTodo追加モードを実装してください。\n・タイトルを聞く → 空なら終了、入力があれば追加してもう一度聞く\n・追加後に現在の一覧を表示",
+    code: `// src/interactive.js
+import readline from 'readline/promises';
+import { stdin, stdout } from 'process';
+// 対話ループを実装`,
+    answer: `// src/interactive.js
+import readline from 'readline/promises';
+import { stdin, stdout } from 'process';
+import { TodoStore } from './TodoStore.js';
+
+const rl = readline.createInterface({ input: stdin, output: stdout });
+const store = await new TodoStore().init();
+
+console.log('=== Todo 対話モード ===');
+console.log('タイトルを入力（空で終了）\\n');
+
+while (true) {
+  const title = await rl.question('新しいTodo> ');
+  if (!title.trim()) {
+    console.log('終了します。');
+    break;
+  }
+  const todo = await store.add(title.trim());
+  console.log(\`  追加: #\${todo.id} \${todo.title}\`);
+  console.log('--- 現在のTodo ---');
+  store.list().forEach(t => {
+    const mark = t.done ? '[x]' : '[ ]';
+    console.log(\`  \${mark} #\${t.id} \${t.title}\`);
+  });
+  console.log('');
+}
+
+rl.close();`
+  }, {
+    diff: 2,
+    q: "CLIの出力にchalk（またはpicocolors）で色を付けてください。\n・完了済みは緑、未完了は黄色、IDはシアン、エラーは赤で表示\n・パッケージのインストールコマンドも記載すること",
+    code: `// npm install chalk
+// src/cli.js に色付け追加`,
+    answer: `// npm install chalk
+// src/cli.js
+import chalk from 'chalk';
+import { TodoStore } from './TodoStore.js';
+
+const [,, command, ...args] = process.argv;
+const store = await new TodoStore().init();
+
+function printTodo(t) {
+  const mark = t.done
+    ? chalk.green('[x]')
+    : chalk.yellow('[ ]');
+  const title = t.done
+    ? chalk.strikethrough.gray(t.title)
+    : t.title;
+  console.log(\`  \${mark} \${chalk.cyan('#' + t.id)} \${title}\`);
+}
+
+switch (command) {
+  case 'list': {
+    const todos = store.list();
+    if (todos.length === 0) {
+      console.log(chalk.gray('Todoはありません。'));
+    } else {
+      console.log(chalk.bold('\\n📋 Todo一覧:'));
+      todos.forEach(printTodo);
+      console.log('');
+    }
+    break;
+  }
+  case 'add': {
+    const title = args.join(' ');
+    if (!title) {
+      console.error(chalk.red('エラー: タイトルを指定してください。'));
+      break;
+    }
+    const todo = await store.add(title);
+    console.log(chalk.green(\`追加: #\${todo.id} \${todo.title}\`));
+    break;
+  }
+  default:
+    console.log(chalk.yellow('使い方: node src/cli.js [list|add|done|remove]'));
+}`
+  }],
+  ch4: [{
+    diff: 1,
+    q: "Express で最小限のTodo API サーバを作ってください。\n・GET /api/todos — 全Todo取得（JSON）\n・POST /api/todos — Todo追加（titleをボディで受取）\n・ポート3000で起動",
+    code: `// npm install express
+// src/server.js`,
+    answer: `// src/server.js
+import express from 'express';
+import { TodoStore } from './TodoStore.js';
+
+const app = express();
+app.use(express.json());
+
+const store = await new TodoStore().init();
+
+app.get('/api/todos', (req, res) => {
+  res.json(store.list());
+});
+
+app.post('/api/todos', async (req, res) => {
+  const { title } = req.body;
+  if (!title) {
+    return res.status(400).json({ error: 'title is required' });
+  }
+  const todo = await store.add(title);
+  res.status(201).json(todo);
+});
+
+app.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
+});`
+  }, {
+    diff: 2,
+    q: "上記のAPIに PUT（完了切替）と DELETE（削除）を追加し、\nさらに CORS ミドルウェアを設定してください。\nエラー時は適切なステータスコードを返すこと。",
+    code: `// npm install cors
+// PUT /api/todos/:id と DELETE /api/todos/:id を追加`,
+    answer: `// src/server.js
+import express from 'express';
+import cors from 'cors';
+import { TodoStore } from './TodoStore.js';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const store = await new TodoStore().init();
+
+app.get('/api/todos', (req, res) => {
+  res.json(store.list());
+});
+
+app.post('/api/todos', async (req, res) => {
+  const { title } = req.body;
+  if (!title) return res.status(400).json({ error: 'title is required' });
+  const todo = await store.add(title);
+  res.status(201).json(todo);
+});
+
+app.put('/api/todos/:id', async (req, res) => {
+  try {
+    const todo = await store.toggle(Number(req.params.id));
+    res.json(todo);
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+app.delete('/api/todos/:id', async (req, res) => {
+  try {
+    const removed = await store.remove(Number(req.params.id));
+    res.json(removed);
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+app.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
+});`
+  }, {
+    diff: 3,
+    q: "Router を使ってルーティングをモジュール分離し、\nリクエストログを出力するカスタムミドルウェアも作成してください。\n・src/routes/todos.js にTodoルートを分離\n・src/middleware/logger.js にロガーを分離\n・src/server.js でまとめて使う",
+    code: `// 3ファイルに分離して整理`,
+    answer: `// src/middleware/logger.js
+export function logger(req, res, next) {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    console.log(
+      \`\${req.method} \${req.originalUrl} \${res.statusCode} - \${ms}ms\`
+    );
+  });
+  next();
+}
+
+// src/routes/todos.js
+import { Router } from 'express';
+import { TodoStore } from '../TodoStore.js';
+
+const router = Router();
+const store = await new TodoStore().init();
+
+router.get('/', (req, res) => {
+  res.json(store.list());
+});
+
+router.post('/', async (req, res) => {
+  const { title } = req.body;
+  if (!title) return res.status(400).json({ error: 'title is required' });
+  const todo = await store.add(title);
+  res.status(201).json(todo);
+});
+
+router.put('/:id', async (req, res) => {
+  try {
+    const todo = await store.toggle(Number(req.params.id));
+    res.json(todo);
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  try {
+    await store.remove(Number(req.params.id));
+    res.status(204).end();
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+export default router;
+
+// src/server.js
+import express from 'express';
+import cors from 'cors';
+import { logger } from './middleware/logger.js';
+import todosRouter from './routes/todos.js';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+app.use(logger);
+app.use('/api/todos', todosRouter);
+
+app.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
+});`
+  }],
+  ch5: [{
+    diff: 1,
+    q: "fetch API を使って /api/todos から Todo 一覧を取得し、\n<ul id=\"todo-list\"> に <li> として表示する関数 renderTodos() を書いてください。",
+    code: `<!-- public/index.html の <script> 内 -->
+<ul id="todo-list"></ul>
+<script>
+async function renderTodos() {
+  // fetch → DOM 操作
+}
+renderTodos();
+</script>`,
+    answer: `async function renderTodos() {
+  const res = await fetch('/api/todos');
+  const todos = await res.json();
+  const ul = document.getElementById('todo-list');
+  ul.innerHTML = '';
+
+  todos.forEach(todo => {
+    const li = document.createElement('li');
+    li.textContent = todo.title;
+    li.style.textDecoration = todo.done ? 'line-through' : 'none';
+    li.style.cursor = 'pointer';
+
+    li.addEventListener('click', async () => {
+      await fetch(\`/api/todos/\${todo.id}\`, { method: 'PUT' });
+      renderTodos();
+    });
+
+    ul.appendChild(li);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', renderTodos);`
+  }, {
+    diff: 2,
+    q: "Todo追加フォームを作り、submit イベントで POST してから一覧を再描画してください。\nまた、各Todoに削除ボタンも付けてください。",
+    code: `<form id="add-form">
+  <input id="title-input" placeholder="新しいTodo...">
+  <button type="submit">追加</button>
+</form>
+<ul id="todo-list"></ul>`,
+    answer: `const form = document.getElementById('add-form');
+const input = document.getElementById('title-input');
+const ul = document.getElementById('todo-list');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const title = input.value.trim();
+  if (!title) return;
+
+  await fetch('/api/todos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title })
+  });
+
+  input.value = '';
+  renderTodos();
+});
+
+async function renderTodos() {
+  const res = await fetch('/api/todos');
+  const todos = await res.json();
+  ul.innerHTML = '';
+
+  todos.forEach(todo => {
+    const li = document.createElement('li');
+
+    const span = document.createElement('span');
+    span.textContent = todo.title;
+    span.style.textDecoration = todo.done ? 'line-through' : 'none';
+    span.style.cursor = 'pointer';
+    span.addEventListener('click', async () => {
+      await fetch(\`/api/todos/\${todo.id}\`, { method: 'PUT' });
+      renderTodos();
+    });
+
+    const btn = document.createElement('button');
+    btn.textContent = '削除';
+    btn.addEventListener('click', async () => {
+      await fetch(\`/api/todos/\${todo.id}\`, { method: 'DELETE' });
+      renderTodos();
+    });
+
+    li.appendChild(span);
+    li.appendChild(btn);
+    ul.appendChild(li);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', renderTodos);`
+  }, {
+    diff: 3,
+    q: "フロントエンドに以下の機能を追加してください。\n・フィルタ機能（全て / 未完了 / 完了済み）\n・Todo 件数の表示（残り N 件）\n・Enter キーでフォーム送信",
+    code: `// フィルタボタンと件数表示を追加`,
+    answer: `let currentFilter = 'all'; // 'all' | 'active' | 'done'
+
+function createFilterButtons() {
+  const container = document.getElementById('filters');
+  ['all', 'active', 'done'].forEach(filter => {
+    const btn = document.createElement('button');
+    btn.textContent = { all: '全て', active: '未完了', done: '完了済み' }[filter];
+    btn.addEventListener('click', () => {
+      currentFilter = filter;
+      renderTodos();
+    });
+    container.appendChild(btn);
+  });
+}
+
+async function renderTodos() {
+  const res = await fetch('/api/todos');
+  const allTodos = await res.json();
+
+  const filtered = allTodos.filter(t => {
+    if (currentFilter === 'active') return !t.done;
+    if (currentFilter === 'done') return t.done;
+    return true;
+  });
+
+  // 件数表示
+  const remaining = allTodos.filter(t => !t.done).length;
+  document.getElementById('count').textContent =
+    \`残り \${remaining} 件\`;
+
+  // フィルタボタンのアクティブ状態
+  document.querySelectorAll('#filters button').forEach(btn => {
+    const map = { '全て': 'all', '未完了': 'active', '完了済み': 'done' };
+    btn.style.fontWeight = map[btn.textContent] === currentFilter
+      ? 'bold' : 'normal';
+  });
+
+  const ul = document.getElementById('todo-list');
+  ul.innerHTML = '';
+
+  filtered.forEach(todo => {
+    const li = document.createElement('li');
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = todo.done;
+    checkbox.addEventListener('change', async () => {
+      await fetch(\`/api/todos/\${todo.id}\`, { method: 'PUT' });
+      renderTodos();
+    });
+
+    const span = document.createElement('span');
+    span.textContent = todo.title;
+    span.style.textDecoration = todo.done ? 'line-through' : 'none';
+
+    const btn = document.createElement('button');
+    btn.textContent = '削除';
+    btn.addEventListener('click', async () => {
+      await fetch(\`/api/todos/\${todo.id}\`, { method: 'DELETE' });
+      renderTodos();
+    });
+
+    li.appendChild(checkbox);
+    li.appendChild(span);
+    li.appendChild(btn);
+    ul.appendChild(li);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  createFilterButtons();
+  renderTodos();
+});`
+  }],
+  ch6: [{
+    diff: 1,
+    q: "EJS を使って Todo 一覧ページをサーバサイドレンダリングしてください。\nviews/index.ejs にテンプレートを作り、GET / でレンダリング。",
+    code: `// npm install ejs
+// app.set('view engine', 'ejs') を設定
+// views/index.ejs テンプレートを作成`,
+    answer: `// src/server.js に追加
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, '../views'));
+
+app.get('/', async (req, res) => {
+  const todos = store.list();
+  res.render('index', {
+    title: 'Todo App',
+    todos,
+    remaining: todos.filter(t => !t.done).length
+  });
+});
+
+// views/index.ejs
+// <!DOCTYPE html>
+// <html>
+// <head><title><%= title %></title></head>
+// <body>
+//   <h1><%= title %></h1>
+//   <p>残り <%= remaining %> 件</p>
+//   <ul>
+//     <% todos.forEach(todo => { %>
+//       <li style="text-decoration: <%= todo.done ? 'line-through' : 'none' %>">
+//         <%= todo.title %>
+//       </li>
+//     <% }) %>
+//   </ul>
+// </body>
+// </html>`
+  }, {
+    diff: 2,
+    q: "EJS のパーシャル（部分テンプレート）を使って、\nheader / footer / todo-item を分離してください。\nheaderにナビゲーション、footerに著作権表示を入れること。",
+    code: `// views/partials/header.ejs
+// views/partials/footer.ejs
+// views/partials/todo-item.ejs
+// views/index.ejs から include`,
+    answer: `// views/partials/header.ejs
+// <header>
+//   <nav>
+//     <a href="/">ホーム</a>
+//     <a href="/about">About</a>
+//   </nav>
+// </header>
+
+// views/partials/footer.ejs
+// <footer>
+//   <p>&copy; 2026 Todo App</p>
+// </footer>
+
+// views/partials/todo-item.ejs
+// <li class="todo-item <%= todo.done ? 'done' : '' %>">
+//   <span><%= todo.title %></span>
+//   <small><%= todo.createdAt %></small>
+// </li>
+
+// views/index.ejs
+// <!DOCTYPE html>
+// <html>
+// <head><title><%= title %></title></head>
+// <body>
+//   <%- include('partials/header') %>
+//   <main>
+//     <h1><%= title %></h1>
+//     <ul>
+//       <% todos.forEach(todo => { %>
+//         <%- include('partials/todo-item', { todo }) %>
+//       <% }) %>
+//     </ul>
+//   </main>
+//   <%- include('partials/footer') %>
+// </body>
+// </html>`
+  }, {
+    diff: 3,
+    q: "SSR と API を併存させ、フォームからのPOSTでTodoを追加できるようにしてください。\nPOST /todos で追加後、GET / にリダイレクト（PRGパターン）。\nまた、EJS 内で条件分岐を使い、Todoが0件の場合のメッセージも表示すること。",
+    code: `// PRGパターン: POST → リダイレクト → GET`,
+    answer: `// src/server.js に追加
+app.post('/todos', async (req, res) => {
+  const { title } = req.body;
+  if (title && title.trim()) {
+    await store.add(title.trim());
+  }
+  res.redirect('/');
+});
+
+// views/index.ejs
+// <form action="/todos" method="POST">
+//   <input name="title" placeholder="新しいTodo..." required>
+//   <button type="submit">追加</button>
+// </form>
+//
+// <% if (todos.length === 0) { %>
+//   <p class="empty-msg">Todoはありません。上のフォームから追加しましょう！</p>
+// <% } else { %>
+//   <p>全 <%= todos.length %> 件（残り <%= remaining %> 件）</p>
+//   <ul>
+//     <% todos.forEach(todo => { %>
+//       <li>
+//         <form action="/todos/<%= todo.id %>/toggle" method="POST" style="display:inline">
+//           <button type="submit"><%= todo.done ? '☑' : '☐' %></button>
+//         </form>
+//         <span style="<%= todo.done ? 'text-decoration:line-through' : '' %>">
+//           <%= todo.title %>
+//         </span>
+//         <form action="/todos/<%= todo.id %>/delete" method="POST" style="display:inline">
+//           <button type="submit">削除</button>
+//         </form>
+//       </li>
+//     <% }) %>
+//   </ul>
+// <% } %>`
+  }],
+  ch7: [{
+    diff: 1,
+    q: "express-validator を使って POST /api/todos のバリデーションを追加してください。\n・title は必須・1文字以上100文字以下・前後空白トリム・HTMLエスケープ",
+    code: `// npm install express-validator
+// バリデーション付き POST ルート`,
+    answer: `import { body, validationResult } from 'express-validator';
+
+const validateTodo = [
+  body('title')
+    .trim()
+    .notEmpty().withMessage('タイトルは必須です')
+    .isLength({ max: 100 }).withMessage('タイトルは100文字以内です')
+    .escape()
+];
+
+router.post('/', validateTodo, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      error: 'バリデーションエラー',
+      details: errors.array()
+    });
+  }
+  const todo = await store.add(req.body.title);
+  res.status(201).json(todo);
+});`
+  }, {
+    diff: 2,
+    q: "カスタムエラークラス AppError を作成し、\nNotFoundError / ValidationError を継承で定義してください。\n集約エラーハンドリングミドルウェアも作成し、エラーの種類に応じて\n適切なステータスコードとJSONを返すようにしてください。",
+    code: `// src/errors.js — カスタムエラー定義
+// src/middleware/errorHandler.js — 集約ハンドラ`,
+    answer: `// src/errors.js
+export class AppError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.name = this.constructor.name;
+    this.statusCode = statusCode;
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(resource = 'リソース') {
+    super(\`\${resource}が見つかりません\`, 404);
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(details) {
+    super('バリデーションエラー', 400);
+    this.details = details;
+  }
+}
+
+// src/middleware/errorHandler.js
+export function errorHandler(err, req, res, next) {
+  console.error(\`[\${err.name}] \${err.message}\`);
+
+  if (err.name === 'ValidationError') {
+    return res.status(err.statusCode).json({
+      error: err.message,
+      details: err.details || []
+    });
+  }
+
+  if (err.statusCode) {
+    return res.status(err.statusCode).json({
+      error: err.message
+    });
+  }
+
+  // 予期しないエラー
+  res.status(500).json({
+    error: '内部サーバエラーが発生しました'
+  });
+}
+
+// src/server.js 末尾に追加
+// app.use(errorHandler);`
+  }, {
+    diff: 3,
+    q: "非同期ルートハンドラのエラーを自動キャッチする asyncHandler ラッパーと、\n404 キャッチオールミドルウェアを作成してください。\nさらに、開発環境ではスタックトレースも返すようにしてください。",
+    code: `// asyncHandler + 404 + 環境別エラー詳細`,
+    answer: `// src/middleware/asyncHandler.js
+export function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
+// src/middleware/notFound.js
+import { NotFoundError } from '../errors.js';
+
+export function notFound(req, res, next) {
+  next(new NotFoundError(\`\${req.method} \${req.originalUrl}\`));
+}
+
+// src/middleware/errorHandler.js（環境対応版）
+export function errorHandler(err, req, res, next) {
+  const statusCode = err.statusCode || 500;
+  const response = {
+    error: err.message || '内部サーバエラー',
+    ...(err.details && { details: err.details })
+  };
+
+  // 開発環境ではスタックトレースを含める
+  if (process.env.NODE_ENV !== 'production') {
+    response.stack = err.stack;
+  }
+
+  console.error(\`[\${new Date().toISOString()}] \${err.name}: \${err.message}\`);
+  res.status(statusCode).json(response);
+}
+
+// src/routes/todos.js（asyncHandler適用）
+import { asyncHandler } from '../middleware/asyncHandler.js';
+
+router.post('/', validateTodo, asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    throw new ValidationError(errors.array());
+  }
+  const todo = await store.add(req.body.title);
+  res.status(201).json(todo);
+}));
+
+// src/server.js 末尾
+// app.use(notFound);
+// app.use(errorHandler);`
+  }],
+  ch8: [{
+    diff: 1,
+    q: "Jest を使って TodoStore の add / list メソッドをテストしてください。\nファイルI/Oはモックして、メモリ上だけで動くようにすること。",
+    code: `// npm install --save-dev jest @jest/globals
+// __tests__/TodoStore.test.js`,
+    answer: `// __tests__/TodoStore.test.js
+import { jest } from '@jest/globals';
+
+// storage モジュールをモック
+jest.unstable_mockModule('../src/storage.js', () => ({
+  loadTodos: jest.fn().mockResolvedValue([]),
+  saveTodos: jest.fn().mockResolvedValue(undefined)
+}));
+
+const { TodoStore } = await import('../src/TodoStore.js');
+const { saveTodos } = await import('../src/storage.js');
+
+describe('TodoStore', () => {
+  let store;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    store = await new TodoStore().init();
+  });
+
+  test('初期状態は空', () => {
+    expect(store.list()).toEqual([]);
+    expect(store.list()).toHaveLength(0);
+  });
+
+  test('add でTodoが追加される', async () => {
+    const todo = await store.add('テスト');
+    expect(todo).toHaveProperty('id', 1);
+    expect(todo).toHaveProperty('title', 'テスト');
+    expect(todo).toHaveProperty('done', false);
+    expect(store.list()).toHaveLength(1);
+    expect(saveTodos).toHaveBeenCalledTimes(1);
+  });
+
+  test('複数追加でIDが自動採番される', async () => {
+    const t1 = await store.add('1番目');
+    const t2 = await store.add('2番目');
+    expect(t1.id).toBe(1);
+    expect(t2.id).toBe(2);
+  });
+});`
+  }, {
+    diff: 2,
+    q: "supertest を使って Express API のエンドポイントをテストしてください。\n・GET /api/todos が 200 と配列を返す\n・POST /api/todos が 201 と新しいTodoを返す\n・存在しないIDへの DELETE が 404 を返す",
+    code: `// npm install --save-dev supertest
+// __tests__/api.test.js`,
+    answer: `// __tests__/api.test.js
+import { jest } from '@jest/globals';
+import request from 'supertest';
+
+jest.unstable_mockModule('../src/storage.js', () => ({
+  loadTodos: jest.fn().mockResolvedValue([]),
+  saveTodos: jest.fn().mockResolvedValue(undefined)
+}));
+
+// app を export する形に server.js を修正する前提
+const { createApp } = await import('../src/app.js');
+const app = await createApp();
+
+describe('Todo API', () => {
+  test('GET /api/todos は 200 と配列', async () => {
+    const res = await request(app)
+      .get('/api/todos')
+      .expect(200)
+      .expect('Content-Type', /json/);
+
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  test('POST /api/todos は 201 と新しいTodo', async () => {
+    const res = await request(app)
+      .post('/api/todos')
+      .send({ title: 'テストTodo' })
+      .expect(201)
+      .expect('Content-Type', /json/);
+
+    expect(res.body).toHaveProperty('title', 'テストTodo');
+    expect(res.body).toHaveProperty('done', false);
+    expect(res.body).toHaveProperty('id');
+  });
+
+  test('POST /api/todos タイトル無しは 400', async () => {
+    await request(app)
+      .post('/api/todos')
+      .send({})
+      .expect(400);
+  });
+
+  test('DELETE /api/todos/999 は 404', async () => {
+    await request(app)
+      .delete('/api/todos/999')
+      .expect(404);
+  });
+});`
+  }, {
+    diff: 3,
+    q: "カバレッジ計測を設定し、TodoStore の toggle / remove のエッジケースもテストしてください。\n・存在しないIDの toggle で例外が投げられること\n・remove 後にリストの長さが減ること\n・package.json にカバレッジ用スクリプトを追加すること",
+    code: `// jest.config.js でカバレッジ設定
+// エッジケーステスト追加`,
+    answer: `// package.json scripts に追加
+// "test": "node --experimental-vm-modules node_modules/.bin/jest",
+// "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage"
+
+// jest.config.js
+// export default {
+//   transform: {},
+//   coverageThreshold: {
+//     global: { branches: 80, functions: 80, lines: 80, statements: 80 }
+//   }
+// };
+
+// __tests__/TodoStore.test.js に追加
+describe('TodoStore toggle/remove', () => {
+  let store;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    store = await new TodoStore().init();
+    await store.add('タスク1');
+    await store.add('タスク2');
+  });
+
+  test('toggle で done が反転する', async () => {
+    const toggled = await store.toggle(1);
+    expect(toggled.done).toBe(true);
+
+    const toggledAgain = await store.toggle(1);
+    expect(toggledAgain.done).toBe(false);
+  });
+
+  test('存在しないIDの toggle は例外', async () => {
+    await expect(store.toggle(999))
+      .rejects.toThrow('Todo id=999 not found');
+  });
+
+  test('remove でリスト長が減る', async () => {
+    expect(store.list()).toHaveLength(2);
+    await store.remove(1);
+    expect(store.list()).toHaveLength(1);
+    expect(store.list()[0].id).toBe(2);
+  });
+
+  test('存在しないIDの remove は例外', async () => {
+    await expect(store.remove(999))
+      .rejects.toThrow('Todo id=999 not found');
+  });
+
+  test('remove 後に同じIDを再度 remove は例外', async () => {
+    await store.remove(1);
+    await expect(store.remove(1))
+      .rejects.toThrow('Todo id=1 not found');
+  });
+});`
+  }],
+  ch9: [{
+    diff: 2,
+    q: "bcrypt を使ってユーザ登録（パスワードハッシュ化）とログイン（検証）の\n関数を作成してください。\n・hashPassword(plain) → ハッシュ文字列\n・verifyPassword(plain, hash) → boolean",
+    code: `// npm install bcrypt
+// src/auth.js`,
+    answer: `// src/auth.js
+import bcrypt from 'bcrypt';
+
+const SALT_ROUNDS = 10;
+
+export async function hashPassword(plain) {
+  return bcrypt.hash(plain, SALT_ROUNDS);
+}
+
+export async function verifyPassword(plain, hash) {
+  return bcrypt.compare(plain, hash);
+}
+
+// 使用例
+// const hash = await hashPassword('mypassword');
+// console.log(hash);  // $2b$10$...
+// const ok = await verifyPassword('mypassword', hash);
+// console.log(ok);    // true
+// const ng = await verifyPassword('wrong', hash);
+// console.log(ng);    // false`
+  }, {
+    diff: 2,
+    q: "express-session を使ったセッション認証を実装してください。\n・POST /auth/register — ユーザ登録\n・POST /auth/login — ログイン（セッション作成）\n・POST /auth/logout — ログアウト\n・GET /auth/me — ログインユーザ情報",
+    code: `// npm install express-session
+// src/routes/auth.js`,
+    answer: `// src/routes/auth.js
+import { Router } from 'express';
+import { hashPassword, verifyPassword } from '../auth.js';
+
+const router = Router();
+
+// 簡易ユーザストア（本番ではDBを使う）
+const users = new Map();
+
+router.post('/register', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username と password は必須' });
+  }
+  if (users.has(username)) {
+    return res.status(409).json({ error: 'ユーザ名は既に使われています' });
+  }
+  const hash = await hashPassword(password);
+  users.set(username, { username, passwordHash: hash });
+  res.status(201).json({ message: '登録完了', username });
+});
+
+router.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+  const user = users.get(username);
+  if (!user) {
+    return res.status(401).json({ error: 'ユーザ名またはパスワードが違います' });
+  }
+  const ok = await verifyPassword(password, user.passwordHash);
+  if (!ok) {
+    return res.status(401).json({ error: 'ユーザ名またはパスワードが違います' });
+  }
+  req.session.user = { username };
+  res.json({ message: 'ログイン成功', username });
+});
+
+router.post('/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) return res.status(500).json({ error: 'ログアウト失敗' });
+    res.clearCookie('connect.sid');
+    res.json({ message: 'ログアウト完了' });
+  });
+});
+
+router.get('/me', (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ error: '未ログイン' });
+  }
+  res.json(req.session.user);
+});
+
+export default router;`
+  }, {
+    diff: 3,
+    q: "JWT 認証を実装し、認証ミドルウェアで保護されたルートを作ってください。\n・POST /auth/token — ログインしてJWT発行\n・authMiddleware — Authorization ヘッダからトークン検証\n・GET /api/todos を認証必須にする",
+    code: `// npm install jsonwebtoken
+// JWT 認証の完全な実装`,
+    answer: `// src/middleware/auth.js
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
+const TOKEN_EXPIRY = '24h';
+
+export function generateToken(payload) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+}
+
+export function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: '認証トークンが必要です' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'トークンの有効期限が切れています' });
+    }
+    return res.status(401).json({ error: '無効なトークンです' });
+  }
+}
+
+// src/routes/auth.js に追加
+import { generateToken } from '../middleware/auth.js';
+
+router.post('/token', async (req, res) => {
+  const { username, password } = req.body;
+  const user = users.get(username);
+  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    return res.status(401).json({ error: '認証失敗' });
+  }
+  const token = generateToken({ username });
+  res.json({ token, expiresIn: '24h' });
+});
+
+// src/routes/todos.js に認証追加
+import { authMiddleware } from '../middleware/auth.js';
+router.use(authMiddleware); // 全Todoルートを保護`
+  }],
+  ch10: [{
+    diff: 1,
+    q: "環境変数を使って PORT と NODE_ENV を設定してください。\n・.env ファイルから読み込み（dotenv 不使用、Node.js 22 の --env-file を使用）\n・.env.example も作成すること",
+    code: `// .env と .env.example を作成
+// node --env-file=.env src/server.js`,
+    answer: `// .env
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=my-super-secret-key-change-me
+
+// .env.example
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=
+
+// src/config.js
+export const config = {
+  port: parseInt(process.env.PORT || '3000', 10),
+  nodeEnv: process.env.NODE_ENV || 'development',
+  jwtSecret: process.env.JWT_SECRET || 'dev-secret',
+  isDev: (process.env.NODE_ENV || 'development') !== 'production'
+};
+
+// src/server.js
+import { config } from './config.js';
+
+app.listen(config.port, () => {
+  console.log(\`[\${config.nodeEnv}] Server on port \${config.port}\`);
+});
+
+// 起動コマンド
+// node --env-file=.env src/server.js
+
+// .gitignore に追加
+// .env
+// node_modules/
+// data/`
+  }, {
+    diff: 2,
+    q: "Dockerfile を作成して、Todo アプリをコンテナ化してください。\n・マルチステージビルド（deps → build → production）\n・非rootユーザで実行\n・docker-compose.yml も作成すること",
+    code: `// Dockerfile と docker-compose.yml を作成`,
+    answer: `# Dockerfile
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+FROM node:22-alpine AS production
+WORKDIR /app
+
+# 非rootユーザ作成
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY src/ ./src/
+COPY views/ ./views/
+COPY public/ ./public/
+COPY package.json ./
+
+# データディレクトリ作成
+RUN mkdir -p data && chown -R appuser:appgroup /app
+
+USER appuser
+EXPOSE 3000
+ENV NODE_ENV=production
+
+CMD ["node", "src/server.js"]
+
+# docker-compose.yml
+# version: '3.8'
+# services:
+#   app:
+#     build: .
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - NODE_ENV=production
+#       - PORT=3000
+#       - JWT_SECRET=\${JWT_SECRET}
+#     volumes:
+#       - todo-data:/app/data
+#     restart: unless-stopped
+#
+# volumes:
+#   todo-data:
+
+# 実行
+# docker build -t todo-app .
+# docker run -p 3000:3000 todo-app
+# または
+# docker compose up -d`
+  }, {
+    diff: 3,
+    q: "PM2 のクラスタモードを設定し、ecosystem ファイルを作成してください。\nさらに、簡易的なヘルスチェックエンドポイント GET /health も追加すること。",
+    code: `// npm install -g pm2
+// ecosystem.config.cjs を作成
+// ヘルスチェック実装`,
+    answer: `// ecosystem.config.cjs
+module.exports = {
+  apps: [{
+    name: 'todo-app',
+    script: 'src/server.js',
+    instances: 'max',
+    exec_mode: 'cluster',
+    env: {
+      NODE_ENV: 'development',
+      PORT: 3000
+    },
+    env_production: {
+      NODE_ENV: 'production',
+      PORT: 3000
+    },
+    max_memory_restart: '256M',
+    log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    error_file: './logs/error.log',
+    out_file: './logs/output.log',
+    merge_logs: true
+  }]
+};
+
+// src/server.js にヘルスチェック追加
+app.get('/health', (req, res) => {
+  const uptime = process.uptime();
+  const memory = process.memoryUsage();
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(uptime),
+    memory: {
+      rss: Math.round(memory.rss / 1024 / 1024) + 'MB',
+      heapUsed: Math.round(memory.heapUsed / 1024 / 1024) + 'MB'
+    },
+    timestamp: new Date().toISOString(),
+    pid: process.pid
+  });
+});
+
+// 起動コマンド
+// pm2 start ecosystem.config.cjs
+// pm2 start ecosystem.config.cjs --env production
+// pm2 monit`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "Node.jsプロジェクトセットアップ",
+  est: "45分",
+  goal: "npm init でプロジェクトを初期化し、package.json の各フィールドの意味を理解する。ES Modules（ESM）を有効化して import/export 構文を使えるようになり、npm scripts でアプリを起動できる状態を作る。Python の pip/venv との対応関係を把握し、Node.js のモジュールシステムの全体像をつかむ。",
+  sections: [{
+    title: "なぜ Node.js なのか",
+    body: "Python 開発者にとって JavaScript は「ブラウザの言語」という印象が強いかもしれませんが、Node.js の登場以降、サーバサイドでも広く使われるようになりました。npm エコシステムは世界最大のパッケージレジストリであり、Express や Next.js などのフレームワーク、React や Vue などのフロントエンドライブラリまで、すべて npm を通じて管理されます。\n\nPython では pip install でパッケージを入れ、venv で仮想環境を作りますが、Node.js では npm install がその両方を兼ねます。node_modules ディレクトリにプロジェクトローカルでパッケージが入るため、仮想環境を別途作る必要がありません。この違いは最初戸惑いますが、慣れると「環境の切り替え忘れ」事故が起きにくい設計だと感じるはずです。\n\nこのコースでは Node.js 22 LTS を前提に、Todo アプリを CLI からスタートし、REST API、フロントエンド統合、テスト、認証、デプロイまで段階的に構築していきます。各章で新しい概念を1つずつ積み上げ、最終的に実務で通用する構成のアプリを完成させます。"
+  }, {
+    title: "npm init と package.json",
+    body: "Node.js プロジェクトの起点は package.json です。Python の setup.py や pyproject.toml に相当するもので、プロジェクト名・バージョン・依存パッケージ・スクリプトなど、プロジェクトのメタ情報をすべてこのファイルで管理します。npm init -y を実行すると、デフォルト値で package.json が自動生成されます。\n\nPython では requirements.txt や Pipfile で依存を管理しますが、package.json は依存管理だけでなくプロジェクトの設定ファイルとしても機能します。scripts フィールドに定義したコマンドは npm run <名前> で実行でき、Makefile や invoke のタスクランナーのような役割を果たします。start だけは特別で、npm start と run を省略して呼べます。",
+    code: `# プロジェクト初期化
+mkdir todo-app && cd todo-app
+npm init -y
+
+# 生成される package.json の中身
+cat package.json`,
+    afterCode: "npm init -y の -y は「全ての質問にデフォルトで回答」するフラグです。対話的に設定したい場合は -y を外して npm init だけで実行します。",
+    table: T.packageJson,
+    afterTable: "dependencies と devDependencies の使い分けは重要です。express のように本番で必要なものは dependencies に、jest のようにテスト時だけ必要なものは devDependencies に入れます。npm install --save-dev（または -D）で後者に追加されます。"
+  }, {
+    title: "ES Modules vs CommonJS",
+    body: "Node.js には歴史的に 2 つのモジュールシステムがあります。古い方の CommonJS（CJS）は require() / module.exports を使い、新しい方の ES Modules（ESM）は import / export を使います。Python では import 文が言語に組み込まれていますが、JavaScript ではこのモジュールシステム自体が長い進化の歴史を持っています。\n\nNode.js 22 では ESM が安定しており、新規プロジェクトでは ESM を使うのが推奨です。package.json に \"type\": \"module\" を追加するだけで、.js ファイルが ESM として扱われるようになります。CJS を使いたい場合は拡張子を .cjs にするか、type を省略します。\n\nPython の from module import name に最も近いのは ESM の import { name } from './module.js' です。CJS の require() は動的にモジュールを読み込めるという点で Python の importlib.import_module() に近い面もありますが、ESM の静的解析可能な import の方が、バンドラによる最適化（Tree Shaking）が効くため現代的な選択です。",
+    table: T.cjsVsEsm,
+    afterTable: "重要: ESM では import パスにファイル拡張子（.js）が必須です。Python のように拡張子なしで import することはできません。これはブラウザとの互換性を保つための設計です。"
+  }, {
+    title: "プロジェクト構成",
+    body: "Python では src/ ディレクトリの下にパッケージを置き、__init__.py でパッケージとして認識させます。Node.js では __init__.py に相当するものは不要で、ディレクトリ構成は自由度が高いです。ただし実務では慣例的な構成があり、このコースでは以下のパターンに従います。\n\nこの構成はスモールスタートで始めて、章が進むごとにファイルを追加していく前提です。最初から完璧な構成を目指す必要はなく、機能が増えたときにリファクタリングしていくのが Node.js プロジェクトの一般的な進め方です。",
+    code: `todo-app/
+├── package.json          # プロジェクト設定
+├── src/
+│   ├── index.js          # エントリポイント
+│   ├── storage.js        # データ永続化
+│   ├── TodoStore.js      # ビジネスロジック
+│   ├── server.js         # Express サーバ
+│   ├── routes/           # ルーティング
+│   ├── middleware/        # ミドルウェア
+│   └── config.js         # 設定管理
+├── views/                # EJS テンプレート
+├── public/               # 静的ファイル（HTML/CSS/JS）
+├── __tests__/            # テストファイル
+├── data/                 # データファイル（.gitignore）
+└── .env                  # 環境変数（.gitignore）`,
+    afterCode: "data/ と .env は .gitignore に追加しておきましょう。node_modules/ も同様です。Python の __pycache__ と同じく、バージョン管理に含めるべきでないファイル群です。"
+  }, {
+    title: "npm scripts の活用",
+    body: "package.json の scripts フィールドは、プロジェクト固有のコマンドを定義する場所です。Python で Makefile や invoke を使うのと同じ発想ですが、npm scripts は package.json に統合されているため、別ファイルを用意する必要がありません。\n\nよく使うスクリプト名には規約があり、start（起動）、test（テスト）、build（ビルド）、dev（開発サーバ）などがデファクトスタンダードです。start と test は npm start / npm test のように run を省略できる特殊なスクリプトです。それ以外は npm run dev のように run が必要です。",
+    code: `// package.json
+{
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "lint": "eslint src/"
+  }
+}
+
+// 実行
+// npm start          — サーバ起動
+// npm run dev        — ファイル変更で自動再起動（Node.js 22）
+// npm test           — テスト実行`,
+    afterCode: "Node.js 22 では --watch フラグが安定版になりました。ファイルを保存するたびにプロセスが自動再起動するため、開発中は npm run dev が便利です。Python の uvicorn --reload や flask --reload に相当する機能です。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "ファイルI/OでTodoデータ永続化",
+  est: "50分",
+  goal: "Node.js の fs/promises モジュールを使ってファイルの読み書きを非同期で行えるようになる。Python の open() / json モジュールとの対応を理解し、async/await による非同期処理の基本パターンを身に付ける。ENOENT 等のエラーコードによるハンドリングを含め、堅牢なデータ永続化層を構築できる状態がゴール。",
+  sections: [{
+    title: "fs/promises — 非同期ファイル操作",
+    body: "Python の open() はデフォルトで同期（ブロッキング）ですが、Node.js のファイル I/O は非同期が基本です。これは Node.js のシングルスレッド・イベントループモデルに由来する設計で、ファイル読み書きの待ち時間中に他のリクエストを処理できるようにするためです。\n\nfs モジュールには3つのスタイルがあります。コールバック版（fs.readFile(path, callback)）、同期版（fs.readFileSync(path)）、Promise版（fs.promises.readFile(path)）です。現代の Node.js では Promise 版を import fs from 'fs/promises' で読み込み、async/await と組み合わせるのが標準です。\n\nPython の asyncio を触ったことがあれば概念は馴染みやすいでしょう。ただし Python の asyncio は明示的にイベントループを起動する必要がありますが、Node.js ではトップレベルで await が使える（ESM の場合）ため、より直感的に非同期コードが書けます。",
+    table: T.fsMethod,
+    afterTable: "fs/promises の各メソッドは Promise を返すので、必ず await を付けて呼びます。await を忘れると Promise オブジェクトそのものが返ってきて、期待した結果になりません。Python で言えば、await を付け忘れた coroutine と同じ状況です。"
+  }, {
+    title: "JSON の読み書き",
+    body: "JavaScript はそもそも JSON（JavaScript Object Notation）の生みの親なので、JSON の扱いは言語レベルで簡潔です。Python の json.loads() / json.dumps() に対応するのが JSON.parse() / JSON.stringify() で、import 不要でグローバルに使えます。\n\nPython と違い、JSON.stringify() の第2引数は replacer（変換関数）、第3引数がインデント幅です。人間が読みやすい整形出力にしたい場合は JSON.stringify(obj, null, 2) のように書きます。null は「replacer は使わない」という意味です。",
+    table: T.jsonMethod,
+    code: `import fs from 'fs/promises';
+
+// 書き出し
+const todos = [
+  { id: 1, title: "買い物", done: false },
+  { id: 2, title: "掃除", done: true }
+];
+await fs.writeFile('todos.json', JSON.stringify(todos, null, 2));
+
+// 読み込み
+const data = await fs.readFile('todos.json', 'utf-8');
+const loaded = JSON.parse(data);
+console.log(loaded);  // [{ id: 1, ... }, { id: 2, ... }]`,
+    afterCode: "readFile の第2引数 'utf-8' を省略すると Buffer（バイナリ）が返ります。テキストファイルを扱う場合は必ずエンコーディングを指定しましょう。Python の open(f, encoding='utf-8') と同じ考え方です。"
+  }, {
+    title: "エラーハンドリング — try/catch と ENOENT",
+    body: "ファイルを読もうとしたが存在しない、という状況は日常的に起こります。Python では FileNotFoundError を catch しますが、Node.js ではエラーオブジェクトの code プロパティで判別します。ファイルが存在しない場合は err.code === 'ENOENT'（Error NO ENTry）です。\n\nこのパターンは Node.js のファイル操作で頻出するので、テンプレートとして覚えてしまうのが効率的です。Python の EAFP（Easier to Ask Forgiveness than Permission）パターンとまったく同じ発想で、「とりあえず読んでみて、ダメならデフォルト値を返す」というアプローチです。\n\nJSON のパースエラーは SyntaxError として投げられます。ファイルは存在するが中身が壊れている場合に発生するので、err.code と instanceof の両方でエラーの種類を判別する二段構えが安全です。",
+    code: `async function loadTodos() {
+  try {
+    const data = await fs.readFile('todos.json', 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      // ファイルが無い → 空配列で初期化
+      return [];
+    }
+    if (err instanceof SyntaxError) {
+      // JSON が壊れている
+      console.error('JSON パースエラー:', err.message);
+      return [];
+    }
+    // その他のエラーは再throw
+    throw err;
+  }
+}`,
+    afterCode: "ポイント: catch の中で throw err すると、呼び出し元にエラーを伝播させます。「この関数では面倒を見きれないエラー」は re-throw するのが定石です。Python の raise と同じです。"
+  }, {
+    title: "ディレクトリの自動作成",
+    body: "Todo データを data/todos.json に保存したいが、data ディレクトリがまだ存在しないかもしれない。こういった場合、fs.mkdir() に { recursive: true } オプションを渡すと、ディレクトリが無ければ作成し、あればそのまま何もしません。Python の os.makedirs(path, exist_ok=True) と同じ挙動です。\n\npath モジュールはファイルパスの結合に使います。Python の os.path.join() や pathlib.Path に相当し、OS 間のパス区切り文字の違い（/ vs \\）を吸収してくれます。ESM では __dirname が使えないため、import.meta.url から自前で導出する必要がある点だけ注意です。",
+    code: `import fs from 'fs/promises';
+import path from 'path';
+
+const DATA_DIR = './data';
+const FILE_PATH = path.join(DATA_DIR, 'todos.json');
+
+async function saveTodos(todos) {
+  // ディレクトリがなければ作成
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  // JSON を整形して書き出し
+  await fs.writeFile(FILE_PATH, JSON.stringify(todos, null, 2));
+}`,
+    afterCode: "path.join() は引数を OS 適切なセパレータで結合します。文字列の + 連結でパスを組み立てると、Windows で動かなくなるリスクがあるため、必ず path.join() を使いましょう。"
+  }, {
+    title: "async/await の落とし穴",
+    body: "Python の asyncio と同じく、Node.js の async/await にもいくつかの罠があります。最も多いのは await の付け忘れです。async 関数は Promise を返すので、await を忘れると関数の戻り値が Promise オブジェクトそのものになり、if (result) のような判定が常に true になってしまいます。\n\nもう一つの頻出パターンは「ループ内の await」です。for ループの中で毎回 await すると逐次実行になり、並行性能を活かせません。Python の asyncio.gather() に相当するのが Promise.all() で、複数の非同期処理を並列に実行したい場合に使います。ただし、ファイル I/O のように順序が重要な場合は逐次実行で問題ありません。",
+    code: `// ❌ await 忘れ
+async function bad() {
+  const data = fs.readFile('file.txt', 'utf-8'); // Promise が返る
+  console.log(data);  // Promise { <pending> }
+}
+
+// ✅ await あり
+async function good() {
+  const data = await fs.readFile('file.txt', 'utf-8');
+  console.log(data);  // ファイルの中身
+}
+
+// 並列実行（複数ファイルを同時に読む）
+const [file1, file2] = await Promise.all([
+  fs.readFile('a.json', 'utf-8'),
+  fs.readFile('b.json', 'utf-8')
+]);`,
+    afterCode: "ESM（type: module）のトップレベルでは await がそのまま使えます。CJS では async 関数で囲む必要がありますが、ESM なら不要です。これも ESM を選ぶメリットの一つです。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "CLIインターフェース構築",
+  est: "50分",
+  goal: "process.argv でコマンドライン引数を受け取り、switch 文でサブコマンドを分岐する CLI アプリケーションを構築できるようになる。readline/promises で対話型インターフェースを実装し、chalk 等のライブラリで出力を装飾できる状態がゴール。Python の argparse / input() / colorama との対応関係を理解する。",
+  sections: [{
+    title: "process.argv — コマンドライン引数",
+    body: "Python の sys.argv に対応するのが Node.js の process.argv です。どちらも文字列の配列で、コマンドライン引数がそのまま入ります。ただし構造が少し違います。Python の sys.argv[0] はスクリプトファイル名ですが、Node.js の process.argv[0] は node 実行ファイルのパス、process.argv[1] がスクリプトファイルパスです。つまりユーザが指定した引数は [2] から始まります。\n\nこの違いは分割代入を使うと綺麗に吸収できます。const [,, command, ...args] = process.argv; と書けば、先頭2要素をスキップして command に最初の引数、args に残りの引数がまとめて入ります。Python でいう _, _, command, *args = sys.argv と同じ発想です。",
+    table: T.processArgv,
+    code: `// node src/cli.js add "買い物する"
+// process.argv = ['/usr/bin/node', '/path/src/cli.js', 'add', '買い物する']
+
+const [,, command, ...args] = process.argv;
+console.log(command);  // 'add'
+console.log(args);     // ['買い物する']`,
+    afterCode: "分割代入の ,, は「先頭2要素を無視する」という意味です。Python の _ と同じくバインドしない変数を省略する書き方で、Node.js の CLI では定番のパターンです。"
+  }, {
+    title: "switch 文によるサブコマンド分岐",
+    body: "Python の match/case（3.10+）に近い構文が JavaScript の switch です。ただし JavaScript の switch は fall-through（break を書き忘れると次の case まで実行が流れる）があるため、各 case の末尾に break を忘れないよう注意が必要です。\n\nCLI では switch の各 case にサブコマンドの処理を書くのが直感的です。default 節にはヘルプメッセージを出すのが親切な設計です。Python でいう argparse のサブパーサーの手動実装と思ってください。本格的な CLI を作る場合は commander や yargs といった npm パッケージがありますが、この規模なら生の switch で十分です。",
+    code: `switch (command) {
+  case 'list':
+    // 一覧表示
+    console.log('Todo一覧:');
+    store.list().forEach(t => console.log(\`  [\${t.done ? 'x' : ' '}] #\${t.id} \${t.title}\`));
+    break;
+
+  case 'add': {
+    const title = args.join(' ');
+    if (!title) {
+      console.error('タイトルを指定してください。');
+      process.exit(1);  // 異常終了
+    }
+    const todo = await store.add(title);
+    console.log(\`追加: #\${todo.id} \${todo.title}\`);
+    break;
+  }
+
+  default:
+    console.log('使い方: node src/cli.js [list|add|done|remove]');
+}`,
+    afterCode: "ポイント: case の中で const/let を使う場合はブロック {} で囲む必要があります。これは JavaScript のスコープ規則で、switch の case はデフォルトで同じスコープを共有するためです。"
+  }, {
+    title: "readline/promises — 対話型入力",
+    body: "Python の input() に対応するのが Node.js の readline モジュールです。ただし Node.js の readline はストリームベースの設計になっており、Python の input() ほど簡潔には書けません。Node.js 17+ では readline/promises が追加され、async/await で input() に近い感覚で使えるようになりました。\n\nrl.question(prompt) は Promise を返すので await で受けられます。使い終わったら rl.close() を呼んでストリームを閉じないとプロセスが終了しません。Python の input() は内部で自動的にストリームを管理しているので意識しませんが、Node.js では明示的なリソース管理が必要です。",
+    code: `import readline from 'readline/promises';
+import { stdin, stdout } from 'process';
+
+const rl = readline.createInterface({ input: stdin, output: stdout });
+
+// Python の input() に相当
+const name = await rl.question('名前を入力: ');
+console.log(\`こんにちは、\${name}さん！\`);
+
+// ループで繰り返し入力
+while (true) {
+  const line = await rl.question('> ');
+  if (line === 'exit') break;
+  console.log(\`入力: \${line}\`);
+}
+
+rl.close();`,
+    afterCode: "rl.close() を忘れるとプロセスが終了しないので注意。try/finally で囲むか、ループの外で必ず呼ぶようにしましょう。"
+  }, {
+    title: "process.exit とエラーコード",
+    body: "Python の sys.exit() に対応するのが process.exit() です。引数の 0 は正常終了、1 以上は異常終了を示す慣例は Python と同じです。CLI ツールではバリデーションエラーなどで process.exit(1) を呼んで即座に終了させるパターンがよく使われます。\n\nただし process.exit() は強制終了のため、非同期処理の完了を待たずにプロセスが落ちる場合があります。ファイル書き込みの途中で exit すると、データが壊れる可能性があるので注意が必要です。穏やかに終了させたい場合は、process.exitCode = 1 を設定してイベントループが空になるのを待つ方法もあります。",
+    code: `// 引数チェック
+if (process.argv.length < 3) {
+  console.error('使い方: node cli.js <command>');
+  process.exit(1);  // 異常終了
+}
+
+// 穏やかな終了
+process.exitCode = 1;  // 最終的に終了コード1で終了
+
+// 終了時のクリーンアップ
+process.on('SIGINT', () => {
+  console.log('\\n中断されました。');
+  process.exit(0);
+});`,
+    afterCode: "SIGINT は Ctrl+C で送られるシグナルです。Python の signal.signal(signal.SIGINT, handler) と同じ仕組みで、CLI ツールではこれを捕捉してクリーンアップ処理を入れるのが行儀の良い実装です。"
+  }, {
+    title: "chalk — ターミナル出力の色付け",
+    body: "Python の colorama に対応する Node.js のライブラリが chalk です。ターミナル出力に色を付けたり、太字・取り消し線を加えたりできます。CLI ツールの見栄えを良くするだけでなく、エラーを赤、成功を緑で表示するといった情報の可視性向上にも役立ちます。\n\nchalk は ESM にネイティブ対応しており、import chalk from 'chalk' でそのまま使えます。メソッドチェーンで装飾を重ねられるのが特徴で、chalk.bold.green('成功') のように書けます。Python の colorama が初期化（init()）を必要とするのに対し、chalk はそのまま使えるのが便利です。",
+    code: `// npm install chalk
+import chalk from 'chalk';
+
+// 基本的な色
+console.log(chalk.red('エラー！'));
+console.log(chalk.green('成功！'));
+console.log(chalk.yellow('警告'));
+console.log(chalk.cyan('#42'));
+
+// 装飾の組み合わせ
+console.log(chalk.bold.blue('太字の青'));
+console.log(chalk.strikethrough.gray('取り消し線'));
+
+// テンプレートリテラルと組み合わせ
+const name = 'Todo';
+console.log(\`\${chalk.green('✓')} \${chalk.bold(name)} を追加しました\`);`,
+    afterCode: "軽量な代替として picocolors パッケージもあります。chalk は機能豊富ですがサイズも大きいため、CLI ツールの配布サイズを気にする場合は検討してみてください。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "Express.jsでREST APIサーバ構築",
+  est: "60分",
+  goal: "Express.js を使って RESTful な Todo API サーバを構築できるようになる。ルーティング・ミドルウェアの概念を理解し、GET/POST/PUT/DELETE の各エンドポイントを実装できる状態がゴール。Python の Flask/FastAPI との対応関係を把握し、CORS 設定やリクエストログなど実務に必要な設定も含めて一通り構成できるようにする。",
+  sections: [{
+    title: "Express.js の基本",
+    body: "Express は Node.js で最も広く使われている Web フレームワークで、Python でいう Flask に近いポジションです。最小限の機能だけを提供し、必要な機能はミドルウェアとして追加していく「マイクロフレームワーク」の設計思想です。FastAPI のような自動バリデーションや API ドキュメント生成の機能は組み込まれていませんが、シンプルで理解しやすく、エコシステムが非常に充実しています。\n\n基本的な流れは「app を作る → ルートを定義する → listen でサーバを起動する」の3ステップです。Flask の @app.route() デコレータに対応するのが app.get() / app.post() などのメソッドで、パスとハンドラ関数を引数に取ります。ハンドラ関数の引数は (req, res) の2つで、req がリクエスト情報、res がレスポンス送信用のオブジェクトです。",
+    code: `// npm install express
+import express from 'express';
+
+const app = express();
+
+// JSON ボディのパース（Flask の request.get_json() に相当）
+app.use(express.json());
+
+// ルート定義
+app.get('/', (req, res) => {
+  res.json({ message: 'Hello, World!' });
+});
+
+// サーバ起動
+app.listen(3000, () => {
+  console.log('http://localhost:3000');
+});`,
+    afterCode: "express.json() はリクエストボディの JSON をパースするミドルウェアです。これがないと req.body が undefined になります。Flask では暗黙的に行われる処理を、Express では明示的に設定する必要があります。"
+  }, {
+    title: "RESTful ルーティング",
+    body: "REST API の設計原則は言語を問わず共通です。リソース（この場合は Todo）に対して HTTP メソッドで操作を表現します。GET で取得、POST で作成、PUT/PATCH で更新、DELETE で削除という対応は、Python の Flask/FastAPI でも同じです。\n\nExpress ではパスパラメータを :id のように書きます。Flask の <int:id> に対応し、req.params.id でアクセスできます。Python では型変換（int()）を自分で行うか Flask のコンバータに任せますが、Express では常に文字列で渡されるため Number() で明示変換が必要です。",
+    table: T.httpMethod,
+    code: `// GET /api/todos — 全件取得
+app.get('/api/todos', (req, res) => {
+  res.json(store.list());
+});
+
+// POST /api/todos — 新規作成
+app.post('/api/todos', async (req, res) => {
+  const { title } = req.body;
+  if (!title) return res.status(400).json({ error: 'title is required' });
+  const todo = await store.add(title);
+  res.status(201).json(todo);
+});
+
+// PUT /api/todos/:id — 完了切替
+app.put('/api/todos/:id', async (req, res) => {
+  try {
+    const todo = await store.toggle(Number(req.params.id));
+    res.json(todo);
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+// DELETE /api/todos/:id — 削除
+app.delete('/api/todos/:id', async (req, res) => {
+  try {
+    await store.remove(Number(req.params.id));
+    res.status(204).end();
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});`,
+    afterCode: "res.status(201).json(todo) のようにメソッドチェーンでステータスコードとレスポンスボディを同時に設定できます。res.status(204).end() は「ボディ無しで204を返す」です。"
+  }, {
+    title: "ミドルウェアの仕組み",
+    body: "Express の中核概念がミドルウェアです。Python の Flask でいうデコレータや before_request/after_request フック、Django のミドルウェアに相当します。リクエストが来てからレスポンスを返すまでの間に、複数のミドルウェア関数がパイプライン状に順番に実行されます。\n\nミドルウェア関数は (req, res, next) の3引数を取り、next() を呼ぶと次のミドルウェアに処理が渡ります。next() を呼ばなければそこで処理が止まるため、認証チェックで unauthorized なら res.status(401) を返して next() を呼ばない、といった制御ができます。\n\napp.use() で登録したミドルウェアは全ルートに適用され、app.use('/api', middleware) のようにパスを指定すると特定パス以下にだけ適用されます。登録順序が実行順序なので、express.json() は最初の方に置く必要があります。",
+    table: T.middleware,
+    code: `import express from 'express';
+import cors from 'cors';
+
+const app = express();
+
+// ミドルウェアの登録順 = 実行順
+app.use(cors());                    // 1. CORS ヘッダ付与
+app.use(express.json());            // 2. JSON パース
+app.use(express.static('public'));   // 3. 静的ファイル配信
+
+// カスタムミドルウェア — リクエストログ
+app.use((req, res, next) => {
+  console.log(\`\${req.method} \${req.url}\`);
+  next();  // 次のミドルウェアへ
+});
+
+// ルート定義...`,
+    afterCode: "CORS（Cross-Origin Resource Sharing）は、ブラウザが異なるオリジン間のリクエストを制御する仕組みです。フロントエンドとバックエンドを別ポートで動かす開発環境では必須です。Python の flask-cors と同じ役割です。"
+  }, {
+    title: "Router によるモジュール分離",
+    body: "アプリが大きくなると、すべてのルートを1ファイルに書くのは管理が大変です。Express の Router を使うと、関連するルートをモジュールに分離できます。Python の Flask Blueprint に相当する機能です。\n\nRouter インスタンスを作り、そこにルートを定義して、メインの app に app.use('/api/todos', router) でマウントします。router 内のパスは相対パスになるので、router.get('/') は /api/todos/ にマッピングされます。",
+    code: `// src/routes/todos.js
+import { Router } from 'express';
+
+const router = Router();
+
+router.get('/', (req, res) => {
+  res.json(store.list());
+});
+
+router.post('/', async (req, res) => {
+  const todo = await store.add(req.body.title);
+  res.status(201).json(todo);
+});
+
+export default router;
+
+// src/server.js
+import todosRouter from './routes/todos.js';
+app.use('/api/todos', todosRouter);`,
+    afterCode: "ルートのファイル分割は早い段階からやっておくのがおすすめです。後からリファクタリングするより、最初から分けておく方がずっと楽です。"
+  }, {
+    title: "リクエスト・レスポンスの詳細",
+    body: "Express の req オブジェクトには、クライアントからのリクエスト情報がすべて格納されています。req.body（POSTボディ）、req.params（パスパラメータ）、req.query（クエリ文字列）、req.headers（ヘッダ）が主要なプロパティです。Python の Flask では request.json、request.args、request.headers に対応します。\n\nres オブジェクトはレスポンスを構築するためのメソッドを持ちます。res.json() は Content-Type を application/json に設定してオブジェクトを JSON 文字列にして送信します。res.status() でステータスコードを設定し、res.send() でテキスト、res.sendFile() でファイルを返します。",
+    code: `// リクエスト情報の取得
+app.get('/api/todos', (req, res) => {
+  // クエリパラメータ: GET /api/todos?done=true&sort=date
+  const { done, sort } = req.query;
+
+  // ヘッダ
+  const auth = req.headers.authorization;
+
+  let todos = store.list();
+  if (done !== undefined) {
+    todos = todos.filter(t => t.done === (done === 'true'));
+  }
+  res.json(todos);
+});
+
+// パスパラメータ: GET /api/todos/42
+app.get('/api/todos/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const todo = store.list().find(t => t.id === id);
+  if (!todo) return res.status(404).json({ error: 'Not found' });
+  res.json(todo);
+});`,
+    afterCode: "req.query の値は常に文字列です。done=true でも文字列 'true' として届くので、比較時は === 'true' と文字列で比較する必要があります。Python の Flask でも request.args.get('done') は文字列です。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "フロントエンド — HTML/CSS/JS統合",
+  est: "60分",
+  goal: "Express の静的ファイル配信を使ってフロントエンドHTMLを提供し、fetch API でバックエンドの REST API と通信できるようになる。DOM 操作の基本を理解し、イベントリスナーでユーザ操作に応答するインタラクティブな Todo UI を構築できる状態がゴール。Python にはないブラウザ固有の概念（DOM、イベントバブリング、fetch）を押さえる。",
+  sections: [{
+    title: "静的ファイル配信",
+    body: "Express の express.static() ミドルウェアを使うと、指定したディレクトリ内のファイル（HTML、CSS、JS、画像など）をそのまま HTTP で配信できます。Python の Flask でいう send_from_directory() や static/ ディレクトリの自動配信に相当します。\n\npublic/ ディレクトリに index.html を置けば、http://localhost:3000/ でアクセスしたときに自動的にそのファイルが返されます。API エンドポイント（/api/...）とは別に、フロントエンドのファイルを同じサーバから配信できるため、開発時の CORS 問題も解消されます。",
+    code: `// src/server.js
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// public/ ディレクトリの中身を静的配信
+app.use(express.static(path.join(__dirname, '../public')));
+
+// public/index.html が http://localhost:3000/ で表示される`,
+    afterCode: "ESM では __dirname がグローバルに使えません。import.meta.url から path.dirname() で導出するパターンを覚えておきましょう。CJS なら __dirname がそのまま使えます。"
+  }, {
+    title: "fetch API — ブラウザからAPIを呼ぶ",
+    body: "Python の requests ライブラリに対応するブラウザ標準 API が fetch です。fetch() は Promise を返し、レスポンスの .json() メソッドも Promise を返すため、2回の await が必要です。\n\nPython の requests.get(url).json() は同期処理で1行で書けますが、ブラウザの fetch はネットワーク通信がブロッキングだと UI が固まってしまうため、非同期が必須です。async/await を使えば、見た目は同期的なコードとほぼ変わらず書けます。\n\nPOST/PUT リクエストでは、headers に Content-Type を指定し、body に JSON.stringify() した文字列を渡す必要があります。Python の requests.post(url, json=data) と比べると冗長ですが、フロントエンドの fetch はブラウザに組み込まれている標準 API なので、追加のインストールが不要です。",
+    table: T.fetchOption,
+    code: `// GET — Todo 一覧取得
+async function getTodos() {
+  const res = await fetch('/api/todos');
+  const todos = await res.json();
+  return todos;
+}
+
+// POST — Todo 追加
+async function addTodo(title) {
+  const res = await fetch('/api/todos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title })
+  });
+  return res.json();
+}
+
+// PUT — 完了切替
+async function toggleTodo(id) {
+  await fetch(\`/api/todos/\${id}\`, { method: 'PUT' });
+}
+
+// DELETE — 削除
+async function deleteTodo(id) {
+  await fetch(\`/api/todos/\${id}\`, { method: 'DELETE' });
+}`,
+    afterCode: "fetch は HTTP エラー（404、500等）でも reject しません。res.ok プロパティでレスポンスの成否を判定する必要があります。Python の requests の raise_for_status() に相当する自動チェックはないので、自分で if (!res.ok) throw ... と書くか、ラッパー関数を作るのが安全です。"
+  }, {
+    title: "DOM 操作の基本",
+    body: "DOM（Document Object Model）はブラウザが HTML を解析した結果のツリー構造で、JavaScript からこのツリーを操作することで画面を動的に変更できます。Python には直接の対応概念はありませんが、BeautifulSoup で HTML を操作するのに近い感覚です。ただし DOM は「生きている」ツリーで、変更が即座に画面に反映されます。\n\ndocument.getElementById() や document.querySelector() で要素を取得し、createElement() で新しい要素を作り、appendChild() で追加する、という流れが基本パターンです。innerHTML に HTML 文字列を代入して一括描画する方法もありますが、ユーザ入力をそのまま innerHTML に入れると XSS（クロスサイトスクリプティング）のリスクがあるため、textContent を使うか、適切にエスケープする必要があります。",
+    table: T.domMethod,
+    afterTable: "querySelector は CSS セレクタを使えるため非常に柔軟です。getElementById はIDによる検索が高速なので、フォーム要素など確実にIDが付いている要素にはこちらを使います。"
+  }, {
+    title: "イベント処理",
+    body: "ブラウザ上の JavaScript ではイベント駆動プログラミングが中心です。ボタンクリック、フォーム送信、キー入力などのユーザ操作をイベントとして受け取り、コールバック関数（イベントハンドラ）で処理します。Python の tkinter のイベントバインドや、Django のシグナルに近い概念です。\n\nelement.addEventListener(type, handler) でイベントを登録します。フォームの submit イベントでは e.preventDefault() を呼んでデフォルトのページ遷移を防ぐのが定番パターンです。Python の Flask でフォームを処理する場合は通常ページ遷移（POST → redirect → GET）しますが、SPA（Single Page Application）では JavaScript でフォームを送信してページ遷移なしに画面を更新します。",
+    table: T.eventType,
+    code: `// フォーム送信イベント
+const form = document.getElementById('add-form');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();  // ページ遷移を防止
+
+  const input = document.getElementById('title-input');
+  const title = input.value.trim();
+  if (!title) return;
+
+  await addTodo(title);
+  input.value = '';     // 入力欄をクリア
+  renderTodos();        // 画面を再描画
+});
+
+// クリックイベント
+button.addEventListener('click', () => {
+  console.log('クリックされました');
+});`,
+    afterCode: "e.preventDefault() は非常に重要です。フォームの submit はデフォルトでページ遷移を起こすため、これを呼ばないと fetch による API 通信が完了する前にページが遷移してしまいます。"
+  }, {
+    title: "Todo UI の統合",
+    body: "ここまでの知識を統合して、フロントエンドの Todo UI を構築します。public/index.html にHTML構造を書き、<script> タグ内で fetch + DOM 操作を行います。renderTodos() 関数を中心に、データ取得 → DOM クリア → 要素生成 → イベント登録というサイクルを回します。\n\nこのパターンは React や Vue などのフレームワークが自動化してくれる部分ですが、まずは素のJavaScriptで仕組みを理解しておくことが重要です。「なぜフレームワークが必要なのか」がこの経験を通じて実感できるはずです。",
+    code: `<!-- public/index.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Todo App</title>
+  <style>
+    body { font-family: sans-serif; max-width: 500px; margin: 40px auto; }
+    .done { text-decoration: line-through; color: #999; }
+    li { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>Todo App</h1>
+  <form id="add-form">
+    <input id="title-input" placeholder="新しいTodo..." required>
+    <button type="submit">追加</button>
+  </form>
+  <ul id="todo-list"></ul>
+
+  <script>
+    async function renderTodos() {
+      const res = await fetch('/api/todos');
+      const todos = await res.json();
+      const ul = document.getElementById('todo-list');
+      ul.innerHTML = '';
+
+      todos.forEach(todo => {
+        const li = document.createElement('li');
+        const span = document.createElement('span');
+        span.textContent = todo.title;
+        if (todo.done) span.classList.add('done');
+        // ... イベント登録
+        li.appendChild(span);
+        ul.appendChild(li);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', renderTodos);
+  </script>
+</body>
+</html>`,
+    afterCode: "DOMContentLoaded イベントは HTML の解析が完了した時点で発火します。画像などの外部リソースの読み込み完了は待ちません。初期化処理はこのイベントのハンドラに書くのが定石です。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "テンプレートエンジンとサーバサイドレンダリング",
+  est: "45分",
+  goal: "EJS テンプレートエンジンを使ったサーバサイドレンダリング（SSR）を理解し、パーシャル（部分テンプレート）によるレイアウト共通化ができるようになる。Python の Jinja2 との構文対応を押さえ、SSR と SPA（クライアントサイドレンダリング）の使い分けを自分で判断できる状態がゴール。",
+  sections: [{
+    title: "EJS テンプレートエンジン",
+    body: "Python の Flask では Jinja2 がデフォルトのテンプレートエンジンですが、Express にはデフォルトのテンプレートエンジンがありません。EJS（Embedded JavaScript）は Express で最も広く使われるテンプレートエンジンで、Jinja2 と設計思想が近いため Python 経験者には馴染みやすいです。\n\nJinja2 の {{ variable }} に対応するのが EJS の <%= variable %> です。ロジック（if/for）は <% %> で囲みます。Jinja2 の {% if %} が EJS では <% if (...) { %> になると考えれば、構文の違いは小さいことがわかります。最大の違いは、EJS 内で書けるのが純粋な JavaScript であるという点です。Jinja2 は独自のテンプレート言語ですが、EJS は JavaScript そのものなので、覚えることが少なく済みます。",
+    table: T.ejsSyntax,
+    afterTable: "<%= %> と <%- %> の違いは重要です。<%= %> はHTMLエスケープするため安全ですが、<%- %> はエスケープしないため、ユーザ入力を直接使うとXSS脆弱性になります。include で使うのは <%- %> です。"
+  }, {
+    title: "EJS のセットアップと基本使用",
+    body: "Express で EJS を使うには、app.set('view engine', 'ejs') で設定し、views/ ディレクトリにテンプレートファイルを配置します。res.render('template', data) でテンプレートにデータを渡してHTMLを生成・返却します。Flask の render_template() と同じ流れです。\n\nESM では __dirname が使えないため、import.meta.url から views ディレクトリのパスを明示的に設定する必要があります。テンプレートファイルの拡張子は .ejs ですが、render() の引数では拡張子を省略できます。",
+    code: `// src/server.js
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, '../views'));
+
+// テンプレートにデータを渡してレンダリング
+app.get('/', (req, res) => {
+  const todos = store.list();
+  res.render('index', {
+    title: 'Todo App',
+    todos,
+    remaining: todos.filter(t => !t.done).length
+  });
+});`,
+    afterCode: "res.render() の第2引数のオブジェクトが、テンプレート内で変数として使えるデータです。Flask の render_template('index.html', todos=todos) と同じ仕組みです。"
+  }, {
+    title: "パーシャル（部分テンプレート）",
+    body: "実際のWebアプリでは、ヘッダー・フッター・ナビゲーションなど共通のHTML部品を複数ページで再利用したくなります。EJS では <%- include('partials/header') %> で別のテンプレートファイルを埋め込めます。Jinja2 の {% include 'header.html' %} と同じ機能です。\n\nパーシャルにはデータを渡すこともできます。<%- include('partials/todo-item', { todo }) %> のように第2引数にオブジェクトを指定すると、パーシャル内でその変数が使えます。Jinja2 のマクロに近い使い方です。\n\nレイアウトの共通化は DRY 原則（Don't Repeat Yourself）の実践です。ヘッダーのナビゲーションを変更する場合、パーシャルを使っていれば1ファイルの修正で済みますが、各ページにコピペしていると全ファイルを修正する羽目になります。",
+    code: `<!-- views/partials/header.ejs -->
+<header>
+  <nav>
+    <a href="/">ホーム</a>
+    <a href="/about">About</a>
+  </nav>
+</header>
+
+<!-- views/index.ejs -->
+<!DOCTYPE html>
+<html>
+<head><title><%= title %></title></head>
+<body>
+  <%- include('partials/header') %>
+  <main>
+    <h1><%= title %></h1>
+    <ul>
+      <% todos.forEach(todo => { %>
+        <%- include('partials/todo-item', { todo }) %>
+      <% }) %>
+    </ul>
+  </main>
+  <%- include('partials/footer') %>
+</body>
+</html>`,
+    afterCode: "Jinja2 には extends/block による継承ベースのレイアウトシステムがありますが、EJS には同等の機能がありません。代わりに include を使った「合成」アプローチで対応します。express-ejs-layouts パッケージを使えば継承的な書き方もできます。"
+  }, {
+    title: "フォームとPRGパターン",
+    body: "サーバサイドレンダリングでフォームを処理する場合、PRG（Post/Redirect/Get）パターンが定石です。フォームを POST で送信 → サーバで処理 → GET でリダイレクト、という流れで、ブラウザの「戻る」ボタンによる二重送信を防ぎます。Python の Flask でも redirect(url_for('index')) で同じパターンを使います。\n\nExpress では express.urlencoded() ミドルウェアを使うとフォームの POST データをパースできます。req.body にフォームのフィールドが格納されます。res.redirect('/') でリダイレクトします。",
+    code: `// フォームデータのパース
+app.use(express.urlencoded({ extended: true }));
+
+// POST で受け取ってリダイレクト（PRGパターン）
+app.post('/todos', async (req, res) => {
+  const { title } = req.body;
+  if (title && title.trim()) {
+    await store.add(title.trim());
+  }
+  res.redirect('/');  // GET / にリダイレクト
+});`,
+    afterCode: "extended: true は qs ライブラリでパースすることを意味し、ネストしたオブジェクトもパースできます。false にすると querystring モジュール（フラットなデータのみ）を使います。通常は true で問題ありません。"
+  }, {
+    title: "SSR vs SPA の使い分け",
+    body: "サーバサイドレンダリング（SSR）とクライアントサイドレンダリング（SPA）は、どちらが優れているかではなく用途が違います。SSR は SEO が重要なコンテンツページ、初回表示速度を重視する場面に向いています。SPA はリッチなインタラクションが必要な管理画面やダッシュボードに向いています。\n\nこの Todo アプリでは Ch.5 の SPA アプローチ（fetch + DOM操作）と Ch.6 の SSR アプローチ（EJS + PRG）の両方を体験しました。実務では Next.js のようなフレームワークがSSRとSPAのハイブリッドを提供しますが、まずは両方の仕組みを理解しておくことが重要です。",
+    afterCode: "ポイント: Express で SSR と API を併存させる構成は実際の開発でもよく使われます。/api/* は JSON を返し、/* は HTML を返す、という棲み分けです。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "バリデーションとエラーハンドリング",
+  est: "50分",
+  goal: "express-validator を使ったリクエストバリデーションを実装し、不正な入力を適切に弾けるようになる。カスタムエラークラスの設計、集約エラーハンドリングミドルウェアの構築、HTTP ステータスコードの正しい使い分けを理解し、堅牢な API を構築できる状態がゴール。",
+  sections: [{
+    title: "なぜバリデーションが必要か",
+    body: "Python の Flask/FastAPI でもバリデーションは必須ですが、JavaScript は動的型付けであるため、型レベルのチェックがない分だけ入力値の検証がより重要になります。クライアントから送られてくるデータは常に「信頼できないもの」として扱い、サーバ側で必ず検証する必要があります。\n\n例えば、Todo の title に空文字列や100万文字の文字列が来たらどうなるか。done フィールドに 'yes' という文字列が来たらどうなるか。こうしたエッジケースを放置すると、データの整合性が崩れたり、セキュリティ上の問題（XSS、SQLインジェクション等）が生じたりします。Python の pydantic や marshmallow に相当するのが express-validator です。",
+    table: T.validatorMethod,
+    afterTable: "trim() と escape() はサニタイザ（正規化）です。バリデーション（検証）だけでなく、データの正規化もセキュリティ上重要です。"
+  }, {
+    title: "express-validator の使い方",
+    body: "express-validator はミドルウェアとしてルートハンドラの前に挟む形で使います。バリデーションルールを配列で定義し、ルートの第2引数として渡します。ハンドラ内で validationResult(req) を呼ぶと、バリデーションエラーの一覧が取得できます。\n\nPython の pydantic が型定義ベースなのに対し、express-validator はチェーンメソッドでルールを組み立てるスタイルです。body('title').trim().notEmpty().isLength({max: 100}) のように読みやすい API で、何を検証しているかが一目でわかります。",
+    code: `import { body, validationResult } from 'express-validator';
+
+// バリデーションルールの定義
+const validateTodo = [
+  body('title')
+    .trim()                                    // 前後空白除去
+    .notEmpty().withMessage('タイトルは必須です')   // 空文字チェック
+    .isLength({ max: 100 }).withMessage('100文字以内') // 長さ制限
+    .escape(),                                 // HTMLエスケープ
+  body('done')
+    .optional()                                // 省略可能
+    .isBoolean().withMessage('真偽値のみ')
+];
+
+// ルートに適用
+router.post('/', validateTodo, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      error: 'バリデーションエラー',
+      details: errors.array()
+    });
+  }
+  const todo = await store.add(req.body.title);
+  res.status(201).json(todo);
+});`,
+    afterCode: "withMessage() でカスタムエラーメッセージを設定できます。デフォルトのメッセージは英語なので、日本語アプリでは必ずカスタマイズしましょう。"
+  }, {
+    title: "カスタムエラークラス",
+    body: "JavaScript のエラーハンドリングは Python と同じく try/catch ベースですが、エラーの種類を判別する方法が異なります。Python では例外クラスの階層（ValueError, FileNotFoundError 等）を catch で使い分けますが、JavaScript のビルトインエラーは Error, TypeError, SyntaxError 程度しかありません。\n\nそこでアプリ固有のエラークラスを定義して、ステータスコードやエラーの種類を構造化します。Error クラスを継承して AppError を作り、さらに NotFoundError や ValidationError を派生させるパターンが定石です。Python で独自例外クラスを作るのと全く同じ発想です。",
+    code: `// src/errors.js
+export class AppError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.name = this.constructor.name;
+    this.statusCode = statusCode;
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(resource = 'リソース') {
+    super(\`\${resource}が見つかりません\`, 404);
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(details = []) {
+    super('バリデーションエラー', 400);
+    this.details = details;
+  }
+}
+
+// 使用例
+throw new NotFoundError('Todo');
+// → { name: 'NotFoundError', message: 'Todoが見つかりません', statusCode: 404 }`,
+    afterCode: "this.name = this.constructor.name はエラーのスタックトレースに正しいクラス名を表示させるためです。Python では __class__.__name__ が自動で設定されますが、JavaScript では明示的に設定する必要があります。"
+  }, {
+    title: "集約エラーハンドリング",
+    body: "Express では、引数が4つ (err, req, res, next) のミドルウェアが「エラーハンドリングミドルウェア」として認識されます。ルートハンドラ内で throw されたエラーや、next(err) で渡されたエラーがここに集約されます。Python の Flask でいう @app.errorhandler デコレータに相当します。\n\nこの集約エラーハンドラを app.use() の最後に登録することで、アプリ全体のエラーを一箇所で処理できます。ログ出力、ステータスコードの決定、エラーレスポンスの構築を統一的に行えるため、各ルートでいちいち try/catch を書く手間が減ります。",
+    table: T.httpStatus,
+    code: `// src/middleware/errorHandler.js
+export function errorHandler(err, req, res, next) {
+  // ログ出力
+  console.error(\`[\${new Date().toISOString()}] \${err.name}: \${err.message}\`);
+
+  const statusCode = err.statusCode || 500;
+  const response = {
+    error: err.message || '内部サーバエラー'
+  };
+
+  // バリデーションエラーの詳細
+  if (err.details) response.details = err.details;
+
+  // 開発環境ではスタックトレースも返す
+  if (process.env.NODE_ENV !== 'production') {
+    response.stack = err.stack;
+  }
+
+  res.status(statusCode).json(response);
+}
+
+// src/server.js の末尾に登録（ルート定義の後）
+app.use(errorHandler);`,
+    afterCode: "重要: エラーハンドリングミドルウェアは必ずルート定義の後に app.use() してください。Express はミドルウェアを登録順に実行するため、ルートより前に置くとエラーを捕捉できません。"
+  }, {
+    title: "asyncHandler パターン",
+    body: "Express 4.x は async 関数内での throw を自動的に catch してくれません（Express 5.x では改善されています）。async ルートハンドラで例外が発生すると、エラーハンドリングミドルウェアに伝わらず、レスポンスが返らないままタイムアウトしてしまいます。\n\nこれを解決するのが asyncHandler ラッパーです。ハンドラ関数を Promise.resolve().catch(next) で包むことで、async 関数内の例外を next(err) として Express のエラーハンドリングに流します。Python の Flask では例外は自動的にハンドラに届くので、この問題は Node.js/Express 固有のものです。",
+    code: `// src/middleware/asyncHandler.js
+export function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
+// 使用例
+import { asyncHandler } from '../middleware/asyncHandler.js';
+
+router.post('/', validateTodo, asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    throw new ValidationError(errors.array());
+  }
+  const todo = await store.add(req.body.title);
+  res.status(201).json(todo);
+}));`,
+    afterCode: "ポイント: Express 5.x（2024年リリース）では async ハンドラの例外が自動的に next(err) に渡されるため、asyncHandler は不要になります。ただし Express 4.x を使うプロジェクトはまだ多いため、このパターンは知っておくべきです。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "テスト",
+  est: "55分",
+  goal: "Jest を使った単体テスト・API統合テストを書けるようになる。モック・スタブの概念を理解し、外部依存（ファイルI/O等）を切り離した独立性の高いテストを設計できる状態がゴール。Python の pytest/unittest.mock との対応関係を把握し、テストカバレッジの計測と目標設定ができるようにする。",
+  sections: [{
+    title: "Jest の基本",
+    body: "Python の pytest に対応する Node.js のテストフレームワークが Jest です。Facebook（Meta）が開発したもので、テストランナー・アサーション・モック・カバレッジ計測がすべて一体になっています。Python では pytest + unittest.mock + coverage.py を別々に入れる必要がありますが、Jest は1つのパッケージで完結します。\n\ntest() 関数でテストケースを定義し、expect() でアサーションを書きます。Python の assert 文に対応するのが expect(value).toBe(expected) です。describe() でテストをグループ化でき、beforeEach() / afterEach() でセットアップ・クリーンアップを行います。\n\nESM でJestを使う場合は、node --experimental-vm-modules フラグが必要です。package.json の test スクリプトにこのフラグを含めておきましょう。",
+    table: T.jestMatcher,
+    code: `// __tests__/example.test.js
+import { describe, test, expect } from '@jest/globals';
+
+describe('基本的なテスト', () => {
+  test('1 + 1 は 2', () => {
+    expect(1 + 1).toBe(2);
+  });
+
+  test('オブジェクトの比較は toEqual', () => {
+    const todo = { id: 1, title: 'Test', done: false };
+    expect(todo).toEqual({ id: 1, title: 'Test', done: false });
+  });
+
+  test('配列の検証', () => {
+    const arr = [1, 2, 3];
+    expect(arr).toHaveLength(3);
+    expect(arr).toContain(2);
+  });
+});`,
+    afterCode: "toBe は === による厳密等価で、プリミティブ値（数値・文字列・真偽値）に使います。オブジェクトや配列の比較には toEqual を使います。Python の assert x == y はオブジェクトの値比較ですが、JavaScript の === はオブジェクトの参照比較なので、この使い分けが重要です。"
+  }, {
+    title: "モック — 外部依存の分離",
+    body: "テストでファイルI/Oやデータベースアクセスを実際に行うと、テストが遅くなり、環境依存で壊れやすくなります。Python の unittest.mock.patch() でモジュールを差し替えるのと同じく、Jest ではモジュール単位でモックに置き換えることができます。\n\nESM でのモックは jest.unstable_mockModule() を使います（CJS では jest.mock()）。モック関数は jest.fn() で作成し、.mockResolvedValue() で戻り値を設定します。Python の MagicMock(return_value=...) に対応します。beforeEach で jest.clearAllMocks() を呼んで、テスト間の状態汚染を防ぐのが定石です。",
+    code: `import { jest, describe, test, expect, beforeEach } from '@jest/globals';
+
+// storage モジュールをモックに差し替え
+jest.unstable_mockModule('../src/storage.js', () => ({
+  loadTodos: jest.fn().mockResolvedValue([]),
+  saveTodos: jest.fn().mockResolvedValue(undefined)
+}));
+
+// モック適用後に動的 import
+const { TodoStore } = await import('../src/TodoStore.js');
+const { saveTodos } = await import('../src/storage.js');
+
+describe('TodoStore', () => {
+  let store;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    store = await new TodoStore().init();
+  });
+
+  test('add で saveTodos が呼ばれる', async () => {
+    await store.add('テスト');
+    expect(saveTodos).toHaveBeenCalledTimes(1);
+  });
+});`,
+    afterCode: "jest.fn() で作られたモック関数は、呼び出し回数・引数・戻り値を追跡できます。expect(fn).toHaveBeenCalledWith(arg) で「正しい引数で呼ばれたか」も検証できます。"
+  }, {
+    title: "supertest — API統合テスト",
+    body: "Express アプリのAPIエンドポイントをテストするには、supertest ライブラリを使います。Python の requests を使ったテストや、Flask の test_client() に相当するもので、HTTP リクエストを送って レスポンスのステータスコード・ヘッダ・ボディを検証できます。\n\nsupertestはExpressのappオブジェクトを直接受け取るため、実際にサーバを listen させる必要がありません。テスト用のリクエストが内部的にルーティングされるので、ポートの競合やネットワーク遅延を気にせずにテストできます。",
+    table: T.supertestMethod,
+    code: `import request from 'supertest';
+
+// app を export する形にしておく（listen はしない）
+const { createApp } = await import('../src/app.js');
+const app = await createApp();
+
+describe('Todo API', () => {
+  test('GET /api/todos は200と配列', async () => {
+    const res = await request(app)
+      .get('/api/todos')
+      .expect(200)
+      .expect('Content-Type', /json/);
+
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  test('POST /api/todos は201と新Todo', async () => {
+    const res = await request(app)
+      .post('/api/todos')
+      .send({ title: 'テスト' })
+      .expect(201);
+
+    expect(res.body).toHaveProperty('title', 'テスト');
+  });
+});`,
+    afterCode: "テスト用に app を export する場合、server.js と app.js を分離するのが定石です。app.js は Express アプリの設定だけを行い、server.js が app.listen() を呼ぶ構成にします。テストでは app.js だけを import します。"
+  }, {
+    title: "テストカバレッジ",
+    body: "テストカバレッジは「テストがコードのどれだけの部分を通過したか」を数値化したものです。Python の coverage.py に対応する機能が Jest には組み込まれています。--coverage フラグを付けてテストを実行するだけで、行・関数・分岐のカバレッジレポートが生成されます。\n\n100% を目指すのが理想ですが、現実的には 80% 前後を目標にするのが一般的です。重要なのは「ビジネスロジック」のカバレッジで、設定ファイルや定数定義のカバレッジは低くても問題ありません。coverageThreshold でプロジェクト全体の最低ラインを設定し、CI で自動チェックするのが実務的です。",
+    code: `// package.json
+{
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage",
+    "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watchAll"
+  }
+}
+
+// jest.config.js
+export default {
+  transform: {},
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80
+    }
+  }
+};`,
+    afterCode: "--watchAll はファイル変更を監視して自動的にテストを再実行するモードです。開発中は常にこれを走らせておくと、変更の影響を即座に確認できます。Python の pytest-watch に相当します。"
+  }, {
+    title: "テスト設計の原則",
+    body: "良いテストは「何をテストしているか」が明確で、独立していて、高速に動きます。AAA パターン（Arrange-Act-Assert）は Python でも Node.js でも共通の設計指針で、「準備→実行→検証」の3ステップで各テストを構成します。\n\nテスト名は「何が、どういう状況で、どうなるべきか」を日本語で書くのがおすすめです。test('存在しないIDのtoggleは例外を投げる') のように書けば、テストが失敗した時に何が壊れたか一目でわかります。Python の pytest でも同じ流儀が使えます。",
+    code: `test('存在しないIDの toggle は例外を投げる', async () => {
+  // Arrange: 空のストアを用意（beforeEachで済んでいる）
+
+  // Act & Assert: 例外が投げられることを検証
+  await expect(store.toggle(999))
+    .rejects.toThrow('Todo id=999 not found');
+});
+
+test('remove 後にリスト長が減る', async () => {
+  // Arrange
+  await store.add('タスク1');
+  await store.add('タスク2');
+
+  // Act
+  await store.remove(1);
+
+  // Assert
+  expect(store.list()).toHaveLength(1);
+  expect(store.list()[0].title).toBe('タスク2');
+});`,
+    afterCode: "expect(...).rejects.toThrow() は async 関数が Promise を reject することを検証するマッチャーです。Python の pytest.raises(Exception) に相当します。"
+  }]
+}, {
+  id: "ch9",
+  num: 9,
+  title: "認証とセッション",
+  est: "55分",
+  goal: "パスワードのハッシュ化（bcrypt）、セッション管理（express-session）、トークン認証（JWT）の3つの認証基盤を実装できるようになる。セッション方式と JWT 方式の違い・使い分けを理解し、認証ミドルウェアで保護されたルートを構築できる状態がゴール。",
+  sections: [{
+    title: "パスワードのハッシュ化 — bcrypt",
+    body: "パスワードを平文で保存するのは論外です。Python では bcrypt や passlib を使いますが、Node.js でも bcrypt パッケージが定番です。仕組みは同じで、ソルト（ランダム文字列）を付加してハッシュ化し、元のパスワードに戻せないようにします。\n\nbcrypt.hash(password, saltRounds) でハッシュ化し、bcrypt.compare(password, hash) で検証します。saltRounds はハッシュ計算の反復回数を制御するパラメータで、大きいほど安全ですが遅くなります。10〜12 が現在の推奨値です。Python の bcrypt.hashpw() と API が少し違いますが、概念は同一です。",
+    code: `// npm install bcrypt
+import bcrypt from 'bcrypt';
+
+const SALT_ROUNDS = 10;
+
+// ハッシュ化（ユーザ登録時）
+async function hashPassword(plain) {
+  return bcrypt.hash(plain, SALT_ROUNDS);
+}
+
+// 検証（ログイン時）
+async function verifyPassword(plain, hash) {
+  return bcrypt.compare(plain, hash);
+}
+
+// 使用例
+const hash = await hashPassword('mypassword');
+console.log(hash);  // $2b$10$...（毎回異なる）
+console.log(await verifyPassword('mypassword', hash));  // true
+console.log(await verifyPassword('wrong', hash));        // false`,
+    afterCode: "bcrypt のハッシュには元のソルトが含まれているため、compare 時に別途ソルトを渡す必要はありません。同じパスワードでもハッシュは毎回異なりますが、compare は正しく検証できます。"
+  }, {
+    title: "セッション認証 — express-session",
+    body: "セッション認証はサーバ側にユーザの状態を保存する方式です。Python の Flask では flask.session がデフォルトで使えますが、Express では express-session パッケージを別途インストールします。\n\n仕組みは Flask と同じで、サーバ側にセッションストア（メモリ、Redis、データベース等）を持ち、クライアントには Cookie でセッション ID だけを渡します。ログイン時に req.session.user にユーザ情報を格納し、ログアウト時に req.session.destroy() で破棄する、という流れです。\n\nデフォルトではセッションデータはメモリに保存されるため、サーバが再起動すると消えます。本番環境では connect-redis や connect-mongo などのセッションストアを使ってデータを永続化する必要があります。",
+    code: `// npm install express-session
+import session from 'express-session';
+
+app.use(session({
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,     // JavaScript からアクセス不可（XSS対策）
+    secure: false,      // 本番では true（HTTPS必須）
+    maxAge: 24 * 60 * 60 * 1000  // 24時間
+  }
+}));
+
+// ログイン
+app.post('/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  const user = findUser(username);
+  if (!user || !(await verifyPassword(password, user.hash))) {
+    return res.status(401).json({ error: '認証失敗' });
+  }
+  req.session.user = { username };
+  res.json({ message: 'ログイン成功' });
+});
+
+// ログアウト
+app.post('/auth/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.clearCookie('connect.sid');
+    res.json({ message: 'ログアウト完了' });
+  });
+});`,
+    afterCode: "httpOnly: true は Cookie を JavaScript から読めなくするオプションで、XSS 攻撃への対策です。secure: true は HTTPS 接続でのみ Cookie を送信する設定で、本番環境では必須です。"
+  }, {
+    title: "JWT 認証",
+    body: "JWT（JSON Web Token）はステートレスな認証方式で、サーバ側にセッション情報を持ちません。トークン自体にユーザ情報が含まれており、署名で改ざんを検知します。Python では PyJWT パッケージを使いますが、Node.js では jsonwebtoken パッケージが標準です。\n\nJWT はマイクロサービスアーキテクチャとの相性が良く、複数のサービス間でトークンを共有できます。一方で、発行済みトークンの無効化が難しいという欠点もあります（サーバに状態を持たないため）。セッション方式との使い分けは、アプリケーションの要件に応じて判断します。",
+    table: T.authCompare,
+    code: `// npm install jsonwebtoken
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
+// トークン発行（ログイン時）
+function generateToken(payload) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+}
+
+// トークン検証（認証ミドルウェア）
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: '認証トークンが必要です' });
+  }
+  try {
+    const token = authHeader.split(' ')[1];
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    res.status(401).json({ error: '無効なトークンです' });
+  }
+}`,
+    afterCode: "Authorization ヘッダの Bearer スキームは RFC 6750 で定義された標準的な形式です。Bearer <token> の形で送信し、サーバ側で split(' ')[1] でトークン部分を取り出します。"
+  }, {
+    title: "認証ミドルウェアの適用",
+    body: "認証ミドルウェアは、保護したいルートの前に挟むだけで使えます。router.use(authMiddleware) でルーター全体に適用するか、個別のルートに router.get('/', authMiddleware, handler) で適用するか選べます。Python の Flask-Login の @login_required デコレータと同じ役割です。\n\nログインが必要な API と不要な API を分ける場合は、Router を分離してそれぞれに異なるミドルウェアを適用するのが整理しやすいです。/auth/* は認証不要、/api/* は認証必須、という構成が典型的です。",
+    code: `// 認証不要のルート
+app.use('/auth', authRouter);
+
+// 認証必須のルート
+app.use('/api/todos', authMiddleware, todosRouter);
+
+// 個別適用もOK
+router.get('/public', (req, res) => {
+  res.json({ message: '誰でもアクセス可能' });
+});
+
+router.get('/private', authMiddleware, (req, res) => {
+  res.json({ message: \`\${req.user.username}さん専用\` });
+});`,
+    afterCode: "ミドルウェアの適用順序に注意してください。express.json() や cors() よりも後、ルートハンドラよりも前に認証ミドルウェアを配置する必要があります。"
+  }, {
+    title: "セキュリティのベストプラクティス",
+    body: "認証実装にはセキュリティ上の落とし穴が多いため、いくつかのベストプラクティスを押さえておきましょう。パスワードは必ずハッシュ化して保存し、平文をログに出力しないこと。JWT の secret は環境変数で管理し、コードにハードコードしないこと。HTTPS を使うこと。\n\n「ユーザ名またはパスワードが違います」という曖昧なエラーメッセージも重要です。「ユーザが存在しません」と具体的に返すと、攻撃者にユーザ名の有無を教えてしまいます。Python の Django でも同じ設計指針が採用されています。",
+    code: `// ❌ 悪い例: 情報を漏らす
+if (!user) return res.status(404).json({ error: 'ユーザが存在しません' });
+if (!passwordMatch) return res.status(401).json({ error: 'パスワードが違います' });
+
+// ✅ 良い例: 曖昧に返す
+if (!user || !passwordMatch) {
+  return res.status(401).json({ error: 'ユーザ名またはパスワードが違います' });
+}
+
+// ✅ 環境変数で secret を管理
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('JWT_SECRET 環境変数が設定されていません');
+  process.exit(1);
+}`,
+    afterCode: "本番環境では helmet パッケージを使って、各種セキュリティヘッダ（X-Content-Type-Options, X-Frame-Options 等）を自動設定するのも推奨です。"
+  }]
+}, {
+  id: "ch10",
+  num: 10,
+  title: "デプロイとビルド",
+  est: "50分",
+  goal: "環境変数による設定管理、PM2 によるプロセス管理、Docker によるコンテナ化、クラウドプラットフォームへのデプロイまでの一連の流れを理解し、Todo アプリを本番環境に公開できる状態がゴール。開発から本番までのワークフローを俯瞰し、次のステップ（中級コース）に進む準備を整える。",
+  sections: [{
+    title: "環境変数と設定管理",
+    body: "Python では python-dotenv で .env ファイルから環境変数を読み込むのが一般的ですが、Node.js 22 では --env-file フラグがビルトインで使えるため、追加パッケージなしで .env ファイルを読めます。これは大きな進歩で、dotenv パッケージに依存する必要がなくなりました。\n\n環境変数は設定の12ファクター原則（The Twelve-Factor App）に基づく管理手法です。コードと設定を分離し、同じコードが開発・ステージング・本番の各環境で動くようにします。PORT、NODE_ENV、JWT_SECRET、DATABASE_URL など、環境によって異なる値を環境変数で管理します。\n\n.env ファイルは .gitignore に追加して、バージョン管理に含めないのが鉄則です。代わりに .env.example を用意して、必要な環境変数の一覧とデフォルト値を示します。",
+    code: `// .env
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=my-secret-key
+
+// .env.example（Git に含める）
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=
+
+// 起動コマンド
+node --env-file=.env src/server.js
+
+// src/config.js — 設定を一元管理
+export const config = {
+  port: parseInt(process.env.PORT || '3000', 10),
+  nodeEnv: process.env.NODE_ENV || 'development',
+  jwtSecret: process.env.JWT_SECRET,
+  isDev: process.env.NODE_ENV !== 'production'
+};
+
+// 必須環境変数のチェック
+if (!config.jwtSecret && !config.isDev) {
+  console.error('本番環境では JWT_SECRET が必須です');
+  process.exit(1);
+}`,
+    afterCode: "--env-file は Node.js 20.6.0 で導入され、22 LTS で安定版になりました。複数の .env ファイルを --env-file=.env --env-file=.env.local のように指定することもできます。"
+  }, {
+    title: "PM2 — プロセス管理",
+    body: "開発中は node src/server.js で直接起動しますが、本番環境ではプロセスが落ちたら自動再起動する仕組みが必要です。Python の gunicorn や supervisord に相当するのが PM2 です。クラスタモード（複数プロセスで並列処理）、ログ管理、モニタリングなどの機能を備えたプロダクション向けのプロセスマネージャです。\n\necosystem.config.cjs にアプリの設定を定義し、pm2 start で起動します。instances: 'max' を指定すると、CPU コア数に応じて自動的にワーカープロセスを立ち上げるクラスタモードになります。Node.js はシングルスレッドですが、PM2 のクラスタモードで複数プロセスを起動することで、マルチコア CPU を有効活用できます。",
+    table: T.pm2Command,
+    code: `// npm install -g pm2
+
+// ecosystem.config.cjs
+module.exports = {
+  apps: [{
+    name: 'todo-app',
+    script: 'src/server.js',
+    instances: 'max',        // CPUコア数分
+    exec_mode: 'cluster',    // クラスタモード
+    env: {
+      NODE_ENV: 'development',
+      PORT: 3000
+    },
+    env_production: {
+      NODE_ENV: 'production',
+      PORT: 3000
+    },
+    max_memory_restart: '256M',
+    log_date_format: 'YYYY-MM-DD HH:mm:ss'
+  }]
+};
+
+// 起動
+pm2 start ecosystem.config.cjs --env production`,
+    afterCode: "ecosystem.config.cjs の拡張子が .cjs なのは、PM2 が CommonJS を要求するためです。プロジェクト全体が ESM（type: module）でも、PM2 設定ファイルだけは CJS で書く必要があります。"
+  }, {
+    title: "Docker によるコンテナ化",
+    body: "Docker は「どの環境でも同じように動く」ことを保証するコンテナ技術です。Python でも Dockerfile を書いてアプリをコンテナ化しますが、Node.js の場合も流れはほぼ同じです。ベースイメージの選択、依存のインストール、ソースコードのコピー、起動コマンドの指定、という手順です。\n\nNode.js の Docker イメージは node:22-alpine が推奨です。Alpine Linux ベースで軽量（約100MB）です。マルチステージビルドを使うと、開発依存（devDependencies）を本番イメージから除外してさらに軽量化できます。\n\n非 root ユーザでの実行もセキュリティ上重要です。コンテナ内で root 権限を持つプロセスが侵害された場合のリスクを軽減するため、専用のアプリユーザを作成してそのユーザで実行します。",
+    code: `# Dockerfile
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+FROM node:22-alpine AS production
+WORKDIR /app
+
+# 非rootユーザ
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY src/ ./src/
+COPY views/ ./views/
+COPY public/ ./public/
+COPY package.json ./
+
+RUN mkdir -p data && chown -R appuser:appgroup /app
+USER appuser
+
+EXPOSE 3000
+ENV NODE_ENV=production
+CMD ["node", "src/server.js"]`,
+    afterCode: "npm ci は package-lock.json から正確なバージョンをインストールするコマンドで、CI/CD 環境やDockerビルドで使います。npm install はバージョン範囲内で最新を入れるため、環境差異が生じる可能性があります。"
+  }, {
+    title: "クラウドデプロイ",
+    body: "Todo アプリを実際にインターネットに公開するには、クラウドプラットフォームにデプロイします。Python の Heroku / PythonAnywhere に相当するサービスとして、Render、Railway、Vercel、Fly.io などがあります。Node.js アプリは特に Render との相性が良く、Git push でデプロイが完了する手軽さがあります。\n\nRender は Node.js を直接デプロイできるほか、Docker イメージでのデプロイもサポートしています。無料枠があり、個人プロジェクトやプロトタイプに最適です。Vercel はサーバレス関数ベースなので、従来の Express アプリとは少し設計を変える必要がありますが、フロントエンド中心のプロジェクトでは非常に強力です。",
+    table: T.deployCompare,
+    code: `# Render にデプロイ（render.yaml）
+services:
+  - type: web
+    name: todo-app
+    runtime: node
+    buildCommand: npm ci
+    startCommand: node src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true  # 自動生成
+
+# または Docker でデプロイ
+services:
+  - type: web
+    name: todo-app
+    runtime: docker`,
+    afterCode: "Git push でデプロイが走る CI/CD パイプラインは、手動デプロイのミスを防ぎます。main ブランチにマージされたら自動デプロイ、という設定が一般的です。"
+  }, {
+    title: "コース完了 — 次のステップ",
+    body: "ここまでで、Node.js プロジェクトのセットアップから、ファイル I/O、CLI、REST API、フロントエンド統合、テンプレートエンジン、バリデーション、テスト、認証、デプロイまでを一通り体験しました。Todo アプリという一つのプロジェクトを通じて、JavaScript/Node.js のエコシステム全体を俯瞰できたはずです。\n\n中級コースでは、TypeScript の導入、データベース（PostgreSQL/MongoDB）との接続、WebSocket によるリアルタイム通信、React/Next.js によるモダンフロントエンド、CI/CD パイプラインの構築など、より実務に近いトピックに進みます。このコースで身に付けた基礎があれば、スムーズに次のステップに進めるでしょう。",
+    afterCode: "コース完了後に習得できる状態: Node.js + Express で CRUD アプリを構築でき、テスト・認証・デプロイまで一通り実装できる。Python との対応関係を理解しており、公式ドキュメントを読みながら自力で開発を進められる。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, React.createElement("thead", null, React.createElement("tr", null, data.h.map((h, i) => React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), React.createElement("tbody", null, data.r.map((row, ri) => React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function JsBeginnerCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, React.createElement("div", {
+    style: {
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\uD83C\uDF10"), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "JavaScript \u521D\u7D1A\u30B3\u30FC\u30B9"), React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "Todo \u30A2\u30D7\u30EA\u3092 CLI \u304B\u3089\u30B9\u30BF\u30FC\u30C8\u3057\u3001REST API\u3001\u30D5\u30ED\u30F3\u30C8\u30A8\u30F3\u30C9\u7D71\u5408\u3001\u30C6\u30B9\u30C8\u3001\u8A8D\u8A3C\u3001\u30C7\u30D7\u30ED\u30A4\u307E\u3067\u6BB5\u968E\u7684\u306B\u69CB\u7BC9\u3057\u307E\u3059\u3002Python \u3068\u306E\u5BFE\u5FDC\u95A2\u4FC2\u3092\u8EF8\u306B\u3001Node.js + Express \u306E\u30A8\u30B3\u30B7\u30B9\u30C6\u30E0\u5168\u4F53\u3092\u4FEF\u77B0\u3057\u3001\u300C\u6B21\u306B\u4F55\u3092\u5B66\u3079\u3070\u3088\u3044\u304B\u300D\u306E\u5730\u56F3\u3092\u624B\u306B\u5165\u308C\u308B\u3053\u3068\u304C\u30B4\u30FC\u30EB\u3067\u3059\u3002"), React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "\u25B2" : "\u25BC")), menuOpen && React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F"))))), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` \u30FB \u6F14\u7FD2${exercises.length}\u554F` : ""))), chapter.goal && React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"), React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => React.createElement(Section, {
+    key: ch + "-" + i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => React.createElement(Exercise, {
+    key: ch + "-" + i,
+    ex: ex,
+    idx: i
+  }))), React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : React.createElement("a", {
+    href: "../index.html",
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "ECMAScript 2024 \u00B7 Node.js 22 LTS \u00B7 Express 4.x \u6E96\u62E0 \u00B7 2026\u5E744\u6708\u6642\u70B9")));
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(JsBeginnerCourse));
+  </script>
+</body>
+</html>
