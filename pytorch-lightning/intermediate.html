@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PyTorch Lightning 中級コース</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const CHAPTERS = [
+  {
+    id: "ch1", title: "第1章 カスタムトレーニングループ",
+    goal: "manual_optimization を使って自前の最適化ロジックを実装し、gradient accumulation で大きなバッチを疑似的に再現できる。",
+    sections: [
+      {
+        title: "manual_optimization の基本",
+        body: `PyTorch Lightning では通常、optimizerのステップは Trainer が自動で管理します。しかし GAN や強化学習など複数のオプティマイザを細かく制御したいケースでは、self.automatic_optimization = False を指定して手動制御モードに切り替えます。
+
+manual_optimization では training_step 内で self.optimizers() でオプティマイザを取得し、opt.zero_grad() / self.manual_backward(loss) / opt.step() を自分で呼び出します。自動モードと異なり、スケジューラの step も手動で呼ぶ必要があります。
+
+このモードを使う最大のメリットは「いつ・何回 backward を呼ぶか」を完全にコントロールできる点です。GAN のように Generator と Discriminator を交互に更新するシナリオでは不可欠な機能です。`,
+        code: `class ManualOptModel(LightningModule):
+    def __init__(self):
+        super().__init__()
+        self.automatic_optimization = False  # 手動モード有効化
+        self.model = nn.Linear(10, 1)
+
+    def training_step(self, batch, batch_idx):
+        opt = self.optimizers()
+        x, y = batch
+        loss = F.mse_loss(self.model(x), y)
+        opt.zero_grad()
+        self.manual_backward(loss)
+        opt.step()
+        self.log("train_loss", loss)
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=1e-3)`
+      },
+      {
+        title: "Gradient Accumulation",
+        body: `GPU メモリの制約でバッチサイズを大きくできない場合、gradient accumulation（勾配累積）が有効です。複数のミニバッチにわたって勾配を累積し、一定ステップ後にまとめて更新することで、大きな effective batch size を実現できます。
+
+自動モードでは Trainer(accumulate_grad_batches=4) と指定するだけで機能します。手動モードでは self.trainer.is_last_batch や batch_idx % accum_steps == 0 を自分で判定してステップを打つ必要があります。
+
+勾配累積は特に Transformer 系の大規模モデルや医療画像など高解像度データを扱う際に実用的です。ただし累積ステップ分だけ実際の更新頻度が下がるため、学習率も合わせて調整することが推奨されます。`,
+        code: `# 自動モードの場合
+trainer = Trainer(accumulate_grad_batches=4)
+
+# 手動モードの場合
+class AccumModel(LightningModule):
+    def __init__(self, accum_steps=4):
+        super().__init__()
+        self.automatic_optimization = False
+        self.accum_steps = accum_steps
+        self.model = nn.Linear(10, 1)
+
+    def training_step(self, batch, batch_idx):
+        opt = self.optimizers()
+        x, y = batch
+        loss = F.mse_loss(self.model(x), y) / self.accum_steps
+        self.manual_backward(loss)
+        if (batch_idx + 1) % self.accum_steps == 0:
+            opt.step()
+            opt.zero_grad()
+        self.log("train_loss", loss * self.accum_steps)`
+      }
+    ],
+    exercises: [
+      {
+        q: "GAN の Generator と Discriminator を manual_optimization で交互に更新する training_step を実装せよ。",
+        stars: 3,
+        a: `class GAN(LightningModule):
+    def __init__(self):
+        super().__init__()
+        self.automatic_optimization = False
+        self.G = Generator()
+        self.D = Discriminator()
+
+    def training_step(self, batch, batch_idx):
+        opt_g, opt_d = self.optimizers()
+        real = batch[0]
+        z = torch.randn(real.size(0), 100, device=self.device)
+        fake = self.G(z)
+        # Discriminator
+        loss_d = -torch.mean(self.D(real)) + torch.mean(self.D(fake.detach()))
+        opt_d.zero_grad(); self.manual_backward(loss_d); opt_d.step()
+        # Generator
+        loss_g = -torch.mean(self.D(fake))
+        opt_g.zero_grad(); self.manual_backward(loss_g); opt_g.step()
+        self.log_dict({"loss_d": loss_d, "loss_g": loss_g})
+
+    def configure_optimizers(self):
+        opt_g = torch.optim.Adam(self.G.parameters(), lr=2e-4)
+        opt_d = torch.optim.Adam(self.D.parameters(), lr=2e-4)
+        return [opt_g, opt_d]`
+      }
+    ]
+  },
+  {
+    id: "ch2", title: "第2章 高度なコールバック",
+    goal: "on_train_epoch_end など各フックの使い方を理解し、状態を持つカスタムコールバックを実装できる。",
+    sections: [
+      {
+        title: "コールバックフックの種類と使い分け",
+        body: `PyTorch Lightning のコールバックシステムは、学習の各フェーズに差し込み可能なフックを多数提供します。代表的なものとして on_train_epoch_end（学習エポック終了時）、on_validation_epoch_end（検証エポック終了時）、on_train_batch_end（バッチ処理後）などがあります。
+
+コールバックは LightningModule から分離された横断的な処理（ロギング、早期停止、チェックポイントなど）を実装するのに適しています。関心の分離が明確になり、同じコールバックを複数のモデルに再利用できます。
+
+フックの引数には trainer と pl_module が渡されるため、trainer.current_epoch、pl_module.hparams など訓練状態やモデルのあらゆる情報にアクセス可能です。`,
+        code: `from lightning.pytorch.callbacks import Callback
+
+class MyCallback(Callback):
+    def on_train_epoch_end(self, trainer, pl_module):
+        epoch = trainer.current_epoch
+        metrics = trainer.callback_metrics
+        print(f"Epoch {epoch}: {metrics}")
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        val_loss = trainer.callback_metrics.get("val_loss")
+        if val_loss is not None:
+            pl_module.log("val_loss_cb", val_loss)`
+      },
+      {
+        title: "状態を持つコールバック",
+        body: `コールバックインスタンスは Python オブジェクトなので、self に状態を持たせることができます。たとえばエポックごとの損失推移を記録するリストや、ベストスコアを保持する変数などを管理できます。
+
+チェックポイントと連携させる場合は state_dict / load_state_dict を実装することで、コールバックの状態も保存・復元できます。これにより学習を中断して再開した場合でも、コールバックの内部状態が正しく引き継がれます。
+
+カスタム EarlyStopping など、過去の履歴に基づく判断を行うコールバックを実装するときはこのパターンが不可欠です。`,
+        code: `class LossHistoryCallback(Callback):
+    def __init__(self):
+        self.train_losses = []
+        self.val_losses = []
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        loss = trainer.callback_metrics.get("train_loss")
+        if loss is not None:
+            self.train_losses.append(float(loss))
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        loss = trainer.callback_metrics.get("val_loss")
+        if loss is not None:
+            self.val_losses.append(float(loss))
+
+    def state_dict(self):
+        return {"train_losses": self.train_losses, "val_losses": self.val_losses}
+
+    def load_state_dict(self, state_dict):
+        self.train_losses = state_dict["train_losses"]
+        self.val_losses = state_dict["val_losses"]`
+      }
+    ],
+    exercises: [
+      {
+        q: "検証損失がN エポック連続で改善しなかった場合に学習を停止するカスタム EarlyStopping コールバックを実装せよ。",
+        stars: 3,
+        a: `class CustomEarlyStopping(Callback):
+    def __init__(self, patience=5, monitor="val_loss", mode="min"):
+        self.patience = patience
+        self.monitor = monitor
+        self.mode = mode
+        self.best = float("inf") if mode == "min" else float("-inf")
+        self.counter = 0
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        val = trainer.callback_metrics.get(self.monitor)
+        if val is None:
+            return
+        val = float(val)
+        improved = val < self.best if self.mode == "min" else val > self.best
+        if improved:
+            self.best = val
+            self.counter = 0
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                trainer.should_stop = True`
+      }
+    ]
+  },
+  {
+    id: "ch3", title: "第3章 分散学習",
+    goal: "DDPStrategy と FSDPStrategy の違いを理解し、マルチGPU / マルチノード学習を Trainer の設定だけで構成できる。",
+    sections: [
+      {
+        title: "DDPStrategy の仕組みと設定",
+        body: `DDP（DistributedDataParallel）は最も一般的な分散学習戦略で、各 GPU がモデルの完全なコピーを持ち、backward 後に勾配を All-Reduce で同期します。PyTorch Lightning では Trainer(strategy="ddp", devices=4) のように指定するだけで有効になります。
+
+DDP を使う際は DataLoader の num_workers を適切に設定し、各プロセスが同じデータを重複して読まないよう DistributedSampler が自動的に適用されることを把握しておく必要があります。Lightning はこれを自動で処理するため、DataLoader 側の設定変更は不要です。
+
+マルチノード学習では num_nodes=2 のように指定します。クラスタ環境では MASTER_ADDR / MASTER_PORT などの環境変数も必要ですが、SLURM 等のジョブスケジューラを使う場合は SLURMEnvironment が自動検出します。`,
+        code: `# シングルノード・マルチGPU
+trainer = Trainer(
+    strategy="ddp",
+    devices=4,
+    accelerator="gpu",
+    max_epochs=10,
+)
+
+# マルチノード
+trainer = Trainer(
+    strategy="ddp",
+    devices=4,
+    accelerator="gpu",
+    num_nodes=2,
+    max_epochs=10,
+)`
+      },
+      {
+        title: "FSDPStrategy と accumulate_grad_batches",
+        body: `FSDP（Fully Sharded Data Parallel）はモデルのパラメータ・勾配・オプティマイザ状態を全 GPU に分割して保持する戦略です。DDP ではモデル全体を各 GPU に複製するため VRAM 消費が大きいですが、FSDP では分割することで数十億パラメータ規模のモデルも学習可能になります。
+
+Lightning での使用は strategy=FSDPStrategy(...) で指定し、auto_wrap_policy でどの層を分割するかを制御します。Transformer 系では transformer_auto_wrap_policy が便利です。
+
+accumulate_grad_batches は分散学習とも併用でき、effective batch size = batch_size × devices × num_nodes × accumulate_grad_batches として機能します。大規模モデルでは FSDP + gradient accumulation の組み合わせが実用的です。`,
+        code: `from lightning.pytorch.strategies import FSDPStrategy
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+from transformers.models.bert.modeling_bert import BertLayer
+import functools
+
+policy = functools.partial(
+    transformer_auto_wrap_policy,
+    transformer_layer_cls={BertLayer}
+)
+
+trainer = Trainer(
+    strategy=FSDPStrategy(auto_wrap_policy=policy),
+    devices=4,
+    accelerator="gpu",
+    accumulate_grad_batches=8,
+    max_epochs=5,
+    precision="bf16-mixed",
+)`
+      }
+    ],
+    exercises: [
+      {
+        q: "4 GPU を使い、effective batch size が 512 になるよう accumulate_grad_batches を計算して Trainer を設定せよ（1 GPU あたり batch_size=16）。",
+        stars: 2,
+        a: `# effective_batch = batch_size × devices × accumulate
+# 512 = 16 × 4 × accumulate → accumulate = 8
+trainer = Trainer(
+    strategy="ddp",
+    devices=4,
+    accelerator="gpu",
+    accumulate_grad_batches=8,  # 16 * 4 * 8 = 512
+    max_epochs=10,
+)`
+      }
+    ]
+  },
+  {
+    id: "ch4", title: "第4章 Fabric",
+    goal: "Lightning Fabric の低レベル API を理解し、既存の raw PyTorch コードを最小限の変更で Fabric に移行できる。",
+    sections: [
+      {
+        title: "Fabric の概要と Fabric.setup",
+        body: `Lightning Fabric は Trainer の高レベル抽象を使わずに、分散学習・混合精度・デバイス管理だけを Lightning から借りたいケースのための低レベル API です。既存の PyTorch コードに最小限の変更を加えるだけで DDP や 16-bit 学習を有効化できます。
+
+Fabric の基本的な使い方は、Fabric インスタンスを作成し、fabric.setup(model, optimizer) でモデルとオプティマイザをラップし、fabric.setup_dataloaders(dataloader) でデータローダをラップします。その後は通常の PyTorch ループを書くだけで、分散・デバイス転送が透過的に処理されます。
+
+Trainer を使う場合と異なり、学習ループの構造は自分で書くため、研究用途や独自ループが必要なケースで特に有効です。`,
+        code: `from lightning.fabric import Fabric
+
+fabric = Fabric(accelerator="gpu", devices=2, strategy="ddp", precision="16-mixed")
+fabric.launch()
+
+model = MyModel()
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+model, optimizer = fabric.setup(model, optimizer)
+dataloader = fabric.setup_dataloaders(DataLoader(dataset, batch_size=32))
+
+for epoch in range(10):
+    for batch in dataloader:
+        x, y = batch
+        loss = F.cross_entropy(model(x), y)
+        fabric.backward(loss)
+        optimizer.step()
+        optimizer.zero_grad()`
+      },
+      {
+        title: "raw PyTorch を Fabric に移行するパターン",
+        body: `既存の PyTorch コードを Fabric に移行する際の変更点は主に4つです。まず Fabric インスタンスを作成して fabric.launch() を呼びます。次に model と optimizer を fabric.setup() でラップ、DataLoader を fabric.setup_dataloaders() でラップします。そして loss.backward() を fabric.backward(loss) に変えます。
+
+device の手動管理（.to(device) や .cuda()）は Fabric が自動化するため削除できます。また torch.cuda.amp.autocast や GradScaler なども Fabric が内部で処理するため、混合精度のコードも大幅に簡略化されます。
+
+この移行パターンにより、数百行の分散学習のボイラープレートを数行の Fabric 設定に置き換えることが可能です。`,
+        code: `# Before (raw PyTorch)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = MyModel().to(device)
+optimizer = torch.optim.Adam(model.parameters())
+scaler = torch.cuda.amp.GradScaler()
+
+for x, y in dataloader:
+    x, y = x.to(device), y.to(device)
+    with torch.cuda.amp.autocast():
+        loss = criterion(model(x), y)
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()
+    optimizer.zero_grad()
+
+# After (Fabric)
+fabric = Fabric(accelerator="gpu", precision="16-mixed")
+model, optimizer = fabric.setup(model, optimizer)
+dataloader = fabric.setup_dataloaders(dataloader)
+
+for x, y in dataloader:
+    loss = criterion(model(x), y)
+    fabric.backward(loss)
+    optimizer.step()
+    optimizer.zero_grad()`
+      }
+    ],
+    exercises: [
+      {
+        q: "既存の raw PyTorch 学習ループ（GPU転送・GradScalerあり）を Fabric を使って書き直せ。accelerator='gpu', precision='bf16-mixed', devices=2 を使用すること。",
+        stars: 3,
+        a: `from lightning.fabric import Fabric
+
+fabric = Fabric(accelerator="gpu", devices=2, strategy="ddp", precision="bf16-mixed")
+fabric.launch()
+
+model = MyModel()
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+model, optimizer = fabric.setup(model, optimizer)
+train_loader = fabric.setup_dataloaders(DataLoader(train_dataset, batch_size=64))
+
+for epoch in range(num_epochs):
+    model.train()
+    for x, y in train_loader:
+        # device への転送は不要・autocast/scaler も不要
+        logits = model(x)
+        loss = F.cross_entropy(logits, y)
+        fabric.backward(loss)
+        optimizer.step()
+        optimizer.zero_grad()`
+      }
+    ]
+  },
+  {
+    id: "ch5", title: "第5章 LightningCLI",
+    goal: "LightningCLI を使って fit / test / predict をコマンドライン引数と YAML 設定ファイルで制御できる。",
+    sections: [
+      {
+        title: "LightningCLI の基本",
+        body: `LightningCLI は LightningModule と LightningDataModule をコマンドラインから設定・実行するための統合ツールです。スクリプトに LightningCLI(MyModel, MyDataModule) の1行を書くだけで、Trainer の全引数やモデルのハイパーパラメータをコマンドラインから制御できるようになります。
+
+python train.py fit でトレーニング、python train.py test でテスト、python train.py predict で推論を実行できます。これにより実験管理が大幅に簡略化され、ハイパーパラメータのハードコーディングが不要になります。
+
+LightningCLI はデフォルトで引数の型検証も行うため、誤った型の引数が渡された場合に早期にエラーを検出できます。`,
+        code: `# train.py
+from lightning.pytorch.cli import LightningCLI
+from mymodule import MyModel
+from mydatamodule import MyDataModule
+
+def main():
+    cli = LightningCLI(MyModel, MyDataModule)
+
+if __name__ == "__main__":
+    main()
+
+# 実行例
+# python train.py fit --trainer.max_epochs=10 --model.lr=0.001
+# python train.py test --ckpt_path=checkpoints/best.ckpt
+# python train.py predict --ckpt_path=checkpoints/best.ckpt`
+      },
+      {
+        title: "YAML 設定ファイルによる管理",
+        body: `LightningCLI は YAML 設定ファイルをサポートしており、--config config.yaml で指定できます。YAML ファイルにはモデルのハイパーパラメータ、Trainer の設定、コールバックの設定などをまとめて記述できます。
+
+設定ファイルを使うことで実験設定をコードから完全に分離でき、git で管理することで実験の再現性が保証されます。複数の設定ファイルをマージすることも可能で、base.yaml + experiment.yaml のように基本設定を継承しながら差分だけを上書きするパターンが実用的です。
+
+python train.py fit --config base.yaml --config overrides.yaml のように複数ファイルを指定した場合、後から指定したファイルが優先されます。`,
+        code: `# config.yaml
+trainer:
+  max_epochs: 50
+  accelerator: gpu
+  devices: 2
+  strategy: ddp
+  precision: "16-mixed"
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        monitor: val_loss
+        save_top_k: 3
+        mode: min
+    - class_path: lightning.pytorch.callbacks.EarlyStopping
+      init_args:
+        monitor: val_loss
+        patience: 10
+
+model:
+  lr: 0.001
+  hidden_dim: 256
+
+data:
+  batch_size: 64
+  num_workers: 4
+
+# 実行
+# python train.py fit --config config.yaml`
+      }
+    ],
+    exercises: [
+      {
+        q: "LightningCLI を使ったエントリポイントスクリプトを書き、YAML で lr=0.001, max_epochs=20 を設定するファイルを作成せよ。",
+        stars: 2,
+        a: `# train.py
+from lightning.pytorch.cli import LightningCLI
+from model import MyModel
+from datamodule import MyDataModule
+
+if __name__ == "__main__":
+    LightningCLI(MyModel, MyDataModule)
+
+# config.yaml
+# trainer:
+#   max_epochs: 20
+#   accelerator: gpu
+#   devices: 1
+# model:
+#   lr: 0.001
+# data:
+#   batch_size: 32
+
+# 実行:
+# python train.py fit --config config.yaml`
+      }
+    ]
+  },
+  {
+    id: "ch6", title: "第6章 モデルの本番デプロイ",
+    goal: "学習済みモデルを TorchScript / ONNX 形式にエクスポートし、BentoML を使って API サービスとして公開できる。",
+    sections: [
+      {
+        title: "TorchScript と ONNX エクスポート",
+        body: `学習済みの LightningModule を本番環境にデプロイするには、Python に依存しない形式にエクスポートするのが一般的です。TorchScript は PyTorch のサブセット言語にモデルをコンパイルし、Python なしで C++ や Java から実行できます。torch.jit.script() でスクリプトモード、torch.jit.trace() でトレースモードを使えます。
+
+ONNX（Open Neural Network Exchange）は異なるフレームワーク間でモデルを交換するための標準形式です。ONNX Runtime を使うと CPU 推論が大幅に高速化されるケースがあり、TensorRT への変換やモバイルデプロイの中間フォーマットとしても使われます。
+
+LightningModule は to_torchscript() と to_onnx() の便利メソッドを持っており、生の PyTorch より簡単にエクスポートできます。`,
+        code: `# TorchScript エクスポート
+model = MyModel.load_from_checkpoint("best.ckpt")
+model.eval()
+script = model.to_torchscript(method="script")
+torch.jit.save(script, "model.pt")
+
+# ロードして推論
+loaded = torch.jit.load("model.pt")
+with torch.no_grad():
+    output = loaded(input_tensor)
+
+# ONNX エクスポート
+dummy_input = torch.randn(1, 3, 224, 224)
+model.to_onnx(
+    "model.onnx",
+    input_sample=dummy_input,
+    export_params=True,
+    opset_version=17,
+    input_names=["input"],
+    output_names=["output"],
+    dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
+)`
+      },
+      {
+        title: "BentoML による API サービング",
+        body: `BentoML は ML モデルを REST API として素早くサービス化するためのフレームワークです。モデルの保存・バージョン管理・Docker コンテナ化までを一貫して行えます。Lightning モデルを ONNX や TorchScript にエクスポートした上で、BentoML でラップして公開するのが典型的なパターンです。
+
+BentoML ではサービスクラスに @bentoml.api デコレータを付けてエンドポイントを定義します。入出力の型は Python の型ヒントで指定でき、numpy array・PIL Image・pandas DataFrame など様々な型に対応しています。
+
+bentoml serve service:svc でローカル起動し、bentoml build → bentoml containerize でコンテナ化して GCP / AWS / K8s にデプロイできます。`,
+        code: `import bentoml
+import numpy as np
+
+# モデルの保存
+bentoml.onnx.save_model("my_model", "model.onnx")
+
+# service.py
+import bentoml
+from bentoml.io import NumpyNdarray
+
+runner = bentoml.onnx.get("my_model:latest").to_runner()
+svc = bentoml.Service("my_model_service", runners=[runner])
+
+@svc.api(input=NumpyNdarray(), output=NumpyNdarray())
+async def predict(input_data: np.ndarray) -> np.ndarray:
+    result = await runner.async_run(input_data.astype(np.float32))
+    return result
+
+# 起動: bentoml serve service:svc --reload
+# ビルド: bentoml build
+# コンテナ化: bentoml containerize my_model_service:latest`
+      }
+    ],
+    exercises: [
+      {
+        q: "LightningModule を ONNX にエクスポートし、onnxruntime で推論するコードを書け。dynamic_axes でバッチサイズを動的にすること。",
+        stars: 3,
+        a: `import onnxruntime as ort
+import numpy as np
+
+# エクスポート
+model = MyModel.load_from_checkpoint("best.ckpt")
+model.eval()
+dummy = torch.randn(1, 3, 224, 224)
+model.to_onnx(
+    "model.onnx",
+    input_sample=dummy,
+    export_params=True,
+    opset_version=17,
+    input_names=["input"],
+    output_names=["output"],
+    dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
+)
+
+# ONNX Runtime で推論
+sess = ort.InferenceSession("model.onnx", providers=["CPUExecutionProvider"])
+input_name = sess.get_inputs()[0].name
+# バッチサイズ 8 で推論
+batch = np.random.randn(8, 3, 224, 224).astype(np.float32)
+outputs = sess.run(None, {input_name: batch})
+print(outputs[0].shape)  # (8, num_classes)`
+      }
+    ]
+  }
+];
+
+function CodeBlock({ code }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  };
+  return React.createElement("div", { style: { position:"relative", margin:"16px 0" } },
+    React.createElement("button", {
+      onClick: copy,
+      style: {
+        position:"absolute", top:8, right:8, background: copied ? "#22c55e" : "#374151",
+        color:"#fff", border:"none", borderRadius:6, padding:"4px 10px", fontSize:12,
+        cursor:"pointer", fontFamily:"inherit"
+      }
+    }, copied ? "コピー済" : "コピー"),
+    React.createElement("pre", {
+      style: {
+        background:"#1e1b4b", color:"#e0e7ff", padding:"20px 16px", borderRadius:10,
+        overflowX:"auto", fontSize:13, lineHeight:1.7,
+        fontFamily:"'JetBrains Mono', 'Fira Mono', monospace"
+      }
+    }, React.createElement("code", null, code))
+  );
+}
+
+function Section({ section, chId }) {
+  const [open, setOpen] = useState(false);
+  return React.createElement("div", {
+    key: chId + section.title,
+    style: { borderRadius:10, border:"1px solid #e5e7eb", marginBottom:10, overflow:"hidden" }
+  },
+    React.createElement("button", {
+      onClick: () => setOpen(o => !o),
+      style: {
+        width:"100%", textAlign:"left", padding:"14px 18px", background: open ? "#f5f3ff" : "#fff",
+        border:"none", cursor:"pointer", fontWeight:700, fontSize:15, color:"#1e1b4b",
+        display:"flex", justifyContent:"space-between", alignItems:"center"
+      }
+    }, section.title, React.createElement("span", { style: { fontSize:18, color:"#7c3aed" } }, open ? "▲" : "▼")),
+    open && React.createElement("div", { style: { padding:"18px 20px", background:"#faf9ff" } },
+      React.createElement("p", { style: { color:"#374151", lineHeight:1.85, whiteSpace:"pre-line", marginBottom:12 } }, section.body),
+      section.code && React.createElement(CodeBlock, { code: section.code })
+    )
+  );
+}
+
+function Exercise({ ex, chId }) {
+  const [open, setOpen] = useState(false);
+  const stars = "⭐".repeat(ex.stars);
+  return React.createElement("div", {
+    key: chId + ex.q,
+    style: { borderRadius:10, border:"1px solid #ddd6fe", marginBottom:10, overflow:"hidden" }
+  },
+    React.createElement("div", { style: { padding:"14px 18px", background:"#f5f3ff" } },
+      React.createElement("div", { style: { fontWeight:700, color:"#6d28d9", marginBottom:4 } }, stars),
+      React.createElement("p", { style: { color:"#1e1b4b", fontWeight:600, marginBottom:8 } }, ex.q),
+      React.createElement("button", {
+        onClick: () => setOpen(o => !o),
+        style: {
+          background:"linear-gradient(135deg,#7c3aed,#6366f1)", color:"#fff",
+          border:"none", borderRadius:6, padding:"6px 16px", fontSize:13,
+          cursor:"pointer", fontWeight:700
+        }
+      }, open ? "解答を隠す" : "解答を見る")
+    ),
+    open && React.createElement("div", { style: { padding:"0 18px 14px", background:"#f5f3ff" } },
+      React.createElement(CodeBlock, { code: ex.a })
+    )
+  );
+}
+
+function ChapterNav({ chapters, current, onSelect }) {
+  return React.createElement("div", { style: { display:"flex", gap:8, flexWrap:"wrap", marginBottom:24 } },
+    chapters.map((ch, i) =>
+      React.createElement("button", {
+        key: ch.id,
+        onClick: () => onSelect(i),
+        style: {
+          padding:"8px 14px", borderRadius:8, border:"2px solid",
+          borderColor: current === i ? "#7c3aed" : "#e5e7eb",
+          background: current === i ? "#7c3aed" : "#fff",
+          color: current === i ? "#fff" : "#374151",
+          fontWeight: current === i ? 700 : 500,
+          fontSize: 13, cursor:"pointer", transition:"all 0.15s"
+        }
+      }, `第${i+1}章`)
+    )
+  );
+}
+
+function LightningIntermediateCourse() {
+  const [chIdx, setChIdx] = useState(0);
+  const ch = CHAPTERS[chIdx];
+
+  const selectChapter = (i) => setChIdx(i);
+
+  return React.createElement("div", { style: { background:"linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%)", minHeight:"100vh" } },
+    // Hero
+    React.createElement("div", { style: { background:"linear-gradient(135deg,#4c1d95,#6d28d9,#7c3aed)", color:"#fff", padding:"48px 24px 36px", textAlign:"center" } },
+      React.createElement("div", { style: { display:"inline-block", background:"rgba(255,255,255,0.15)", borderRadius:12, padding:"6px 18px", fontSize:13, marginBottom:16 } }, "中級コース"),
+      React.createElement("h1", { style: { fontSize:"clamp(24px,4vw,40px)", fontWeight:900, marginBottom:16 } }, "PyTorch Lightning 中級コース"),
+      React.createElement("div", { style: { display:"flex", gap:24, justifyContent:"center", flexWrap:"wrap", marginBottom:20 } },
+        [["📚", "6章"], ["🔧", "12セクション"], ["💡", "6演習"]].map(([icon, label]) =>
+          React.createElement("span", { key: label, style: { background:"rgba(255,255,255,0.15)", borderRadius:8, padding:"6px 16px", fontSize:14 } }, `${icon} ${label}`)
+        )
+      ),
+      React.createElement("p", { style: { maxWidth:700, margin:"0 auto", fontSize:16, lineHeight:1.8, opacity:0.9 } },
+        "manual_optimization・分散学習・Fabric・LightningCLI・本番デプロイまでを網羅し、実務レベルの PyTorch Lightning 活用力を身につけます。"
+      )
+    ),
+    // Main content
+    React.createElement("div", { style: { maxWidth:900, margin:"0 auto", padding:"32px 16px" } },
+      React.createElement(ChapterNav, { chapters: CHAPTERS, current: chIdx, onSelect: selectChapter }),
+      // Chapter goal
+      React.createElement("div", { style: { background:"#ede9fe", border:"2px solid #7c3aed", borderRadius:12, padding:"16px 20px", marginBottom:24 } },
+        React.createElement("div", { style: { fontWeight:800, color:"#6d28d9", marginBottom:6 } }, "🎯 この章のゴール"),
+        React.createElement("p", { style: { color:"#1e1b4b", lineHeight:1.75 } }, ch.goal)
+      ),
+      React.createElement("h2", { style: { fontSize:22, fontWeight:800, color:"#1e1b4b", marginBottom:20 } }, ch.title),
+      ch.sections.map(sec =>
+        React.createElement(Section, { key: ch.id + sec.title, section: sec, chId: ch.id })
+      ),
+      // Exercises
+      React.createElement("h3", { style: { fontSize:18, fontWeight:800, color:"#7c3aed", margin:"28px 0 14px" } }, "演習問題"),
+      ch.exercises.map(ex =>
+        React.createElement(Exercise, { key: ch.id + ex.q, ex, chId: ch.id })
+      ),
+      // Prev/Next nav
+      React.createElement("div", { style: { display:"flex", justifyContent:"space-between", marginTop:32 } },
+        chIdx > 0
+          ? React.createElement("button", {
+              onClick: () => setChIdx(chIdx - 1),
+              style: { background:"#7c3aed", color:"#fff", border:"none", borderRadius:8, padding:"10px 20px", fontWeight:700, cursor:"pointer" }
+            }, "← 前の章")
+          : React.createElement("span"),
+        chIdx < CHAPTERS.length - 1
+          ? React.createElement("button", {
+              onClick: () => setChIdx(chIdx + 1),
+              style: { background:"#7c3aed", color:"#fff", border:"none", borderRadius:8, padding:"10px 20px", fontWeight:700, cursor:"pointer" }
+            }, "次の章 →")
+          : React.createElement("a", {
+              href: "../index.html",
+              style: { background:"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", borderRadius:8, padding:"10px 20px", fontWeight:700, textDecoration:"none", display:"inline-block" }
+            }, "🎉 コース完了 — ホームへ")
+      ),
+      // Footer
+      React.createElement("footer", { style: { textAlign:"center", color:"#9ca3af", fontSize:12, marginTop:48, paddingTop:24, borderTop:"1px solid #e5e7eb" } },
+        "参考: lightning.ai/docs ・ PyTorch Lightning 2.x 時点の情報"
+      )
+    )
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(LightningIntermediateCourse));
+  </script>
+</body>
+</html>
