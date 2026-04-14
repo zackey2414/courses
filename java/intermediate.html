@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java 中級コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのJava中級コース。Spring Boot・Spring Security・JPA・テスト戦略など全12章・36問の演習付き。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+/* ── Table definitions ── */
+const T = {
+  springLayers: {
+    h: ["レイヤー", "アノテーション", "役割"],
+    r: [
+      ["Presentation", "@RestController", "HTTPリクエストを受け取りJSONを返す"],
+      ["Business", "@Service", "ビジネスロジックを実装する"],
+      ["Persistence", "@Repository", "DBアクセスを担当する"],
+      ["Domain", "@Entity", "DBテーブルに対応するデータ構造"]
+    ]
+  },
+  autoConfig: {
+    h: ["仕組み", "説明"],
+    r: [
+      ["spring.factories / AutoConfiguration.imports", "クラスパスにJARがあると自動的に@Configurationクラスが読み込まれる"],
+      ["@ConditionalOnClass", "特定のクラスが存在するときだけ設定を適用"],
+      ["@ConditionalOnMissingBean", "同じ型のBeanがなければデフォルトBeanを登録"],
+      ["application.properties", "自動設定の挙動をプロパティで上書き可能"]
+    ]
+  },
+  beanScope: {
+    h: ["スコープ", "デフォルト?", "ライフサイクル", "用途"],
+    r: [
+      ["singleton", "✅", "アプリ起動〜終了", "ステートレスなService・Repository"],
+      ["prototype", "❌", "getBean()のたびに新生成", "ステートフルなオブジェクト"],
+      ["request", "❌", "HTTPリクエスト1回", "Web層の一時データ"],
+      ["session", "❌", "HTTPセッション期間", "ユーザーセッション情報"]
+    ]
+  },
+  requestMapping: {
+    h: ["アノテーション", "HTTPメソッド", "典型的な用途"],
+    r: [
+      ["@GetMapping", "GET", "リソース取得"],
+      ["@PostMapping", "POST", "リソース作成"],
+      ["@PutMapping", "PUT", "リソース全体更新"],
+      ["@PatchMapping", "PATCH", "リソース部分更新"],
+      ["@DeleteMapping", "DELETE", "リソース削除"]
+    ]
+  },
+  validationAnnotations: {
+    h: ["アノテーション", "対象", "説明"],
+    r: [
+      ["@NotNull", "任意", "nullを許可しない"],
+      ["@NotBlank", "String", "null・空文字・空白のみを禁止"],
+      ["@Size(min,max)", "String/Collection", "長さ・サイズの範囲指定"],
+      ["@Min/@Max", "数値", "数値の最小・最大"],
+      ["@Email", "String", "メールアドレス形式"],
+      ["@Pattern(regexp)", "String", "正規表現でバリデーション"],
+      ["@Positive", "数値", "正の数のみ許可"]
+    ]
+  },
+  jpaAnnotations: {
+    h: ["アノテーション", "説明"],
+    r: [
+      ["@Entity", "このクラスがDBテーブルに対応することを示す"],
+      ["@Table(name)", "テーブル名を明示指定（省略時はクラス名）"],
+      ["@Id", "主キーフィールドを示す"],
+      ["@GeneratedValue", "主キーの自動採番戦略を指定"],
+      ["@Column(name,nullable)", "カラム定義を細かく指定"],
+      ["@Transient", "DBに保存しないフィールド"]
+    ]
+  },
+  fetchType: {
+    h: ["FetchType", "タイミング", "デフォルト", "注意点"],
+    r: [
+      ["LAZY", "関連エンティティに初めてアクセスしたとき", "@OneToMany/@ManyToMany", "セッション外アクセスでLazyInitializationException"],
+      ["EAGER", "親エンティティ取得と同時", "@ManyToOne/@OneToOne", "N+1問題を引き起こしやすい"]
+    ]
+  },
+  securityFilter: {
+    h: ["フィルター", "順序", "役割"],
+    r: [
+      ["SecurityContextPersistenceFilter", "1", "SecurityContextをリクエスト間で引き継ぐ"],
+      ["UsernamePasswordAuthenticationFilter", "5", "フォームログインの認証処理"],
+      ["BasicAuthenticationFilter", "6", "HTTP Basic認証"],
+      ["BearerTokenAuthenticationFilter", "7", "JWT Bearerトークン認証"],
+      ["ExceptionTranslationFilter", "14", "認証・認可例外を適切なHTTPレスポンスに変換"],
+      ["AuthorizationFilter", "15", "認可（アクセス制御）"]
+    ]
+  },
+  testAnnotations: {
+    h: ["アノテーション", "用途", "起動コンテキスト"],
+    r: [
+      ["@SpringBootTest", "フルコンテキストでの統合テスト", "全Bean起動"],
+      ["@WebMvcTest", "コントローラ層のみのスライステスト", "MVC関連Beanのみ"],
+      ["@DataJpaTest", "JPA層のみのスライステスト", "JPA/DB関連のみ"],
+      ["@MockBean", "Beanをモックに差し替える", "—"],
+      ["@ExtendWith(MockitoExtension)", "Mockitoを使ったピュアユニットテスト", "Springなし"]
+    ]
+  },
+  cacheLevels: {
+    h: ["レベル", "実装例", "特徴"],
+    r: [
+      ["アプリ内メモリ", "ConcurrentHashMap / Caffeine", "超高速・JVMヒープ使用・再起動でクリア"],
+      ["分散キャッシュ", "Redis / Memcached", "複数インスタンス間で共有・永続化可"],
+      ["DBクエリキャッシュ", "Hibernate 2ndレベルキャッシュ", "JPA内部で透過的にキャッシュ"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [
+    {
+      diff: 1,
+      q: "Spring Initializrで生成したプロジェクトのmain classに、アプリ起動時に「Spring Boot アプリ起動！」とログ出力する処理を追加してください。\nCommandLineRunnerを実装する方法を使うこと。",
+      code: `@SpringBootApplication
+public class DemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+    // ここにCommandLineRunnerを追加
+}`,
+      answer: `@SpringBootApplication
+public class DemoApplication implements CommandLineRunner {
+    private static final Logger log =
+        LoggerFactory.getLogger(DemoApplication.class);
+
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) {
+        log.info("Spring Boot アプリ起動！");
+    }
+}`
+    },
+    {
+      diff: 2,
+      q: "application.propertiesに独自プロパティ app.name=MyApp と app.version=1.0 を定義し、@Valueで読み込んでCommandLineRunnerで出力してください。",
+      code: `# application.properties
+# ここにプロパティを追加
+
+// AppRunner.java
+@Component
+public class AppRunner implements CommandLineRunner {
+    // @Valueで注入
+    @Override
+    public void run(String... args) {
+        // 出力
+    }
+}`,
+      answer: `# application.properties
+app.name=MyApp
+app.version=1.0
+
+// AppRunner.java
+@Component
+public class AppRunner implements CommandLineRunner {
+    @Value("\${app.name}")
+    private String appName;
+
+    @Value("\${app.version}")
+    private String appVersion;
+
+    @Override
+    public void run(String... args) {
+        System.out.println("アプリ名: " + appName + " v" + appVersion);
+    }
+}`
+    },
+    {
+      diff: 3,
+      q: "@ConfigurationPropertiesを使って、以下のプロパティをタイプセーフに読み込むクラスを定義してください。\napp.database.host=localhost\napp.database.port=5432\napp.database.name=mydb",
+      code: `// AppConfig.java - @ConfigurationPropertiesを実装
+// AppRunner.java - 注入して出力`,
+      answer: `// AppProperties.java
+@ConfigurationProperties(prefix = "app.database")
+@Component
+public class AppProperties {
+    private String host;
+    private int port;
+    private String name;
+    // getter/setter省略（Lombokの@Dataでも可）
+    public String getHost() { return host; }
+    public void setHost(String host) { this.host = host; }
+    public int getPort() { return port; }
+    public void setPort(int port) { this.port = port; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+}
+
+// AppRunner.java
+@Component
+public class AppRunner implements CommandLineRunner {
+    @Autowired
+    private AppProperties props;
+
+    @Override
+    public void run(String... args) {
+        System.out.printf("DB: %s:%d/%s%n",
+            props.getHost(), props.getPort(), props.getName());
+    }
+}`
+    }
+  ],
+  ch2: [
+    {
+      diff: 1,
+      q: "@Componentと@Autowiredを使って、GreetingServiceを作成しHelloControllerで使用してください。\nGreetingServiceのgreet(String name)メソッドは「こんにちは、{name}！」を返すものとします。",
+      code: `// GreetingService.java - 作成してください
+// HelloController.java
+@RestController
+public class HelloController {
+    // GreetingServiceを注入
+    @GetMapping("/hello")
+    public String hello(@RequestParam String name) {
+        // サービスを呼ぶ
+    }
+}`,
+      answer: `// GreetingService.java
+@Service
+public class GreetingService {
+    public String greet(String name) {
+        return "こんにちは、" + name + "！";
+    }
+}
+
+// HelloController.java
+@RestController
+public class HelloController {
+    private final GreetingService greetingService;
+
+    public HelloController(GreetingService greetingService) {
+        this.greetingService = greetingService;
+    }
+
+    @GetMapping("/hello")
+    public String hello(@RequestParam String name) {
+        return greetingService.greet(name);
+    }
+}`
+    },
+    {
+      diff: 2,
+      q: "GreetingServiceのインターフェースを定義し、JapaneseGreetingServiceとEnglishGreetingServiceの2実装を作成してください。\n@Qualifier(\"japanese\")/@Qualifier(\"english\")で切り替えられるようにすること。",
+      code: `// GreetingService.java - インターフェース
+// JapaneseGreetingService.java
+// EnglishGreetingService.java
+// GreetingController.java - 両方注入して使う`,
+      answer: `// GreetingService.java
+public interface GreetingService {
+    String greet(String name);
+}
+
+// JapaneseGreetingService.java
+@Service("japanese")
+public class JapaneseGreetingService implements GreetingService {
+    public String greet(String name) { return "こんにちは、" + name + "！"; }
+}
+
+// EnglishGreetingService.java
+@Service("english")
+public class EnglishGreetingService implements GreetingService {
+    public String greet(String name) { return "Hello, " + name + "!"; }
+}
+
+// GreetingController.java
+@RestController
+public class GreetingController {
+    private final GreetingService japaneseService;
+    private final GreetingService englishService;
+
+    public GreetingController(
+        @Qualifier("japanese") GreetingService japaneseService,
+        @Qualifier("english") GreetingService englishService) {
+        this.japaneseService = japaneseService;
+        this.englishService = englishService;
+    }
+
+    @GetMapping("/greet/ja")
+    public String ja(@RequestParam String name) {
+        return japaneseService.greet(name);
+    }
+
+    @GetMapping("/greet/en")
+    public String en(@RequestParam String name) {
+        return englishService.greet(name);
+    }
+}`
+    },
+    {
+      diff: 3,
+      q: "@Scopeを使ってprototypスコープのCounterBeanを作成し、DIコンテナから取得するたびに新しいインスタンスが生成されることを確認するテストを書いてください。",
+      code: `// CounterBean.java - @Scope("prototype")
+// CounterBeanTest.java - ApplicationContextから2回取得して別インスタンスを確認`,
+      answer: `// CounterBean.java
+@Component
+@Scope("prototype")
+public class CounterBean {
+    private int count = 0;
+    public void increment() { count++; }
+    public int getCount() { return count; }
+}
+
+// CounterBeanTest.java
+@SpringBootTest
+class CounterBeanTest {
+    @Autowired
+    private ApplicationContext context;
+
+    @Test
+    void prototypeCreatesNewInstance() {
+        CounterBean bean1 = context.getBean(CounterBean.class);
+        CounterBean bean2 = context.getBean(CounterBean.class);
+
+        bean1.increment();
+        bean1.increment();
+
+        assertThat(bean1.getCount()).isEqualTo(2);
+        assertThat(bean2.getCount()).isEqualTo(0);
+        assertThat(bean1).isNotSameAs(bean2);
+    }
+}`
+    }
+  ],
+  ch3: [
+    {
+      diff: 1,
+      q: "商品情報を返すAPIを実装してください。\nGET /products/{id} で商品IDを受け取り、仮データ（Map）を返すエンドポイントを作成すること。",
+      code: `@RestController
+@RequestMapping("/products")
+public class ProductController {
+    // GET /products/{id} を実装
+}`,
+      answer: `@RestController
+@RequestMapping("/products")
+public class ProductController {
+    private final Map<Long, Map<String, Object>> products = Map.of(
+        1L, Map.of("id", 1, "name", "ノートPC", "price", 80000),
+        2L, Map.of("id", 2, "name", "マウス", "price", 3000)
+    );
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getProduct(@PathVariable Long id) {
+        Map<String, Object> product = products.get(id);
+        if (product == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(product);
+    }
+}`
+    },
+    {
+      diff: 2,
+      q: "クエリパラメータで商品検索を行うエンドポイントを実装してください。\nGET /products?category=electronics&minPrice=1000&maxPrice=100000\n@RequestParamでデフォルト値も設定すること。",
+      code: `@GetMapping
+public List<Map<String, Object>> searchProducts(
+    // クエリパラメータを受け取る
+) {
+    // フィルタリングロジック
+}`,
+      answer: `@GetMapping
+public List<Map<String, Object>> searchProducts(
+    @RequestParam(required = false) String category,
+    @RequestParam(defaultValue = "0") int minPrice,
+    @RequestParam(defaultValue = "999999") int maxPrice) {
+
+    List<Map<String, Object>> allProducts = List.of(
+        Map.of("name", "ノートPC", "category", "electronics", "price", 80000),
+        Map.of("name", "マウス", "category", "electronics", "price", 3000),
+        Map.of("name", "デスク", "category", "furniture", "price", 50000)
+    );
+
+    return allProducts.stream()
+        .filter(p -> category == null || category.equals(p.get("category")))
+        .filter(p -> (int)p.get("price") >= minPrice)
+        .filter(p -> (int)p.get("price") <= maxPrice)
+        .collect(java.util.stream.Collectors.toList());
+}`
+    },
+    {
+      diff: 3,
+      q: "RESTfulなCRUD APIのスケルトンをProductControllerに実装してください。\n作成(POST)・取得(GET)・更新(PUT)・削除(DELETE)の全エンドポイントを定義し、適切なHTTPステータスコードを返すこと。",
+      code: `// ProductController.java
+// ProductDto.java (record使用)`,
+      answer: `// ProductDto.java
+public record ProductDto(Long id, String name, int price) {}
+
+// ProductController.java
+@RestController
+@RequestMapping("/api/v1/products")
+public class ProductController {
+    private final Map<Long, ProductDto> store = new ConcurrentHashMap<>();
+    private final AtomicLong seq = new AtomicLong(1);
+
+    @GetMapping
+    public List<ProductDto> list() {
+        return new ArrayList<>(store.values());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductDto> get(@PathVariable Long id) {
+        ProductDto p = store.get(id);
+        return p != null ? ResponseEntity.ok(p) : ResponseEntity.notFound().build();
+    }
+
+    @PostMapping
+    public ResponseEntity<ProductDto> create(@RequestBody ProductDto dto) {
+        long id = seq.getAndIncrement();
+        ProductDto saved = new ProductDto(id, dto.name(), dto.price());
+        store.put(id, saved);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ProductDto> update(
+            @PathVariable Long id, @RequestBody ProductDto dto) {
+        if (!store.containsKey(id)) return ResponseEntity.notFound().build();
+        ProductDto updated = new ProductDto(id, dto.name(), dto.price());
+        store.put(id, updated);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (store.remove(id) == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.noContent().build();
+    }
+}`
+    }
+  ],
+  ch4: [
+    {
+      diff: 1,
+      q: "ユーザー登録APIのリクエストボディにバリデーションを追加してください。\n・name: 空白禁止、2〜50文字\n・email: メールアドレス形式\n・age: 1〜120の整数",
+      code: `// UserRequest.java - バリデーションアノテーションを追加
+public class UserRequest {
+    private String name;
+    private String email;
+    private int age;
+    // getter/setter
+}
+
+// UserController.java
+@PostMapping("/users")
+public ResponseEntity<?> createUser(@RequestBody UserRequest req) {
+    // @Validを追加
+}`,
+      answer: `// UserRequest.java
+public class UserRequest {
+    @NotBlank(message = "名前は必須です")
+    @Size(min = 2, max = 50, message = "名前は2〜50文字で入力してください")
+    private String name;
+
+    @NotBlank(message = "メールアドレスは必須です")
+    @Email(message = "メールアドレスの形式が正しくありません")
+    private String email;
+
+    @Min(value = 1, message = "年齢は1以上で入力してください")
+    @Max(value = 120, message = "年齢は120以下で入力してください")
+    private int age;
+
+    // getter/setter省略
+}
+
+// UserController.java
+@PostMapping("/users")
+public ResponseEntity<?> createUser(@Valid @RequestBody UserRequest req) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(req);
+}`
+    },
+    {
+      diff: 2,
+      q: "@ExceptionHandlerを使って、MethodArgumentNotValidExceptionをキャッチしフィールドごとのエラーメッセージをJSON形式で返す@ControllerAdviceを実装してください。",
+      code: `// ErrorResponse.java (record)
+// GlobalExceptionHandler.java - @ControllerAdvice`,
+      answer: `// ErrorResponse.java
+public record ErrorResponse(
+    int status,
+    String message,
+    Map<String, String> fieldErrors
+) {}
+
+// GlobalExceptionHandler.java
+@ControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(
+            MethodArgumentNotValidException ex) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(err ->
+            errors.put(err.getField(), err.getDefaultMessage())
+        );
+        ErrorResponse body = new ErrorResponse(400, "バリデーションエラー", errors);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(NoSuchElementException ex) {
+        ErrorResponse body = new ErrorResponse(404, ex.getMessage(), Map.of());
+        return ResponseEntity.status(404).body(body);
+    }
+}`
+    },
+    {
+      diff: 3,
+      q: "カスタムバリデーションアノテーション@ValidPostalCodeを作成してください。\n日本の郵便番号形式（「123-4567」または「1234567」）を許可する制約を実装すること。",
+      code: `// ValidPostalCode.java - アノテーション定義
+// PostalCodeValidator.java - ConstraintValidator実装
+// AddressRequest.java - @ValidPostalCodeを使用`,
+      answer: `// ValidPostalCode.java
+@Documented
+@Constraint(validatedBy = PostalCodeValidator.class)
+@Target({ ElementType.FIELD })
+@Retention(RetentionPolicy.RUNTIME)
+public @interface ValidPostalCode {
+    String message() default "郵便番号の形式が正しくありません（例: 123-4567）";
+    Class<?>[] groups() default {};
+    Class<? extends Payload>[] payload() default {};
+}
+
+// PostalCodeValidator.java
+public class PostalCodeValidator
+        implements ConstraintValidator<ValidPostalCode, String> {
+    private static final Pattern PATTERN =
+        Pattern.compile("^\\d{3}-?\\d{4}$");
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext ctx) {
+        if (value == null) return true; // @NotNullと組み合わせる
+        return PATTERN.matcher(value).matches();
+    }
+}
+
+// AddressRequest.java
+public class AddressRequest {
+    @ValidPostalCode
+    private String postalCode;
+    private String address;
+}`
+    }
+  ],
+  ch5: [
+    {
+      diff: 1,
+      q: "ProductエンティティとProductRepositoryを作成してください。\nフィールド: id(Long), name(String), price(int), createdAt(LocalDateTime)\nJpaRepositoryを継承し、findByNameContainingメソッドも定義すること。",
+      code: `// Product.java - @Entityを使ったエンティティ
+// ProductRepository.java - JpaRepositoryを継承`,
+      answer: `// Product.java
+@Entity
+@Table(name = "products")
+public class Product {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 100)
+    private String name;
+
+    @Column(nullable = false)
+    private int price;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    // getter/setter/コンストラクタ省略
+}
+
+// ProductRepository.java
+public interface ProductRepository extends JpaRepository<Product, Long> {
+    List<Product> findByNameContaining(String keyword);
+}`
+    },
+    {
+      diff: 2,
+      q: "@QueryアノテーションでJPQLを使って、価格が指定範囲内の商品を価格昇順で取得するメソッドをProductRepositoryに追加してください。\nさらに、ネイティブSQLで全商品の平均価格を取得するメソッドも追加すること。",
+      code: `public interface ProductRepository extends JpaRepository<Product, Long> {
+    // findByNameContaining は既存
+
+    // JPQL: 価格範囲検索（価格昇順）
+
+    // ネイティブSQL: 平均価格
+}`,
+      answer: `public interface ProductRepository extends JpaRepository<Product, Long> {
+    List<Product> findByNameContaining(String keyword);
+
+    @Query("SELECT p FROM Product p WHERE p.price BETWEEN :minPrice AND :maxPrice ORDER BY p.price ASC")
+    List<Product> findByPriceRange(
+        @Param("minPrice") int minPrice,
+        @Param("maxPrice") int maxPrice
+    );
+
+    @Query(value = "SELECT AVG(price) FROM products", nativeQuery = true)
+    Double findAveragePrice();
+}`
+    },
+    {
+      diff: 3,
+      q: "ProductServiceを作成し、以下の機能を実装してください。\n1. 商品作成（重複名チェック付き）\n2. 商品取得（見つからない場合はNoSuchElementExceptionをスロー）\n3. ページネーション付き商品一覧取得（Pageableを使用）",
+      code: `@Service
+public class ProductService {
+    private final ProductRepository productRepository;
+    // コンストラクタインジェクション
+
+    // create(ProductRequest dto) → Product
+    // findById(Long id) → Product
+    // findAll(int page, int size) → Page<Product>
+}`,
+      answer: `@Service
+public class ProductService {
+    private final ProductRepository productRepository;
+
+    public ProductService(ProductRepository productRepository) {
+        this.productRepository = productRepository;
+    }
+
+    public Product create(String name, int price) {
+        if (productRepository.findByNameContaining(name).stream()
+                .anyMatch(p -> p.getName().equals(name))) {
+            throw new IllegalArgumentException("同名の商品が既に存在します: " + name);
+        }
+        Product product = new Product();
+        product.setName(name);
+        product.setPrice(price);
+        product.setCreatedAt(LocalDateTime.now());
+        return productRepository.save(product);
+    }
+
+    public Product findById(Long id) {
+        return productRepository.findById(id)
+            .orElseThrow(() -> new NoSuchElementException("商品が見つかりません: " + id));
+    }
+
+    public Page<Product> findAll(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return productRepository.findAll(pageable);
+    }
+}`
+    }
+  ],
+  ch6: [
+    {
+      diff: 1,
+      q: "OrderとOrderItemのエンティティを作成し、@OneToMany/@ManyToOneの双方向関係を定義してください。\nOrder: id, orderDate, items\nOrderItem: id, productName, quantity, unitPrice",
+      code: `// Order.java
+// OrderItem.java`,
+      answer: `// Order.java
+@Entity
+@Table(name = "orders")
+public class Order {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "order_date", nullable = false)
+    private LocalDateTime orderDate = LocalDateTime.now();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> items = new ArrayList<>();
+
+    public void addItem(OrderItem item) {
+        items.add(item);
+        item.setOrder(this);
+    }
+    // getter/setter省略
+}
+
+// OrderItem.java
+@Entity
+@Table(name = "order_items")
+public class OrderItem {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", nullable = false)
+    private Order order;
+
+    private String productName;
+    private int quantity;
+    private int unitPrice;
+    // getter/setter省略
+}`
+    },
+    {
+      diff: 2,
+      q: "@Transactionalを使って「注文作成」のサービスメソッドを実装してください。\n注文と明細を同時に保存し、在庫不足の場合はRuntimeExceptionをスローしてロールバックされることを確認すること。",
+      code: `@Service
+public class OrderService {
+    // createOrder(List<OrderItemRequest> items) → Order
+    // 在庫チェック: quantityが0以下の場合は例外
+}`,
+      answer: `@Service
+public class OrderService {
+    private final OrderRepository orderRepository;
+
+    public OrderService(OrderRepository orderRepository) {
+        this.orderRepository = orderRepository;
+    }
+
+    @Transactional
+    public Order createOrder(List<OrderItemRequest> itemRequests) {
+        Order order = new Order();
+
+        for (OrderItemRequest req : itemRequests) {
+            if (req.quantity() <= 0) {
+                throw new IllegalArgumentException(
+                    "在庫不足または数量不正: " + req.productName()
+                );
+            }
+            OrderItem item = new OrderItem();
+            item.setProductName(req.productName());
+            item.setQuantity(req.quantity());
+            item.setUnitPrice(req.unitPrice());
+            order.addItem(item);
+        }
+
+        return orderRepository.save(order); // cascadeでitemsも保存
+    }
+}
+
+// OrderItemRequest.java
+public record OrderItemRequest(String productName, int quantity, int unitPrice) {}`
+    },
+    {
+      diff: 3,
+      q: "@OneToManyのN+1問題を確認し、@EntityGraph（またはJPQL JOIN FETCH）で解決してください。\nログにSQL出力を有効にして、クエリ数が削減されることを確認する方法も示すこと。",
+      code: `// application.properties - SQL出力設定
+// OrderRepository.java - N+1を起こすメソッドと解決済みメソッド`,
+      answer: `# application.properties
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+
+// OrderRepository.java
+public interface OrderRepository extends JpaRepository<Order, Long> {
+
+    // N+1が起きるパターン（Orderを取得 → items毎に1クエリ追加）
+    List<Order> findAll();
+
+    // JOIN FETCHで解決（1クエリで全データ取得）
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.items")
+    List<Order> findAllWithItems();
+
+    // @EntityGraphを使う方法
+    @EntityGraph(attributePaths = {"items"})
+    @Override
+    List<Order> findAll(Sort sort);
+}`
+    }
+  ]
+};
