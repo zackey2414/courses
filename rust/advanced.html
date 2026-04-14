@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rust 上級コース | Programming Courses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:#0d0500;color:#e8d5c0;line-height:1.7;min-height:100vh}
+a{color:#fb923c;text-decoration:none}
+a:hover{text-decoration:underline}
+.header{background:linear-gradient(135deg,#1a0a00,#3b1500);border-bottom:1px solid #7c2d12;padding:1rem 2rem;display:flex;align-items:center;gap:1rem;position:sticky;top:0;z-index:100}
+.header a{color:#fb923c;font-weight:700;font-size:1.1rem}
+.header span{color:#c2410c}
+.hero{background:linear-gradient(135deg,#1a0a00 0%,#3b1500 50%,#1a0a00 100%);padding:3rem 2rem;text-align:center;border-bottom:1px solid #7c2d12}
+.hero h1{font-size:2.2rem;color:#fb923c;margin-bottom:.5rem}
+.hero .subtitle{color:#c2410c;font-size:1.1rem;margin-bottom:1rem}
+.hero .meta{display:flex;justify-content:center;gap:2rem;flex-wrap:wrap;margin-bottom:1.5rem}
+.hero .meta span{background:#2d0f00;border:1px solid #7c2d12;padding:.3rem .8rem;border-radius:20px;font-size:.9rem}
+.hero .desc{max-width:700px;margin:0 auto;color:#d4a574;font-size:1rem}
+.nav-tabs{display:flex;justify-content:center;gap:.5rem;padding:1rem;background:#130800;border-bottom:1px solid #7c2d12;flex-wrap:wrap}
+.nav-tab{padding:.4rem 1rem;border-radius:20px;background:#1a0a00;border:1px solid #7c2d12;color:#d4a574;cursor:pointer;font-size:.9rem;transition:all .2s}
+.nav-tab:hover,.nav-tab.active{background:#7c2d12;border-color:#fb923c;color:#fb923c}
+.content{max-width:900px;margin:0 auto;padding:2rem}
+.chapter{background:#1a0a00;border:1px solid #7c2d12;border-radius:12px;margin-bottom:1.5rem;overflow:hidden}
+.chapter-header{padding:1.2rem 1.5rem;cursor:pointer;display:flex;align-items:center;gap:1rem;transition:background .2s}
+.chapter-header:hover{background:#2d0f00}
+.chapter-num{background:linear-gradient(135deg,#c2410c,#ea580c);color:white;width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0}
+.chapter-title{font-size:1.1rem;font-weight:700;color:#fb923c;flex:1}
+.chapter-est{color:#7c2d12;font-size:.85rem}
+.chapter-arrow{color:#7c2d12;transition:transform .3s;font-size:1.2rem}
+.chapter-arrow.open{transform:rotate(180deg)}
+.chapter-body{padding:0 1.5rem 1.5rem;display:none}
+.chapter-body.open{display:block}
+.goal-block{background:#2d0f00;border:1px solid #c2410c;border-radius:8px;padding:1rem 1.2rem;margin-bottom:1.5rem}
+.goal-block h4{color:#fb923c;margin-bottom:.4rem;font-size:.95rem}
+.goal-block p{color:#d4a574;font-size:.9rem}
+.section{margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid #3b1500}
+.section:last-child{border-bottom:none;padding-bottom:0}
+.section h3{color:#f97316;margin-bottom:.7rem;font-size:1rem}
+.section p{color:#d4a574;margin-bottom:.7rem;font-size:.92rem}
+code{font-family:'JetBrains Mono',monospace;background:#0d0500;border:1px solid #3b1500;padding:.1em .4em;border-radius:4px;color:#fb923c;font-size:.88em}
+pre{background:#0d0500;border:1px solid #3b1500;border-radius:8px;padding:1.2rem;overflow-x:auto;margin:.7rem 0}
+pre code{background:none;border:none;padding:0;color:#fb923c;font-size:.88rem;line-height:1.6}
+table{width:100%;border-collapse:collapse;margin:.7rem 0;font-size:.88rem}
+th{background:#2d0f00;color:#fb923c;padding:.5rem .8rem;text-align:left;border:1px solid #7c2d12}
+td{padding:.5rem .8rem;border:1px solid #3b1500;color:#d4a574;vertical-align:top}
+tr:nth-child(even) td{background:#130800}
+.table-caption{color:#7c2d12;font-size:.82rem;margin-bottom:.3rem}
+.exercises{margin-top:1.5rem}
+.exercises h4{color:#fb923c;margin-bottom:1rem;font-size:1rem}
+.exercise{background:#130800;border:1px solid #3b1500;border-radius:8px;margin-bottom:1rem;overflow:hidden}
+.exercise-header{padding:.8rem 1rem;display:flex;align-items:center;gap:.7rem;cursor:pointer;transition:background .2s}
+.exercise-header:hover{background:#1a0a00}
+.diff{display:flex;gap:2px}
+.star{color:#fb923c;font-size:.9rem}
+.star.empty{color:#3b1500}
+.exercise-q{color:#d4a574;flex:1;font-size:.9rem}
+.exercise-body{padding:0 1rem 1rem;display:none}
+.exercise-body.open{display:block}
+.answer-toggle{background:#2d0f00;border:1px solid #c2410c;color:#fb923c;padding:.3rem .8rem;border-radius:6px;cursor:pointer;font-size:.82rem;margin-top:.7rem;font-family:'Noto Sans JP',sans-serif}
+.answer-toggle:hover{background:#3b1500}
+.answer-block{background:#0d0500;border:1px solid #3b1500;border-radius:8px;padding:1rem;margin-top:.7rem;display:none}
+.answer-block.open{display:block}
+.chapter-nav{display:flex;justify-content:space-between;margin-top:2rem;padding-top:1rem;border-top:1px solid #7c2d12}
+.nav-btn{background:#1a0a00;border:1px solid #7c2d12;color:#fb923c;padding:.6rem 1.2rem;border-radius:8px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:.9rem;transition:all .2s}
+.nav-btn:hover{background:#2d0f00;border-color:#fb923c}
+.nav-btn:disabled{opacity:.3;cursor:not-allowed}
+.complete-banner{text-align:center;padding:2rem;background:linear-gradient(135deg,#1a0a00,#3b1500);border:1px solid #c2410c;border-radius:12px;margin-top:2rem}
+.complete-banner h2{color:#fb923c;margin-bottom:.5rem}
+.complete-banner p{color:#d4a574}
+.home-btn{display:inline-block;margin-top:1rem;background:linear-gradient(135deg,#c2410c,#ea580c);color:white;padding:.7rem 1.5rem;border-radius:8px;font-weight:700}
+footer{text-align:center;padding:2rem;color:#7c2d12;font-size:.82rem;border-top:1px solid #3b1500;margin-top:3rem}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const T = {
+  procMacroFlow: { h:["ステップ","説明"], r:[
+    ["1. Cargo.tomlにproc-macro=true","独立クレートとして宣言"],
+    ["2. syn::parse_macro_input!","TokenStreamをASTに変換"],
+    ["3. quote::quote!","新しいRustコードを生成"],
+    ["4. proc_macro2::TokenStream","クレート境界を超えて操作"],
+    ["5. #[proc_macro_derive]等で公開","使用側からderive等で呼び出す"],
+  ], cap:"proc-macroの実装フロー" },
+  pinnedTypes: { h:["型","固定対象","主な用途"], r:[
+    ["Pin<Box<T>>","ヒープ上のT","自己参照型・async state machine"],
+    ["Pin<&mut T>","借用したT","Futureのpolling"],
+    ["PhantomPinned","自己参照構造体","Unpinを実装させない"],
+  ], cap:"Pinの主要な使い方" },
+  allocTraits: { h:["トレイト","役割","実装例"], r:[
+    ["GlobalAlloc","グローバルアロケータ","jemalloc・mimalloc等"],
+    ["Allocator","コンテナ別アロケータ","Nightly、Vec<T,A>等"],
+    ["Box<T, A>","Allocator指定Box","Nightly"],
+    ["#[global_allocator]","デフォルト割り当て器の置換","stable"],
+  ], cap:"カスタムアロケータAPI" },
+  embeddedPrimitives: { h:["概念","説明"], r:[
+    ["no_std","標準ライブラリなし（OS不要）環境"],
+    ["#![no_main]","main関数をエントリとしない"],
+    ["panic_handler","パニック時の動作を手動実装"],
+    ["volatile_read/write","最適化されないメモリアクセス"],
+    ["cortex-m","ARM Cortex-Mクレート群"],
+    ["embassy","組み込み向け非同期フレームワーク"],
+  ], cap:"組み込みRustの主要概念" },
+  simdApis: { h:["API","特徴","安定性"], r:[
+    ["std::simd (portable SIMD)","アーキテクチャ非依存","Nightly"],
+    ["std::arch","x86/ARM intrinsic直接呼び出し","stable(unsafe)"],
+    ["packed_simd2","サードパーティのポータブルSIMD","stable"],
+    ["wide","f32x4等の使いやすいAPI","stable"],
+  ], cap:"RustのSIMD API" },
+  compilerPlugins: { h:["手法","Rustバージョン","用途"], r:[
+    ["proc-macro","stable","コード生成・derive拡張"],
+    ["compiler_plugin (rustc internal)","nightly/unstable","型チェック拡張"],
+    ["clippy lint","stable","カスタム警告"],
+    ["MIR pass (rustc内部)","contrib向け","最適化・解析"],
+  ], cap:"Rustコンパイラ拡張の手法" },
+  asyncRuntime: { h:["ランタイム","特徴","向いている用途"], r:[
+    ["tokio","最大手、機能豊富","Webサーバー・ネットワーク"],
+    ["async-std","stdに近いAPI","ファイルI/O重視"],
+    ["smol","軽量","組み込み・リソース制限"],
+    ["glommio","io_uring使用","超高スループットI/O"],
+    ["embassy","no_std対応","MCU・組み込み"],
+  ], cap:"Rustの非同期ランタイム比較" },
+  safeAbstractions: { h:["パターン","説明","例"], r:[
+    ["NewType","単一フィールドの薄いラッパー","struct Meters(f64)"],
+    ["Builder","段階的なオブジェクト構築","reqwest::ClientBuilder"],
+    ["RAII","dorp時にリソース解放","Mutex guard, File"],
+    ["typestate","型でステート機械を表現","接続前/後で型が変わる"],
+    ["phantom type","ゼロコストの型マーカー","PhantomData<T>"],
+  ], cap:"Rustの安全な抽象化パターン" },
+  libDesign: { h:["原則","説明"], r:[
+    ["最小公開API","pub itemを必要最小限に抑える"],
+    ["#![deny(missing_docs)]","全pub itemにドキュメント必須"],
+    ["semver互換","マイナーバージョンは後方互換を守る"],
+    ["cargo-semver-checks","APIの破壊的変更を自動検出"],
+    ["clippy+rustfmt","コードスタイルの統一"],
+    ["CHANGELOG.md","変更履歴を人間が読める形で管理"],
+  ], cap:"ライブラリ設計の原則" },
+  asyncAdvanced: { h:["概念","説明"], r:[
+    ["Future::poll","Futureを一歩進める基本操作"],
+    ["Waker","ポーリング再開を通知するメカニズム"],
+    ["Pin<&mut Self>","自己参照対応のmut参照"],
+    ["Context","WakerをFutureに渡すためのラッパー"],
+    ["AsyncRead/AsyncWrite","非同期I/Oトレイト（tokio版）"],
+  ], cap:"Futureトレイトの内部実装" },
+  typeSystem: { h:["機能","説明","例"], r:[
+    ["GAT","Generic Associated Types (1.65+)","type Item<'a>"],
+    ["impl Trait in return","不透明戻り値型","-> impl Iterator"],
+    ["RPITIT","トレイト中のimpl Trait(1.75+)","fn foo() -> impl Bar"],
+    ["const generics","定数をジェネリクスの引数に","[T; N]"],
+    ["specialization","トレイト実装の特化(nightly)","default impl"],
+  ], cap:"Rustの高度な型システム機能" },
+  perf: { h:["技法","説明","ツール"], r:[
+    ["SIMD vectorization","データをまとめて並列演算","std::arch・wide"],
+    ["memory layout最適化","キャッシュ効率向上","repr(C)・repr(packed)"],
+    ["lock-free data structures","Mutexを使わない並行データ","crossbeam・dashmap"],
+    ["arena allocation","一括割り当て・一括解放","bumpalo・typed-arena"],
+    ["inlining hints","#[inline(always)]等","pgoとLTOと組み合わせ"],
+  ], cap:"Rustの高度な最適化技法" },
+};
+
+const EX = {
+ch1:[
+  {diff:2,q:"syn・quote・proc-macro2を使って、構造体のフィールド名を全て出力するderive macro Helloを書け。",code:`// proc-macro crateのlib.rs
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, DeriveInput};
+
+#[proc_macro_derive(Hello)]
+pub fn hello_derive(input: TokenStream) -> TokenStream {
+    // ここに書く
+    todo!()
+}`,answer:`#[proc_macro_derive(Hello)]
+pub fn hello_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let fields = if let syn::Data::Struct(s) = &input.data {
+        s.fields.iter().map(|f| f.ident.as_ref().unwrap().to_string()).collect::<Vec<_>>()
+    } else { vec![] };
+    let expanded = quote! {
+        impl #name {
+            pub fn hello(&self) {
+                println!("Struct: {}, fields: {:?}", stringify!(#name), vec![#(#fields),*]);
+            }
+        }
+    };
+    expanded.into()
+}`},
+  {diff:3,q:"attribute macro #[log_call]を定義し、付与した関数の呼び出し時に関数名をprintlnするコードを書け。",code:`#[proc_macro_attribute]
+pub fn log_call(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // ここに書く
+    todo!()
+}`,answer:`#[proc_macro_attribute]
+pub fn log_call(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as syn::ItemFn);
+    let name = &input.sig.ident;
+    let block = &input.block;
+    let vis = &input.vis;
+    let sig = &input.sig;
+    let expanded = quote! {
+        #vis #sig {
+            println!("calling: {}", stringify!(#name));
+            #block
+        }
+    };
+    expanded.into()
+}`},
+  {diff:1,q:"phf_map!マクロ（phfクレート）を使ってコンパイル時に静的なHashMapを生成するコードを書け。",code:`// phf = { version = \"0.11\", features = [\"macros\"] }
+use phf::phf_map;
+
+// ここに書く`,answer:`use phf::phf_map;
+
+static COLORS: phf::Map<&'static str, u32> = phf_map! {
+    "red"   => 0xFF0000,
+    "green" => 0x00FF00,
+    "blue"  => 0x0000FF,
+};
+
+fn main() {
+    println!("{:#X}", COLORS["red"]);
+}`},
+],
+ch2:[
+  {diff:2,q:"Futureトレイトを手動で実装し、poll()を3回呼ぶと完了するカウンタFutureを書け。",code:`use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+struct CountFuture { count: u32 }
+
+impl Future for CountFuture {
+    type Output = u32;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // ここに書く
+        todo!()
+    }
+}`,answer:`impl Future for CountFuture {
+    type Output = u32;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.count += 1;
+        if self.count >= 3 {
+            Poll::Ready(self.count)
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
+}`},
+  {diff:3,q:"Pin<Box<dyn Future>>を引数に取り、Box内のFutureをpollするexec関数を書け（シンプルなシングルスレッド実行器）。",code:`use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+
+fn noop_waker() -> Waker { todo!() }
+
+fn exec<F: Future>(f: F) -> F::Output {
+    // ここに書く
+    todo!()
+}`,answer:`fn noop_raw_waker() -> RawWaker {
+    fn no_op(_: *const ()) {}
+    fn clone(p: *const ()) -> RawWaker { noop_raw_waker() }
+    static VT: RawWakerVTable = RawWakerVTable::new(clone, no_op, no_op, no_op);
+    RawWaker::new(std::ptr::null(), &VT)
+}
+fn noop_waker() -> Waker { unsafe { Waker::from_raw(noop_raw_waker()) } }
+
+fn exec<F: Future>(f: F) -> F::Output {
+    let mut f = Box::pin(f);
+    let waker = noop_waker();
+    let mut cx = Context::from_waker(&waker);
+    loop {
+        match f.as_mut().poll(&mut cx) {
+            Poll::Ready(v) => return v,
+            Poll::Pending => {},
+        }
+    }
+}`},
+  {diff:1,q:"PhantomPinnedを使って自己参照構造体をスタック上にPinするコードを書け（pinned_init等は使わずPin::new_uncheckedで）。",code:`use std::pin::Pin;
+use std::marker::PhantomPinned;
+
+struct SelfRef {
+    value: String,
+    ptr: *const String,
+    _pin: PhantomPinned,
+}
+
+impl SelfRef {
+    fn new(v: &str) -> Self {
+        // ここに書く
+        todo!()
+    }
+    fn init(self: Pin<&mut Self>) {
+        // ptrをvalueのアドレスに向ける
+        todo!()
+    }
+}`,answer:`impl SelfRef {
+    fn new(v: &str) -> Self {
+        SelfRef { value: v.to_string(), ptr: std::ptr::null(), _pin: PhantomPinned }
+    }
+    fn init(self: Pin<&mut Self>) {
+        let self_ptr: *const String = &self.value;
+        unsafe { Pin::get_unchecked_mut(self).ptr = self_ptr; }
+    }
+    fn get_ptr_value(self: Pin<&Self>) -> &str {
+        unsafe { &*self.ptr }
+    }
+}`},
+],
+ch3:[
+  {diff:1,q:"mimalloc = \"0.1\" を使ってグローバルアロケータをMiMallocに置き換えるコードを書け。",code:`// Cargo.toml: mimalloc = \"0.1\"
+use mimalloc::MiMalloc;
+
+// ここに書く
+
+fn main() {
+    let v: Vec<i32> = (0..1000).collect();
+    println!("len={}", v.len());
+}`,answer:`use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
+fn main() {
+    let v: Vec<i32> = (0..1000).collect();
+    println!("len={}", v.len());
+}`},
+  {diff:2,q:"bumpaloのBumpを使ってアリーナ割り当てを行い、複数の文字列を割り当てて解放するコードを書け。",code:`use bumpalo::Bump;
+
+fn main() {
+    let bump = Bump::new();
+    // bumpoで3つの文字列を割り当て
+}`,answer:`use bumpalo::Bump;
+
+fn main() {
+    let bump = Bump::new();
+    let s1 = bump.alloc_str("hello");
+    let s2 = bump.alloc_str("world");
+    let s3 = bump.alloc_str("rust");
+    println!("{} {} {}", s1, s2, s3);
+    // bump dropで一括解放
+}`},
+  {diff:3,q:"repr(C)で構造体のメモリレイアウトをC互換にし、std::mem::size_ofで確認するコードを書け。両方向（with/withoutrepr(C)）を比較すること。",code:`#[repr(C)]
+struct WithC { a: u8, b: u64, c: u8 }
+
+struct WithoutC { a: u8, b: u64, c: u8 }
+
+fn main() {
+    // size_ofとoffset_ofで比較
+}`,answer:`use std::mem;
+
+#[repr(C)]
+struct WithC { a: u8, b: u64, c: u8 }
+struct WithoutC { a: u8, b: u64, c: u8 }
+
+fn main() {
+    println!("repr(C)  size={}", mem::size_of::<WithC>());   // 24
+    println!("default  size={}", mem::size_of::<WithoutC>()); // 16 (reordered)
+}`},
+],
+ch4:[
+  {diff:1,q:"no_std環境でpanicハンドラを定義するコードを書け（アーキテクチャはtarget=thumbv7em-none-eabihfを想定）。",code:`#![no_std]
+#![no_main]
+
+use core::panic::PanicInfo;
+
+// panicハンドラとentry pointを書く`,answer:`#![no_std]
+#![no_main]
+
+use core::panic::PanicInfo;
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
+}
+
+#[no_mangle]
+pub extern "C" fn _start() -> ! {
+    loop {}
+}`},
+  {diff:2,q:"cortex-m-rtクレートを使って割り込みハンドラとIDLE loopを持つ最小限の組み込みアプリのスケルトンを書け。",code:`#![no_std]
+#![no_main]
+
+// cortex-m-rt = \"0.7\"
+use cortex_m_rt::entry;
+
+// ここに書く`,answer:`#![no_std]
+#![no_main]
+
+use cortex_m_rt::entry;
+use core::panic::PanicInfo;
+
+#[entry]
+fn main() -> ! {
+    loop {
+        // メインループ (低優先度タスク)
+    }
+}
+
+#[panic_handler]
+fn panic(_: &PanicInfo) -> ! { loop {} }`},
+  {diff:3,q:"core::ptr::read_volatileとwrite_volatileを使って、メモリマップドIOレジスタを読み書きするラッパー関数を書け（アドレスは0x4000_0000とする）。",code:`const REG_ADDR: *mut u32 = 0x4000_0000 as *mut u32;
+
+fn read_reg() -> u32 { todo!() }
+fn write_reg(val: u32) { todo!() }`,answer:`const REG_ADDR: *mut u32 = 0x4000_0000 as *mut u32;
+
+fn read_reg() -> u32 {
+    unsafe { core::ptr::read_volatile(REG_ADDR) }
+}
+
+fn write_reg(val: u32) {
+    unsafe { core::ptr::write_volatile(REG_ADDR, val) }
+}`},
+],
+ch5:[
+  {diff:1,q:"std::archのx86_64 SSE2命令(_mm_add_ps)を使って4つのf32を同時に加算するコードを書け。",code:`#[cfg(target_arch = \"x86_64\")]
+use std::arch::x86_64::*;
+
+fn simd_add(a: [f32;4], b: [f32;4]) -> [f32;4] {
+    // ここに書く
+    todo!()
+}`,answer:`#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
+
+fn simd_add(a: [f32;4], b: [f32;4]) -> [f32;4] {
+    unsafe {
+        let va = _mm_loadu_ps(a.as_ptr());
+        let vb = _mm_loadu_ps(b.as_ptr());
+        let vc = _mm_add_ps(va, vb);
+        let mut out = [0f32;4];
+        _mm_storeu_ps(out.as_mut_ptr(), vc);
+        out
+    }
+}`},
+  {diff:2,q:"wideクレートのf32x4を使って、4要素ごとに並列に加算するSIMDコードを書け（unsafeなし）。",code:`// wide = \"0.7\"
+use wide::f32x4;
+
+fn simd_sum(a: &[f32], b: &[f32]) -> Vec<f32> {
+    // 4要素ずつf32x4で加算
+    todo!()
+}`,answer:`use wide::f32x4;
+
+fn simd_sum(a: &[f32], b: &[f32]) -> Vec<f32> {
+    a.chunks(4).zip(b.chunks(4)).flat_map(|(ca, cb)| {
+        let mut av = [0f32;4]; let mut bv = [0f32;4];
+        av[..ca.len()].copy_from_slice(ca);
+        bv[..cb.len()].copy_from_slice(cb);
+        let r = f32x4::from(av) + f32x4::from(bv);
+        r.to_array()[..ca.len()].to_vec()
+    }).collect()
+}`},
+  {diff:3,q:"rayonのpar_iter()を使って10億個の数字の合計を並列計算するコードを書け（実際には小さいVecで構文だけ示せばよい）。",code:`// rayon = \"1\"
+use rayon::prelude::*;
+
+fn parallel_sum(data: &[i64]) -> i64 {
+    // ここに書く
+    todo!()
+}`,answer:`use rayon::prelude::*;
+
+fn parallel_sum(data: &[i64]) -> i64 {
+    data.par_iter().sum()
+}
+
+fn main() {
+    let v: Vec<i64> = (0..1_000_000).collect();
+    println!("{}", parallel_sum(&v));
+}`},
+],
+ch6:[
+  {diff:1,q:"Generic Associated Types (GAT) を使ってイテレータのような Lending Iterator トレイトを定義せよ。",code:`// Rust 1.65+
+trait LendingIterator {
+    type Item<'a> where Self: 'a;
+    fn next<'a>(&'a mut self) -> Option<Self::Item<'a>>;
+}`,answer:`trait LendingIterator {
+    type Item<'a> where Self: 'a;
+    fn next<'a>(&'a mut self) -> Option<Self::Item<'a>>;
+}
+
+struct WindowIter<'s> { data: &'s [i32], pos: usize, size: usize }
+
+impl<'s> LendingIterator for WindowIter<'s> {
+    type Item<'a> = &'a [i32] where Self: 'a;
+    fn next<'a>(&'a mut self) -> Option<&'a [i32]> {
+        if self.pos + self.size > self.data.len() { return None; }
+        let s = &self.data[self.pos..self.pos+self.size];
+        self.pos += 1;
+        Some(s)
+    }
+}`},
+  {diff:2,q:"typestate パターンで接続前/接続後の状態を型で表現し、connect()でConnected状態に、send()はConnected状態のみ呼べるようにせよ。",code:`struct Disconnected;
+struct Connected;
+
+struct Socket<State> {
+    // ここに書く
+    _state: std::marker::PhantomData<State>,
+}
+
+impl Socket<Disconnected> {
+    fn new() -> Self { todo!() }
+    fn connect(self) -> Socket<Connected> { todo!() }
+}
+
+impl Socket<Connected> {
+    fn send(&self, msg: &str) { todo!() }
+}`,answer:`struct Disconnected;
+struct Connected;
+
+struct Socket<State> {
+    addr: String,
+    _state: std::marker::PhantomData<State>,
+}
+
+impl Socket<Disconnected> {
+    fn new(addr: &str) -> Self {
+        Socket { addr: addr.to_string(), _state: std::marker::PhantomData }
+    }
+    fn connect(self) -> Socket<Connected> {
+        println!("connecting to {}", self.addr);
+        Socket { addr: self.addr, _state: std::marker::PhantomData }
+    }
+}
+
+impl Socket<Connected> {
+    fn send(&self, msg: &str) { println!("sending: {}", msg); }
+}`},
+  {diff:3,q:"const genericsを使って、長さNの固定長配列をラップするStack<T,N>を実装せよ。push/popを持ち、満杯・空の場合はResultで返すこと。",code:`struct Stack<T, const N: usize> {
+    data: [Option<T>; N],
+    len: usize,
+}
+
+impl<T: Copy + Default, const N: usize> Stack<T, N> {
+    fn new() -> Self { todo!() }
+    fn push(&mut self, v: T) -> Result<(), &'static str> { todo!() }
+    fn pop(&mut self) -> Result<T, &'static str> { todo!() }
+}`,answer:`struct Stack<T, const N: usize> {
+    data: [Option<T>; N],
+    len: usize,
+}
+
+impl<T: Copy + Default, const N: usize> Stack<T, N> {
+    fn new() -> Self {
+        Stack { data: [None; N], len: 0 }
+    }
+    fn push(&mut self, v: T) -> Result<(), &'static str> {
+        if self.len >= N { return Err("full"); }
+        self.data[self.len] = Some(v);
+        self.len += 1;
+        Ok(())
+    }
+    fn pop(&mut self) -> Result<T, &'static str> {
+        if self.len == 0 { return Err("empty"); }
+        self.len -= 1;
+        Ok(self.data[self.len].take().unwrap())
+    }
+}`},
+],
+ch7:[
+  {diff:1,q:"cargo-semver-checks (CLI)を使ってAPIの破壊的変更を検出するコマンドを書け（コードではなくコマンド例として）。",code:`# ここにコマンドを書け
+# 使い方: cargo semver-checks check-release を使う`,answer:`# インストール
+cargo install cargo-semver-checks
+
+# 直前のpublish済みバージョンと比較
+cargo semver-checks check-release
+
+# 特定バージョンと比較
+cargo semver-checks check-release --baseline-version 1.0.0`},
+  {diff:2,q:"pub use を使って内部モジュールのエラー型を再エクスポートし、クレートルートからも使えるようにするlib.rsを書け。",code:`// src/lib.rs
+mod db;
+mod api;
+
+// db::Error と api::Error をクレートルートから使えるようにする`,answer:`// src/lib.rs
+pub mod db;
+pub mod api;
+
+pub use db::Error as DbError;
+pub use api::Error as ApiError;
+
+// または共通エラー型にまとめる
+// pub use error::AppError;`},
+  {diff:3,q:"doctestで使える Example を含む pub fn を書き、cargo doc --testで実行されるコードを確認せよ。",code:`/// 文字列をBase64エンコードする。
+///
+/// # Examples
+///
+/// \`\`\`
+/// // ここにdoctestを書く
+/// \`\`\`
+pub fn base64_encode(input: &[u8]) -> String {
+    // 本実装（base64クレートを使う）
+    todo!()
+}`,answer:`/// 文字列をBase64エンコードする。
+///
+/// # Examples
+///
+/// \`\`\`
+/// // 実際のcodeではbase64クレートを使う
+/// // この例はコンパイルだけ確認
+/// let input = b"hello";
+/// assert_eq!(input.len(), 5);
+/// \`\`\`
+pub fn base64_encode(input: &[u8]) -> String {
+    use std::fmt::Write;
+    const TABLE: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    for chunk in input.chunks(3) {
+        // 簡易実装省略
+        let _ = chunk;
+    }
+    out
+}`},
+],
+ch8:[
+  {diff:1,q:"criterion + cargo-flamegraphの組み合わせでフレームグラフを生成するコマンドを示せ（コードではなくシェルコマンドとして）。",code:`# criterionベンチマークのフレームグラフ生成コマンドを書け`,answer:`# インストール
+cargo install flamegraph
+
+# フレームグラフ生成（Linux: perf必要）
+cargo flamegraph --bench my_bench
+
+# または特定のbinで
+cargo flamegraph --bin my_app
+
+# 出力: flamegraph.svg (ブラウザで開く)`},
+  {diff:2,q:"lock-free なAtomicU64カウンタを複数スレッドから操作するコードを書け（fetch_add使用）。",code:`use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::thread;
+
+fn main() {
+    // AtomicU64をArcで共有し、10スレッドから100回インクリメント
+}`,answer:`use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(AtomicU64::new(0));
+    let mut handles = vec![];
+    for _ in 0..10 {
+        let c = Arc::clone(&counter);
+        handles.push(thread::spawn(move || {
+            for _ in 0..100 { c.fetch_add(1, Ordering::Relaxed); }
+        }));
+    }
+    for h in handles { h.join().unwrap(); }
+    println!("{}", counter.load(Ordering::SeqCst)); // 1000
+}`},
+  {diff:3,q:"dashmapクレートを使ってスレッドセーフなHashMapへ並列書き込みするコードを書け（Arc<Mutex<HashMap>>は使わない）。",code:`// dashmap = \"5\"
+use dashmap::DashMap;
+use std::sync::Arc;
+use std::thread;
+
+fn main() {
+    // 10スレッドから並列でDashMapへ書き込み
+}`,answer:`use dashmap::DashMap;
+use std::sync::Arc;
+use std::thread;
+
+fn main() {
+    let map = Arc::new(DashMap::new());
+    let mut handles = vec![];
+    for i in 0..10 {
+        let m = Arc::clone(&map);
+        handles.push(thread::spawn(move || {
+            m.insert(i, i * i);
+        }));
+    }
+    for h in handles { h.join().unwrap(); }
+    println!("entries: {}", map.len());
+}`},
+],
+ch9:[
+  {diff:1,q:"axum + sqlx + tokioを組み合わせてGET /usersでDBから全ユーザーを返す完全なハンドラを書け（pool.fetchと構造体のFromRowを使う）。",code:`use axum::{extract::State, Json};
+use sqlx::PgPool;
+use serde::Serialize;
+use std::sync::Arc;
+
+#[derive(Serialize, sqlx::FromRow)]
+struct User { id: i64, name: String }
+
+async fn list_users(
+    State(pool): State<Arc<PgPool>>,
+) -> Json<Vec<User>> {
+    // ここに書く
+    todo!()
+}`,answer:`async fn list_users(
+    State(pool): State<Arc<PgPool>>,
+) -> Json<Vec<User>> {
+    let users = sqlx::query_as::<_, User>("SELECT id, name FROM users")
+        .fetch_all(pool.as_ref())
+        .await
+        .unwrap_or_default();
+    Json(users)
+}`},
+  {diff:2,q:"tower::Serviceトレイトを手動実装してリクエストにX-Requestid headerを付与するミドルウェアを書け。",code:`use std::task::{Context, Poll};
+use tower::Service;
+
+struct AddRequestId<S> { inner: S }
+
+impl<S, Req> Service<Req> for AddRequestId<S>
+where S: Service<Req>,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: Req) -> Self::Future {
+        // X-Request-Idをreqに付与する（型を簡略化した例）
+        self.inner.call(req)
+    }
+}`,answer:`// (Httpリクエストへのヘッダ付与は実際にはhttp::Requestを扱う必要がある)
+// この例では概念を示す最小構造を回答とする
+use std::task::{Context, Poll};
+use tower::Service;
+
+struct AddRequestId<S> { inner: S, next_id: u64 }
+
+impl<S, Req> Service<Req> for AddRequestId<S>
+where S: Service<Req>,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: Req) -> Self::Future {
+        self.next_id += 1;
+        // 実際: reqにX-Request-Idヘッダを追加してinnerに渡す
+        self.inner.call(req)
+    }
+}`},
+  {diff:3,q:"opentelemetryクレートを使ってspan付きのトレーシングを有効にするaxumアプリのセットアップを書け（初期化コードのみでよい）。",code:`// opentelemetry = \"0.21\"
+// opentelemetry-otlp = \"0.14\"
+// tracing-opentelemetry = \"0.22\"
+
+fn init_tracing() {
+    // OTLPエクスポーター＋tracingサブスクライバのセットアップ
+    todo!()
+}`,answer:`use opentelemetry::global;
+use opentelemetry_otlp::WithExportConfig;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+fn init_tracing() {
+    let tracer = opentelemetry_otlp::new_pipeline()
+        .tracing()
+        .with_exporter(opentelemetry_otlp::new_exporter().tonic().with_endpoint("http://localhost:4317"))
+        .install_batch(opentelemetry_sdk::runtime::Tokio)
+        .expect("tracer init failed");
+
+    tracing_subscriber::registry()
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+}`},
+],
+ch10:[
+  {diff:1,q:"CHANGELOG.mdのKeep a Changelog形式でバージョン1.1.0のエントリを書け（Added/Changed/Fixed 各1項目）。",code:`# CHANGELOG
+
+## [Unreleased]
+
+## [1.1.0] - 2026-04-14
+### ここに書く`,answer:`## [1.1.0] - 2026-04-14
+### Added
+- \`Client::with_timeout()\`でタイムアウト設定を追加
+
+### Changed
+- \`Connection::send()\`の引数を\`&str\`から\`impl AsRef<str>\`に変更
+
+### Fixed
+- 空のレスポンスボディで\`parse()\`がpanicする問題を修正`},
+  {diff:2,q:"cargo publishの前に実行すべきコマンドチェックリストをshellスクリプトで書け（fmt/clippy/test/doc/semver-checks）。",code:`#!/bin/bash
+set -e
+# ここに各コマンドを書く`,answer:`#!/bin/bash
+set -e
+cargo fmt --check
+cargo clippy -- -D warnings
+cargo test --all
+cargo doc --no-deps
+cargo semver-checks check-release
+echo "All checks passed — ready to publish"
+cargo publish`},
+  {diff:3,q:"criterionのベンチマーク結果をHTMLレポートとして保存し、CIで前回結果と比較する方法を説明するコメント付きのCargo.tomlとワークフローを書け。",code:`# Cargo.toml (bench section)
+# .github/workflows/bench.yml の概要`,answer:`# Cargo.toml
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "my_bench"
+harness = false
+
+# .github/workflows/bench.yml の概要:
+# - cargo bench -- --save-baseline main で保存
+# - PRでcargo bench -- --baseline mainで比較
+# - criterion-compareアクションでPRコメントに結果を出力`},
+],
+ch11:[
+  {diff:1,q:"cargo-geiger を使ってクレートのunsafeコード量を確認するコマンドを書け。",code:`# cargo-geiger のインストールと使い方`,answer:`# インストール
+cargo install cargo-geiger
+
+# 依存含む全unsafeを表示
+cargo geiger
+
+# 特定パッケージのみ
+cargo geiger --package mylib`},
+  {diff:2,q:"miriを使ってunsafeコードのUBを検出するテストコマンドを書け。",code:`# cargo miriのセットアップと実行`,answer:`# miriのインストール
+rustup +nightly component add miri
+
+# テスト実行（nightly必須）
+cargo +nightly miri test
+
+# 特定のテストのみ
+cargo +nightly miri test test_name`},
+  {diff:3,q:"crates.ioへの初回publishに必要なCargo.toml必須フィールドを全て含む最小限のCargo.tomlを書け。",code:`[package]
+# 必須フィールドを全て書け`,answer:`[package]
+name = "my-awesome-lib"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <you@example.com>"]
+description = "A concise description of what this crate does"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/you/my-awesome-lib"
+readme = "README.md"
+keywords = ["keyword1", "keyword2"]
+categories = ["development-tools"]`},
+],
+ch12:[
+  {diff:1,q:"Rustのエコシステムで「これだけ覚えれば十分」なコアクレートを7つ挙げ、それぞれ一言で説明せよ（コードではなく表形式）。",code:`// 以下の7つのクレートの用途を日本語で説明せよ:
+// serde, tokio, anyhow, thiserror, reqwest, clap, rayon`,answer:`// serde     : シリアライズ/デシリアライズのデファクトスタンダード
+// tokio     : 非同期ランタイムのデファクトスタンダード
+// anyhow    : アプリ向けエラー処理（コンテキスト付きpropagation）
+// thiserror : ライブラリ向けカスタムエラー型の自動導出
+// reqwest   : HTTPクライアントのデファクトスタンダード
+// clap      : CLIパーサーのデファクトスタンダード
+// rayon     : データ並列処理（.par_iter()で並列化）`},
+  {diff:2,q:"Rustで「Pythonのdataclasses.dataclass相当」を実現するコードを書け（Clone/Debug/PartialEq/Serialize/Deserializeを一括derive）。",code:`use serde::{Serialize, Deserialize};
+
+// dataclassに相当するRust構造体を書け
+// フィールド: name: String, age: u32, email: Option<String>`,answer:`use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct User {
+    name: String,
+    age: u32,
+    email: Option<String>,
+}
+
+// 使い方
+fn main() {
+    let u = User { name: "Alice".into(), age: 30, email: None };
+    let json = serde_json::to_string(&u).unwrap();
+    println!("{}", json);
+    let u2: User = serde_json::from_str(&json).unwrap();
+    assert_eq!(u, u2);
+}`},
+  {diff:3,q:"Rustのライブラリを設計する際の「公開APIチェックリスト」を10項目のコメントとして書け。",code:`// pub API公開前のチェックリスト (10項目)`,answer:`// 1. 全pubアイテムにdocコメント(///)+doctestがあるか
+// 2. #![deny(missing_docs)]が有効か
+// 3. pub関数の引数はowned型より借用型(&str, &[T])を使っているか
+// 4. ErrorはthiserrorでDebug+Display+std::error::Errorを実装しているか
+// 5. semverを意識してpubモジュール構造を設計したか
+// 6. cargo semver-checks check-releaseでbreaking changeを確認したか
+// 7. cargo clippyで警告がゼロか
+// 8. cargo fmtが適用されているか
+// 9. CHANGELOG.mdが更新されているか
+// 10. Cargo.tomlのdescription/license/repositoryが全て記入されているか`},
+],
+};
+
+const chapters = [
+{id:"ch1",num:1,title:"proc-macroの実装",est:"75分",
+goal:"proc-macroクレートを作成し、syn/quoteを使ってderiveマクロとattribute macroを実装できる。phf等のコンパイル時計算マクロを活用できる。",
+sections:[
+{title:"proc-macroクレートの構成",
+body:`proc-macroはコンパイラのフロントエンドに組み込まれるプラグインの一種で、Rustのソースコードを入力として受け取りRustのソースコードを出力します。通常のコードとは別のクレートとして定義し、Cargo.tomlにproc-macro = trueと宣言します。
+
+Pythonのデコレータとよく似た役割ですが、Rustのproc-macroはコンパイル時にのみ実行され実行時コストがゼロです。さらに、型情報・ASTにアクセスできるため、コード生成の自由度が格段に高いです。#[derive(Debug)]や#[serde::Serialize]は全てこのproc-macroとして実装されています。`,
+table:T.procMacroFlow,
+afterTable:`proc-macroの難点はコンパイルエラーメッセージが分かりにくい点です。eprintln!を使ったデバッグと、cargo expandによる展開確認が主なデバッグ手法です。`},
+{title:"syn/quoteによるASTの操作",
+body:`synはTokenStreamをRustのASTに変換するパーサーライブラリです。DeriveInputをパースすると構造体名・フィールド・属性等の情報にアクセスできます。quoteはRustのコードを書くためのDSLで、#name等の補間構文でASTの値を埋め込んでTokenStreamを生成します。
+
+proc_macro2はprocマクロとの境界で使われるTokenStream型で、テストコードでも動作します（proc-macroは実際のコンパイルプロセス内でのみ動作するためテストが困難）。proc_macro2のおかげでユニットテスト可能なprocマクロが書けます。`,
+code:`// Cargo.toml (proc-macro crate)
+// [lib]
+// proc-macro = true
+// [dependencies]
+// syn = { version = "2", features = ["full"] }
+// quote = "1"
+// proc-macro2 = "1"
+
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, DeriveInput, Data, Fields};
+
+#[proc_macro_derive(Describe)]
+pub fn describe_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    let field_names: Vec<String> = if let Data::Struct(s) = &input.data {
+        if let Fields::Named(f) = &s.fields {
+            f.named.iter()
+                .filter_map(|f| f.ident.as_ref().map(|i| i.to_string()))
+                .collect()
+        } else { vec![] }
+    } else { vec![] };
+
+    let expanded = quote! {
+        impl #name {
+            pub fn describe(&self) -> String {
+                format!("{} has fields: {:?}", stringify!(#name), vec![#(#field_names),*])
+            }
+        }
+    };
+    expanded.into()
+}`,
+afterCode:`quote!内の#(#items),*はVec等のイテラブルを繰り返し展開するパターンです。Rustのforループをコンパイル時に展開する表現で、proc-macroの最重要構文の一つです。`},
+]},
+{id:"ch2",num:2,title:"Futureの内部実装とPin",est:"80分",
+goal:"FutureとPoll/Waker/Contextの関係を理解し、手動でFutureを実装できる。Pinが必要な理由と自己参照構造体の問題を説明できる。",
+sections:[
+{title:"Futureトレイトの内部構造",
+body:`async/awaitはコンパイル時にFutureトレイトを実装したステートマシンに変換されます。Futureのコア操作はpoll()で、PollableタスクをWakerで再スケジュールする設計です。ランタイム（tokio等）はpoll()を繰り返し呼び出し、Poll::Readyが返るまで待機します。
+
+Pythonのasyncio.Futureと概念は似ていますが、Rustのランタイムはコールバックではなく繰り返しのpoll()でFutureを進めます（ポーリングモデル）。このモデルの利点はヒープ割り当てが少なく、スタック上にFutureを配置できる点です。`,
+table:T.asyncAdvanced,
+afterTable:`Wakerはコールバックに相当しますが、Rustでは不特定のスレッドからwake()できる型（Send + Sync）として設計されています。これによりtokioのワークスティーリングが実現できます。`},
+{title:"Pinと自己参照問題",
+body:`async fnが生成するステートマシンは、ある.await前に保持していた変数への参照を次の.await後も保持することがあります。これが「自己参照構造体」です。自己参照構造体をmoveすると内部ポインタが無効になるため、Pinによって移動を禁止する必要があります。
+
+PhantomPinnedを含む構造体はUnpinを実装しないため、Pin<&mut Self>を通してしかアクセスできなくなります。これによりコンパイラが移動を禁止します。async/awaitを使う分にはPinを直接扱う必要はほぼありませんが、カスタムFuture実装やライブラリを書く際は避けて通れません。`,
+table:T.pinnedTypes,
+code:`// 自己参照構造体の問題を示す例
+use std::pin::Pin;
+use std::marker::PhantomPinned;
+
+struct SelfReferential {
+    value: String,
+    ptr: *const String,  // valueを指す
+    _pin: PhantomPinned,
+}
+
+impl SelfReferential {
+    fn new(v: &str) -> Self {
+        SelfReferential {
+            value: v.to_string(),
+            ptr: std::ptr::null(),
+            _pin: PhantomPinned,
+        }
+    }
+
+    fn init(self: Pin<&mut Self>) {
+        let self_ptr: *const String = &self.value;
+        // SAFETY: self_ptrはselfのvalueを指し、Pinなので移動しない
+        unsafe { Pin::get_unchecked_mut(self).ptr = self_ptr; }
+    }
+
+    fn get_value(self: Pin<&Self>) -> &str {
+        // SAFETY: ptrはPinによって移動しないvalueを指す
+        unsafe { &*self.ptr }
+    }
+}`,
+afterCode:`pin-projectクレートを使うと#[pin_project]アトリビュートでPin操作のボイラープレートを削減できます。非同期ライブラリを開発する際はpin-projectを積極的に使ってください。`},
+]},
+{id:"ch3",num:3,title:"カスタムアロケータとメモリ管理",est:"70分",
+goal:"GlobalAllocトレイトを理解し、jemallocやmimirocをグローバルアロケータとして導入できる。アリーナアロケータのユースケースを説明できる。",
+sections:[
+{title:"Rustのメモリアロケータシステム",
+body:`Rustはデフォルトでシステムアロケータ（Linux: glibc malloc）を使います。#[global_allocator]アトリビュートでグローバルアロケータを置き換えられます。jemallocやmimirocは特にマルチスレッド環境でのパフォーマンスが優れており、メモリ断片化も少ないです。
+
+Pythonはメモリ管理をインタープリタが全て担うため変更できませんが、Rustでは完全にカスタマイズ可能です。サーバーアプリケーションでjemallocへの切り替えだけで10〜30%のスループット改善が観測されることがあります。ベンチマークして確認することが前提ですが、手順は非常に簡単です。`,
+table:T.allocTraits,
+afterTable:`Nightly APIのAllocatorトレイトを使うとコンテナごとに異なるアロケータを指定できます（Vec<T, MyAlloc>等）。stable版では#[global_allocator]のみが使用可能です。`},
+{title:"アリーナアロケータ",
+body:`アリーナアロケータは「まとめて割り当て、まとめて解放」する戦略で、個別のdropを必要としません。パーサー・コンパイラ・ゲームエンジン等、大量の小さなオブジェクトを生成して一括破棄するユースケースに絶大な効果があります。
+
+bumpaloクレートはリニアアロケータ（バンプポインタ）の実装で、割り当てがほぼゼロコストです。typed-arenaは型安全なアリーナで、dropが正しく呼ばれます。Pythonではメモリプールはインタープリタが隠蔽しますが、Rustではプログラマが明示的に制御できます。`,
+code:`use bumpalo::Bump;
+
+fn parse_document(input: &str) -> Vec<&str> {
+    let bump = Bump::new();
+
+    // bump内に大量のノードを割り当て
+    let words: Vec<&str> = input.split_whitespace()
+        .map(|w| bump.alloc_str(w) as &str)
+        .collect();
+
+    // bump.drop()で一括解放（スコープ終了で自動）
+    words
+}
+// ↑ words内の&strはbumpより長生きできないのでコンパイルエラーになる
+// 実際にはArena + 参照のライフタイム設計が必要`,
+afterCode:`アリーナの参照は必ずアリーナより先にdropされる必要があります。bumpaloでは&'bump strのようなライフタイムで表現されます。ライフタイム設計がアリーナ活用の鍵です。`},
+]},
+{id:"ch4",num:4,title:"組み込みRust (no_std)",est:"70分",
+goal:"no_std環境でRustコードをコンパイルできる。panicハンドラとエントリポイントを実装できる。cortex-mクレートを使ったMCU向け最小プログラムの構造を説明できる。",
+sections:[
+{title:"no_stdとは何か",
+body:`通常のRustプログラムはstdクレート（標準ライブラリ）に依存します。stdはOS機能（ヒープ・ファイルI/O・スレッド等）を前提にしており、OSのないマイコン（MCU）では動きません。#![no_std]を宣言するとstdを使わずcoreのみでコンパイルできます。
+
+coreはstdのサブセットで、OS依存のないプリミティブ型・iteratorトレイト・オプショナル型・パニックハンドラ等が含まれます。allocクレートを追加すると、カスタムアロケータ経由でVecやStringも使えます。PythonはOSなしには動きませんが、RustはOSなしの低レベル制御に使えるのが大きな強みです。`,
+table:T.embeddedPrimitives,
+afterTable:`Raspberry Pi PicoやSTM32等のMCUでRustを動かす場合、rustup target add thumbv6m-none-eabiでクロスコンパイルターゲットを追加し、cargo build --target thumbv6m-none-eabiでビルドします。`},
+{title:"組み込みRustエコシステム",
+body:`embassyは組み込み向け非同期フレームワークで、no_std環境でasync/awaitを使えます。割り込みをFutureとして表現し、RTOSなしで協調的マルチタスクを実現します。Pythonのasyncioと同じ概念をMCU上で実現している点が革新的です。
+
+probe-rs・cargo-flashでファームウェアの書き込みとデバッグが可能です。defmt（deferred formatting）クレートを使うとシリアル経由でprintln的なデバッグ出力を非常に低コストで実現できます（フォーマット処理をホスト側で行う設計）。`,
+code:`// STM32向けLチカの概念コード（実際にはHALクレートを使用）
+#![no_std]
+#![no_main]
+
+use cortex_m_rt::entry;
+use cortex_m::delay::Delay;
+use core::panic::PanicInfo;
+
+#[entry]
+fn main() -> ! {
+    // ペリフェラルの初期化（実際はHALで行う）
+    // let dp = stm32f4xx_hal::pac::Peripherals::take().unwrap();
+    // let gpioa = dp.GPIOA.split();
+    // let mut led = gpioa.pa5.into_push_pull_output();
+
+    loop {
+        // led.set_high();
+        // delay.delay_ms(500u32);
+        // led.set_low();
+        // delay.delay_ms(500u32);
+        cortex_m::asm::nop(); // No-op（実際はLED制御）
+    }
+}
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    cortex_m::asm::udf(); // 未定義命令でハードフォルト
+}`,
+afterCode:`The Embedded Rust Book（公式）はno_std開発の最良の出発点です。HAL（Hardware Abstraction Layer）クレートを使うことで、STM32・nRF・RP2040等の特定MCUの詳細を抽象化できます。`},
+]},
+{id:"ch5",num:5,title:"SIMDと高性能演算",est:"70分",
+goal:"std::archのintrinsicを使ったSIMD演算を書ける。wideクレートで安全なポータブルSIMDを書ける。rayonでデータ並列処理を実装できる。",
+sections:[
+{title:"SIMDの基礎とRustでの利用",
+body:`SIMD（Single Instruction Multiple Data）は1つの命令で複数のデータを同時に処理するCPU機能です。x86_64のSSE/AVXはf32を4〜8個同時に演算でき、機械学習・信号処理・画像処理で絶大な効果があります。Pythonでnumpy等のライブラリがSIMDを使いますが、RustではSIMDを直接プログラムできます。
+
+std::archはCPUのintrinsic関数をRustから呼び出すAPIで、_mm_add_ps等がx86のSIMD命令に対応します。unsafeが必要で、CPUが該当命令をサポートするかの確認も自己責任です。is_x86_feature_detected!マクロでランタイムにCPU機能を確認できます。`,
+table:T.simdApis,
+afterTable:`ポータブルSIMD（std::simd）はNightlyで利用可能で、コンパイラが自動的に最適なSIMD命令を選択します。stable環境ではwideクレートが代替として機能します。`},
+{title:"rayonによるデータ並列処理",
+body:`rayonはイテレータをマルチスレッドで並列実行するライブラリです。.iter()を.par_iter()に変えるだけで自動的にCPUコア数に合わせた並列化が行われます。スレッドプールの管理はrayonが内部で行うため、スレッド生成のコストを最小化できます。
+
+Pythonのmultiprocessing.Poolに相当しますが、GILがないためスレッドが本当に並列に動きます。さらにRustの所有権システムによりデータ競合がコンパイル時に排除されます。大規模データの変換・フィルタ・集計処理では実装コストほぼゼロで劇的な高速化が得られます。`,
+code:`use rayon::prelude::*;
+
+fn main() {
+    // イテレータをpar_iterに変えるだけ
+    let data: Vec<i64> = (0..10_000_000).collect();
+
+    // 逐次版
+    let sum_seq: i64 = data.iter().sum();
+
+    // 並列版（マルチコアで自動並列化）
+    let sum_par: i64 = data.par_iter().sum();
+
+    assert_eq!(sum_seq, sum_par);
+
+    // 並列map-filter-collect
+    let result: Vec<i64> = data.par_iter()
+        .filter(|&&x| x % 2 == 0)
+        .map(|&x| x * x)
+        .collect();
+
+    println!("evens squared: {} items", result.len());
+}`,
+afterCode:`par_sort()・par_chunks()・par_bridge()（通常のIteratorをparallel化）等も用意されています。rayonのスレッドプールはカスタマイズ可能で、タスク数・スタックサイズ等を調整できます。`},
+]},
+{id:"ch6",num:6,title:"高度な型システム",est:"80分",
+goal:"GAT・const generics・typestateパターン・PhantomDataを使った高度な型設計ができる。APIの設計段階でコンパイル時に不正状態を表現できる。",
+sections:[
+{title:"Generic Associated Types (GAT)",
+body:`Generic Associated Types（GAT、Rust 1.65から安定化）はトレイトの関連型にジェネリクスパラメータ（特にライフタイム）を持たせる機能です。これにより、借用を返すイテレータ（Lending Iterator）のような従来は表現できなかったトレイトが記述できます。
+
+Pythonの型ヒントではこのレベルの型表現は不可能で、Rustの型システムの高度さが際立つ機能の一つです。GATはstreamingイテレータ・コレクション・非同期トレイトの設計で重要な役割を果たします。`,
+table:T.typeSystem,
+afterTable:`RPITIT（Return Position Impl Trait In Trait）はRust 1.75から安定化され、トレイト内でasync fn（async-traitクレートなし）を書けるようになりました。これが安定したことでasync_traitクレートの使用は徐々に減ると予想されます。`},
+{title:"Typestateパターンとコンパイル時安全性",
+body:`Typestateパターンは型パラメータでオブジェクトの状態を表現し、不正な操作をコンパイルエラーにする設計手法です。例えばファイルを開く前にwriteを呼べないことを型で強制できます。実行時チェックをコンパイル時に移動できるため、バグの早期発見とランタイムコストの削減が同時に実現できます。
+
+PhantomData<T>はメモリを消費せずに型マーカーとして機能するゼロコスト型です。Typestateパターンの実装で状態型を「保持」するために必須です。Pythonでは実行時に状態チェックを行うことが多いですが、RustのTypestateは状態遷移の正しさをコンパイラが保証します。`,
+table:T.safeAbstractions,
+code:`// Builderパターン + Typestateの組み合わせ
+struct Builder<HasName, HasAge> {
+    name: Option<String>,
+    age: Option<u32>,
+    _n: std::marker::PhantomData<HasName>,
+    _a: std::marker::PhantomData<HasAge>,
+}
+
+struct Yes; struct No;
+
+impl Builder<No, No> {
+    fn new() -> Self {
+        Builder { name: None, age: None, _n: std::marker::PhantomData, _a: std::marker::PhantomData }
+    }
+}
+
+impl<A> Builder<No, A> {
+    fn name(self, name: &str) -> Builder<Yes, A> {
+        Builder { name: Some(name.to_string()), age: self.age, _n: std::marker::PhantomData, _a: std::marker::PhantomData }
+    }
+}
+
+impl<N> Builder<N, No> {
+    fn age(self, age: u32) -> Builder<N, Yes> {
+        Builder { name: self.name, age: Some(age), _n: std::marker::PhantomData, _a: std::marker::PhantomData }
+    }
+}
+
+// build()はName・Age両方が設定された状態のみ呼べる
+impl Builder<Yes, Yes> {
+    fn build(self) -> String {
+        format!("{}:{}", self.name.unwrap(), self.age.unwrap())
+    }
+}`,
+afterCode:`このパターンはreqwest::ClientBuilderやstd::fs::OpenOptionsで広く使われています。「呼び出し順序の誤り」というバグをゼロコストでコンパイル時に排除できます。`},
+]},
+{id:"ch7",num:7,title:"ライブラリ設計のベストプラクティス",est:"65分",
+goal:"semver互換APIを設計できる。#[non_exhaustive]や#[must_use]等のattributeを使いこなせる。cargo-semver-checksでbreaking changeを検出できる。",
+sections:[
+{title:"公開APIの設計原則",
+body:`ライブラリのpub APIは一度公開すると変更しにくくなります。特にsemverを守る場合、型の変更・フィールドの追加削除・トレイト実装の変更はすべてbreaking changeになりえます。設計段階でAPIの最小化と拡張ポイントを考慮することが重要です。
+
+Pythonのライブラリでも後方互換性は重要ですが、Rustではコンパイラが型レベルで互換性を保証するため変更の影響がより明確です。#[non_exhaustive]をenumに付けると利用側でmatchに_=>アームが必須になり、将来バリアント追加時のbreaking changeを防げます。`,
+table:T.libDesign,
+afterTable:`#[must_use]をResultや重要な戻り値の型に付けると、戻り値を無視したときにコンパイル警告が出ます。Resultはデフォルトでmust_useですが、カスタム型にも積極的に付けてください。`},
+{title:"ドキュメントとCHANGELOG",
+body:`cargo docはsrc内の///コメントからHTMLドキュメントを生成します。ドキュメントはコードと同じリポジトリに置くことで常に最新を保てます。docs.rsはcrates.ioに公開されたクレートのドキュメントを自動ホストします。
+
+CHANGELOG.mdはKeep a Changelog形式が業界標準です。ユーザーがアップグレード時に変更点を理解できるよう、Added/Changed/Deprecated/Removed/Fixed/Securityのカテゴリで記録します。Pythonパッケージでも同じ慣行が推奨されます。`,
+code:`//! # mylib
+//!
+//! このクレートは...
+//!
+//! ## 使い方
+//!
+//! \`\`\`
+//! use mylib::Client;
+//! let client = Client::new("https://api.example.com")?;
+//! \`\`\`
+
+/// APIクライアント。
+///
+/// # 例
+///
+/// \`\`\`
+/// let c = mylib::Client::new("https://api.example.com");
+/// \`\`\`
+#[must_use]
+pub struct Client { base_url: String }
+
+/// 将来バリアントを追加する可能性があるエラー型。
+#[non_exhaustive]
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("connection failed: {0}")]
+    Connection(String),
+    #[error("not found")]
+    NotFound,
+}`,
+afterCode:`//! (スラッシュビックリ2つ)で始まるコメントはモジュールレベルのドキュメントになります。lib.rsの先頭にクレートの概要・使い方・例を書くと、docs.rsのトップページに表示されます。`},
+]},
+{id:"ch8",num:8,title:"高度なパフォーマンスチューニング",est:"70分",
+goal:"lock-freeデータ構造・アトミック操作・アリーナアロケータを使った性能改善ができる。cargo-flamegraphでホットスポットを特定できる。",
+sections:[
+{title:"アトミック操作とlock-free",
+body:`Mutexを使わないアトミック操作（AtomicUsize等）はオーバーヘッドが少なく、ホットパスに向いています。AtomicにはRelaxed・AcqRel・SeqCstなどのOrderingがあり、メモリ順序保証の強さと性能のトレードオフがあります。
+
+Relaxedは最も弱く最速で、カウンタ等に使えます。SeqCstは最強で全CPUコア間での順序を保証しますが最も遅いです。AcquireとReleaseをペアで使うのがmutex代替の一般的なパターンです。Pythonではこのレベルの制御は不可能で、Rustの低レベル性能最適化の強みが発揮されます。`,
+table:T.perf,
+afterTable:`crossbeamのEpoch-based reclamation（crossbeam-epoch）は安全なlock-free構造のメモリ解放に使われます。dashmapはArc<RwLock<HashMap>>の高性能代替で、内部でシャーディングによりロック競合を削減します。`},
+{title:"PGOとLTO",
+body:`Profile-Guided Optimization（PGO）は実際のワークロードでプロファイリングし、そのデータを使って最適化するコンパイラ技術です。インライン化・分岐予測の改善で5〜30%の高速化が報告されています。Link Time Optimization（LTO）はリンク時にクレート境界を超えた最適化を行います。
+
+これらはリリースビルドでのみ有効です。実際のサーバーアプリケーションではthin LTO（lto = "thin"）が一般的なトレードオフです。FirefoxのRust成分部分はPGOとLTOを組み合わせて最大30%の高速化を達成しています。`,
+code:`# Cargo.toml でLTOを有効化
+[profile.release]
+lto = "thin"          # thin: ビルド時間とパフォーマンスのバランス
+# lto = true          # fat: 最大最適化、ビルド遅い
+codegen-units = 1     # 並列コード生成を無効化（最大最適化）
+opt-level = 3         # デフォルトはrelease=3
+
+# PGO（プロファイルガイド最適化）の手順:
+# 1. RUSTFLAGS="-Cprofile-generate=/tmp/pgo-data" cargo build --release
+# 2. ./target/release/myapp < real_workload.txt  # プロファイル収集
+# 3. llvm-profdata merge -o /tmp/pgo-data/merged.profdata /tmp/pgo-data/
+# 4. RUSTFLAGS="-Cprofile-use=/tmp/pgo-data/merged.profdata" cargo build --release`,
+afterCode:`cargo-pgo クレートはPGOの手順を自動化します。本番環境の実際のトラフィックでプロファイリングする場合は、sampled instrumentation（低オーバーヘッド）モードを使用してください。`},
+]},
+{id:"ch9",num:9,title:"フルスタックRust: axum + sqlx + wasm",est:"80分",
+goal:"axum・sqlx・wasm-bindgenを組み合わせたフルスタックアプリケーションを設計できる。tower-httpミドルウェアとopentelemetryによるオブザーバビリティを設定できる。",
+sections:[
+{title:"axum + sqlxの本番的設計",
+body:`本番Webサービスでは、エラーハンドリング・コネクションプール・トレーシング・graceful shutdownの設計が必要です。axumはIntoResponseトレイトを通じてカスタムエラーレスポンスを実装でき、?演算子と組み合わせてハンドラを簡潔に保てます。
+
+PgPoolはArc<PgPool>をStateで共有するパターンが推奨です。sqlx::migrationで本番データベースのスキーマ管理もできます。Pythonのalembicに相当しますが、sqlx migrationsはRustプロセスに組み込めるため、デプロイ時に自動マイグレーションを実行するパターンが書きやすいです。`,
+code:`use axum::{
+    Router, extract::State, http::StatusCode,
+    response::IntoResponse, Json, routing::get,
+};
+use sqlx::PgPool;
+use std::sync::Arc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum AppError {
+    #[error("database error")]
+    Db(#[from] sqlx::Error),
+    #[error("not found")]
+    NotFound,
+}
+
+// AppErrorをHTTPレスポンスに変換
+impl IntoResponse for AppError {
+    fn into_response(self) -> axum::response::Response {
+        let status = match &self {
+            AppError::NotFound => StatusCode::NOT_FOUND,
+            AppError::Db(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        (status, self.to_string()).into_response()
+    }
+}
+
+async fn get_user(
+    State(pool): State<Arc<PgPool>>,
+) -> Result<Json<String>, AppError> {
+    let name = sqlx::query_scalar!("SELECT name FROM users LIMIT 1")
+        .fetch_optional(pool.as_ref()).await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(name))
+}`,
+afterCode:`Result<Json<T>, AppError>のパターンは?演算子でエラーを自動変換できるため、ハンドラのコードが非常にシンプルになります。AppErrorにthiserrorの#[from]を使うとsqlx::Errorが自動変換されます。`},
+{title:"オブザーバビリティ: tracing + opentelemetry",
+body:`本番サービスにはログ・メトリクス・トレーシング（三本柱）が必要です。tracingクレートはRustのデファクトロギングフレームワークで、structuredログとspan（トレーシング）を統合しています。opentelemetryとの統合でJaeger・Datadog・GrafanaTempoへのトレース送信が可能です。
+
+tracing::instrument アトリビュートを関数に付けると、自動的にspanが作成されて関数の引数・実行時間が記録されます。PythonのOpenTelemetry SDKより型安全で、コンパイル時に計装の誤りが検出されます。`,
+code:`use tracing::{info, instrument, warn};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+// 関数自動計装: 引数をspanに記録
+#[instrument(skip(pool), fields(user_id = %user_id))]
+async fn fetch_user(pool: &sqlx::PgPool, user_id: i64) -> anyhow::Result<String> {
+    info!("fetching user");
+
+    let result = sqlx::query_scalar!("SELECT name FROM users WHERE id = $1", user_id)
+        .fetch_optional(pool)
+        .await?;
+
+    match result {
+        Some(name) => { info!(%name, "found user"); Ok(name) }
+        None => { warn!("user not found"); Err(anyhow::anyhow!("not found")) }
+    }
+}
+
+fn init_tracing() {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+}`,
+afterCode:`RUST_LOG=myapp=debug,sqlx=warn のように環境変数でログレベルを制御できます。本番ではJSONフォーマット（tracing-subscriber::fmt::format::Json）でログを出力しElasticsearch等に送るのが一般的です。`},
+]},
+{id:"ch10",num:10,title:"コンパイラ拡張とカスタムLint",est:"65分",
+goal:"cargo-expandでマクロ展開を確認できる。clippyのカスタムlintの仕組みを理解できる。cargo-geiger・miriでunsafeとUBを検査できる。",
+sections:[
+{title:"コンパイラ診断ツールチェーン",
+body:`Rustのツールチェーンにはコード品質を確認するツールが充実しています。cargo expandはマクロ展開後のコードを出力し、procマクロのデバッグに不可欠です。cargo geigerはdependency treeのunsafeコード使用量を可視化し、サプライチェーンリスクの評価に使えます。
+
+cargo mirはRustの中間表現（MIR）インタープリタで、unsafeコードのUB（未定義動作）を検出します。通常のテストではUBを見逃すことがありますが、mirはメモリアクセスパターンをシミュレートして問題を発見します。本番前に必ずcargo miri testを実行することをお勧めします。`,
+table:T.compilerPlugins,
+afterTable:`clippyはRustの公式lintツールで、300以上のlintが含まれます。cargo clippy -- -D warningsをCIに組み込み、新しい警告がマージされないようにするのが業界標準です。`},
+{title:"独自clippyの追加（概念）",
+body:`clippyはRustコンパイラプラグインとして実装されており、コントリビューターがlintを追加できます。独自のorganization lintを追加するには現状clippy自体のフォークが必要ですが、dylintクレートを使うと外部クレートとして独自lintを配布できます。
+
+MIR（Mid-level Intermediate Representation）はRustコンパイラが型チェック後に生成する中間表現で、多くの最適化とlintがここで行われます。Pythonのastモジュールでソースコードを解析するのと同様に、RustではMIRやHIR（High-level IR）を解析してlintを実装します。`,
+code:`// dylintを使ったカスタムlintの概念
+// 実際はdylint-template等を使う
+
+// .cargo/dylint.toml
+// [workspace.metadata.dylint]
+// libraries = [{ path = "./lints" }]
+
+// lints/src/lib.rs の概念:
+// #[no_mangle]
+// pub fn register_lints(sess: &rustc_session::Session, lint_store: &mut rustc_lint::LintStore) {
+//     lint_store.register_lints(&[MY_LINT]);
+//     lint_store.register_late_pass(|_| Box::new(MyLint));
+// }
+
+// 一般的なカスタムルール例:
+// - unwrap()の使用を禁止（組織ポリシー）
+// - 特定の非推奨APIを警告
+// - ログ出力にstructuredフォーマットを強制`,
+afterCode:`プロジェクト固有のコーディングルールをdylintで実装することで、コードレビューの自動化が進みます。「unwrap()はテスト外で禁止」等のルールをlintとして定義するのが実践的な活用例です。`},
+]},
+{id:"ch11",num:11,title:"エコシステムと重要クレートの深掘り",est:"65分",
+goal:"Rustエコシステムの主要クレートを使い分けられる。serde・reqwest・clap・tokio等の高度な機能を活用できる。crates.io公開の手順を理解している。",
+sections:[
+{title:"主要クレートの深掘り",
+body:`Rustエコシステムには少数の「デファクトスタンダード」クレートがあり、これらを習得することで大半のアプリケーション要件を満たせます。serdeは直列化/逆直列化のインフラで、JSON・TOML・YAML・MessagePack等の多くのフォーマットがserdeのトレイトを実装しています。
+
+clapはCLIパーサーで、derive APIを使うと構造体にアトリビュートを付けるだけでサブコマンド・オプション・バリデーションが自動生成されます。Pythonのargparse・clickよりも型安全で、サブコマンドごとに異なる構造体を使った設計がしやすいです。`,
+code:`// clap derive API の例
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(version, about = "My CLI tool")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+
+    #[arg(short, long, default_value = "info")]
+    log_level: String,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// ユーザーを一覧表示
+    List {
+        #[arg(short, long, default_value_t = 10)]
+        limit: usize,
+    },
+    /// ユーザーを作成
+    Create {
+        name: String,
+        #[arg(short, long)]
+        email: Option<String>,
+    },
+}
+
+fn main() {
+    let cli = Cli::parse();
+    match cli.command {
+        Commands::List { limit } => println!("listing {} users", limit),
+        Commands::Create { name, email } => {
+            println!("creating {} ({:?})", name, email);
+        }
+    }
+}`,
+afterCode:`clap generate機能を使うとbash/zsh/fish向けのシェル補完スクリプトを自動生成できます。プロフェッショナルなCLIツールに必要な機能がほぼ全て含まれています。`},
+{title:"crates.ioへのpublish",
+body:`crates.ioはRustの公式パッケージレジストリです。cargo publishコマンドで公開できますが、一度公開したバージョンは取り消せません（yankはできますが削除不可）。Cargo.tomlに必須フィールド（name・version・edition・description・license・repository）を記載してください。
+
+semver管理・CHANGELOG・ドキュメント整備・CI設定を整えてから公開するのが理想です。cargo package --list で公開対象ファイルを事前確認できます。.gitignoreは尊重されますが、必要なファイルを除外しないよう注意してください。`,
+code:`# 公開前チェックリスト実行スクリプト
+#!/bin/bash
+set -e
+
+echo "=== 1. Format check ==="
+cargo fmt --check
+
+echo "=== 2. Clippy ==="
+cargo clippy -- -D warnings
+
+echo "=== 3. Tests ==="
+cargo test --all
+
+echo "=== 4. Doc generation ==="
+cargo doc --no-deps --all-features
+
+echo "=== 5. Package check ==="
+cargo package --list
+
+echo "=== 6. Semver check ==="
+cargo semver-checks check-release 2>/dev/null || echo "(skip: no previous version)"
+
+echo "All checks passed!"
+echo "Run: cargo publish --dry-run"
+echo "Then: cargo publish`,
+afterCode:`cargo publish --dry-runで実際の公開なしに問題がないか確認できます。初回publishの前にcargo loginでcrates.ioのAPIトークンを設定してください。`},
+]},
+{id:"ch12",num:12,title:"実務設計パターンとRustエコシステムの全体像",est:"60分",
+goal:"Rustエコシステム全体の構造を俯瞰できる。実務的な設計パターン（Builder・RAII・Newtype・Typestate）を使いこなせる。今後の学習の方向性を自分で設定できる。",
+sections:[
+{title:"Rustが実際に使われている場所",
+body:`Rustは多くの主要プロジェクトで採用されています。MozillaのFirefox（Servo・CSS・MP4パーサー）、Cloudflare（pingora・BoringTunnel）、Dropbox（Magic Pocket・ファイルシステム）、Amazon（Firecracker VMM・Bottlerocket OS）、Microsoft（Windowsカーネルドライバ・AzureSDK）などです。
+
+Linuxカーネル（6.1以降）にRustサポートが統合されたことで、システムプログラミングにおけるRustの地位は決定的になりました。Pythonからのシフトは特に「Pythonで書いていたサービスをRustで書き直してパフォーマンスとメモリ効率を改善」という実績が多く報告されています。`,
+table:T.asyncRuntime,
+afterTable:`非同期ランタイムの選択はプロジェクトのライフタイム全体に影響します。tokioは最大のエコシステムを持つため、特別な理由がない限りtokioを選択することを推奨します。`},
+{title:"次のステップ",
+body:`このコースで学んだ技術を組み合わせて実際のプロジェクトを構築することが最も重要な次のステップです。推奨プロジェクトとしては、axum + sqlx + Dockerでの本番デプロイ可能なREST API・wasm-packを使ったブラウザアプリ・no_stdで書く簡単な組み込みファームウェアなどがあります。
+
+Rustの公式リソースとして、The Rust Programming Language（通称The Book）・Rustonomicon（unsafe Rust詳解）・Async Book（非同期詳解）・Embedded Rust Book（組み込み詳解）が充実しています。RustのRFCリポジトリを読むと言語設計の背景を深く理解できます。`,
+table:T.libDesign,
+code:`// このコース修了後の推奨学習パス
+
+// 1. 実践: axum + sqlx + DockerでREST APIを本番デプロイ
+//    → 認証(JWT)・レート制限・CI/CDも含める
+
+// 2. 実践: wasm-packでブラウザ向けRustライブラリを公開
+//    → npmパッケージとしてcrates.ioとnpmに同時公開
+
+// 3. 読書: The Rustonomicon
+//    → unsafeの全てを深く理解
+
+// 4. 実践: Raspberry Pi Pico + embassy でLチカ
+//    → no_std + async の組み合わせ
+
+// 5. 貢献: お気に入りのOSSにPRを出す
+//    → ripgrep・fd・tokio・axum等
+
+// 6. 読書: Async Book + tokioのソースコード
+//    → ランタイムの実装を理解
+
+// 推奨コミュニティ
+// - users.rust-lang.org (フォーラム)
+// - discord.gg/rust-lang (公式Discord)
+// - This Week in Rust (週次ニュースレター)`,
+afterCode:`Rustコミュニティは非常にフレンドリーで、初心者の質問にも丁寧に答えてくれます。Rustフォーラム（users.rust-lang.org）や公式Discordを積極的に活用してください。このコースで学んだ知識をベースに、実際のプロジェクトで経験を積み重ねることが上達への最短ルートです。`},
+]},
+];
+
+function DataTable({t}) {
+  if (!t) return null;
+  return (
+    <div>
+      {t.cap && <div className="table-caption">{t.cap}</div>}
+      <table>
+        <thead><tr>{t.h.map((h,i)=><th key={i}>{h}</th>)}</tr></thead>
+        <tbody>{t.r.map((row,i)=><tr key={i}>{row.map((c,j)=><td key={j}>{c}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function CodeBlock({code}) {
+  if (!code) return null;
+  return <pre><code>{code}</code></pre>;
+}
+
+function Exercise({ex}) {
+  const [open, setOpen] = useState(false);
+  const [ansOpen, setAnsOpen] = useState(false);
+  const stars = Array.from({length:3},(_,i)=>(
+    <span key={i} className={i<ex.diff?"star":"star empty"}>★</span>
+  ));
+  return (
+    <div className="exercise">
+      <div className="exercise-header" onClick={()=>{setOpen(!open);setAnsOpen(false);}}>
+        <div className="diff">{stars}</div>
+        <div className="exercise-q">{ex.q}</div>
+        <span>{open?"▲":"▼"}</span>
+      </div>
+      {open && (
+        <div className="exercise-body open">
+          <CodeBlock code={ex.code}/>
+          <button className="answer-toggle" onClick={()=>setAnsOpen(!ansOpen)}>
+            {ansOpen?"解答を隠す":"解答を見る"}
+          </button>
+          {ansOpen && <div className="answer-block open"><CodeBlock code={ex.answer}/></div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Section({s}) {
+  return (
+    <div className="section">
+      <h3>{s.title}</h3>
+      {s.body && s.body.split('\n\n').map((p,i)=><p key={i}>{p}</p>)}
+      {s.table && <DataTable t={s.table}/>}
+      {s.afterTable && <p>{s.afterTable}</p>}
+      {s.code && <CodeBlock code={s.code}/>}
+      {s.afterCode && <p>{s.afterCode}</p>}
+    </div>
+  );
+}
+
+function App() {
+  const [cur, setCur] = useState(0);
+  const [openCh, setOpenCh] = useState(null);
+  const ch = chapters[cur];
+  const exList = EX[ch.id] || [];
+
+  useEffect(()=>{ setOpenCh(null); }, [cur]);
+
+  return (
+    <div>
+      <header className="header">
+        <a href="../index.html">🏠 ホーム</a>
+        <span>›</span>
+        <a href="index.html">Rust</a>
+        <span>›</span>
+        <span>上級</span>
+      </header>
+
+      <div className="hero">
+        <h1>Rust 上級コース</h1>
+        <div className="subtitle">ライブラリ設計・低レベル・エコシステムの深化</div>
+        <div className="meta">
+          <span>全12章</span>
+          <span>演習36問</span>
+          <span>Rust 1.78</span>
+        </div>
+        <div className="desc">
+          proc-macro・Futureの内部実装・カスタムアロケータ・組み込みRust（no_std）・SIMD・高度な型システム（GAT・typestate）・ライブラリ設計・オブザーバビリティまで、Rustエンジニアの最高レベルを目指します。このコースを修了すると、本番品質のライブラリ・フレームワーク・組み込みファームウェアを自力で設計・実装できるようになります。
+        </div>
+      </div>
+
+      <div className="nav-tabs">
+        {chapters.map((c,i)=>(
+          <button key={c.id} className={`nav-tab${cur===i?" active":""}`} onClick={()=>setCur(i)}>
+            Ch{c.num}
+          </button>
+        ))}
+      </div>
+
+      <div className="content">
+        <div className="chapter" key={ch.id}>
+          <div className="chapter-header" onClick={()=>setOpenCh(openCh===ch.id?null:ch.id)}>
+            <div className="chapter-num">{ch.num}</div>
+            <div className="chapter-title">{ch.title}</div>
+            <div className="chapter-est">⏱ {ch.est}</div>
+            <div className={`chapter-arrow${openCh===ch.id?" open":""}`}>▼</div>
+          </div>
+          {openCh===ch.id && (
+            <div className="chapter-body open">
+              <div className="goal-block">
+                <h4>🎯 この章のゴール</h4>
+                <p>{ch.goal}</p>
+              </div>
+              {ch.sections.map((s,i)=><Section key={i} s={s}/>)}
+              {exList.length>0 && (
+                <div className="exercises">
+                  <h4>演習問題</h4>
+                  {exList.map((ex,i)=><Exercise key={i} ex={ex}/>)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="chapter-nav">
+          <button className="nav-btn" onClick={()=>setCur(c=>c-1)} disabled={cur===0}>← 前の章</button>
+          <span style={{color:"#7c2d12",fontSize:".9rem"}}>第{ch.num}章 / 全{chapters.length}章</span>
+          <button className="nav-btn" onClick={()=>setCur(c=>c+1)} disabled={cur===chapters.length-1}>次の章 →</button>
+        </div>
+
+        {cur===chapters.length-1 && (
+          <div className="complete-banner">
+            <h2>🎉 Rust コース完全修了!</h2>
+            <p>入門から上級まで——proc-macro・Futureの内部・no_std・SIMD・ライブラリ設計まで習得しました。あなたは本物のRustエンジニアです。</p>
+            <a href="../index.html" className="home-btn">ホームに戻る 🏠</a>
+          </div>
+        )}
+      </div>
+
+      <footer>
+        Rust 1.78 (2024-05リリース) 準拠 · rustc 1.78 / cargo 1.78 基準 · 2026年4月時点<br/>
+        proc-macro2 1.x · syn 2.x · quote 1.x · wasm-bindgen 0.2 · embassy (latest) 基準
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

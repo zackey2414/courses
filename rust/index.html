@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rust 入門コース</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:#0f0f1a;color:#e2e8f0;line-height:1.7;min-height:100vh}
+a{color:#f97316;text-decoration:none}
+a:hover{text-decoration:underline}
+.header{background:linear-gradient(135deg,#1a0a00,#3b1500);padding:1rem 2rem;display:flex;align-items:center;gap:1rem;border-bottom:1px solid #7c2d12}
+.header-logo{font-size:1.5rem;font-weight:700;color:#fb923c}
+.header-logo a{color:inherit;text-decoration:none}
+.hero{background:linear-gradient(135deg,#1a0a00 0%,#431407 50%,#1a0a00 100%);padding:4rem 2rem;text-align:center;border-bottom:1px solid #7c2d12}
+.hero h1{font-size:2.5rem;font-weight:700;color:#fb923c;margin-bottom:.5rem}
+.hero .subtitle{color:#f97316;font-size:1.1rem;margin-bottom:1.5rem}
+.hero .desc{max-width:700px;margin:0 auto 2rem;color:#cbd5e1;font-size:1rem}
+.stats{display:flex;justify-content:center;gap:2rem;flex-wrap:wrap}
+.stat{background:rgba(249,115,22,.1);border:1px solid #c2410c;border-radius:.75rem;padding:.75rem 1.5rem;text-align:center}
+.stat-num{font-size:1.5rem;font-weight:700;color:#fb923c}
+.stat-label{font-size:.8rem;color:#f97316}
+.container{max-width:900px;margin:0 auto;padding:2rem}
+.chapter{background:#1a0a00;border:1px solid #7c2d12;border-radius:1rem;margin-bottom:1rem;overflow:hidden}
+.chapter-header{padding:1.25rem 1.5rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .2s}
+.chapter-header:hover{background:rgba(249,115,22,.1)}
+.chapter-title{font-weight:600;color:#fb923c;font-size:1.05rem}
+.chapter-meta{display:flex;align-items:center;gap:1rem}
+.chapter-est{font-size:.8rem;color:#c2410c;background:rgba(194,65,12,.15);padding:.2rem .6rem;border-radius:.5rem}
+.chapter-body{border-top:1px solid #7c2d12;padding:1.5rem}
+.goal-block{background:linear-gradient(135deg,rgba(194,65,12,.15),rgba(249,115,22,.1));border:1px solid #c2410c;border-radius:.75rem;padding:1rem 1.25rem;margin-bottom:1.5rem}
+.goal-block h4{color:#fb923c;margin-bottom:.5rem;font-size:.95rem}
+.goal-block p{color:#fed7aa;font-size:.9rem}
+.section{margin-bottom:1.5rem}
+.section h3{color:#f97316;font-size:1rem;margin-bottom:.75rem;padding-bottom:.25rem;border-bottom:1px solid #7c2d12}
+.section p{color:#cbd5e1;font-size:.95rem;margin-bottom:.75rem}
+table{width:100%;border-collapse:collapse;margin:.75rem 0;font-size:.88rem}
+th{background:#431407;color:#fb923c;padding:.5rem .75rem;text-align:left;border:1px solid #7c2d12}
+td{padding:.5rem .75rem;border:1px solid #7c2d12;color:#cbd5e1}
+tr:nth-child(even) td{background:rgba(124,45,18,.2)}
+pre{background:#0d0500;border:1px solid #7c2d12;border-radius:.75rem;padding:1.25rem;overflow-x:auto;margin:.75rem 0}
+code{font-family:'JetBrains Mono',monospace;font-size:.88rem;color:#fb923c}
+pre code{color:#e2e8f0}
+.ex-block{background:#120500;border:1px solid #7c2d12;border-radius:.75rem;padding:1.25rem;margin:.75rem 0}
+.ex-header{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem}
+.diff{font-size:.8rem;color:#f59e0b}
+.ex-q{color:#fed7aa;margin-bottom:.75rem;font-size:.95rem}
+.toggle-btn{background:linear-gradient(135deg,#c2410c,#b45309);color:#fff;border:none;padding:.4rem 1rem;border-radius:.5rem;cursor:pointer;font-size:.85rem}
+.toggle-btn:hover{opacity:.85}
+.answer{margin-top:.75rem;border-top:1px solid #7c2d12;padding-top:.75rem}
+.nav-buttons{display:flex;justify-content:space-between;margin-top:2rem}
+.nav-btn{background:linear-gradient(135deg,#c2410c,#92400e);color:#fff;border:none;padding:.75rem 1.5rem;border-radius:.75rem;cursor:pointer;font-size:.95rem;font-family:'Noto Sans JP',sans-serif;transition:opacity .2s}
+.nav-btn:hover{opacity:.85}
+.nav-btn:disabled{opacity:.3;cursor:not-allowed}
+.completion{text-align:center;padding:3rem 2rem;background:#1a0a00;border-radius:1rem;border:1px solid #7c2d12}
+.badge{display:inline-block;background:linear-gradient(135deg,#c2410c,#f97316);color:#fff;padding:1rem 2.5rem;border-radius:2rem;font-size:1.2rem;font-weight:700;margin-bottom:1rem}
+.footer{text-align:center;padding:2rem;color:#c2410c;font-size:.85rem;border-top:1px solid #1a0a00}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-logo"><a href="../index.html">🦀 Programming Courses</a></div>
+</header>
+<section class="hero">
+  <h1>🦀 Rust 入門コース</h1>
+  <p class="subtitle">所有権・借用・ライフタイムの基礎</p>
+  <p class="desc">Rustは「メモリ安全」と「高性能」を両立する次世代システムプログラミング言語です。本コースでは、Pythonとの違いを意識しながら、所有権・借用チェッカー・列挙型・トレイト・エラーハンドリングなどRust固有の概念を習得します。コースを修了すると、Rustの基本的な構文と設計思想を理解し、小規模なプログラムを自力で書けるようになります。</p>
+  <div class="stats">
+    <div class="stat"><div class="stat-num">10</div><div class="stat-label">章</div></div>
+    <div class="stat"><div class="stat-num">30</div><div class="stat-label">演習問題</div></div>
+    <div class="stat"><div class="stat-num">Rust 1.78</div><div class="stat-label">対応バージョン</div></div>
+  </div>
+</section>
+<div class="container" id="root"></div>
+<footer class="footer">Rust 1.78 (2024-05リリース) 準拠 · rustc 1.78 / cargo 1.78 基準 · 2026年4月時点</footer>
+<script type="text/babel">
+const T = {
+  rustVsPython: {
+    h:["特徴","Python","Rust"],
+    r:[
+      ["型システム","動的型付け","静的型付け (型推論あり)"],
+      ["メモリ管理","GC (参照カウント)","所有権・借用 (GCなし)"],
+      ["実行速度","インタプリタ (~100x遅い)","ネイティブ (C++と同等)"],
+      ["安全性","実行時エラーあり","コンパイル時にメモリ安全保証"],
+      ["並行性","GILで制限","fearless concurrency"],
+      ["エラー処理","例外 (raise/try)","Result<T,E> / Option<T>"],
+      ["ヌル値","None","Option<T> (null安全)"],
+      ["パッケージ管理","pip + venv","cargo (ビルド込み)"],
+    ],
+    cap:"Python と Rust の比較"
+  },
+  ownershipRules: {
+    h:["ルール","説明"],
+    r:[
+      ["1. 各値には所有者が1人","複数の所有者は存在できない"],
+      ["2. 同時に所有者は1人","変数はいつでも唯一の所有者"],
+      ["3. 所有者がスコープを抜けると解放","dropが自動呼び出し"],
+    ],
+    cap:"所有権の3ルール"
+  },
+  borrowingRules: {
+    h:["借用の種類","構文","同時に何個?","変更可能?"],
+    r:[
+      ["不変参照","&T","複数(∞)","不可"],
+      ["可変参照","&mut T","1つのみ","可能"],
+    ],
+    cap:"借用チェッカーのルール"
+  },
+  primitiveTypes: {
+    h:["型","説明","Python対応"],
+    r:[
+      ["i32","32ビット符号付き整数","int (小)"],
+      ["i64","64ビット符号付き整数","int"],
+      ["u8/u32/u64","符号なし整数","—"],
+      ["f32/f64","浮動小数点","float"],
+      ["bool","true/false","bool"],
+      ["char","Unicodeスカラー値","str[0]"],
+      ["&str","文字列スライス(不変)","str (参照)"],
+      ["String","ヒープ上の可変文字列","str (所有)"],
+      ["()","ユニット型","None"],
+    ],
+    cap:"Rustの基本型"
+  },
+  enumVsMatch: {
+    h:["Python","Rust","説明"],
+    r:[
+      ["if/elif/else","match","パターンマッチング"],
+      ["isinstance()","match arm の型","型による分岐"],
+      ["Union[A,B]","enum {A, B}","代数的データ型"],
+      ["Optional[T]","Option<T>","値なしを安全に表現"],
+      ["Union[T, Exception]","Result<T,E>","エラーを型で表現"],
+    ],
+    cap:"PythonとRustの対応"
+  },
+  traitVsAbstract: {
+    h:["概念","Python","Rust"],
+    r:[
+      ["インターフェース","ABC/abstractmethod","trait"],
+      ["実装","class inherits ABC","impl Trait for Type"],
+      ["デフォルト実装","abstractmethodのデフォルト","trait にデフォルト実装"],
+      ["多重実装","MRO","複数traitをimpl可"],
+      ["ジェネリクス","型ヒント(緩い)","trait bound (厳格)"],
+    ],
+    cap:"PythonのABCとRustのtrait"
+  },
+  closureCapture: {
+    h:["キャプチャ","説明","例"],
+    r:[
+      ["move","所有権ごと移動","move || { ... }"],
+      ["参照(デフォルト)","不変参照でキャプチャ","|| { ... }"],
+      ["可変参照","可変参照でキャプチャ","|x| { *x += 1; }"],
+      ["Fn","不変でキャプチャ、複数回呼び出し可","高階関数"],
+      ["FnMut","可変でキャプチャ","イテレータアダプタ"],
+      ["FnOnce","所有権でキャプチャ、1回のみ","スレッド生成"],
+    ],
+    cap:"クロージャのキャプチャ方法"
+  },
+  iteratorMethods: {
+    h:["メソッド","Python対応","説明"],
+    r:[
+      ["map(|x| f(x))","map(f)","各要素を変換"],
+      ["filter(|x| cond)","filter(f)","条件でフィルタ"],
+      ["collect::<Vec<_>>()","list(iter)","コレクションに収集"],
+      ["sum()","sum()","合計"],
+      ["fold(init, |acc,x| ...)","reduce(f, init)","累積"],
+      ["for_each(|x| ...)","for x in iter","各要素に適用"],
+      ["chain(other)","itertools.chain","2イテレータを連結"],
+      ["enumerate()","enumerate()","(index, value)ペア"],
+      ["zip(other)","zip()","2イテレータをzip"],
+      ["flat_map(|x| ...)","itertools.chain.from_iterable","flatMap"],
+    ],
+    cap:"イテレータの主要メソッド"
+  },
+};
+
+const EX = {
+  ch1:[
+    {diff:1,q:"Rustをインストールしてmain関数から 'Hello, Rust!' を出力してください。",code:`// rustup install: https://rustup.rs/
+// cargo new hello && cd hello
+fn main() {
+    // println! マクロで出力
+}`,answer:`fn main() {
+    println!("Hello, Rust!");
+    // cargo run で実行
+    // cargo build --release でリリースビルド
+}`},
+    {diff:1,q:"変数の不変性を確認してください。xに5を代入し、変更しようとするとコンパイルエラーになることを示してください。",code:`fn main() {
+    let x = 5;
+    // x = 6; // これはエラー
+    println!("{}", x);
+
+    // mut をつけると変更可能
+    let mut y = 5;
+    y = 6;
+    println!("{}", y);
+}`,answer:`fn main() {
+    let x = 5; // デフォルトは不変
+    // x = 6; // error[E0384]: cannot assign twice to immutable variable
+    println!("x = {}", x);
+    let mut y = 5;
+    y = 6; // mut なら変更可能
+    println!("y = {}", y);
+    // シャドーイング: 同名の変数を再宣言できる
+    let x = x * 2; // 新しい変数 x (型も変えられる)
+    println!("shadowed x = {}", x); // 10
+}`},
+    {diff:2,q:"Cargoを使って依存ライブラリ(rand)を追加し、1〜6のランダムな数を生成してください。",code:`// Cargo.toml に依存を追加:
+// [dependencies]
+// rand = "0.8"
+use rand::Rng;
+fn main() {
+    let n = rand::thread_rng().gen_range(1..=6);
+    println!("Dice: {}", n);
+}`,answer:`// Cargo.toml:
+// [dependencies]
+// rand = "0.8"
+use rand::Rng;
+fn main() {
+    let mut rng = rand::thread_rng();
+    let dice = rng.gen_range(1..=6);
+    println!("You rolled: {}", dice);
+    // cargo run で実行 (cargo が自動でダウンロード・コンパイル)
+}`},
+  ],
+  ch2:[
+    {diff:1,q:"String と &str の違いを示すコードを書いてください。",code:`fn greet(name: &str) {
+    println!("Hello, {}!", name);
+}
+fn main() {
+    let owned = String::from("Alice");
+    let literal = "Bob"; // &str
+    greet(&owned); // String を &str として渡す
+    greet(literal);
+}`,answer:`fn greet(name: &str) { // &str を受け取る (String も &str も渡せる)
+    println!("Hello, {}!", name);
+}
+fn main() {
+    let owned: String = String::from("Alice"); // ヒープ上の String
+    let literal: &str = "Bob"; // 静的な文字列リテラル
+    greet(&owned); // & で String を &str に変換 (deref coercion)
+    greet(literal); // そのまま渡せる
+    // String は所有。&str は借用(参照)
+}`},
+    {diff:2,q:"所有権の移動(move)を示してください。moveした後にアクセスするとコンパイルエラーになることを確認してください。",code:`fn consume(s: String) {
+    println!("{}", s);
+} // s が drop される
+fn main() {
+    let s1 = String::from("hello");
+    consume(s1);
+    // println!("{}", s1); // エラー! 所有権が移動済み
+
+    // clone で解決
+    let s2 = String::from("world");
+    let s3 = s2.clone();
+    consume(s2);
+    println!("{}", s3); // OK
+}`,answer:`fn consume(s: String) {
+    println!("Consumed: {}", s);
+} // ここで s の所有権が解放 (drop)
+fn main() {
+    let s1 = String::from("hello");
+    consume(s1); // s1 の所有権が consume に移動
+    // println!("{}", s1); // error[E0382]: borrow of moved value
+
+    let s2 = String::from("world");
+    let s3 = s2.clone(); // deep copy: 所有権は移動しない
+    consume(s2);
+    println!("s3 still alive: {}", s3);
+
+    // i32 などの Copy型は自動コピーされる
+    let x = 5;
+    let y = x; // x はコピーされる (移動しない)
+    println!("{} {}", x, y); // 両方使える
+}`},
+    {diff:2,q:"参照を使って所有権を移動せずに関数に値を渡してください。",code:`fn print_length(s: &String) -> usize {
+    s.len()
+}
+fn main() {
+    let s = String::from("hello, world");
+    let len = print_length(&s);
+    println!("{} has {} chars", s, len); // s はまだ使える
+}`,answer:`fn print_length(s: &String) -> usize {
+    s.len() // s を所有せず借用するだけ
+}
+fn first_word(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    for (i, &byte) in bytes.iter().enumerate() {
+        if byte == b' ' { return &s[0..i]; }
+    }
+    &s[..]
+}
+fn main() {
+    let s = String::from("hello, world");
+    let len = print_length(&s);
+    println!("'{}' has {} chars", s, len); // 所有権はそのまま
+    let sentence = String::from("hello world");
+    let word = first_word(&sentence);
+    println!("First word: {}", word);
+}`},
+  ],
+  ch3:[
+    {diff:1,q:"Option<T> を使って安全にNoneを扱ってください。",code:`fn find_even(numbers: &[i32]) -> Option<i32> {
+    // 最初の偶数を返す。なければ None
+}
+fn main() {
+    let nums = vec![1, 3, 4, 7];
+    match find_even(&nums) {
+        Some(n) => println!("Found: {}", n),
+        None => println!("No even number"),
+    }
+}`,answer:`fn find_even(numbers: &[i32]) -> Option<i32> {
+    numbers.iter().find(|&&x| x % 2 == 0).copied()
+}
+fn main() {
+    let nums = vec![1, 3, 4, 7];
+    match find_even(&nums) {
+        Some(n) => println!("Found even: {}", n),
+        None => println!("No even number found"),
+    }
+    // if let 構文
+    if let Some(n) = find_even(&[1, 2, 3]) {
+        println!("if let: {}", n);
+    }
+    // unwrap_or でデフォルト値
+    let result = find_even(&[1, 3, 5]).unwrap_or(-1);
+    println!("unwrap_or: {}", result); // -1
+}`},
+    {diff:1,q:"Result<T,E> を使ってエラーを返す関数を実装してください。",code:`use std::num::ParseIntError;
+fn parse_positive(s: &str) -> Result<u32, String> {
+    // 数値でなければ ParseIntError
+    // 負の数なら "Negative number" エラー
+}`,answer:`fn parse_positive(s: &str) -> Result<u32, String> {
+    match s.trim().parse::<i64>() {
+        Err(e) => Err(format!("Parse error: {}", e)),
+        Ok(n) if n < 0 => Err(format!("Negative number: {}", n)),
+        Ok(n) => Ok(n as u32),
+    }
+}
+fn main() {
+    println!("{:?}", parse_positive("42"));    // Ok(42)
+    println!("{:?}", parse_positive("-5"));    // Err("Negative...")
+    println!("{:?}", parse_positive("abc"));   // Err("Parse error...")
+    // ? 演算子でエラー伝播
+    fn double_parse(s: &str) -> Result<u32, String> {
+        let n = parse_positive(s)?; // エラーなら即return
+        Ok(n * 2)
+    }
+    println!("{:?}", double_parse("21")); // Ok(42)
+}`},
+    {diff:2,q:"? 演算子を使ってエラー伝播を簡潔に書いてください。",code:`use std::fs;
+use std::io;
+fn read_username() -> Result<String, io::Error> {
+    // fs::read_to_string で読み込み、? でエラー伝播
+}`,answer:`use std::fs;
+use std::io;
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut s = fs::read_to_string("username.txt")?; // エラーなら即 return Err(e)
+    s = s.trim().to_string();
+    Ok(s)
+}
+// anyhow クレートを使うと複数エラー型を統一できる
+// fn main() -> anyhow::Result<()> {
+//     let s = fs::read_to_string("file.txt")?;
+//     Ok(())
+// }`},
+  ],
+  ch4:[
+    {diff:1,q:"Shape enumを定義し、面積を計算するメソッドを実装してください。",code:`enum Shape {
+    Circle(f64),
+    Rectangle(f64, f64),
+    Triangle(f64, f64),
+}
+impl Shape {
+    fn area(&self) -> f64 {
+        // matchで分岐
+    }
+}`,answer:`enum Shape {
+    Circle(f64),
+    Rectangle(f64, f64),
+    Triangle(f64, f64),
+}
+impl Shape {
+    fn area(&self) -> f64 {
+        match self {
+            Shape::Circle(r) => std::f64::consts::PI * r * r,
+            Shape::Rectangle(w, h) => w * h,
+            Shape::Triangle(b, h) => 0.5 * b * h,
+        }
+    }
+}
+fn main() {
+    let shapes = vec![
+        Shape::Circle(5.0),
+        Shape::Rectangle(4.0, 6.0),
+        Shape::Triangle(3.0, 8.0),
+    ];
+    for s in &shapes { println!("Area: {:.2}", s.area()); }
+}`},
+    {diff:2,q:"matchのガード条件(if guard)を使って数値を分類してください。",code:`fn classify(n: i32) -> &'static str {
+    match n {
+        0 => "zero",
+        n if n < 0 => "negative",
+        n if n % 2 == 0 => "positive even",
+        _ => "positive odd",
+    }
+}`,answer:`fn classify(n: i32) -> &'static str {
+    match n {
+        0 => "zero",
+        n if n < 0 => "negative",
+        n if n % 2 == 0 => "positive even",
+        _ => "positive odd",
+    }
+}
+fn main() {
+    for n in [-5, 0, 3, 8] {
+        println!("{}: {}", n, classify(n));
+    }
+}`},
+    {diff:2,q:"if let と while let を使って Option を扱ってください。",code:`fn main() {
+    let mut stack: Vec<i32> = vec![1, 2, 3];
+    // while let で pop しながら処理
+    while let Some(top) = stack.pop() {
+        println!("{}", top);
+    }
+}`,answer:`fn main() {
+    // if let
+    let some_val: Option<i32> = Some(42);
+    if let Some(n) = some_val {
+        println!("Got: {}", n);
+    }
+    // while let
+    let mut stack = vec![1, 2, 3];
+    while let Some(top) = stack.pop() {
+        println!("Popped: {}", top);
+    }
+    // let else (Rust 1.65+): 条件不成立なら早期リターン
+    fn process(val: Option<i32>) -> String {
+        let Some(n) = val else { return "None".to_string(); };
+        format!("Value: {}", n)
+    }
+    println!("{}", process(Some(42)));
+    println!("{}", process(None));
+}`},
+  ],
+  ch5:[
+    {diff:1,q:"Display トレイトを自作の型に実装してください。",code:`use std::fmt;
+struct Point { x: f64, y: f64 }
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // "(x, y)" 形式で出力
+    }
+}`,answer:`use std::fmt;
+struct Point { x: f64, y: f64 }
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+impl fmt::Debug for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Point {{ x: {}, y: {} }}", self.x, self.y)
+    }
+}
+fn main() {
+    let p = Point { x: 1.5, y: 2.5 };
+    println!("{}", p);   // Display: (1.5, 2.5)
+    println!("{:?}", p); // Debug: Point { x: 1.5, y: 2.5 }
+}`},
+    {diff:2,q:"Summary トレイトを定義し、Article と Tweet にそれぞれ実装してください。",code:`trait Summary {
+    fn summarize(&self) -> String;
+    fn preview(&self) -> String { // デフォルト実装
+        format!("{}...", &self.summarize()[..20.min(self.summarize().len())])
+    }
+}
+struct Article { title: String, content: String }
+struct Tweet { username: String, text: String }`,answer:`trait Summary {
+    fn summarize(&self) -> String;
+    fn preview(&self) -> String {
+        let s = self.summarize();
+        let end = s.char_indices().nth(20).map(|(i,_)| i).unwrap_or(s.len());
+        format!("{}...", &s[..end])
+    }
+}
+struct Article { title: String, content: String }
+struct Tweet { username: String, text: String }
+impl Summary for Article {
+    fn summarize(&self) -> String {
+        format!("{}: {}", self.title, self.content)
+    }
+}
+impl Summary for Tweet {
+    fn summarize(&self) -> String {
+        format!("@{}: {}", self.username, self.text)
+    }
+}
+fn notify(item: &impl Summary) { println!("Breaking: {}", item.summarize()); }
+fn main() {
+    let a = Article { title: "Rust 2024".into(), content: "Exciting features...".into() };
+    let t = Tweet { username: "rustlang".into(), text: "New release!".into() };
+    notify(&a); notify(&t);
+}`},
+    {diff:3,q:"ジェネリクスとトレイト境界を使ってlargest関数を実装してください。",code:`// T: PartialOrd の境界を使う
+fn largest<T: PartialOrd>(list: &[T]) -> &T {
+    // スライスから最大値を返す
+}`,answer:`fn largest<T: PartialOrd>(list: &[T]) -> &T {
+    let mut largest = &list[0];
+    for item in list {
+        if item > largest { largest = item; }
+    }
+    largest
+}
+fn main() {
+    let numbers = vec![34, 50, 25, 100, 65];
+    println!("Largest number: {}", largest(&numbers));
+    let chars = vec!['y', 'm', 'a', 'q'];
+    println!("Largest char: {}", largest(&chars));
+}`},
+  ],
+  ch6:[
+    {diff:1,q:"Vec, HashMap, HashSet の基本操作を示してください。",code:`use std::collections::{HashMap, HashSet};
+fn main() {
+    // Vec: push, pop, iter
+    // HashMap: insert, get, entry
+    // HashSet: insert, contains
+}`,answer:`use std::collections::{HashMap, HashSet};
+fn main() {
+    // Vec
+    let mut v: Vec<i32> = vec![1, 2, 3];
+    v.push(4);
+    v.retain(|&x| x > 2); // フィルタリング
+    println!("{:?}", v); // [3, 4]
+    // HashMap
+    let mut scores: HashMap<String, i32> = HashMap::new();
+    scores.insert("Alice".to_string(), 90);
+    scores.entry("Bob".to_string()).or_insert(75);
+    println!("{:?}", scores.get("Alice")); // Some(90)
+    // HashSet
+    let mut seen: HashSet<i32> = HashSet::new();
+    for n in [1, 2, 3, 2, 1] { seen.insert(n); }
+    println!("{}", seen.len()); // 3
+}`},
+    {diff:2,q:"イテレータチェーンを使って単語の出現回数をカウントしてください。",code:`use std::collections::HashMap;
+fn word_count(text: &str) -> HashMap<&str, usize> {
+    // split_whitespace → fold で HashMap に集計
+}`,answer:`use std::collections::HashMap;
+fn word_count(text: &str) -> HashMap<&str, usize> {
+    text.split_whitespace()
+        .fold(HashMap::new(), |mut map, word| {
+            *map.entry(word).or_insert(0) += 1;
+            map
+        })
+}
+fn main() {
+    let text = "hello world hello rust world hello";
+    let counts = word_count(text);
+    let mut pairs: Vec<_> = counts.iter().collect();
+    pairs.sort_by_key(|&(_, &v)| std::cmp::Reverse(v));
+    for (word, count) in pairs { println!("{}: {}", word, count); }
+}`},
+    {diff:2,q:"カスタムイテレータを実装してください。Fibonacci型にIteratorトレイトを実装します。",code:`struct Fibonacci { a: u64, b: u64 }
+impl Fibonacci {
+    fn new() -> Self { Fibonacci { a: 0, b: 1 } }
+}
+impl Iterator for Fibonacci {
+    type Item = u64;
+    fn next(&mut self) -> Option<u64> { /* ... */ }
+}`,answer:`struct Fibonacci { a: u64, b: u64 }
+impl Fibonacci {
+    fn new() -> Self { Fibonacci { a: 0, b: 1 } }
+}
+impl Iterator for Fibonacci {
+    type Item = u64;
+    fn next(&mut self) -> Option<u64> {
+        let next = self.a + self.b;
+        self.a = self.b;
+        self.b = next;
+        Some(self.a - self.b + self.b) // 元の self.a を返す
+    }
+}
+// よりシンプルな実装
+struct Fib { a: u64, b: u64 }
+impl Iterator for Fib {
+    type Item = u64;
+    fn next(&mut self) -> Option<u64> {
+        let val = self.a;
+        (self.a, self.b) = (self.b, self.a + self.b);
+        Some(val)
+    }
+}
+fn main() {
+    let fibs: Vec<u64> = Fib { a:0, b:1 }.take(10).collect();
+    println!("{:?}", fibs);
+}`},
+  ],
+  ch7:[
+    {diff:1,q:"クロージャを使ってmap・filter・collectのチェーンを書いてください。",code:`fn main() {
+    let numbers = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    // 偶数を2乗して Vec<i32> に収集
+}`,answer:`fn main() {
+    let numbers = vec![1,2,3,4,5,6,7,8,9,10];
+    let result: Vec<i32> = numbers.iter()
+        .filter(|&&x| x % 2 == 0)
+        .map(|&x| x * x)
+        .collect();
+    println!("{:?}", result); // [4, 16, 36, 64, 100]
+    let sum: i32 = numbers.iter().sum();
+    println!("Sum: {}", sum);
+    let product: i32 = numbers.iter().product();
+    println!("Product: {}", product);
+}`},
+    {diff:2,q:"move クロージャを使ってスレッドに値を渡してください。",code:`use std::thread;
+fn main() {
+    let message = String::from("Hello from thread!");
+    // message の所有権をスレッドに移動して println! する
+}`,answer:`use std::thread;
+fn main() {
+    let message = String::from("Hello from thread!");
+    let handle = thread::spawn(move || { // move で所有権ごと移動
+        println!("{}", message);
+    });
+    handle.join().unwrap(); // スレッドの終了を待つ
+    // 複数スレッド
+    let handles: Vec<_> = (0..5).map(|i| {
+        thread::spawn(move || { println!("Thread {}", i); })
+    }).collect();
+    for h in handles { h.join().unwrap(); }
+}`},
+    {diff:3,q:"Fn, FnMut, FnOnce の違いを示すコードを書いてください。",code:`// apply_fn:  Fn    を受け取る
+// apply_mut: FnMut を受け取る
+// apply_once:FnOnce を受け取る`,answer:`fn apply_fn<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(x) }
+fn apply_mut<F: FnMut() -> i32>(mut f: F) -> i32 { f() }
+fn apply_once<F: FnOnce() -> String>(f: F) -> String { f() }
+fn main() {
+    // Fn: 不変参照キャプチャ、複数回呼び出し可
+    let add = |x| x + 10;
+    println!("{}", apply_fn(add, 5));
+    println!("{}", apply_fn(add, 10)); // 複数回OK
+    // FnMut: 可変参照キャプチャ
+    let mut count = 0;
+    let mut counter = || { count += 1; count };
+    println!("{}", apply_mut(&mut counter));
+    println!("{}", apply_mut(&mut counter));
+    // FnOnce: 所有権キャプチャ、1回のみ
+    let s = String::from("owned");
+    let consume = move || format!("Got: {}", s);
+    println!("{}", apply_once(consume));
+    // apply_once(consume); // エラー: 2回目は使えない
+}`},
+  ],
+  ch8:[
+    {diff:1,q:"ライフタイムアノテーションを使って2つの文字列スライスの長い方を返す関数を書いてください。",code:`fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() { x } else { y }
+}`,answer:`fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() { x } else { y }
+}
+fn main() {
+    let s1 = String::from("long string");
+    let result;
+    {
+        let s2 = String::from("xyz");
+        result = longest(s1.as_str(), s2.as_str());
+        println!("Longest: {}", result); // s2 がスコープ内なのでOK
+    }
+    // println!("{}", result); // エラー: s2 はもう存在しない
+}`},
+    {diff:2,q:"構造体にライフタイムアノテーションをつけて参照を持つ構造体を定義してください。",code:`struct Excerpt<'a> {
+    text: &'a str,
+}
+impl<'a> Excerpt<'a> {
+    fn announce(&self, ann: &str) -> &str { /* ... */ }
+}`,answer:`struct Excerpt<'a> {
+    text: &'a str,
+}
+impl<'a> Excerpt<'a> {
+    fn level(&self) -> i32 { 3 }
+    fn announce(&self, announcement: &str) -> &str {
+        println!("Attention: {}", announcement);
+        self.text
+    }
+}
+fn main() {
+    let novel = String::from("Call me Ishmael. Some years ago...");
+    let first_sentence;
+    {
+        let i = novel.find('.').unwrap_or(novel.len());
+        first_sentence = &novel[..i];
+    }
+    let excerpt = Excerpt { text: first_sentence };
+    println!("{}", excerpt.text);
+    println!("{}", excerpt.announce("New chapter!"));
+}`},
+    {diff:2,q:"'static ライフタイムと文字列リテラルについて説明するコードを書いてください。",code:`// 'static はプログラム全体で生存するライフタイム
+fn static_demo() {
+    let s: &'static str = "I live forever"; // 文字列リテラルは 'static
+    // trait オブジェクト + Send + 'static でスレッド間共有も可
+}`,answer:`fn longest_with_announcement<'a, T>(x: &'a str, y: &'a str, ann: T) -> &'a str
+    where T: std::fmt::Display
+{
+    println!("Announcement: {}", ann);
+    if x.len() > y.len() { x } else { y }
+}
+// 'static: プログラム全体で有効な参照
+static GREETING: &str = "Hello, world!"; // 'static
+fn get_static() -> &'static str {
+    "This is a static string" // 文字列リテラルは 'static
+}
+fn main() {
+    println!("{}", GREETING);
+    let s = get_static();
+    println!("{}", s);
+    let r = longest_with_announcement("long str", "short", 42);
+    println!("{}", r);
+}`},
+  ],
+  ch9:[
+    {diff:1,q:"Box<T> を使ってヒープ上にデータを確保してください。",code:`fn main() {
+    let b = Box::new(5); // i32 をヒープに置く
+    println!("{}", b);
+    // 再帰的な型 (コンパイル時サイズ不明) に Box が必要
+}`,answer:`// 再帰的なリスト型: Box なしではコンパイル不可
+enum List {
+    Cons(i32, Box<List>),
+    Nil,
+}
+fn main() {
+    let b = Box::new(5);
+    println!("b = {}", b); // 5
+    // *b で中身を取得 (Deref)
+    let val = *b + 1;
+    println!("val = {}", val);
+    // 再帰的型
+    let list = List::Cons(1, Box::new(List::Cons(2, Box::new(List::Nil))));
+}`},
+    {diff:2,q:"Rc<T> と RefCell<T> を使って複数所有と内部可変性を実現してください。",code:`use std::rc::Rc;
+use std::cell::RefCell;
+// 複数箇所から所有される可変な値
+fn main() {
+    let shared = Rc::new(RefCell::new(vec![1, 2, 3]));
+    let clone1 = Rc::clone(&shared);
+    clone1.borrow_mut().push(4);
+    println!("{:?}", shared.borrow()); // [1,2,3,4]
+}`,answer:`use std::rc::Rc;
+use std::cell::RefCell;
+fn main() {
+    let shared = Rc::new(RefCell::new(vec![1, 2, 3]));
+    let clone1 = Rc::clone(&shared);
+    let clone2 = Rc::clone(&shared);
+    clone1.borrow_mut().push(4);
+    clone2.borrow_mut().push(5);
+    println!("{:?}", shared.borrow()); // [1,2,3,4,5]
+    println!("Count: {}", Rc::strong_count(&shared)); // 3
+    // Arc<T> はスレッド安全版 (Atomically Reference Counted)
+    // Mutex<T> はスレッドセーフな内部可変性
+    use std::sync::{Arc, Mutex};
+    let arc = Arc::new(Mutex::new(0));
+    let arc_clone = Arc::clone(&arc);
+    *arc_clone.lock().unwrap() += 1;
+    println!("{}", arc.lock().unwrap()); // 1
+}`},
+    {diff:3,q:"トレイトオブジェクト (dyn Trait) を使って異なる型を統一的に扱ってください。",code:`trait Draw {
+    fn draw(&self);
+}
+struct Button { label: String }
+struct Image { url: String }
+impl Draw for Button { fn draw(&self) { /* ... */ } }
+impl Draw for Image { fn draw(&self) { /* ... */ } }
+// Vec<Box<dyn Draw>> で異なる型をまとめる`,answer:`trait Draw {
+    fn draw(&self);
+}
+struct Button { label: String }
+struct Image { url: String }
+impl Draw for Button {
+    fn draw(&self) { println!("Button: {}", self.label); }
+}
+impl Draw for Image {
+    fn draw(&self) { println!("Image: {}", self.url); }
+}
+struct Screen {
+    components: Vec<Box<dyn Draw>>,
+}
+impl Screen {
+    fn render(&self) { for c in &self.components { c.draw(); } }
+}
+fn main() {
+    let screen = Screen {
+        components: vec![
+            Box::new(Button { label: "OK".to_string() }),
+            Box::new(Image { url: "logo.png".to_string() }),
+        ],
+    };
+    screen.render();
+}`},
+  ],
+  ch10:[
+    {diff:1,q:"cargo test を使って単体テストを書いてください。",code:`pub fn add(a: i32, b: i32) -> i32 { a + b }
+pub fn divide(a: f64, b: f64) -> Option<f64> {
+    if b == 0.0 { None } else { Some(a / b) }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_add() { /* assert_eq! */ }
+    #[test]
+    fn test_divide_by_zero() { /* assert_eq!(None, ...) */ }
+}`,answer:`pub fn add(a: i32, b: i32) -> i32 { a + b }
+pub fn divide(a: f64, b: f64) -> Option<f64> {
+    if b == 0.0 { None } else { Some(a / b) }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_add() { assert_eq!(add(2, 3), 5); }
+    #[test]
+    fn test_add_negative() { assert_eq!(add(-1, 1), 0); }
+    #[test]
+    fn test_divide_ok() { assert_eq!(divide(10.0, 2.0), Some(5.0)); }
+    #[test]
+    fn test_divide_by_zero() { assert_eq!(divide(1.0, 0.0), None); }
+    #[test]
+    #[should_panic(expected = "called unwrap on None")]
+    fn test_panic() { divide(1.0, 0.0).unwrap(); }
+}
+// cargo test で実行`},
+    {diff:2,q:"ファイルI/Oとエラーハンドリングを組み合わせてテキストファイルを処理してください。",code:`use std::fs;
+use std::io::{self, BufRead};
+fn count_lines(path: &str) -> io::Result<usize> {
+    // ファイルを行単位で読み込んで行数を返す
+}`,answer:`use std::fs::File;
+use std::io::{self, BufRead, BufReader};
+fn count_lines(path: &str) -> io::Result<usize> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    Ok(reader.lines().count())
+}
+fn process_file(path: &str) -> io::Result<Vec<String>> {
+    let content = std::fs::read_to_string(path)?;
+    Ok(content.lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(String::from)
+        .collect())
+}
+fn main() -> io::Result<()> {
+    std::fs::write("test.txt", "Hello\nWorld\nRust\n")?;
+    println!("Lines: {}", count_lines("test.txt")?);
+    let lines = process_file("test.txt")?;
+    println!("{:?}", lines);
+    std::fs::remove_file("test.txt")?;
+    Ok(())
+}`},
+    {diff:3,q:"入門コースの総合演習: コマンドラインで引数を解析して動作する電卓プログラムを実装してください。",code:`// cargo run -- 10 + 5   → 15
+// cargo run -- 10 / 0   → Error: division by zero
+use std::env;
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    // 引数解析 → 計算 → 結果表示
+}`,answer:`use std::env;
+fn calculate(a: f64, op: &str, b: f64) -> Result<f64, String> {
+    match op {
+        "+" => Ok(a + b),
+        "-" => Ok(a - b),
+        "*" | "x" => Ok(a * b),
+        "/" => if b == 0.0 { Err("division by zero".into()) } else { Ok(a / b) },
+        _ => Err(format!("Unknown operator: {}", op)),
+    }
+}
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 4 {
+        eprintln!("Usage: calc <num> <op> <num>");
+        std::process::exit(1);
+    }
+    let a: f64 = args[1].parse().expect("Invalid number");
+    let op = &args[2];
+    let b: f64 = args[3].parse().expect("Invalid number");
+    match calculate(a, op, b) {
+        Ok(result) => println!("{}", result),
+        Err(e) => { eprintln!("Error: {}", e); std::process::exit(1); }
+    }
+}`},
+  ],
+};
+
+const chapters = [
+  {id:"ch1",num:1,title:"Rustとは・開発環境・Cargo",est:"45分",
+   goal:"rustup/cargoでプロジェクトを作成し、cargo run/test/build を使いこなせる。Rustがなぜメモリ安全かを1文で説明できる。",
+   sections:[
+     {title:"Rustの設計思想とPythonとの違い",body:`Rustは2015年にMozillaが公開したシステムプログラミング言語で、「メモリ安全性をランタイムコストなしに保証する」という一見矛盾した目標を実現しています。Pythonがガベージコレクタでメモリを管理するのに対し、Rustはコンパイル時の「所有権チェック」でメモリ安全性を保証します。GCがないため、実行時のポーズやオーバーヘッドがありません。\n\nRustはFirefoxのレンダリングエンジン・LinuxカーネルのドライバAPI・WebAssembly・CLIツール（ripgrep・fd・exa）・クラウドインフラ（Cloudflare Pingora）など、パフォーマンスと安全性が重要な分野で広く使われています。\n\n最大の特徴は「コンパイルエラーが親切」なことです。Rustのコンパイラ（rustc）は問題の原因と修正方法を丁寧に説明してくれます。最初はエラーが多くて戸惑いますが、それはコンパイラがバグを事前に防いでいる証拠です。`,table:T.rustVsPython,code:`// Cargo でプロジェクト作成
+// cargo new hello_rust
+// cd hello_rust
+// cargo run
+
+fn main() {
+    // println! はマクロ (関数ではない)
+    println!("Hello, Rust!");
+    println!("1 + 1 = {}", 1 + 1);
+    println!("{:?}", vec![1, 2, 3]); // Debug出力
+
+    // Pythonと違い、変数はデフォルトで不変
+    let x = 5;          // 不変変数
+    let mut y = 5;      // 可変変数
+    y += 1;
+    println!("x={}, y={}", x, y);
+
+    // 型推論: 右辺から型を推論
+    let z: i64 = 1_000_000; // アンダースコアで可読性向上
+    println!("{}", z);
+}`,afterCode:"rustup はRustのバージョン管理ツールです。`rustup update stable` で最新安定版に更新、`rustup doc` でオフラインドキュメントを開けます。"},
+     {title:"Cargoエコシステム",body:`CargoはRustのビルドシステム+パッケージマネージャです。Pythonのpip + setuptools + venv + pytest の役割をすべて担います。`cargo new` でプロジェクト作成、`cargo add` で依存追加、`cargo run` でビルド+実行、`cargo test` でテスト実行、`cargo build --release` で最適化ビルドを行います。\n\n依存ライブラリ（クレートと呼ぶ）は crates.io で公開されています。Cargo.toml に依存を書くだけで、初回ビルド時に自動ダウンロードされます。Cargo.lock でバージョンが固定されます。\n\nRustの標準ライブラリは意図的に小さく設計されています。ネットワーク・非同期・シリアライゼーション等は高品質なサードパーティクレートに任せています。tokio（非同期）・serde（シリアライゼーション）・reqwest（HTTP）・clap（CLI）が定番です。`,code:`# Cargo.toml
+[package]
+name = "my_project"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rand = "0.8"
+
+[dev-dependencies]  # テスト時のみ
+pretty_assertions = "1.3"
+
+# よく使うcargoコマンド:
+# cargo new <name>         新プロジェクト
+# cargo add <crate>        依存追加
+# cargo run                ビルド+実行
+# cargo test               テスト実行
+# cargo fmt                コードフォーマット
+# cargo clippy             静的解析 (linter)
+# cargo doc --open         ドキュメント生成+表示
+# cargo build --release    最適化ビルド`,afterCode:"cargo clippy はPythonのflake8/ruffに相当する静的解析ツールです。慣用的でないコードを検出して改善提案をしてくれます。開発中は常に有効にしておきましょう。"},
+   ]},
+  {id:"ch2",num:2,title:"所有権・借用・ライフタイム入門",est:"60分",
+   goal:"所有権の3ルールを暗記し、moveとcopyの違いを説明できる。&TとString・&strの違いを理解し、基本的な借用エラーを解決できる。",
+   sections:[
+     {title:"所有権システム",body:`所有権（Ownership）はRustが他の言語と最も異なる部分です。Pythonでは変数は値への「参照」ですが、Rustでは変数は値の「所有者」です。所有者が1人しかいないため、所有者がスコープを抜けると自動的にメモリが解放されます。\n\nPythonの `a = b` はどちらも同じオブジェクトを参照しますが、Rustの `let a = b;`（CopyでないString等の場合）はbの所有権をaに移動（move）します。以降、bは使えません。これが「所有権の移動（move semantics）」です。\n\nCopy トレイトを実装した型（i32, f64, bool, char 等）は自動的にコピーされるため移動しません。String や Vec などのヒープを使う型は Move になります。`,table:T.ownershipRules,code:`fn main() {
+    // String は所有権あり (Heap確保)
+    let s1 = String::from("hello");
+    let s2 = s1;       // 所有権が s1 から s2 に移動
+    // println!("{}", s1); // コンパイルエラー: s1 は無効
+    println!("{}", s2); // OK
+
+    // clone() で深いコピー
+    let s3 = s2.clone();
+    println!("{} {}", s2, s3); // 両方使える
+
+    // i32 は Copy (スタックのみ、コピーが安い)
+    let x = 5;
+    let y = x; // コピーされる (xはまだ使える)
+    println!("{} {}", x, y); // OK
+
+    // スコープを抜けるとdrop
+    {
+        let s = String::from("scoped");
+        println!("{}", s);
+    } // s の drop が呼ばれる
+    // println!("{}", s); // エラー: s はスコープ外
+}`,afterCode:"Python の `id()` で変数が同じオブジェクトを指しているか確認するように、Rustでは借用チェッカーが安全性を強制します。最初は難しく感じますが、一度慣れると 「借用エラー = 実行時にクラッシュする可能性があるバグ」 を事前に発見できる強力なツールになります。"},
+     {title:"借用と参照",body:`借用（Borrowing）は所有権を渡さずに値を参照する仕組みです。`&T` で不変参照、`&mut T` で可変参照を作ります。借用チェッカーは2つのルールを強制します: (1) 不変参照は複数同時に持てる、(2) 可変参照は1つしか持てない（かつ不変参照と共存できない）。\n\nこのルールにより、「データ競合（data race）」がコンパイル時に防がれます。PythonのGIL（Global Interpreter Lock）はデータ競合を防ぐためのランタイム機構ですが、Rustはコンパイル時に解決します。\n\n`&str` はString（ヒープ上の可変文字列）へのスライス参照です。関数が文字列を読むだけなら `&str` を受け取るのが慣用的です。`String` も `&str` も `&s` と書くことで自動的に `&str` に変換されます（Deref coercion）。`,table:T.borrowingRules,code:`fn main() {
+    let mut s = String::from("hello");
+
+    // 不変参照: 複数OK
+    let r1 = &s;
+    let r2 = &s;
+    println!("{} {}", r1, r2); // OK
+
+    // 可変参照: 1つのみ (不変参照と同時不可)
+    let r3 = &mut s;
+    r3.push_str(", world");
+    println!("{}", r3); // OK
+    // let r4 = &s; // エラー: r3 が可変参照を持っている間は不変参照不可
+
+    println!("{}", s); // r3 のスコープが終わったので OK
+
+    // &str vs String
+    let literal: &str = "hello";    // 静的な文字列スライス
+    let owned: String = String::from("hello"); // ヒープ上のString
+    let slice: &str = &owned;       // String から &str を作れる
+    println!("{} {} {}", literal, owned, slice);
+}`,afterCode:"NLL（Non-Lexical Lifetimes, Rust 2018以降）で借用チェッカーが改善され、参照の有効範囲が実際の最後の使用まで縮まりました。以前は難しかったパターンが書きやすくなっています。"},
+   ]},
+  {id:"ch3",num:3,title:"Option<T>とResult<T,E>",est:"55分",
+   goal:"Option<T>でNullableな値を安全に扱える。Result<T,E>でエラーを返せる。?演算子でエラー伝播を簡潔に書ける。",
+   sections:[
+     {title:"NullセーフなOption<T>",body:``Option<T>` はRustにnullがない代わりに「値があるかもしれない」を表す列挙型です。`Some(value)` か `None` の2状態を持ちます。Pythonの `Optional[T]` に似ていますが、`None` を扱い忘れるとコンパイルエラーになる点が異なります。\n\nPythonでは `x = None; x.upper()` は実行時に `AttributeError` が発生しますが、RustではOption値にそのままメソッドを呼ぶことはできず、`match` や `if let`、`?` 演算子で明示的に処理する必要があります。\n\n便利なメソッドとして: `unwrap_or(default)` でデフォルト値、`map(f)` で中身を変換、`and_then(f)` でチェーン、`ok_or(err)` で `Result` に変換などがあります。`,code:`fn divide(a: f64, b: f64) -> Option<f64> {
+    if b == 0.0 { None } else { Some(a / b) }
+}
+
+fn main() {
+    // match で網羅的に処理
+    match divide(10.0, 2.0) {
+        Some(result) => println!("Result: {}", result),
+        None => println!("Cannot divide by zero"),
+    }
+
+    // ? 演算子: None なら即 return None
+    fn double_divide(a: f64, b: f64, c: f64) -> Option<f64> {
+        let x = divide(a, b)?; // None なら return None
+        divide(x, c)
+    }
+
+    // 便利なメソッド
+    let result = divide(10.0, 0.0)
+        .unwrap_or(f64::INFINITY);
+    println!("{}", result); // inf
+
+    let doubled = divide(10.0, 2.0)
+        .map(|x| x * 2.0); // Some(10.0)
+    println!("{:?}", doubled);
+}`,afterCode:"`unwrap()` はSomeの中身を取り出しますが、Noneの場合はpanicします。本番コードでは `unwrap_or`, `map`, `?` を使いましょう。ただしテストやプロトタイプでは `unwrap()` は許容されます。"},
+     {title:"エラー型としてのResult<T,E>",body:``Result<T, E>` はRustのエラーハンドリングの中心的な型です。`Ok(value)` か `Err(error)` の2状態を持ちます。Pythonの例外(exception)と異なり、エラーは戻り値として明示的に返します。これにより、どの関数がエラーを返しうるかコンパイル時に明確です。\n\nPythonでは `try/except` でエラーを捕捉しますが、Rustでは `match` か `?` でエラーを処理します。`?` 演算子は「OkならアンラップしてOkの値を返す、ErrならそのままErrをreturnする」という糖衣構文です。Pythonで `raise` を再スローするのに相当します。\n\n複数のエラー型を扱う場合、`Box<dyn std::error::Error>` か `anyhow::Error`（crateが必要）を使います。Pythonの `Exception` の基底クラスに相当します。`,code:`use std::num::ParseIntError;
+use std::fmt;
+
+// カスタムエラー型
+#[derive(Debug)]
+enum AppError {
+    ParseError(ParseIntError),
+    NegativeError(i32),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AppError::ParseError(e) => write!(f, "Parse error: {}", e),
+            AppError::NegativeError(n) => write!(f, "Negative: {}", n),
+        }
+    }
+}
+
+impl From<ParseIntError> for AppError {
+    fn from(e: ParseIntError) -> Self { AppError::ParseError(e) }
+}
+
+fn parse_positive(s: &str) -> Result<u32, AppError> {
+    let n: i32 = s.trim().parse()?; // ParseIntError → AppError (From実装があるので自動変換)
+    if n < 0 { return Err(AppError::NegativeError(n)); }
+    Ok(n as u32)
+}
+
+fn main() {
+    println!("{:?}", parse_positive("42"));  // Ok(42)
+    println!("{:?}", parse_positive("-5"));  // Err(NegativeError(-5))
+    println!("{:?}", parse_positive("abc")); // Err(ParseError(...))
+}`,afterCode:"anyhow クレートを使うと `anyhow::Result<T>` で複数エラー型を統一でき、`?` でどんなエラーも伝播できます。小〜中規模のアプリでは anyhow、ライブラリ設計では thiserror クレートが定番です。"},
+   ]},
+  {id:"ch4",num:4,title:"列挙型とパターンマッチング",est:"55分",
+   goal:"データを持つenum(代数的データ型)を定義できる。matchで全パターンを網羅的に処理できる。if let / while let / let else を適切に使い分けられる。",
+   sections:[
+     {title:"代数的データ型としてのenum",body:`RustのenumはPythonのenumと全く異なります。Rustのenumは各バリアントが異なるデータを持てる「代数的データ型（ADT）」です。Haskellの `data` 型や ScalaのSealed classに相当します。\n\n`Option<T>` や `Result<T,E>` もRustのenumとして定義されています。`enum Option<T> { Some(T), None }` がその定義です。この設計が「Null安全」と「エラー型の明示」を自然に実現しています。\n\n`match` はすべてのパターンを「網羅的」に処理することをコンパイラが強制します。Python の `if/elif/else` と違い、処理漏れがあればコンパイルエラーになります。また `_` で残りすべてにマッチできます。`,table:T.enumVsMatch,code:`// JSONのような値を表すenum
+#[derive(Debug)]
+enum JsonValue {
+    Null,
+    Bool(bool),
+    Number(f64),
+    Text(String),
+    Array(Vec<JsonValue>),
+}
+
+impl JsonValue {
+    fn type_name(&self) -> &str {
+        match self {
+            JsonValue::Null => "null",
+            JsonValue::Bool(_) => "boolean",
+            JsonValue::Number(_) => "number",
+            JsonValue::Text(_) => "string",
+            JsonValue::Array(_) => "array",
+        }
+    }
+
+    fn as_number(&self) -> Option<f64> {
+        if let JsonValue::Number(n) = self { Some(*n) } else { None }
+    }
+}
+
+fn main() {
+    let values = vec![
+        JsonValue::Null,
+        JsonValue::Bool(true),
+        JsonValue::Number(42.0),
+        JsonValue::Text("hello".to_string()),
+    ];
+    for v in &values {
+        println!("{:?} -> {}", v, v.type_name());
+    }
+}`,afterCode:"Rustのmatchは値だけでなく、参照・ガード条件・複数パターン（|）・範囲（1..=5）・タプル・構造体などにも使えます。matchを使いこなすとコードが大幅に簡潔になります。"},
+   ]},
+  {id:"ch5",num:5,title:"トレイトとジェネリクス",est:"60分",
+   goal:"traitを定義し、impl Trait for Typeで実装できる。トレイト境界 (T: Trait) でジェネリクスを制約できる。Display, Debug, Clone, Copy, Iterator, From/Into を使いこなせる。",
+   sections:[
+     {title:"traitでインターフェースを定義する",body:`traitはRustのインターフェース機構です。Pythonの抽象基底クラス（ABCとabstractmethod）に相当しますが、よりシステマティックです。\n\nRustの重要なtraitとして `Display`（println!({}) での表示）、`Debug`（println!({:?}) でのデバッグ表示）、`Clone`（clone()メソッド）、`Copy`（自動コピー）、`Iterator`（イテレータ）、`From<T>` / `Into<T>`（型変換）があります。\n\n`#[derive(Debug, Clone, PartialEq)]` のようにderive attributeを使うと、コンパイラが自動実装を生成します。多くのトレイトはderiveで実装できます。Pythonの `@dataclass(eq=True)` に似ていますが、Rustではフィールドの型もそのtraitを実装している必要があります。`,table:T.traitVsAbstract,code:`use std::fmt;
+
+// traitの定義
+trait Area {
+    fn area(&self) -> f64;
+    fn is_large(&self) -> bool { // デフォルト実装
+        self.area() > 100.0
+    }
+}
+
+// derive で標準トレイトを自動実装
+#[derive(Debug, Clone, PartialEq)]
+struct Circle { radius: f64 }
+
+#[derive(Debug, Clone, PartialEq)]
+struct Rectangle { width: f64, height: f64 }
+
+impl Area for Circle {
+    fn area(&self) -> f64 { std::f64::consts::PI * self.radius * self.radius }
+}
+
+impl Area for Rectangle {
+    fn area(&self) -> f64 { self.width * self.height }
+}
+
+// Display実装
+impl fmt::Display for Circle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Circle(r={})", self.radius)
+    }
+}
+
+// ジェネリクス関数: T は Area を実装している必要がある
+fn print_area<T: Area + fmt::Debug>(shape: &T) {
+    println!("{:?} has area {:.2}", shape, shape.area());
+}
+
+fn main() {
+    let c = Circle { radius: 5.0 };
+    let r = Rectangle { width: 4.0, height: 6.0 };
+    print_area(&c); print_area(&r);
+    println!("{}", c); // Display
+    println!("{:?}", r); // Debug
+}`,afterCode:"impl Trait 構文は関数引数でトレイト境界を簡潔に書けます。`fn greet(item: &impl Summary)` は `fn greet<T: Summary>(item: &T)` と等価です。複数境界が必要なら `T: Debug + Display` のように `+` で連結します。"},
+   ]},
+  {id:"ch6",num:6,title:"コレクションとイテレータ",est:"55分",
+   goal:"Vec・HashMap・HashSetの主要操作を使いこなせる。map/filter/collect/fold のイテレータチェーンを書ける。カスタムイテレータを実装できる。",
+   sections:[
+     {title:"標準コレクション",body:`Rustの標準コレクションはPythonのものと一対一で対応しています。`Vec<T>` は `list`、`HashMap<K,V>` は `dict`、`HashSet<T>` は `set`、`VecDeque<T>` は `collections.deque`、`BTreeMap<K,V>` はソート済み `dict` です。\n\nRustのコレクションは所有権モデルに従い、要素を所有します。イテレートの方法が3種類あります: `iter()` は不変参照のイテレータ、`iter_mut()` は可変参照、`into_iter()` は所有権ごと取り出すイテレータです。Pythonの `for x in xs` は Rustの `for x in xs.iter()` または `for x in &xs` に対応します。\n\nHashMapの `entry()` APIはPythonの `dict.setdefault()` より強力です。`entry(key).or_insert(default)` でキーがなければデフォルト値を挿入し、そのmutable参照を返します。`,table:T.iteratorMethods,code:`use std::collections::HashMap;
+
+fn main() {
+    // Vec
+    let mut v: Vec<i32> = (1..=5).collect();
+    v.push(6);
+    v.sort_by(|a, b| b.cmp(a)); // 降順
+    v.retain(|&x| x > 3); // [6, 5, 4]
+    println!("{:?}", v);
+
+    // HashMap
+    let text = "hello world hello rust world hello";
+    let mut word_count: HashMap<&str, u32> = HashMap::new();
+    for word in text.split_whitespace() {
+        *word_count.entry(word).or_insert(0) += 1;
+    }
+    let mut pairs: Vec<_> = word_count.iter().collect();
+    pairs.sort_by_key(|&(_, &v)| std::cmp::Reverse(v));
+    for (word, count) in pairs { println!("{}: {}", word, count); }
+
+    // イテレータチェーン
+    let result: Vec<_> = (1..=10)
+        .filter(|x| x % 2 == 0)
+        .map(|x| x * x)
+        .take(3)
+        .collect();
+    println!("{:?}", result); // [4, 16, 36]
+}`,afterCode:"`collect()` は型注釈が必要です。`let v: Vec<_> = ...collect()` の `Vec<_>` で型を指定します。`HashMap<_,_>` のように `_` でコンパイラに型推論させられます。"},
+   ]},
+  {id:"ch7",num:7,title:"クロージャとfunctional programming",est:"50分",
+   goal:"クロージャのキャプチャ方法(move/参照)を理解できる。Fn/FnMut/FnOnceの違いを説明できる。高階関数を使って関数型スタイルでデータを変換できる。",
+   sections:[
+     {title:"クロージャとキャプチャ",body:`Rustのクロージャはラムダ式で、`|x| x * 2` のように書きます。Pythonの `lambda x: x * 2` に相当しますが、Rustのクロージャはより強力です。複数行のブロックが書け、外部変数を「キャプチャ」できます。\n\nキャプチャの仕方に3種類あります: デフォルトは可能なら不変参照でキャプチャ（Fn）、変更が必要なら可変参照（FnMut）、所有権が必要（move クロージャ）なら所有権ごと移動（FnOnce）します。\n\nスレッドに渡すクロージャは `move` が必須です。スレッドがいつ実行されるか不明なため、借用ではなく所有権を移す必要があるからです。これはコンパイラが強制するため、「後からデータが消えてクラッシュ」というバグが起きません。`,table:T.closureCapture,code:`fn apply<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(x) }
+fn apply_twice<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(f(x)) }
+
+fn make_adder(n: i32) -> impl Fn(i32) -> i32 {
+    move |x| x + n // n の所有権をクロージャに移動 (クロージャを関数の外に返す)
+}
+
+fn main() {
+    // クロージャ
+    let double = |x| x * 2;
+    let square = |x: i32| x * x;
+
+    println!("{}", apply(double, 5));       // 10
+    println!("{}", apply_twice(double, 3)); // 12
+
+    // 外部変数のキャプチャ
+    let threshold = 5;
+    let is_big = |x: &i32| *x > threshold; // threshold を参照でキャプチャ
+    let big_nums: Vec<_> = vec![1, 6, 3, 8, 2].into_iter().filter(is_big).collect();
+    println!("{:?}", big_nums); // [6, 8]
+
+    // クロージャを返す (impl Trait)
+    let add5 = make_adder(5);
+    let add10 = make_adder(10);
+    println!("{} {}", add5(3), add10(3)); // 8 13
+}`,afterCode:"Rustのクロージャは `Fn`, `FnMut`, `FnOnce` いずれかのトレイトを自動実装します。これを理解していると `std::thread::spawn` や `Iterator::map` の型シグネチャが読めるようになります。"},
+   ]},
+  {id:"ch8",num:8,title:"ライフタイムアノテーション",est:"55分",
+   goal:"ライフタイムとは何かを説明できる。基本的なライフタイムアノテーション ('a) を書ける。構造体に参照フィールドを持たせるケースを実装できる。",
+   sections:[
+     {title:"ライフタイムアノテーション",body:`ライフタイムはRustが借用の有効期間を追跡するための仕組みです。Pythonにはない概念で、最初は難しく感じますが、「参照が有効である期間」を明示するだけです。\n\nほとんどの場合、コンパイラが自動的にライフタイムを推論（ライフタイム省略規則）するため、アノテーションを書く必要はありません。アノテーションが必要なのは「戻り値の参照がどの引数に紐づくか曖昧な場合」です。\n\n`'a` はライフタイムの名前で、任意の名前が使えます（`'a`, `'b`, `'static` など）。`fn longest<'a>(x: &'a str, y: &'a str) -> &'a str` は「戻り値のライフタイムは x と y のうち短い方に制限される」という意味です。これにより、ダングリングポインタ（解放済みメモリへの参照）がコンパイル時に防がれます。`,code:`// ライフタイムアノテーションの例
+
+// 'a: x と y の短い方のライフタイムを戻り値に適用
+fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() { x } else { y }
+}
+
+// 構造体が参照を持つ場合
+struct ImportantExcerpt<'a> {
+    text: &'a str, // この構造体は text の参照を持つ
+}
+
+impl<'a> ImportantExcerpt<'a> {
+    fn first_word(&self) -> &str {
+        let bytes = self.text.as_bytes();
+        for (i, &b) in bytes.iter().enumerate() {
+            if b == b' ' { return &self.text[..i]; }
+        }
+        self.text
+    }
+}
+
+fn main() {
+    let s1 = String::from("long string is long");
+    let result;
+    {
+        let s2 = String::from("xyz");
+        result = longest(s1.as_str(), s2.as_str());
+        println!("Longest: {}", result); // s2のスコープ内でのみ使える
+    }
+
+    let novel = String::from("Call me Ishmael. Some years ago...");
+    let excerpt = ImportantExcerpt {
+        text: novel.split('.').next().unwrap(),
+    };
+    println!("{}", excerpt.first_word());
+}`,afterCode:"'static ライフタイムはプログラムの全実行期間有効であることを意味します。文字列リテラル(`\"hello\"`)はすべて `'static` です。スレッドに渡すトレイトオブジェクトにも `'static` が必要なことが多いです。"},
+   ]},
+  {id:"ch9",num:9,title:"スマートポインタと内部可変性",est:"55分",
+   goal:"Box<T>でヒープ確保・再帰型を定義できる。Rc<T>/RefCell<T>で複数所有と内部可変性を実現できる。Arc<T>/Mutex<T>でスレッド間共有ができる。dyn Traitでトレイトオブジェクトを使える。",
+   sections:[
+     {title:"Box, Rc, Arc, RefCell",body:`Rustの「スマートポインタ」は参照以上の機能を持つ型です。`Box<T>` はヒープ確保、`Rc<T>` は参照カウントによる複数所有（シングルスレッド）、`Arc<T>` はスレッドセーフな参照カウントです。\n\n`RefCell<T>` は「内部可変性」を提供します。通常、不変参照があれば変更できませんが、RefCellを使うと実行時に借用チェックを行い、不変参照を通しても変更できます。コンパイル時チェックを実行時に先送りするトレードオフがあります。Pythonでは参照型なので内部可変性は当たり前ですが、Rustでは明示的に選択します。\n\n`Rc<RefCell<T>>` の組み合わせは「複数の所有者から変更できるデータ」を表現します。グラフ・ツリーなどの複雑なデータ構造に使います。スレッドをまたぐなら `Arc<Mutex<T>>` を使います。`,code:`use std::rc::Rc;
+use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
+
+fn main() {
+    // Box: ヒープ確保、スタックサイズが予測できない再帰型に使う
+    let b = Box::new(5);
+    println!("b = {}", b);
+
+    // Rc: 複数所有 (参照カウント)
+    let shared = Rc::new(vec![1, 2, 3]);
+    let clone1 = Rc::clone(&shared);
+    println!("Count: {}", Rc::strong_count(&shared)); // 2
+    println!("{:?}", clone1);
+
+    // RefCell: 内部可変性
+    let data = RefCell::new(vec![1, 2, 3]);
+    data.borrow_mut().push(4); // 実行時借用チェック
+    println!("{:?}", data.borrow());
+
+    // Rc<RefCell<T>>: 複数所有 + 可変
+    let shared_data = Rc::new(RefCell::new(0));
+    let c1 = Rc::clone(&shared_data);
+    *c1.borrow_mut() += 1;
+    *shared_data.borrow_mut() += 1;
+    println!("{}", shared_data.borrow()); // 2
+
+    // Arc<Mutex<T>>: スレッドセーフ
+    let counter = Arc::new(Mutex::new(0));
+    let c = Arc::clone(&counter);
+    std::thread::spawn(move || { *c.lock().unwrap() += 1; }).join().unwrap();
+    println!("{}", counter.lock().unwrap()); // 1
+}`,afterCode:"Box<dyn Error> か anyhow::Error を使うと、さまざまなエラー型をひとつの型に統一できます。ライブラリでは具体的なエラー型（thiserrorを使用）を、アプリケーションでは anyhow を使うのが定番です。"},
+   ]},
+  {id:"ch10",num:10,title:"テストとファイルI/O",est:"50分",
+   goal:"#[test]と#[cfg(test)]でユニットテストを書ける。cargo testで全テストを実行できる。std::fsとBufReaderでファイルを安全に読み書きできる。",
+   sections:[
+     {title:"Rustのテストシステム",body:`Rustのテストはビルドシステムに統合されています。`#[test]` アノテーションをつけた関数がテスト関数になり、`cargo test` で実行されます。Pythonの `pytest` に相当しますが、外部ツールのインストールは不要です。\n\nテストはソースコードと同じファイルに書くのがRustの慣習です。`#[cfg(test)]` ブロック内に書くとテスト時のみコンパイルされます。`assert_eq!`, `assert_ne!`, `assert!` マクロでアサーションを書きます。\n\n`#[should_panic]` アノテーションでパニックが期待されるテストを書けます。統合テストは `tests/` ディレクトリに置きます。doc-testはドキュメントのコード例をテストとして実行する強力な機能です。`,code:`pub fn add(a: i32, b: i32) -> i32 { a + b }
+
+pub fn fibonacci(n: u64) -> u64 {
+    match n {
+        0 => 0,
+        1 => 1,
+        _ => fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*; // 親モジュールをインポート
+
+    #[test]
+    fn test_add() {
+        assert_eq!(add(2, 3), 5);
+        assert_eq!(add(-1, 1), 0);
+        assert_ne!(add(1, 1), 3);
+    }
+
+    #[test]
+    fn test_fibonacci() {
+        assert_eq!(fibonacci(0), 0);
+        assert_eq!(fibonacci(1), 1);
+        assert_eq!(fibonacci(10), 55);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic() {
+        vec![1, 2, 3][10]; // out of bounds → panic
+    }
+
+    // cargo test -- --nocapture で println! の出力を見られる
+}`,afterCode:"Rustのテストは並列実行がデフォルトです。テスト間で状態を共有する場合は `cargo test -- --test-threads=1` でシリアル実行にするか、Mutexを使います。"},
+   ]},
+];
+
+function DataTable({tbl}) {
+  if (!tbl) return null;
+  return (
+    <div>
+      {tbl.cap && <caption style={{display:'block',color:'#f97316',fontSize:'.85rem',marginBottom:'.5rem'}}>{tbl.cap}</caption>}
+      <table>
+        <thead><tr>{tbl.h.map((h,i)=><th key={i}>{h}</th>)}</tr></thead>
+        <tbody>{tbl.r.map((row,i)=><tr key={i}>{row.map((c,j)=><td key={j}>{c}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+function CodeBlock({code}) {
+  if (!code) return null;
+  return <pre><code>{code}</code></pre>;
+}
+function Exercise({ex}) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="ex-block">
+      <div className="ex-header"><span className="diff">{'⭐'.repeat(ex.diff)}</span></div>
+      <p className="ex-q">{ex.q}</p>
+      <CodeBlock code={ex.code}/>
+      <button className="toggle-btn" onClick={()=>setOpen(!open)}>{open?'回答を隠す':'回答を見る'}</button>
+      {open && <div className="answer"><CodeBlock code={ex.answer}/></div>}
+    </div>
+  );
+}
+function Section({s}) {
+  return (
+    <div className="section">
+      <h3>{s.title}</h3>
+      {s.body.split('\n').map((p,i)=>p.trim()&&<p key={i}>{p.trim()}</p>)}
+      {s.table && <DataTable tbl={s.table}/>}
+      <CodeBlock code={s.code}/>
+      {s.afterCode && <p style={{color:'#cbd5e1',fontSize:'.95rem',marginTop:'.5rem'}}>{s.afterCode}</p>}
+    </div>
+  );
+}
+function App() {
+  const [cur, setCur] = React.useState(0);
+  const [open, setOpen] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+  const ch = chapters[cur];
+  const exList = EX[ch.id] || [];
+  function goTo(idx) { setCur(idx); setOpen(false); window.scrollTo(0,0); }
+  if (done) return (
+    <div className="completion">
+      <div className="badge">🎉 入門コース完了!</div>
+      <p style={{color:'#fed7aa',marginBottom:'1.5rem'}}>Rustの所有権・借用・traitの基礎を習得しました。初級コースでCLIアプリを構築しましょう。</p>
+      <a href="../index.html" style={{background:'linear-gradient(135deg,#c2410c,#92400e)',color:'#fff',padding:'.75rem 2rem',borderRadius:'.75rem',fontWeight:600}}>ホームに戻る</a>
+    </div>
+  );
+  return (
+    <div>
+      <div className="chapter">
+        <div className="chapter-header" onClick={()=>setOpen(!open)}>
+          <span className="chapter-title">第{ch.num}章: {ch.title}</span>
+          <div className="chapter-meta">
+            <span className="chapter-est">⏱ {ch.est}</span>
+            <span className="chevron">{open?'▲':'▼'}</span>
+          </div>
+        </div>
+        {open && (
+          <div className="chapter-body">
+            <div className="goal-block">
+              <h4>🎯 この章のゴール</h4>
+              <p>{ch.goal}</p>
+            </div>
+            {ch.sections.map((s,i)=><Section key={i} s={s}/>)}
+            {exList.length>0 && (
+              <div>
+                <h3 style={{color:'#f97316',margin:'1.5rem 0 1rem',borderBottom:'1px solid #7c2d12',paddingBottom:'.25rem'}}>演習問題</h3>
+                {exList.map((ex,i)=><Exercise key={`${ch.id}-${i}`} ex={ex}/>)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="nav-buttons">
+        <button className="nav-btn" onClick={()=>goTo(cur-1)} disabled={cur===0}>← 前の章</button>
+        {cur<chapters.length-1
+          ?<button className="nav-btn" onClick={()=>goTo(cur+1)}>次の章 →</button>
+          :<button className="nav-btn" onClick={()=>setDone(true)}>コース完了 🎉</button>}
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rust 初級コース</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:#0f0f1a;color:#e2e8f0;line-height:1.7;min-height:100vh}
+a{color:#f97316;text-decoration:none}
+.header{background:linear-gradient(135deg,#1a0a00,#3b1500);padding:1rem 2rem;border-bottom:1px solid #7c2d12}
+.header-logo{font-size:1.5rem;font-weight:700;color:#fb923c}
+.header-logo a{color:inherit;text-decoration:none}
+.hero{background:linear-gradient(135deg,#1a0a00 0%,#431407 50%,#1a0a00 100%);padding:4rem 2rem;text-align:center;border-bottom:1px solid #7c2d12}
+.hero h1{font-size:2.5rem;font-weight:700;color:#fb923c;margin-bottom:.5rem}
+.hero .subtitle{color:#f97316;font-size:1.1rem;margin-bottom:1.5rem}
+.hero .desc{max-width:700px;margin:0 auto 2rem;color:#cbd5e1}
+.stats{display:flex;justify-content:center;gap:2rem;flex-wrap:wrap}
+.stat{background:rgba(249,115,22,.1);border:1px solid #c2410c;border-radius:.75rem;padding:.75rem 1.5rem;text-align:center}
+.stat-num{font-size:1.5rem;font-weight:700;color:#fb923c}
+.stat-label{font-size:.8rem;color:#f97316}
+.container{max-width:900px;margin:0 auto;padding:2rem}
+.chapter{background:#1a0a00;border:1px solid #7c2d12;border-radius:1rem;margin-bottom:1rem;overflow:hidden}
+.chapter-header{padding:1.25rem 1.5rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .2s}
+.chapter-header:hover{background:rgba(249,115,22,.1)}
+.chapter-title{font-weight:600;color:#fb923c;font-size:1.05rem}
+.chapter-meta{display:flex;align-items:center;gap:1rem}
+.chapter-est{font-size:.8rem;color:#c2410c;background:rgba(194,65,12,.15);padding:.2rem .6rem;border-radius:.5rem}
+.chapter-body{border-top:1px solid #7c2d12;padding:1.5rem}
+.goal-block{background:linear-gradient(135deg,rgba(194,65,12,.15),rgba(249,115,22,.1));border:1px solid #c2410c;border-radius:.75rem;padding:1rem 1.25rem;margin-bottom:1.5rem}
+.goal-block h4{color:#fb923c;margin-bottom:.5rem}
+.goal-block p{color:#fed7aa;font-size:.9rem}
+.section{margin-bottom:1.5rem}
+.section h3{color:#f97316;font-size:1rem;margin-bottom:.75rem;padding-bottom:.25rem;border-bottom:1px solid #7c2d12}
+.section p{color:#cbd5e1;font-size:.95rem;margin-bottom:.75rem}
+table{width:100%;border-collapse:collapse;margin:.75rem 0;font-size:.88rem}
+th{background:#431407;color:#fb923c;padding:.5rem .75rem;text-align:left;border:1px solid #7c2d12}
+td{padding:.5rem .75rem;border:1px solid #7c2d12;color:#cbd5e1}
+tr:nth-child(even) td{background:rgba(124,45,18,.2)}
+pre{background:#0d0500;border:1px solid #7c2d12;border-radius:.75rem;padding:1.25rem;overflow-x:auto;margin:.75rem 0}
+code{font-family:'JetBrains Mono',monospace;font-size:.88rem;color:#fb923c}
+pre code{color:#e2e8f0}
+.ex-block{background:#120500;border:1px solid #7c2d12;border-radius:.75rem;padding:1.25rem;margin:.75rem 0}
+.diff{font-size:.8rem;color:#f59e0b}
+.ex-q{color:#fed7aa;margin-bottom:.75rem;font-size:.95rem}
+.toggle-btn{background:linear-gradient(135deg,#c2410c,#b45309);color:#fff;border:none;padding:.4rem 1rem;border-radius:.5rem;cursor:pointer;font-size:.85rem}
+.answer{margin-top:.75rem;border-top:1px solid #7c2d12;padding-top:.75rem}
+.nav-buttons{display:flex;justify-content:space-between;margin-top:2rem}
+.nav-btn{background:linear-gradient(135deg,#c2410c,#92400e);color:#fff;border:none;padding:.75rem 1.5rem;border-radius:.75rem;cursor:pointer;font-size:.95rem;font-family:'Noto Sans JP',sans-serif;transition:opacity .2s}
+.nav-btn:hover{opacity:.85}
+.nav-btn:disabled{opacity:.3;cursor:not-allowed}
+.completion{text-align:center;padding:3rem 2rem;background:#1a0a00;border-radius:1rem;border:1px solid #7c2d12}
+.badge{display:inline-block;background:linear-gradient(135deg,#c2410c,#f97316);color:#fff;padding:1rem 2.5rem;border-radius:2rem;font-size:1.2rem;font-weight:700;margin-bottom:1rem}
+.footer{text-align:center;padding:2rem;color:#c2410c;font-size:.85rem;border-top:1px solid #1a0a00}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-logo"><a href="../index.html">🦀 Programming Courses</a></div>
+</header>
+<section class="hero">
+  <h1>🦀 Rust 初級コース</h1>
+  <p class="subtitle">CLIタスクマネージャーを段階的に構築</p>
+  <p class="desc">本コースでは「コマンドラインタスクマネージャー」を10章かけて実装します。構造体・エラーハンドリング・ファイルI/O・clapによるCLI・serdeによるJSON永続化・モジュール分割を実際のアプリ開発で習得します。</p>
+  <div class="stats">
+    <div class="stat"><div class="stat-num">10</div><div class="stat-label">章</div></div>
+    <div class="stat"><div class="stat-num">30</div><div class="stat-label">演習問題</div></div>
+    <div class="stat"><div class="stat-num">CLI App</div><div class="stat-label">成果物</div></div>
+  </div>
+</section>
+<div class="container" id="root"></div>
+<footer class="footer">Rust 1.78 準拠 · 2026年4月時点</footer>
+<script type="text/babel">
+const T = {
+  appStructure: {
+    h:["ファイル","役割"],
+    r:[
+      ["src/main.rs","エントリポイント・CLIハンドリング"],
+      ["src/task.rs","Task構造体・TaskManagerの定義と実装"],
+      ["src/storage.rs","JSON読み書き (serde使用)"],
+      ["src/error.rs","カスタムエラー型 (thiserror使用)"],
+      ["Cargo.toml","依存管理 (clap, serde, thiserror)"],
+    ],
+    cap:"プロジェクト構成"
+  },
+  clapFeatures: {
+    h:["機能","説明","例"],
+    r:[
+      ["derive API","構造体からCLIを自動生成","#[derive(Parser)]"],
+      ["subcommand","サブコマンド","todo add / todo list"],
+      ["argument","位置引数","todo add <title>"],
+      ["option","オプション引数","--priority 1"],
+      ["flag","フラグ","--verbose"],
+      ["help","自動ヘルプ生成","--help"],
+    ],
+    cap:"clapの主要機能"
+  },
+  serdeFeatures: {
+    h:["derive","説明"],
+    r:[
+      ["Serialize","構造体 → JSON変換を自動実装"],
+      ["Deserialize","JSON → 構造体変換を自動実装"],
+      ["serde_json::to_string","Rust値をJSON文字列に変換"],
+      ["serde_json::from_str","JSON文字列をRust値に変換"],
+      ["serde_json::to_writer_pretty","整形JSONでファイルに書き込み"],
+    ],
+    cap:"serdeの主要機能"
+  },
+  errorTypes: {
+    h:["エラー型","用途"],
+    r:[
+      ["io::Error","ファイルI/Oエラー"],
+      ["serde_json::Error","JSON変換エラー"],
+      ["ParseIntError","文字列→整数変換エラー"],
+      ["Box<dyn Error>","複数エラー型を統一 (アプリ用)"],
+      ["anyhow::Error","複数エラー型を統一 (便利)"],
+      ["thiserror::Error","カスタムエラー型定義 (ライブラリ用)"],
+    ],
+    cap:"よく使うエラー型"
+  },
+};
+
+const EX = {
+  ch1:[
+    {diff:1,q:"Task構造体を定義し、new()コンストラクタとDisplayトレイトを実装してください。",code:`use std::fmt;
+#[derive(Debug, Clone)]
+pub struct Task {
+    pub id: u32,
+    pub title: String,
+    pub done: bool,
+    pub priority: u8,
+}
+impl Task {
+    pub fn new(id: u32, title: String, priority: u8) -> Self { todo!() }
+}
+impl fmt::Display for Task { /* [1] Buy milk [P1] [PENDING] */ }`,answer:`use std::fmt;
+#[derive(Debug, Clone)]
+pub struct Task {
+    pub id: u32, pub title: String,
+    pub done: bool, pub priority: u8,
+}
+impl Task {
+    pub fn new(id: u32, title: String, priority: u8) -> Self {
+        Task { id, title, done: false, priority }
+    }
+}
+impl fmt::Display for Task {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{}] {} [P{}] [{}]", self.id, self.title, self.priority,
+               if self.done { "DONE" } else { "PENDING" })
+    }
+}`},
+    {diff:2,q:"TaskManager構造体を実装してください。add/complete/remove/list メソッドを持ちます。",code:`pub struct TaskManager { tasks: Vec<Task>, next_id: u32 }
+impl TaskManager {
+    pub fn new() -> Self { todo!() }
+    pub fn add(&mut self, title: String, priority: u8) -> &Task { todo!() }
+    pub fn complete(&mut self, id: u32) -> bool { todo!() }
+    pub fn remove(&mut self, id: u32) -> bool { todo!() }
+    pub fn list(&self) -> &[Task] { &self.tasks }
+}`,answer:`pub struct TaskManager { tasks: Vec<Task>, next_id: u32 }
+impl TaskManager {
+    pub fn new() -> Self { TaskManager { tasks: vec![], next_id: 1 } }
+    pub fn add(&mut self, title: String, priority: u8) -> &Task {
+        self.tasks.push(Task::new(self.next_id, title, priority));
+        self.next_id += 1;
+        self.tasks.last().unwrap()
+    }
+    pub fn complete(&mut self, id: u32) -> bool {
+        if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) {
+            t.done = true; true
+        } else { false }
+    }
+    pub fn remove(&mut self, id: u32) -> bool {
+        let before = self.tasks.len();
+        self.tasks.retain(|t| t.id != id);
+        self.tasks.len() < before
+    }
+    pub fn list(&self) -> &[Task] { &self.tasks }
+}`},
+    {diff:2,q:"pending()とsearch(keyword)メソッドを追加してください。",code:`// pending: 未完了タスクの参照を返す
+// search: タイトルにキーワードを含むタスクを返す`,answer:`pub fn pending(&self) -> Vec<&Task> {
+    self.tasks.iter().filter(|t| !t.done).collect()
+}
+pub fn search(&self, keyword: &str) -> Vec<&Task> {
+    self.tasks.iter()
+        .filter(|t| t.title.to_lowercase().contains(&keyword.to_lowercase()))
+        .collect()
+}`},
+  ],
+  ch2:[
+    {diff:1,q:"thiserrorクレートを使ってTaskErrorカスタムエラー型を定義してください。",code:`// Cargo.toml: thiserror = "1"
+use thiserror::Error;
+#[derive(Error, Debug)]
+pub enum TaskError {
+    // NotFound(id), InvalidPriority(u8), StorageError(io::Error)
+}`,answer:`use thiserror::Error;
+use std::io;
+#[derive(Error, Debug)]
+pub enum TaskError {
+    #[error("Task with id {0} not found")]
+    NotFound(u32),
+    #[error("Invalid priority {0}: must be 1-3")]
+    InvalidPriority(u8),
+    #[error("Storage error: {0}")]
+    StorageError(#[from] io::Error),
+    #[error("Parse error: {0}")]
+    ParseError(#[from] std::num::ParseIntError),
+}`},
+    {diff:2,q:"add と complete メソッドをResult<T, TaskError>を返すように修正してください。",code:`pub fn add(&mut self, title: String, priority: u8) -> Result<&Task, TaskError> {
+    // priority が 1-3 でなければ InvalidPriority
+}
+pub fn complete(&mut self, id: u32) -> Result<(), TaskError> {
+    // 見つからなければ NotFound
+}`,answer:`pub fn add(&mut self, title: String, priority: u8) -> Result<&Task, TaskError> {
+    if priority < 1 || priority > 3 {
+        return Err(TaskError::InvalidPriority(priority));
+    }
+    self.tasks.push(Task::new(self.next_id, title, priority));
+    self.next_id += 1;
+    Ok(self.tasks.last().unwrap())
+}
+pub fn complete(&mut self, id: u32) -> Result<(), TaskError> {
+    self.tasks.iter_mut()
+        .find(|t| t.id == id)
+        .map(|t| { t.done = true; })
+        .ok_or(TaskError::NotFound(id))
+}`},
+    {diff:2,q:"anyhow を使ってmain関数のエラーハンドリングを簡潔に書いてください。",code:`// Cargo.toml: anyhow = "1"
+fn main() -> anyhow::Result<()> {
+    // 複数のエラー型を ? で伝播
+}`,answer:`use anyhow::{Context, Result};
+fn main() -> Result<()> {
+    let mut mgr = TaskManager::new();
+    mgr.add("Buy milk".into(), 1)?;
+    mgr.complete(1)?;
+    // Context でエラーに文脈を追加
+    let content = std::fs::read_to_string("tasks.json")
+        .context("Failed to read tasks.json")?;
+    println!("{}", content);
+    Ok(())
+}`},
+  ],
+  ch3:[
+    {diff:1,q:"serdeを使ってTask構造体をJSONに変換してください。",code:`// Cargo.toml: serde = {version="1",features=["derive"]}, serde_json="1"
+use serde::{Serialize, Deserialize};
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Task { /* ... */ }
+// serde_json::to_string_pretty でJSON文字列を生成`,answer:`use serde::{Serialize, Deserialize};
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Task {
+    pub id: u32, pub title: String,
+    pub done: bool, pub priority: u8,
+}
+fn main() {
+    let task = Task { id:1, title:"Buy milk".into(), done:false, priority:1 };
+    let json = serde_json::to_string_pretty(&task).unwrap();
+    println!("{}", json);
+    let back: Task = serde_json::from_str(&json).unwrap();
+    println!("{:?}", back);
+}`},
+    {diff:2,q:"save/load メソッドを実装してください。JSONファイルへの保存と読み込みを行います。",code:`pub fn save(&self, path: &str) -> Result<(), TaskError> {
+    // serde_json::to_writer_pretty で書き込み
+}
+pub fn load(path: &str) -> Result<Self, TaskError> {
+    // ファイルがなければ空のTaskManagerを返す
+}`,answer:`use std::fs::{File, OpenOptions};
+pub fn save(&self, path: &str) -> anyhow::Result<()> {
+    let file = File::create(path)?;
+    serde_json::to_writer_pretty(file, &self.tasks)?;
+    Ok(())
+}
+pub fn load(path: &str) -> anyhow::Result<Self> {
+    if !std::path::Path::new(path).exists() {
+        return Ok(Self::new());
+    }
+    let content = std::fs::read_to_string(path)?;
+    let tasks: Vec<Task> = serde_json::from_str(&content)?;
+    let next_id = tasks.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+    Ok(TaskManager { tasks, next_id })
+}`},
+    {diff:3,q:"JSONファイルのパスをディレクトリ(~/.local/share/todo/)に設定してください。",code:`use std::path::PathBuf;
+fn get_data_path() -> PathBuf {
+    // dirs クレートを使って適切なデータディレクトリを取得
+}`,answer:`fn get_data_path() -> std::path::PathBuf {
+    // dirs クレートがあれば: dirs::data_dir().unwrap().join("todo/tasks.json")
+    // 簡易版: カレントディレクトリに保存
+    std::path::PathBuf::from("tasks.json")
+}
+// Cargo.toml: dirs = "5"
+// fn get_data_path_dirs() -> PathBuf {
+//     let dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
+//     let dir = dir.join("todo");
+//     std::fs::create_dir_all(&dir).unwrap();
+//     dir.join("tasks.json")
+// }`},
+  ],
+  ch4:[
+    {diff:2,q:"clapのderive APIを使ってCLIを定義してください。",code:`// Cargo.toml: clap = {version="4", features=["derive"]}
+use clap::{Parser, Subcommand};
+#[derive(Parser)]
+#[command(name="todo", about="Task manager")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+#[derive(Subcommand)]
+enum Commands {
+    Add { title: String, #[arg(short,long,default_value="2")] priority: u8 },
+    List,
+    Done { id: u32 },
+    Remove { id: u32 },
+}`,answer:`use clap::{Parser, Subcommand};
+#[derive(Parser)]
+#[command(name="todo", version, about="A simple task manager")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+    #[arg(short, long, global=true)]
+    verbose: bool,
+}
+#[derive(Subcommand)]
+enum Commands {
+    Add {
+        title: String,
+        #[arg(short, long, default_value="2")]
+        priority: u8,
+    },
+    List {
+        #[arg(long)]
+        pending_only: bool,
+    },
+    Done { id: u32 },
+    Remove { id: u32 },
+    Search { keyword: String },
+}`},
+    {diff:2,q:"main関数でCLIのコマンドを処理してください。",code:`fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    let mut mgr = TaskManager::load("tasks.json")?;
+    match cli.command {
+        // 各コマンドに対応する処理
+    }
+    mgr.save("tasks.json")?;
+    Ok(())
+}`,answer:`fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    let data_path = "tasks.json";
+    let mut mgr = TaskManager::load(data_path)?;
+    match cli.command {
+        Commands::Add { title, priority } => {
+            let task = mgr.add(title, priority)?;
+            println!("Added: {}", task);
+        }
+        Commands::List { pending_only } => {
+            let tasks = if pending_only { mgr.pending() } else { mgr.list().iter().collect() };
+            if tasks.is_empty() { println!("No tasks."); }
+            else { for t in tasks { println!("{}", t); } }
+        }
+        Commands::Done { id } => { mgr.complete(id)?; println!("Completed task {}", id); }
+        Commands::Remove { id } => { mgr.remove(id)?; println!("Removed task {}", id); }
+        Commands::Search { keyword } => {
+            for t in mgr.search(&keyword) { println!("{}", t); }
+        }
+    }
+    mgr.save(data_path)?;
+    Ok(())
+}`},
+    {diff:2,q:"stats サブコマンドを追加して統計情報を表示してください。",code:`// total, done, pending, completion_rate を表示`,answer:`Commands::Stats => {
+    let tasks = mgr.list();
+    let total = tasks.len();
+    let done = tasks.iter().filter(|t| t.done).count();
+    let rate = if total > 0 { done as f64 / total as f64 * 100.0 } else { 0.0 };
+    println!("Total: {} | Done: {} | Pending: {} | Rate: {:.1}%",
+             total, done, total - done, rate);
+}`},
+  ],
+  ch5:[
+    {diff:1,q:"ソート機能をTaskManagerに追加してください (優先度・ID)。",code:`pub fn sort_by_priority(&mut self) { todo!() }
+pub fn sort_by_id(&mut self) { todo!() }`,answer:`pub fn sort_by_priority(&mut self) {
+    self.tasks.sort_by(|a, b| a.priority.cmp(&b.priority));
+}
+pub fn sort_by_id(&mut self) {
+    self.tasks.sort_by_key(|t| t.id);
+}
+// 安定ソートが必要なら sort_by の代わりに sort_unstable_by も使える`},
+    {diff:2,q:"due_date フィールドを追加し、期限切れタスクを警告表示してください。",code:`use chrono::{DateTime, Utc, NaiveDate};
+// due_date: Option<NaiveDate>
+// 今日以降なら [OVERDUE] 表示`,answer:`// Cargo.toml: chrono = {version="0.4", features=["serde"]}
+use chrono::NaiveDate;
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Task {
+    pub id: u32, pub title: String,
+    pub done: bool, pub priority: u8,
+    pub due_date: Option<NaiveDate>,
+}
+impl Task {
+    pub fn is_overdue(&self) -> bool {
+        self.due_date.map_or(false, |d| {
+            d < chrono::Local::now().date_naive() && !self.done
+        })
+    }
+}`},
+    {diff:3,q:"タスクをグループ分けして表示する機能を実装してください (優先度別)。",code:`pub fn grouped_by_priority(&self) -> std::collections::HashMap<u8, Vec<&Task>> {
+    todo!()
+}`,answer:`use std::collections::HashMap;
+pub fn grouped_by_priority(&self) -> HashMap<u8, Vec<&Task>> {
+    let mut groups: HashMap<u8, Vec<&Task>> = HashMap::new();
+    for task in &self.tasks {
+        groups.entry(task.priority).or_default().push(task);
+    }
+    groups
+}
+// 表示:
+// let groups = mgr.grouped_by_priority();
+// let mut priorities: Vec<u8> = groups.keys().cloned().collect();
+// priorities.sort();
+// for p in priorities { println!("=== Priority {} ===", p); ... }`},
+  ],
+  ch6:[
+    {diff:1,q:"std::fs::read_dir を使ってディレクトリ内のファイル一覧を返す関数を実装してください。",code:`use std::path::Path;
+fn list_files(dir: &str) -> anyhow::Result<Vec<String>> {
+    // .json ファイルのみ返す
+}`,answer:`use std::path::Path;
+fn list_files(dir: &str) -> anyhow::Result<Vec<String>> {
+    let mut files = vec![];
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().map_or(false, |e| e == "json") {
+            files.push(path.to_string_lossy().into_owned());
+        }
+    }
+    files.sort();
+    Ok(files)
+}`},
+    {diff:2,q:"複数のJSONファイルからタスクをインポートするimport機能を実装してください。",code:`pub fn import(&mut self, path: &str) -> anyhow::Result<usize> {
+    // 別のJSONファイルからタスクをロードして追加
+    // IDが被らないようにリナンバリング
+}`,answer:`pub fn import(&mut self, path: &str) -> anyhow::Result<usize> {
+    let content = std::fs::read_to_string(path)?;
+    let mut imported: Vec<Task> = serde_json::from_str(&content)?;
+    let count = imported.len();
+    for task in &mut imported {
+        task.id = self.next_id;
+        self.next_id += 1;
+        self.tasks.push(task.clone());
+    }
+    Ok(count)
+}`},
+    {diff:2,q:"タスクをCSV形式でエクスポートする機能を実装してください。",code:`pub fn export_csv(&self, path: &str) -> anyhow::Result<()> {
+    // id,title,done,priority を出力
+}`,answer:`pub fn export_csv(&self, path: &str) -> anyhow::Result<()> {
+    let mut content = String::from("id,title,done,priority\n");
+    for t in &self.tasks {
+        content.push_str(&format!("{},{},{},{}\n",
+            t.id, t.title, if t.done {"1"} else {"0"}, t.priority));
+    }
+    std::fs::write(path, content)?;
+    Ok(())
+}`},
+  ],
+  ch7:[
+    {diff:2,q:"Arcとstd::syncを使ってタスクの並列処理(並列バリデーション)を実装してください。",code:`use std::sync::Arc;
+// 複数のタスクのバリデーションを並列実行
+fn validate_tasks_parallel(tasks: Vec<Task>) -> Vec<anyhow::Result<Task>> {
+    todo!()
+}`,answer:`use std::sync::Arc;
+use std::thread;
+fn validate_task(task: Task) -> anyhow::Result<Task> {
+    if task.title.is_empty() { anyhow::bail!("Title is empty"); }
+    if task.priority > 3 { anyhow::bail!("Invalid priority"); }
+    Ok(task)
+}
+fn validate_tasks_parallel(tasks: Vec<Task>) -> Vec<anyhow::Result<Task>> {
+    let handles: Vec<_> = tasks.into_iter().map(|t| {
+        thread::spawn(move || validate_task(t))
+    }).collect();
+    handles.into_iter().map(|h| h.join().unwrap()).collect()
+}`},
+    {diff:2,q:"Mutex<TaskManager>を使ってスレッドセーフなタスクマネージャーを実装してください。",code:`use std::sync::{Arc, Mutex};
+struct SharedManager(Arc<Mutex<TaskManager>>);
+impl SharedManager {
+    fn add_task(&self, title: String, priority: u8) -> anyhow::Result<()> { todo!() }
+}`,answer:`use std::sync::{Arc, Mutex};
+#[derive(Clone)]
+struct SharedManager(Arc<Mutex<TaskManager>>);
+impl SharedManager {
+    fn new() -> Self { SharedManager(Arc::new(Mutex::new(TaskManager::new()))) }
+    fn add_task(&self, title: String, priority: u8) -> anyhow::Result<()> {
+        let mut mgr = self.0.lock().unwrap();
+        mgr.add(title, priority)?;
+        Ok(())
+    }
+    fn count(&self) -> usize {
+        self.0.lock().unwrap().list().len()
+    }
+}`},
+    {diff:3,q:"std::threadとMpsc channelを使ってバックグラウンドで定期的にタスクを保存する機能を実装してください。",code:`use std::sync::mpsc;
+// 5秒ごとに自動保存するバックグラウンドスレッド
+fn start_autosave(manager: Arc<Mutex<TaskManager>>, path: String) -> mpsc::Sender<()> {
+    todo!() // Sender<()>でシャットダウンシグナルを受け取る
+}`,answer:`use std::sync::mpsc;
+use std::time::Duration;
+fn start_autosave(manager: Arc<Mutex<TaskManager>>, path: String) -> mpsc::Sender<()> {
+    let (tx, rx) = mpsc::channel::<()>();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(Duration::from_secs(5));
+            match rx.try_recv() {
+                Ok(_) | Err(mpsc::TryRecvError::Disconnected) => break,
+                Err(mpsc::TryRecvError::Empty) => {}
+            }
+            if let Ok(mgr) = manager.lock() {
+                let _ = mgr.save(&path);
+                eprintln!("Auto-saved");
+            }
+        }
+    });
+    tx
+}`},
+  ],
+  ch8:[
+    {diff:2,q:"TaskManagerにIteratorトレイトを実装してください。",code:`impl Iterator for TaskManager {
+    type Item = Task; // or &Task
+    fn next(&mut self) -> Option<Self::Item> { todo!() }
+}`,answer:`struct TaskIter<'a> { tasks: &'a [Task], index: usize }
+impl<'a> Iterator for TaskIter<'a> {
+    type Item = &'a Task;
+    fn next(&mut self) -> Option<Self::Item> {
+        let task = self.tasks.get(self.index)?;
+        self.index += 1;
+        Some(task)
+    }
+}
+impl TaskManager {
+    pub fn iter(&self) -> TaskIter {
+        TaskIter { tasks: &self.tasks, index: 0 }
+    }
+}
+// 使用例:
+// for task in mgr.iter().filter(|t| !t.done) { println!("{}", task); }`},
+    {diff:2,q:"FromIterator トレイトを実装して Vec<Task> から TaskManager を作れるようにしてください。",code:`impl FromIterator<Task> for TaskManager {
+    fn from_iter<I: IntoIterator<Item=Task>>(iter: I) -> Self { todo!() }
+}`,answer:`impl FromIterator<Task> for TaskManager {
+    fn from_iter<I: IntoIterator<Item=Task>>(iter: I) -> Self {
+        let tasks: Vec<Task> = iter.into_iter().collect();
+        let next_id = tasks.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+        TaskManager { tasks, next_id }
+    }
+}
+// 使用例:
+// let mgr: TaskManager = some_tasks.into_iter().filter(|t| t.priority == 1).collect();`},
+    {diff:3,q:"ジェネリクスとトレイト境界を使ってプラガブルなフィルター機能を実装してください。",code:`pub trait TaskFilter {
+    fn matches(&self, task: &Task) -> bool;
+}
+struct PriorityFilter(u8);
+struct KeywordFilter(String);
+impl TaskManager {
+    pub fn filter_by<F: TaskFilter>(&self, filter: &F) -> Vec<&Task> { todo!() }
+}`,answer:`pub trait TaskFilter {
+    fn matches(&self, task: &Task) -> bool;
+}
+struct PriorityFilter(u8);
+impl TaskFilter for PriorityFilter {
+    fn matches(&self, task: &Task) -> bool { task.priority == self.0 }
+}
+struct KeywordFilter(String);
+impl TaskFilter for KeywordFilter {
+    fn matches(&self, task: &Task) -> bool {
+        task.title.to_lowercase().contains(&self.0.to_lowercase())
+    }
+}
+struct DoneFilter(bool);
+impl TaskFilter for DoneFilter {
+    fn matches(&self, task: &Task) -> bool { task.done == self.0 }
+}
+impl TaskManager {
+    pub fn filter_by<F: TaskFilter>(&self, filter: &F) -> Vec<&Task> {
+        self.tasks.iter().filter(|t| filter.matches(t)).collect()
+    }
+}`},
+  ],
+  ch9:[
+    {diff:2,q:"Rustのモジュールシステムを使ってプロジェクトを分割してください。",code:`// src/lib.rs と src/main.rs を分割
+// pub mod task; pub mod storage; pub mod error;
+// 各ファイルは src/task.rs, src/storage.rs, src/error.rs`,answer:`// src/lib.rs
+pub mod task;
+pub mod storage;
+pub mod error;
+pub use task::{Task, TaskManager};
+pub use error::TaskError;
+// src/task.rs: Task, TaskManager の定義
+// src/storage.rs: save/load の実装
+// src/error.rs: TaskError の定義
+// src/main.rs:
+// use todo_app::{TaskManager, TaskError};
+// fn main() -> anyhow::Result<()> { ... }`},
+    {diff:2,q:"インテグレーションテストを tests/ ディレクトリに作成してください。",code:`// tests/integration_test.rs
+#[test]
+fn test_add_and_list() { /* TaskManagerの全体動作を確認 */ }
+#[test]
+fn test_save_load() { /* 保存→ロード→同一性確認 */ }`,answer:`// tests/integration_test.rs
+use todo_app::TaskManager;
+#[test]
+fn test_full_workflow() {
+    let mut mgr = TaskManager::new();
+    mgr.add("Task 1".into(), 1).unwrap();
+    mgr.add("Task 2".into(), 2).unwrap();
+    assert_eq!(mgr.list().len(), 2);
+    mgr.complete(1).unwrap();
+    assert_eq!(mgr.pending().len(), 1);
+}
+#[test]
+fn test_save_load() {
+    let path = "/tmp/test_tasks.json";
+    let mut mgr = TaskManager::new();
+    mgr.add("Test".into(), 1).unwrap();
+    mgr.save(path).unwrap();
+    let mgr2 = TaskManager::load(path).unwrap();
+    assert_eq!(mgr2.list().len(), 1);
+    std::fs::remove_file(path).unwrap();
+}`},
+    {diff:2,q:"ベンチマークテスト (criterion) を追加してください。",code:`// Cargo.toml: [dev-dependencies] criterion = {version="0.5", features=["html_reports"]}
+// benches/benchmark.rs を作成`,answer:`// Cargo.toml:
+// [[bench]]
+// name = "task_bench"
+// harness = false
+// [dev-dependencies]
+// criterion = {version="0.5", features=["html_reports"]}
+// benches/task_bench.rs:
+use criterion::{criterion_group, criterion_main, Criterion};
+fn benchmark_add(c: &mut Criterion) {
+    c.bench_function("add 1000 tasks", |b| b.iter(|| {
+        let mut mgr = TaskManager::new();
+        for i in 0..1000 { mgr.add(format!("Task {}", i), 1).unwrap(); }
+    }));
+}
+criterion_group!(benches, benchmark_add);
+criterion_main!(benches);
+// cargo bench で実行`},
+  ],
+  ch10:[
+    {diff:2,q:"完成版のmain.rsを実装してください。全サブコマンドと適切なエラーメッセージを含めます。",code:`// cargo run -- add "Buy milk" --priority 1
+// cargo run -- list --pending-only
+// cargo run -- done 1
+// cargo run -- stats`,answer:`use clap::{Parser, Subcommand};
+use anyhow::Result;
+#[derive(Parser)]
+#[command(name="todo", version="1.0", about="Task manager")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+#[derive(Subcommand)]
+enum Commands {
+    Add { title: String, #[arg(short,long,default_value="2")] priority: u8 },
+    List { #[arg(long)] pending_only: bool },
+    Done { id: u32 },
+    Remove { id: u32 },
+    Search { keyword: String },
+    Stats,
+    Export { path: String },
+}
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+    let data = "tasks.json";
+    let mut mgr = TaskManager::load(data)?;
+    match cli.command {
+        Commands::Add{title,priority} => println!("{}", mgr.add(title,priority)?),
+        Commands::List{pending_only} => {
+            let tasks: Vec<_> = if pending_only { mgr.pending() } else { mgr.list().iter().collect() };
+            if tasks.is_empty() { println!("No tasks."); }
+            else { tasks.iter().for_each(|t| println!("{}", t)); }
+        },
+        Commands::Done{id} => { mgr.complete(id)?; println!("Done!"); },
+        Commands::Remove{id} => { mgr.remove(id)?; println!("Removed."); },
+        Commands::Search{keyword} => mgr.search(&keyword).iter().for_each(|t| println!("{}", t)),
+        Commands::Stats => {
+            let (total, done) = (mgr.list().len(), mgr.list().iter().filter(|t|t.done).count());
+            println!("Total:{} Done:{} Rate:{:.0}%", total, done, if total>0 {done as f64/total as f64*100.0} else {0.0});
+        },
+        Commands::Export{path} => { mgr.export_csv(&path)?; println!("Exported to {}", path); },
+    }
+    mgr.save(data)?; Ok(())
+}`},
+    {diff:3,q:"GitHub Actionsで CI/CDパイプラインを設定してください。",code:`# .github/workflows/ci.yml
+# cargo test, cargo clippy, cargo fmt --check を実行`,answer:`name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo clippy -- -D warnings
+      - run: cargo test
+      - run: cargo build --release`},
+    {diff:3,q:"色付きターミナル出力を実現するためにcoloredクレートを使ってください。",code:`// Cargo.toml: colored = "2"
+use colored::Colorize;
+// 優先度に応じて色を変える: P1=赤, P2=黄, P3=緑`,answer:`use colored::Colorize;
+impl Task {
+    pub fn colored_display(&self) -> String {
+        let priority_str = match self.priority {
+            1 => format!("[P1]").red().bold().to_string(),
+            2 => format!("[P2]").yellow().to_string(),
+            _ => format!("[P{}]", self.priority).green().to_string(),
+        };
+        let status = if self.done { "[DONE]".green() } else { "[PENDING]".yellow() };
+        let title = if self.done { self.title.strikethrough().to_string() } else { self.title.clone() };
+        format!("[{}] {} {} {}", self.id, title, priority_str, status)
+    }
+}`},
+  ],
+};
+
+const chapters = [
+  {id:"ch1",num:1,title:"プロジェクト設計とTask構造体",est:"50分",
+   goal:"Task構造体とTaskManagerを設計し、基本的なCRUD操作を実装できる。Displayトレイトを実装して構造体を整形出力できる。",
+   sections:[
+     {title:"アプリ設計とCargo依存管理",body:`本コースでは「コマンドラインタスクマネージャー」を10章かけて実装します。最終的には `todo add "タスク名"` / `todo list` / `todo done 1` のようなCLIコマンドで動くアプリを完成させます。\n\n使用するクレート: `clap`（CLI引数解析）、`serde` + `serde_json`（JSON永続化）、`thiserror`（カスタムエラー型）、`anyhow`（アプリケーションエラー処理）、`chrono`（日付処理）。\n\nRustの構造体はPythonのdataclassに相当しますが、メモリレイアウトが明確で、フィールドのアクセス制御が `pub` キーワードで行えます。所有者がいることで、構造体をフィールドに持つ型も自動的にデストラクタを持ちます。`,table:T.appStructure,code:`// Cargo.toml
+[package]
+name = "todo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+
+// src/main.rs の初期版
+use std::fmt;
+
+#[derive(Debug, Clone)]
+pub struct Task {
+    pub id: u32,
+    pub title: String,
+    pub done: bool,
+    pub priority: u8, // 1=高, 2=中, 3=低
+}
+
+impl Task {
+    pub fn new(id: u32, title: String, priority: u8) -> Self {
+        Task { id, title, done: false, priority }
+    }
+}
+
+impl fmt::Display for Task {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{}] {} [P{}] [{}]",
+            self.id, self.title, self.priority,
+            if self.done { "DONE" } else { "PENDING" })
+    }
+}`,afterCode:"`impl Display for Task` を実装することで、`println!(\"{}\", task)` が使えるようになります。`#[derive(Debug)]` は `println!(\"{:?}\", task)` のデバッグ出力に使えます。"},
+   ]},
+  {id:"ch2",num:2,title:"エラーハンドリングとthiserror",est:"55分",
+   goal:"thiserrorでカスタムエラー型を定義できる。Result<T,E>で安全にエラーを伝播できる。anyhowで複数エラー型を統一できる。",
+   sections:[
+     {title:"カスタムエラー型の設計",body:`Rustのエラーハンドリングは「失敗しうる操作はResult<T,E>を返す」という設計になっています。エラー型を自分で定義することで、エラーの種類を型システムで表現できます。\n\n`thiserror` クレートを使うと `#[derive(Error)]` と `#[error("メッセージ")]` で簡単にカスタムエラー型を作れます。`#[from]` アノテーションを使うと `?` 演算子でエラーを自動変換できます。\n\n`anyhow` はアプリケーションコードで複数のエラー型を統一したい場合に便利です。`anyhow::Result<T>` は `Result<T, anyhow::Error>` で、どんなエラー型でも `?` で伝播できます。`,table:T.errorTypes,code:`use thiserror::Error;
+use std::io;
+
+#[derive(Error, Debug)]
+pub enum TaskError {
+    #[error("Task with id {0} not found")]
+    NotFound(u32),
+
+    #[error("Invalid priority {0}: must be 1-3")]
+    InvalidPriority(u8),
+
+    #[error("Storage error: {0}")]
+    Storage(#[from] io::Error),
+
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+pub struct TaskManager { tasks: Vec<Task>, next_id: u32 }
+
+impl TaskManager {
+    pub fn add(&mut self, title: String, priority: u8) -> Result<&Task, TaskError> {
+        if priority < 1 || priority > 3 {
+            return Err(TaskError::InvalidPriority(priority));
+        }
+        self.tasks.push(Task::new(self.next_id, title, priority));
+        self.next_id += 1;
+        Ok(self.tasks.last().unwrap())
+    }
+
+    pub fn complete(&mut self, id: u32) -> Result<(), TaskError> {
+        self.tasks.iter_mut()
+            .find(|t| t.id == id)
+            .map(|t| t.done = true)
+            .ok_or(TaskError::NotFound(id))
+    }
+}`,afterCode:"エラーメッセージは `format!()` 構文で書けます。`{0}` は最初のフィールド、`{name}` は名前付きフィールドです。エラーを Display で表示した時と Debug で表示した時の違いも意識しましょう。"},
+   ]},
+  {id:"ch3",num:3,title:"JSON永続化 (serde)",est:"55分",
+   goal:"serde/serde_jsonでRust構造体をJSONに変換・復元できる。ファイルへの読み書きと?演算子のエラー処理を実装できる。",
+   sections:[
+     {title:"serdeによるシリアライゼーション",body:``serde` はRustのデファクトシリアライゼーションフレームワークです。`#[derive(Serialize, Deserialize)]` をつけるだけで、構造体をJSON・TOML・YAML・MessagePackなど様々な形式に変換できます。\n\nPythonでは `json.dumps(obj.__dict__)` のようにやや手間がかかりますが、Rustのserdeはより型安全で高速です。`serde_json::to_string_pretty(&value)` でインデント付きJSON、`serde_json::from_str(&json_str)` でデシリアライズできます。\n\nファイルへの書き込みは `serde_json::to_writer_pretty(file, &value)` で直接書き込めます。ファイルが存在しない場合の初回起動処理も忘れずに実装します。`,table:T.serdeFeatures,code:`use serde::{Serialize, Deserialize};
+use std::fs;
+use std::path::Path;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Task {
+    pub id: u32,
+    pub title: String,
+    pub done: bool,
+    pub priority: u8,
+}
+
+pub struct TaskManager { tasks: Vec<Task>, next_id: u32 }
+
+impl TaskManager {
+    pub fn save(&self, path: &str) -> anyhow::Result<()> {
+        let file = fs::File::create(path)?;
+        serde_json::to_writer_pretty(file, &self.tasks)?;
+        Ok(())
+    }
+
+    pub fn load(path: &str) -> anyhow::Result<Self> {
+        if !Path::new(path).exists() {
+            return Ok(Self::new());
+        }
+        let content = fs::read_to_string(path)?;
+        let tasks: Vec<Task> = serde_json::from_str(&content)?;
+        let next_id = tasks.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+        Ok(TaskManager { tasks, next_id })
+    }
+}`,afterCode:"serdeは `serde_with` クレートと組み合わせると、カスタムシリアライズ形式（日付のフォーマット変更など）が簡単に書けます。また `#[serde(rename = \"field_name\")]` でJSONのキー名を変えられます。"},
+   ]},
+  {id:"ch4",num:4,title:"CLIインターフェース (clap)",est:"55分",
+   goal:"clapのderive APIでCLIを定義できる。サブコマンド・オプション引数・フラグを正しく設定できる。matchでコマンドを振り分けてアプリを完成させられる。",
+   sections:[
+     {title:"clapによるCLI設計",body:``clap` はRustで最も使われるCLIパーサーです。derive APIを使うと、構造体にアノテーションをつけるだけでコマンドライン引数のパーサーが自動生成されます。Pythonの `argparse` や `click` に相当します。\n\n`#[derive(Parser)]` で全体的なCLI、`#[derive(Subcommand)]` でサブコマンドを定義します。`#[arg(short, long)]` でオプション引数（`--priority`・`-p`）、`#[arg(default_value)]` でデフォルト値を設定します。\n\n`Cli::parse()` を呼ぶと引数を自動でパースし、無効な引数はエラーメッセージとともに終了します。`--help` も自動生成されます。`,table:T.clapFeatures,code:`use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(name = "todo", version = "1.0", about = "A simple task manager")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Add a new task
+    Add {
+        title: String,
+        #[arg(short, long, default_value = "2")]
+        priority: u8,
+    },
+    /// List all tasks
+    List {
+        #[arg(long)]
+        pending_only: bool,
+    },
+    /// Mark a task as done
+    Done { id: u32 },
+    /// Remove a task
+    Remove { id: u32 },
+    /// Search tasks by keyword
+    Search { keyword: String },
+    /// Show statistics
+    Stats,
+}
+
+fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    let mut mgr = TaskManager::load("tasks.json")?;
+    match cli.command {
+        Commands::Add { title, priority } => {
+            let task = mgr.add(title, priority)?;
+            println!("Added: {}", task);
+        }
+        Commands::List { pending_only } => {
+            let tasks: Vec<_> = if pending_only {
+                mgr.pending()
+            } else {
+                mgr.list().iter().collect()
+            };
+            for t in tasks { println!("{}", t); }
+        }
+        Commands::Done { id } => { mgr.complete(id)?; }
+        Commands::Remove { id } => { mgr.remove(id)?; }
+        Commands::Search { keyword } => {
+            for t in mgr.search(&keyword) { println!("{}", t); }
+        }
+        Commands::Stats => { mgr.print_stats(); }
+    }
+    mgr.save("tasks.json")?;
+    Ok(())
+}`,afterCode:"clapは `--help` と `--version` を自動で生成します。doc commentの `/// コメント` がhelp文として使われます。`#[command(author)]` で作者情報も設定できます。"},
+   ]},
+  {id:"ch5",num:5,title:"ソート・フィルタ・拡張機能",est:"50分",
+   goal:"優先度・日付でソートできる。due_dateフィールドを追加して期限管理できる。グループ表示・進捗表示を実装できる。",
+   sections:[
+     {title:"ソートとフィルタリング",body:`Rustのソートは `sort_by()` / `sort_by_key()` を使います。Pythonの `sorted(key=...)` に相当します。`sort_by` はコンパレータ（`|a,b| a.field.cmp(&b.field)`）を受け取り、`sort_by_key` はキー抽出関数を受け取ります。\n\n`Ord` トレイトは全順序（すべての要素を比較できる）を表します。整数・文字列は `Ord` を実装しています。`PartialOrd` は部分順序（floatのNaNのように一部比較できない場合）です。\n\n`retain()` はPythonのリスト内包表記的なフィルタリングをインプレースで行います。`filter().collect()` で新しいベクタを作る方法と使い分けます。`,code:`impl TaskManager {
+    pub fn sort_by_priority(&mut self) {
+        self.tasks.sort_by_key(|t| t.priority);
+    }
+
+    pub fn sort_by_title(&mut self) {
+        self.tasks.sort_by(|a, b| a.title.cmp(&b.title));
+    }
+
+    pub fn pending(&self) -> Vec<&Task> {
+        self.tasks.iter().filter(|t| !t.done).collect()
+    }
+
+    pub fn print_stats(&self) {
+        let total = self.tasks.len();
+        let done = self.tasks.iter().filter(|t| t.done).count();
+        let rate = if total > 0 { done as f64 / total as f64 * 100.0 } else { 0.0 };
+        println!("Total: {} | Done: {} | Pending: {} | Rate: {:.0}%",
+                 total, done, total - done, rate);
+    }
+}`,afterCode:"due_date を `chrono::NaiveDate` 型で持ち、`chrono::Local::now().date_naive()` と比較すると期限切れを検出できます。`#[serde(with = \"chrono::serde::ts_seconds_option\")]` で日付のシリアライズも自動化できます。"},
+   ]},
+  {id:"ch6",num:6,title:"ファイルI/Oの応用",est:"50分",
+   goal:"read_dir でディレクトリ操作ができる。インポート・エクスポート機能を実装できる。パスを扱う std::path::Path/PathBuf を使いこなせる。",
+   sections:[
+     {title:"ファイルシステム操作",body:``std::path::Path` と `PathBuf` はRustのパス操作型です。`Path` は参照（借用）、`PathBuf` は所有型です。`path.extension()` でファイル拡張子、`path.parent()` で親ディレクトリを取得できます。\n\n`std::fs::read_dir()` でディレクトリ内のエントリを `DirEntry` のイテレータとして返します。各エントリは `entry.path()` でパスを取得できます。これはPythonの `os.listdir()` や `pathlib.Path.iterdir()` に相当します。\n\nCSVエクスポートは `std::fs::write()` で文字列を一括書き込みするのが簡単です。大きなファイルには `BufWriter` を使って書き込みをバッファリングするとパフォーマンスが向上します。`,code:`use std::path::{Path, PathBuf};
+use std::io::Write;
+
+pub fn export_csv(&self, path: &str) -> anyhow::Result<()> {
+    let mut wtr = std::io::BufWriter::new(std::fs::File::create(path)?);
+    writeln!(wtr, "id,title,done,priority")?;
+    for t in &self.tasks {
+        writeln!(wtr, "{},{},{},{}",
+                 t.id, t.title, if t.done { 1 } else { 0 }, t.priority)?;
+    }
+    Ok(())
+}
+
+fn find_json_files(dir: &str) -> anyhow::Result<Vec<PathBuf>> {
+    let mut files = vec![];
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.extension().map_or(false, |e| e == "json") {
+            files.push(path);
+        }
+    }
+    files.sort();
+    Ok(files)
+}`,afterCode:"`std::fs::create_dir_all(path)` でパスのすべてのディレクトリを再帰的に作成できます。`Path::new(path).exists()` でファイルの存在確認ができます。"},
+   ]},
+  {id:"ch7",num:7,title:"並行処理入門",est:"60分",
+   goal:"std::threadで並行処理を実装できる。Arc<Mutex<T>>でスレッド間のデータ共有ができる。mpsc channelでスレッド間通信ができる。",
+   sections:[
+     {title:"Rustの「安全な並行性」",body:`Rustの所有権システムにより、コンパイラがデータ競合を静的に防ぎます。C++ではデータ競合は実行時に現れる潜在バグですが、Rustでは`Arc<Mutex<T>>`なしにスレッド間でデータを共有しようとするとコンパイルエラーになります。\n\n`Arc<T>`（Atomically Reference Counted）はスレッドセーフな参照カウントです。`Rc<T>` のスレッドセーフ版です。`Mutex<T>` は排他ロックで、`.lock()` でロックを取得し、スコープを抜けると自動解放されます。\n\nmpsc（multiple producer, single consumer）チャネルはスレッド間のメッセージパッシングに使います。送信端（`Sender`）はcloneして複数スレッドから使え、受信端（`Receiver`）は1つだけです。Go言語のgoroutine + channelに似ています。`,code:`use std::sync::{Arc, Mutex};
+use std::thread;
+use std::sync::mpsc;
+
+fn parallel_validate(tasks: Vec<Task>) -> Vec<Result<Task, String>> {
+    let handles: Vec<_> = tasks.into_iter().map(|task| {
+        thread::spawn(move || { // move クロージャで所有権移動
+            if task.title.is_empty() {
+                Err("Title is empty".to_string())
+            } else {
+                Ok(task)
+            }
+        })
+    }).collect();
+    handles.into_iter().map(|h| h.join().unwrap()).collect()
+}
+
+fn shared_counter_demo() {
+    let counter = Arc::new(Mutex::new(0u32));
+    let mut handles = vec![];
+    for _ in 0..10 {
+        let c = Arc::clone(&counter); // 参照カウントを増やす
+        handles.push(thread::spawn(move || {
+            *c.lock().unwrap() += 1;
+        }));
+    }
+    for h in handles { h.join().unwrap(); }
+    println!("Counter: {}", *counter.lock().unwrap()); // 10
+}`,afterCode:"Rustには `Send` と `Sync` という特別なマーカートレイトがあります。`Send` はスレッド間の所有権移動が安全、`Sync` は参照の共有が安全であることを示します。`Arc<T>` は `T: Send + Sync` が必要です。"},
+   ]},
+  {id:"ch8",num:8,title:"イテレータトレイトの実装",est:"55分",
+   goal:"カスタムIteratorトレイトを実装できる。FromIteratorでコレクション変換を実装できる。ジェネリクスとトレイト境界でプラガブルなAPI設計ができる。",
+   sections:[
+     {title:"Iterator トレイトを実装する",body:``Iterator` トレイトは `next(&mut self) -> Option<Self::Item>` の1つのメソッドだけを要求します。これを実装すると `map`・`filter`・`collect`・`sum` など100以上のメソッドが自動的に使えるようになります。\n\nPythonでは `__iter__` と `__next__` を実装するのに相当します。Rustのイテレータは遅延評価で、実際に値が必要になるまで計算しません。Pythonのジェネレータと同じ性質です。\n\n`FromIterator<T>` トレイトを実装すると、`.collect::<MyType>()` が使えるようになります。Pythonの `list(iter)` や `dict(iter)` のようなコレクション変換が型安全に書けます。`,code:`struct TaskIter<'a> {
+    tasks: &'a [Task],
+    index: usize,
+}
+
+impl<'a> Iterator for TaskIter<'a> {
+    type Item = &'a Task;
+    fn next(&mut self) -> Option<Self::Item> {
+        let task = self.tasks.get(self.index)?;
+        self.index += 1;
+        Some(task)
+    }
+}
+
+impl TaskManager {
+    pub fn iter(&self) -> TaskIter {
+        TaskIter { tasks: &self.tasks, index: 0 }
+    }
+}
+
+// 使用例: すべてのIteratorメソッドが使える
+fn main() {
+    let mgr = TaskManager::new();
+    let high_priority_titles: Vec<String> = mgr.iter()
+        .filter(|t| t.priority == 1 && !t.done)
+        .map(|t| t.title.clone())
+        .collect();
+    println!("{:?}", high_priority_titles);
+}`,afterCode:"`DoubleEndedIterator` を実装すると `rev()` で逆順イテレートができます。`ExactSizeIterator` を実装すると `len()` でサイズが取得できます。必要に応じて拡張しましょう。"},
+   ]},
+  {id:"ch9",num:9,title:"モジュール分割とテスト",est:"55分",
+   goal:"pub mod でファイルを分割できる。ユニットテストとインテグレーションテストを書ける。cargo test でテストを実行できる。",
+   sections:[
+     {title:"モジュールシステムとテスト",body:`Rustのモジュールシステムはファイルシステムに対応します。`mod task;` と書くと `src/task.rs` が読み込まれます。`pub` をつけると外部からアクセス可能になります。\n\nユニットテストは `#[cfg(test)]` ブロック内に書きます。インテグレーションテストは `tests/` ディレクトリに置きます。インテグレーションテストはライブラリの公開APIのみテストします。\n\n`#[test]` でテスト関数を宣言し、`assert_eq!`, `assert!` でアサーションします。`#[should_panic]` でパニックが期待されるテストを書けます。テスト名の一部を指定して特定のテストだけ実行できます: `cargo test test_add`。`,code:`// src/lib.rs
+pub mod task;
+pub mod storage;
+pub mod error;
+
+pub use task::{Task, TaskManager};
+pub use error::TaskError;
+
+// src/task.rs の末尾:
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_task() {
+        let mut mgr = TaskManager::new();
+        let task = mgr.add("Buy milk".to_string(), 1).unwrap();
+        assert_eq!(task.title, "Buy milk");
+        assert_eq!(task.priority, 1);
+        assert!(!task.done);
+    }
+
+    #[test]
+    fn test_complete_task() {
+        let mut mgr = TaskManager::new();
+        mgr.add("Task".to_string(), 2).unwrap();
+        mgr.complete(1).unwrap();
+        assert!(mgr.list()[0].done);
+    }
+
+    #[test]
+    fn test_invalid_priority() {
+        let mut mgr = TaskManager::new();
+        assert!(mgr.add("Task".to_string(), 5).is_err());
+    }
+
+    #[test]
+    fn test_not_found() {
+        let mut mgr = TaskManager::new();
+        assert!(matches!(mgr.complete(999), Err(TaskError::NotFound(999))));
+    }
+}`,afterCode:"`cargo test -- --nocapture` で `println!` の出力をテスト中に表示できます。`cargo test -- --show-output` でも同様です。テストが並列実行されるため、ファイルを使うテストでは一時ファイル名を一意にしましょう。"},
+   ]},
+  {id:"ch10",num:10,title:"完成・配布・振り返り",est:"60分",
+   goal:"完成版のアプリを実装できる。cargo build --releaseでリリースビルドを作成できる。GitHub ActionsでCIを設定できる。",
+   sections:[
+     {title:"リリースビルドとCI/CD",body:`アプリが完成したら、最適化ビルドを作成します。`cargo build --release` でコンパイル最適化が有効になり、実行速度が大幅に向上します（デバッグビルドの比べて2〜10倍速い）。\n\nリリース時のバイナリは `target/release/todo` に生成されます。シングルバイナリで依存なしに動作するため、配布が容易です。`cargo install --path .` でローカルにインストールもできます。\n\n`cargo publish` で crates.io に公開できます。Rustのクレートは充実したドキュメント（`cargo doc`）と的確なSemVerが慣習です。GitHubでのリリース自動化には GitHub Actions + `cargo-dist` が便利です。`,code:`# .github/workflows/ci.yml
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Format check
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+      - name: Test
+        run: cargo test
+      - name: Build release
+        run: cargo build --release`,afterCode:"コースを完了しました！Todoアプリを通して、構造体・エラーハンドリング・JSON永続化・CLI・並行処理・テストというRustの基礎を実践的に習得しました。次の中級コースではWebサーバー・async/await・データベースを学びます。"},
+   ]},
+];
+
+function DataTable({tbl}) {
+  if (!tbl) return null;
+  return (
+    <div>
+      {tbl.cap && <caption style={{display:'block',color:'#f97316',fontSize:'.85rem',marginBottom:'.5rem'}}>{tbl.cap}</caption>}
+      <table>
+        <thead><tr>{tbl.h.map((h,i)=><th key={i}>{h}</th>)}</tr></thead>
+        <tbody>{tbl.r.map((row,i)=><tr key={i}>{row.map((c,j)=><td key={j}>{c}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+function CodeBlock({code}) {
+  if (!code) return null;
+  return <pre><code>{code}</code></pre>;
+}
+function Exercise({ex}) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="ex-block">
+      <div style={{marginBottom:'.5rem'}}><span className="diff">{'⭐'.repeat(ex.diff)}</span></div>
+      <p className="ex-q">{ex.q}</p>
+      <CodeBlock code={ex.code}/>
+      <button className="toggle-btn" onClick={()=>setOpen(!open)}>{open?'回答を隠す':'回答を見る'}</button>
+      {open && <div className="answer"><CodeBlock code={ex.answer}/></div>}
+    </div>
+  );
+}
+function Section({s}) {
+  return (
+    <div className="section">
+      <h3>{s.title}</h3>
+      {s.body.split('\n').map((p,i)=>p.trim()&&<p key={i}>{p.trim()}</p>)}
+      {s.table && <DataTable tbl={s.table}/>}
+      <CodeBlock code={s.code}/>
+      {s.afterCode && <p style={{color:'#cbd5e1',fontSize:'.95rem',marginTop:'.5rem'}}>{s.afterCode}</p>}
+    </div>
+  );
+}
+function App() {
+  const [cur, setCur] = React.useState(0);
+  const [open, setOpen] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+  const ch = chapters[cur];
+  const exList = EX[ch.id] || [];
+  function goTo(idx) { setCur(idx); setOpen(false); window.scrollTo(0,0); }
+  if (done) return (
+    <div className="completion">
+      <div className="badge">🎉 初級コース完了!</div>
+      <p style={{color:'#fed7aa',marginBottom:'1.5rem'}}>CLIアプリを完成させました。次は中級コースでWebサーバー・async/awaitを学びましょう。</p>
+      <a href="../index.html" style={{background:'linear-gradient(135deg,#c2410c,#92400e)',color:'#fff',padding:'.75rem 2rem',borderRadius:'.75rem',fontWeight:600}}>ホームに戻る</a>
+    </div>
+  );
+  return (
+    <div>
+      <div className="chapter">
+        <div className="chapter-header" onClick={()=>setOpen(!open)}>
+          <span className="chapter-title">第{ch.num}章: {ch.title}</span>
+          <div className="chapter-meta">
+            <span className="chapter-est">⏱ {ch.est}</span>
+            <span>{open?'▲':'▼'}</span>
+          </div>
+        </div>
+        {open && (
+          <div className="chapter-body">
+            <div className="goal-block">
+              <h4>🎯 この章のゴール</h4>
+              <p>{ch.goal}</p>
+            </div>
+            {ch.sections.map((s,i)=><Section key={i} s={s}/>)}
+            {exList.length>0 && (
+              <div>
+                <h3 style={{color:'#f97316',margin:'1.5rem 0 1rem',borderBottom:'1px solid #7c2d12',paddingBottom:'.25rem'}}>演習問題</h3>
+                {exList.map((ex,i)=><Exercise key={`${ch.id}-${i}`} ex={ex}/>)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="nav-buttons">
+        <button className="nav-btn" onClick={()=>goTo(cur-1)} disabled={cur===0}>← 前の章</button>
+        {cur<chapters.length-1
+          ?<button className="nav-btn" onClick={()=>goTo(cur+1)}>次の章 →</button>
+          :<button className="nav-btn" onClick={()=>setDone(true)}>コース完了 🎉</button>}
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

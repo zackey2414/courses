@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rust 中級コース | Programming Courses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:#0d0500;color:#e8d5c0;line-height:1.7;min-height:100vh}
+a{color:#fb923c;text-decoration:none}
+a:hover{text-decoration:underline}
+.header{background:linear-gradient(135deg,#1a0a00,#3b1500);border-bottom:1px solid #7c2d12;padding:1rem 2rem;display:flex;align-items:center;gap:1rem;position:sticky;top:0;z-index:100}
+.header a{color:#fb923c;font-weight:700;font-size:1.1rem}
+.header span{color:#c2410c}
+.hero{background:linear-gradient(135deg,#1a0a00 0%,#3b1500 50%,#1a0a00 100%);padding:3rem 2rem;text-align:center;border-bottom:1px solid #7c2d12}
+.hero h1{font-size:2.2rem;color:#fb923c;margin-bottom:.5rem}
+.hero .subtitle{color:#c2410c;font-size:1.1rem;margin-bottom:1rem}
+.hero .meta{display:flex;justify-content:center;gap:2rem;flex-wrap:wrap;margin-bottom:1.5rem}
+.hero .meta span{background:#2d0f00;border:1px solid #7c2d12;padding:.3rem .8rem;border-radius:20px;font-size:.9rem}
+.hero .desc{max-width:700px;margin:0 auto;color:#d4a574;font-size:1rem}
+.nav-tabs{display:flex;justify-content:center;gap:.5rem;padding:1rem;background:#130800;border-bottom:1px solid #7c2d12;flex-wrap:wrap}
+.nav-tab{padding:.4rem 1rem;border-radius:20px;background:#1a0a00;border:1px solid #7c2d12;color:#d4a574;cursor:pointer;font-size:.9rem;transition:all .2s}
+.nav-tab:hover,.nav-tab.active{background:#7c2d12;border-color:#fb923c;color:#fb923c}
+.content{max-width:900px;margin:0 auto;padding:2rem}
+.chapter{background:#1a0a00;border:1px solid #7c2d12;border-radius:12px;margin-bottom:1.5rem;overflow:hidden}
+.chapter-header{padding:1.2rem 1.5rem;cursor:pointer;display:flex;align-items:center;gap:1rem;transition:background .2s}
+.chapter-header:hover{background:#2d0f00}
+.chapter-num{background:linear-gradient(135deg,#c2410c,#ea580c);color:white;width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0}
+.chapter-title{font-size:1.1rem;font-weight:700;color:#fb923c;flex:1}
+.chapter-est{color:#7c2d12;font-size:.85rem}
+.chapter-arrow{color:#7c2d12;transition:transform .3s;font-size:1.2rem}
+.chapter-arrow.open{transform:rotate(180deg)}
+.chapter-body{padding:0 1.5rem 1.5rem;display:none}
+.chapter-body.open{display:block}
+.goal-block{background:#2d0f00;border:1px solid #c2410c;border-radius:8px;padding:1rem 1.2rem;margin-bottom:1.5rem}
+.goal-block h4{color:#fb923c;margin-bottom:.4rem;font-size:.95rem}
+.goal-block p{color:#d4a574;font-size:.9rem}
+.section{margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid #3b1500}
+.section:last-child{border-bottom:none;padding-bottom:0}
+.section h3{color:#f97316;margin-bottom:.7rem;font-size:1rem}
+.section p{color:#d4a574;margin-bottom:.7rem;font-size:.92rem}
+code{font-family:'JetBrains Mono',monospace;background:#0d0500;border:1px solid #3b1500;padding:.1em .4em;border-radius:4px;color:#fb923c;font-size:.88em}
+pre{background:#0d0500;border:1px solid #3b1500;border-radius:8px;padding:1.2rem;overflow-x:auto;margin:.7rem 0}
+pre code{background:none;border:none;padding:0;color:#fb923c;font-size:.88rem;line-height:1.6}
+table{width:100%;border-collapse:collapse;margin:.7rem 0;font-size:.88rem}
+th{background:#2d0f00;color:#fb923c;padding:.5rem .8rem;text-align:left;border:1px solid #7c2d12}
+td{padding:.5rem .8rem;border:1px solid #3b1500;color:#d4a574;vertical-align:top}
+tr:nth-child(even) td{background:#130800}
+.table-caption{color:#7c2d12;font-size:.82rem;margin-bottom:.3rem}
+.exercises{margin-top:1.5rem}
+.exercises h4{color:#fb923c;margin-bottom:1rem;font-size:1rem}
+.exercise{background:#130800;border:1px solid #3b1500;border-radius:8px;margin-bottom:1rem;overflow:hidden}
+.exercise-header{padding:.8rem 1rem;display:flex;align-items:center;gap:.7rem;cursor:pointer;transition:background .2s}
+.exercise-header:hover{background:#1a0a00}
+.diff{display:flex;gap:2px}
+.star{color:#fb923c;font-size:.9rem}
+.star.empty{color:#3b1500}
+.exercise-q{color:#d4a574;flex:1;font-size:.9rem}
+.exercise-body{padding:0 1rem 1rem;display:none}
+.exercise-body.open{display:block}
+.answer-toggle{background:#2d0f00;border:1px solid #c2410c;color:#fb923c;padding:.3rem .8rem;border-radius:6px;cursor:pointer;font-size:.82rem;margin-top:.7rem;font-family:'Noto Sans JP',sans-serif}
+.answer-toggle:hover{background:#3b1500}
+.answer-block{background:#0d0500;border:1px solid #3b1500;border-radius:8px;padding:1rem;margin-top:.7rem;display:none}
+.answer-block.open{display:block}
+.chapter-nav{display:flex;justify-content:space-between;margin-top:2rem;padding-top:1rem;border-top:1px solid #7c2d12}
+.nav-btn{background:#1a0a00;border:1px solid #7c2d12;color:#fb923c;padding:.6rem 1.2rem;border-radius:8px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:.9rem;transition:all .2s}
+.nav-btn:hover{background:#2d0f00;border-color:#fb923c}
+.nav-btn:disabled{opacity:.3;cursor:not-allowed}
+.complete-banner{text-align:center;padding:2rem;background:linear-gradient(135deg,#1a0a00,#3b1500);border:1px solid #c2410c;border-radius:12px;margin-top:2rem}
+.complete-banner h2{color:#fb923c;margin-bottom:.5rem}
+.complete-banner p{color:#d4a574}
+.home-btn{display:inline-block;margin-top:1rem;background:linear-gradient(135deg,#c2410c,#ea580c);color:white;padding:.7rem 1.5rem;border-radius:8px;font-weight:700}
+footer{text-align:center;padding:2rem;color:#7c2d12;font-size:.82rem;border-top:1px solid #3b1500;margin-top:3rem}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const T = {
+  asyncBasics: { h:["概念","同期版","非同期版","説明"], r:[
+    ["関数定義","fn fetch()","async fn fetch()","asyncキーワードを付けるだけ"],
+    ["呼び出し","fetch()","fetch().await",".awaitで実行を一時停止"],
+    ["戻り値","String","Future<Output=String>","Futureトレイトを実装した型"],
+    ["実行器","不要","tokio::main等が必要","ランタイムがFutureを駆動"],
+  ], cap:"asyncとsyncの対応関係" },
+  tokioTasks: { h:["API","用途","メモ"], r:[
+    ["tokio::spawn","並列タスク起動","JoinHandleを返す"],
+    ["task::yield_now()","他タスクに制御を譲る","協調的マルチタスク"],
+    ["time::sleep","非同期スリープ","std::thread::sleepは使わない"],
+    ["time::timeout","タイムアウト付き待機","Result<T, Elapsed>を返す"],
+    ["select!","複数Futureを同時待機","最初に完了した分岐が実行"],
+    ["join!","複数Futureを並列実行","全部完了するまで待つ"],
+  ], cap:"Tokio主要API" },
+  channelTypes: { h:["チャネル","バッファ","用途"], r:[
+    ["mpsc::channel","無限(非推奨)","M→1送受信(デフォルト)"],
+    ["mpsc::bounded","有限","バックプレッシャーあり"],
+    ["oneshot","1回限り","リクエスト/レスポンス"],
+    ["broadcast","有限","1→N配信"],
+    ["watch","最新値のみ","設定変更の通知"],
+  ], cap:"Tokioチャネル種類" },
+  axumRouting: { h:["メソッド","ルータ記法","ハンドラの引数例"], r:[
+    ["GET","get(handler)","Path, Query, State"],
+    ["POST","post(handler)","Json<T>, State"],
+    ["PUT","put(handler)","Path, Json<T>, State"],
+    ["DELETE","delete(handler)","Path, State"],
+    ["PATCH","patch(handler)","Path, Json<T>"],
+    ["ミドルウェア",".layer(...)","TraceLayer, CorsLayer等"],
+  ], cap:"axumルーティングAPI" },
+  sqlxTypes: { h:["Rustの型","SQL型(PostgreSQL)","注意点"], r:[
+    ["i64","BIGINT","主キーに推奨"],
+    ["String","TEXT / VARCHAR","長さ制限なし"],
+    ["Option<String>","NULL許容列","NULLをSomeで包む"],
+    ["bool","BOOLEAN",""],
+    ["f64","DOUBLE PRECISION","金額計算には不向き"],
+    ["chrono::DateTime","TIMESTAMPTZ","タイムゾーン付き"],
+    ["Vec<u8>","BYTEA","バイナリ"],
+  ], cap:"sqlx型マッピング(PostgreSQL)" },
+  errorHandling: { h:["アプローチ","クレート","特徴"], r:[
+    ["Box<dyn Error>","std","簡単、型情報失う"],
+    ["カスタムenumを手書き","std","完全制御、ボイラープレート多"],
+    ["thiserror","thiserror","derive、ライブラリ向け"],
+    ["anyhow","anyhow","context()でラップ、アプリ向け"],
+    ["eyre","eyre","anyhow派生、レポート機能強化"],
+  ], cap:"エラーハンドリング手法の比較" },
+  macroTypes: { h:["種類","定義方法","呼び出し方","主な用途"], r:[
+    ["macro_rules!","macro_rules! name","name!(...)","パターンマッチベースの変換"],
+    ["derive macro","#[proc_macro_derive]","#[derive(Name)]","構造体/enumへの実装自動生成"],
+    ["attribute macro","#[proc_macro_attribute]","#[name(...)]","関数・モジュールの変換"],
+    ["function-like macro","#[proc_macro]","name!(...)","任意のトークン列を変換"],
+  ], cap:"Rustマクロの4種類" },
+  unsafeOps: { h:["操作","説明","注意"], r:[
+    ["生ポインタの参照外し","*ptr","nullチェック必須"],
+    ["unsafe関数の呼び出し","unsafe fn","前提条件をdocに書く"],
+    ["静的変数への可変アクセス","static mut","データ競合の可能性"],
+    ["unsafeトレイトの実装","unsafe impl","Send/Sync等"],
+    ["外部コードの呼び出し","extern \"C\"","ABI適合を保証すること"],
+  ], cap:"unsafeで許可される操作" },
+  perfTools: { h:["ツール","用途","使い方"], r:[
+    ["cargo bench","ベンチマーク","criterion等と組み合わせる"],
+    ["perf","CPUプロファイル","Linux専用、flamegraphと組合せ"],
+    ["cargo flamegraph","フレームグラフ","可視化に優れる"],
+    ["heaptrack","メモリプロファイル","ヒープ割り当て追跡"],
+    ["cargo expand","マクロ展開確認","デバッグに役立つ"],
+    ["cargo miri","UB検出","unsafeコードの検証"],
+  ], cap:"Rustパフォーマンス分析ツール" },
+  ffiBasics: { h:["方向","記述","説明"], r:[
+    ["Rust→C","extern \"C\" { fn ... }","Cの関数をRustから呼ぶ"],
+    ["C→Rust","#[no_mangle] pub extern \"C\" fn","RustをCから呼べるよう公開"],
+    ["型変換","c_int, c_char等","libc/std::ffi::*で対応"],
+    ["文字列","CString/CStr","NUL終端に注意"],
+    ["コールバック","fn pointer","extern \"C\" fnで宣言"],
+  ], cap:"FFI基本パターン" },
+  testingTiers: { h:["テスト種別","配置場所","特徴"], r:[
+    ["単体テスト","src/内 #[cfg(test)]","プライベート関数もテスト可"],
+    ["統合テスト","tests/ディレクトリ","公開APIのみ"],
+    ["ドキュメントテスト","///コメント内 ```rust","ドキュメントが常に正しいことを保証"],
+    ["ベンチマーク","benches/またはcriterion","パフォーマンス回帰検知"],
+    ["プロパティテスト","proptest/quickcheck","ランダム入力で境界ケース発見"],
+  ], cap:"テストの種類と配置" },
+  wasm: { h:["概念","説明"], r:[
+    ["wasm-pack","RustコードをWasmにコンパイルするツール"],
+    ["wasm-bindgen","Rust/JSの境界を管理するフレームワーク"],
+    ["js_sys","Web APIへのRustバインディング"],
+    ["web_sys","DOM/BOM APIへのRustバインディング"],
+    ["#[wasm_bindgen]","JSから呼べる関数/構造体を指定するattribute"],
+  ], cap:"wasm-pack/wasm-bindgen主要概念" },
+};
+
+const EX = {
+ch1:[
+  {diff:1,q:"tokio::mainを使って、'Hello, async Rust!'と出力する非同期mainを書け。",code:`#[tokio::main]
+async fn main() {
+    // ここに書く
+}`,answer:`#[tokio::main]
+async fn main() {
+    println!("Hello, async Rust!");
+}`},
+  {diff:2,q:"非同期関数 greet(name: &str) -> String を定義し、'Hello, {name}!'を返せ。mainで.awaitして出力せよ。",code:`async fn greet(name: &str) -> String {
+    // ここに書く
+}
+
+#[tokio::main]
+async fn main() {
+    // ここに書く
+}`,answer:`async fn greet(name: &str) -> String {
+    format!("Hello, {}!", name)
+}
+
+#[tokio::main]
+async fn main() {
+    let msg = greet("Ferris").await;
+    println!("{}", msg);
+}`},
+  {diff:3,q:"tokio::time::sleepを使って1秒後に'Done'と出力する非同期関数 delayed_print を書け。",code:`use tokio::time::{sleep, Duration};
+
+async fn delayed_print() {
+    // 1秒待ってからDoneを出力
+}
+
+#[tokio::main]
+async fn main() {
+    delayed_print().await;
+}`,answer:`use tokio::time::{sleep, Duration};
+
+async fn delayed_print() {
+    sleep(Duration::from_secs(1)).await;
+    println!("Done");
+}
+
+#[tokio::main]
+async fn main() {
+    delayed_print().await;
+}`},
+],
+ch2:[
+  {diff:1,q:"tokio::spawnで'Task A'と'Task B'を並列に出力するプログラムを書け。",code:`#[tokio::main]
+async fn main() {
+    // 2つのspawnタスクを起動しjoin
+}`,answer:`#[tokio::main]
+async fn main() {
+    let a = tokio::spawn(async { println!("Task A"); });
+    let b = tokio::spawn(async { println!("Task B"); });
+    let _ = tokio::join!(a, b);
+}`},
+  {diff:2,q:"mpscチャネルで数字1〜5を送信し、受信側で合計を出力するプログラムを書け。",code:`use tokio::sync::mpsc;
+
+#[tokio::main]
+async fn main() {
+    // チャネル生成・送受信
+}`,answer:`use tokio::sync::mpsc;
+
+#[tokio::main]
+async fn main() {
+    let (tx, mut rx) = mpsc::channel(8);
+    tokio::spawn(async move {
+        for i in 1..=5 { tx.send(i).await.unwrap(); }
+    });
+    let mut sum = 0;
+    while let Some(v) = rx.recv().await { sum += v; }
+    println!("sum = {}", sum);
+}`},
+  {diff:3,q:"tokio::select!を使って、2つの非同期sleepのうち先に終わった方を判定し出力せよ。",code:`use tokio::time::{sleep, Duration};
+
+#[tokio::main]
+async fn main() {
+    tokio::select! {
+        // ここに2つのbranchを書く
+    }
+}`,answer:`use tokio::time::{sleep, Duration};
+
+#[tokio::main]
+async fn main() {
+    tokio::select! {
+        _ = sleep(Duration::from_millis(100)) => println!("branch A won"),
+        _ = sleep(Duration::from_millis(200)) => println!("branch B won"),
+    }
+}`},
+],
+ch3:[
+  {diff:1,q:"axumで GET / にアクセスすると'Hello, axum!'を返すサーバーを書け(ポート3000)。",code:`use axum::{Router, routing::get};
+
+#[tokio::main]
+async fn main() {
+    // ここに書く
+}`,answer:`use axum::{Router, routing::get};
+
+async fn root() -> &'static str { "Hello, axum!" }
+
+#[tokio::main]
+async fn main() {
+    let app = Router::new().route("/", get(root));
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}`},
+  {diff:2,q:"GET /hello/:nameで'Hello, {name}!'を返すハンドラを書け。Pathエクストラクタを使うこと。",code:`use axum::{Router, routing::get, extract::Path};
+
+async fn hello_name(/* ここ */) -> String {
+    // ここに書く
+}`,answer:`use axum::{Router, routing::get, extract::Path};
+
+async fn hello_name(Path(name): Path<String>) -> String {
+    format!("Hello, {}!", name)
+}`},
+  {diff:3,q:"POST /echo でJSONボディ {\"message\": \"...\"}を受け取り、そのまま返すハンドラを書け。Serdeのderive を使うこと。",code:`use axum::{routing::post, Json};
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
+struct Msg { message: String }
+
+async fn echo(/* ここ */) -> /* ここ */ {
+    // ここに書く
+}`,answer:`use axum::{routing::post, Json};
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
+struct Msg { message: String }
+
+async fn echo(Json(body): Json<Msg>) -> Json<Msg> {
+    Json(body)
+}`},
+],
+ch4:[
+  {diff:1,q:"sqlx::PgPoolを使って環境変数DATABASE_URLからプールを作成するコードを書け。",code:`use sqlx::postgres::PgPoolOptions;
+
+#[tokio::main]
+async fn main() -> Result<(), sqlx::Error> {
+    let url = std::env::var("DATABASE_URL").unwrap();
+    // プール作成
+    Ok(())
+}`,answer:`use sqlx::postgres::PgPoolOptions;
+
+#[tokio::main]
+async fn main() -> Result<(), sqlx::Error> {
+    let url = std::env::var("DATABASE_URL").unwrap();
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&url).await?;
+    println!("Connected: {:?}", pool);
+    Ok(())
+}`},
+  {diff:2,q:"sqlx::query_as!で users テーブルから全件取得し、名前を出力するコードを書け(id: i64, name: String)。",code:`#[derive(Debug)]
+struct User { id: i64, name: String }
+
+async fn list_users(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    // ここに書く
+    Ok(())
+}`,answer:`#[derive(Debug, sqlx::FromRow)]
+struct User { id: i64, name: String }
+
+async fn list_users(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    let users = sqlx::query_as::<_, User>("SELECT id, name FROM users")
+        .fetch_all(pool).await?;
+    for u in users { println!("{}: {}", u.id, u.name); }
+    Ok(())
+}`},
+  {diff:3,q:"トランザクションを使って2つのINSERT文を実行し、どちらかが失敗したらロールバックするコードを書け。",code:`async fn insert_pair(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    // transactionを取得して2つinsert
+    Ok(())
+}`,answer:`async fn insert_pair(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("INSERT INTO items(name) VALUES ($1)").bind("foo").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO items(name) VALUES ($1)").bind("bar").execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}`},
+],
+ch5:[
+  {diff:1,q:"macro_rules! を使って say_hello!() を呼ぶと'Hello!'と出力するマクロを書け。",code:`macro_rules! say_hello {
+    // ここに書く
+}
+
+fn main() { say_hello!(); }`,answer:`macro_rules! say_hello {
+    () => { println!("Hello!"); };
+}
+
+fn main() { say_hello!(); }`},
+  {diff:2,q:"macro_rules! vec_of_strings! を定義し、vec_of_strings![\"a\",\"b\",\"c\"]がVec<String>を返すようにせよ。",code:`macro_rules! vec_of_strings {
+    // ここに書く
+}
+
+fn main() {
+    let v = vec_of_strings!["a", "b", "c"];
+    println!("{:?}", v);
+}`,answer:`macro_rules! vec_of_strings {
+    ($($x:expr),*) => {
+        vec![$($x.to_string()),*]
+    };
+}
+
+fn main() {
+    let v = vec_of_strings!["a", "b", "c"];
+    println!("{:?}", v);
+}`},
+  {diff:3,q:"thiserrorを使って AppError を定義し、ParseError と NotFound の2バリアントを持たせ、Displayで適切なメッセージを表示させよ。",code:`use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum AppError {
+    // ここに書く
+}`,answer:`use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum AppError {
+    #[error("parse error: {0}")]
+    ParseError(String),
+    #[error("not found: {0}")]
+    NotFound(String),
+}`},
+],
+ch6:[
+  {diff:1,q:"生ポインタを使って整数をunsafeブロックで読み書きするコードを書け。",code:`fn main() {
+    let mut x = 42i32;
+    let ptr = &mut x as *mut i32;
+    unsafe {
+        // ptrを通じてxを100に変更して出力
+    }
+}`,answer:`fn main() {
+    let mut x = 42i32;
+    let ptr = &mut x as *mut i32;
+    unsafe {
+        *ptr = 100;
+        println!("{}", *ptr);
+    }
+}`},
+  {diff:2,q:"extern \"C\" を使って C の abs 関数を呼び出すコードを書け(libc不要、std::ffi経由)。",code:`extern "C" {
+    // ここに宣言
+}
+
+fn main() {
+    let result = unsafe { /* abs(-5) */ };
+    println!("{}", result);
+}`,answer:`extern "C" {
+    fn abs(x: i32) -> i32;
+}
+
+fn main() {
+    let result = unsafe { abs(-5) };
+    println!("{}", result);
+}`},
+  {diff:3,q:"unsafe traitのMyUnsafeを定義し、構造体Safeに実装せよ。traitはunsafe fn do_it(&self)を持つこと。",code:`unsafe trait MyUnsafe {
+    // ここに書く
+}
+
+struct Safe;
+
+// ここに実装`,answer:`unsafe trait MyUnsafe {
+    unsafe fn do_it(&self);
+}
+
+struct Safe;
+
+unsafe impl MyUnsafe for Safe {
+    unsafe fn do_it(&self) {
+        println!("Safe::do_it called");
+    }
+}`},
+],
+ch7:[
+  {diff:1,q:"criterionを使ってfib(20)のベンチマークを書け（関数fibは再帰で実装すること）。",code:`// Cargo.toml: criterion = \"0.5\" (dev-dependency)
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn fib(n: u64) -> u64 {
+    // 再帰fib
+    todo!()
+}
+
+fn bench(c: &mut Criterion) {
+    // ここにベンチマーク
+}
+
+criterion_group!(benches, bench);
+criterion_main!(benches);`,answer:`use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn fib(n: u64) -> u64 {
+    if n < 2 { n } else { fib(n-1) + fib(n-2) }
+}
+
+fn bench(c: &mut Criterion) {
+    c.bench_function("fib 20", |b| b.iter(|| fib(black_box(20))));
+}
+
+criterion_group!(benches, bench);
+criterion_main!(benches);`},
+  {diff:2,q:"Iterator::mapとfilterを連鎖させ、1〜100のうち偶数の2乗の合計をイテレータチェーンだけで計算せよ。",code:`fn main() {
+    let result: u64 = (1u64..=100)
+        // ここに書く
+        ;
+    println!("{}", result);
+}`,answer:`fn main() {
+    let result: u64 = (1u64..=100)
+        .filter(|n| n % 2 == 0)
+        .map(|n| n * n)
+        .sum();
+    println!("{}", result);
+}`},
+  {diff:3,q:"Rc<RefCell<Vec<i32>>>を使って、複数の所有者から同一ベクタに追加するコードを書け。",code:`use std::rc::Rc;
+use std::cell::RefCell;
+
+fn main() {
+    let shared = Rc::new(RefCell::new(vec![]));
+    // cloneして2つの所有者から1と2を追加
+    println!("{:?}", shared.borrow());
+}`,answer:`use std::rc::Rc;
+use std::cell::RefCell;
+
+fn main() {
+    let shared = Rc::new(RefCell::new(vec![]));
+    let a = Rc::clone(&shared);
+    let b = Rc::clone(&shared);
+    a.borrow_mut().push(1);
+    b.borrow_mut().push(2);
+    println!("{:?}", shared.borrow());
+}`},
+],
+ch8:[
+  {diff:1,q:"proptest を使って add(a, b) == add(b, a) を確認するプロパティテストを書け。",code:`// Cargo.toml: proptest = \"1\" (dev-dependency)
+fn add(a: i32, b: i32) -> i32 { a + b }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        // ここに書く
+    }
+}`,answer:`fn add(a: i32, b: i32) -> i32 { a + b }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn commutative(a: i32, b: i32) {
+            prop_assert_eq!(add(a, b), add(b, a));
+        }
+    }
+}`},
+  {diff:2,q:"async_traitクレートを使ってasync fnを含むトレイトを定義し、構造体に実装せよ。",code:`use async_trait::async_trait;
+
+#[async_trait]
+trait Greeter {
+    async fn greet(&self) -> String;
+}
+
+struct English;
+
+// ここに実装`,answer:`use async_trait::async_trait;
+
+#[async_trait]
+trait Greeter {
+    async fn greet(&self) -> String;
+}
+
+struct English;
+
+#[async_trait]
+impl Greeter for English {
+    async fn greet(&self) -> String {
+        "Hello!".to_string()
+    }
+}`},
+  {diff:3,q:"tokio::test を使って非同期関数のユニットテストを書け(1msのsleep後にtrueを返す関数をテスト)。",code:`use tokio::time::{sleep, Duration};
+
+async fn eventually_true() -> bool {
+    sleep(Duration::from_millis(1)).await;
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    // ここに書く
+}`,answer:`use tokio::time::{sleep, Duration};
+
+async fn eventually_true() -> bool {
+    sleep(Duration::from_millis(1)).await;
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_eventually_true() {
+        assert!(eventually_true().await);
+    }
+}`},
+],
+ch9:[
+  {diff:1,q:"wasm-bindgen を使って alert(\"Hello from Rust!\")を呼び出すWasm関数を書け。",code:`use wasm_bindgen::prelude::*;
+
+// JSのalertを呼ぶ外部宣言
+
+#[wasm_bindgen]
+pub fn greet() {
+    // ここに書く
+}`,answer:`use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+extern "C" {
+    fn alert(s: &str);
+}
+
+#[wasm_bindgen]
+pub fn greet() {
+    alert("Hello from Rust!");
+}`},
+  {diff:2,q:"JSから呼べる add(a: i32, b: i32) -> i32 をwasm_bindgenで公開せよ。",code:`use wasm_bindgen::prelude::*;
+
+// ここに書く`,answer:`use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}`},
+  {diff:3,q:"wasm_bindgenでRust構造体GreeterをJSに公開し、new()とgreet() -> Stringメソッドを持たせよ。",code:`use wasm_bindgen::prelude::*;
+
+// ここに書く`,answer:`use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub struct Greeter { name: String }
+
+#[wasm_bindgen]
+impl Greeter {
+    #[wasm_bindgen(constructor)]
+    pub fn new(name: String) -> Greeter { Greeter { name } }
+    pub fn greet(&self) -> String { format!("Hello, {}!", self.name) }
+}`},
+],
+ch10:[
+  {diff:1,q:"Arc<Mutex<i32>>を2スレッドで共有し、それぞれ50回インクリメントして合計100になることを確認するコードを書け。",code:`use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    // ここに書く
+}`,answer:`use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+    for _ in 0..2 {
+        let c = Arc::clone(&counter);
+        handles.push(thread::spawn(move || {
+            for _ in 0..50 { *c.lock().unwrap() += 1; }
+        }));
+    }
+    for h in handles { h.join().unwrap(); }
+    println!("{}", *counter.lock().unwrap()); // 100
+}`},
+  {diff:2,q:"RwLockを使って、複数のread threadが同時に読み、1つのwrite threadが書くコードを書け。",code:`use std::sync::{Arc, RwLock};
+use std::thread;
+
+fn main() {
+    let data = Arc::new(RwLock::new(0i32));
+    // 3つの読みスレッドと1つの書きスレッドを起動
+}`,answer:`use std::sync::{Arc, RwLock};
+use std::thread;
+
+fn main() {
+    let data = Arc::new(RwLock::new(0i32));
+    let mut handles = vec![];
+    for _ in 0..3 {
+        let d = Arc::clone(&data);
+        handles.push(thread::spawn(move || {
+            println!("read: {}", *d.read().unwrap());
+        }));
+    }
+    let d = Arc::clone(&data);
+    handles.push(thread::spawn(move || { *d.write().unwrap() = 42; }));
+    for h in handles { h.join().unwrap(); }
+}`},
+  {diff:3,q:"crossbeamのscoped threadを使ってスタック上のスライスを複数スレッドで並列処理するコードを書け。",code:`// crossbeam = \"0.8\"
+fn main() {
+    let data = vec![1, 2, 3, 4];
+    // crossbeam::scope を使って各要素を別スレッドで出力
+}`,answer:`fn main() {
+    let data = vec![1, 2, 3, 4];
+    crossbeam::scope(|s| {
+        for item in &data {
+            s.spawn(move |_| println!("{}", item));
+        }
+    }).unwrap();
+}`},
+],
+ch11:[
+  {diff:1,q:"reqwestを使ってhttps://httpbin.org/get にGETリクエストを送り、レスポンスのステータスコードを出力するコードを書け。",code:`// reqwest = { version = \"0.11\", features = [\"json\"] }
+#[tokio::main]
+async fn main() -> Result<(), reqwest::Error> {
+    // ここに書く
+    Ok(())
+}`,answer:`#[tokio::main]
+async fn main() -> Result<(), reqwest::Error> {
+    let resp = reqwest::get("https://httpbin.org/get").await?;
+    println!("Status: {}", resp.status());
+    Ok(())
+}`},
+  {diff:2,q:"serde_jsonでJSON文字列を構造体にデシリアライズし、フィールドを出力するコードを書け。",code:`use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+struct Point { x: f64, y: f64 }
+
+fn main() {
+    let json = r#"{\"x\": 1.0, \"y\": 2.5}"#;
+    // ここに書く
+}`,answer:`use serde::Deserialize;
+use serde_json;
+
+#[derive(Deserialize, Debug)]
+struct Point { x: f64, y: f64 }
+
+fn main() {
+    let json = r#"{"x": 1.0, "y": 2.5}"#;
+    let p: Point = serde_json::from_str(json).unwrap();
+    println!("{:?}", p);
+}`},
+  {diff:3,q:"tower::ServiceBuilderを使ってリクエストにログを追加するミドルウェアスタックを構築するコードのスケルトンを書け。",code:`use tower::ServiceBuilder;
+use tower_http::trace::TraceLayer;
+
+// axum Routerにmiddlewareを追加する例を書け`,answer:`use axum::{Router, routing::get};
+use tower::ServiceBuilder;
+use tower_http::trace::TraceLayer;
+
+async fn root() -> &'static str { "ok" }
+
+#[tokio::main]
+async fn main() {
+    let app = Router::new()
+        .route("/", get(root))
+        .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()));
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}`},
+],
+ch12:[
+  {diff:1,q:"Cargo.tomlのworkspaceを使って、2つのcrate(lib/app)をまとめるワークスペース設定を書け。",code:`# Cargo.toml (root)
+# ここに書く`,answer:`[workspace]
+members = [
+    "mylib",
+    "myapp",
+]
+resolver = "2"`},
+  {diff:2,q:"pub use を使って内部モジュールの型をクレートルートから再エクスポートするコードを書け。",code:`// src/lib.rs
+mod internal {
+    pub struct Foo;
+}
+
+// Fooをクレートルートから使えるように再エクスポート`,answer:`// src/lib.rs
+mod internal {
+    pub struct Foo;
+}
+
+pub use internal::Foo;`},
+  {diff:3,q:"semver互換のバージョン番号 \"1.2.3\" を parse して major/minor/patch を出力するコードをsemverクレートで書け。",code:`// semver = \"1\"
+fn main() {
+    // ここに書く
+}`,answer:`use semver::Version;
+
+fn main() {
+    let v = Version::parse("1.2.3").unwrap();
+    println!("major={} minor={} patch={}", v.major, v.minor, v.patch);
+}`},
+],
+};
+
+const chapters = [
+{id:"ch1",num:1,title:"非同期プログラミング入門 (async/await)",est:"60分",
+goal:"async/awaitの仕組みを理解し、Futureトレイトがどのように動作するかを説明できる。tokio::mainを使った非同期プログラムを自分で書ける。",
+sections:[
+{title:"なぜ非同期が必要か",
+body:`Webサーバーやネットワーク通信では、I/O待ちの間CPUが遊んでしまいます。同期プログラムでは1スレッドが1リクエストを担当するため、同時接続数が増えるとスレッドのメモリ消費が爆発します。非同期プログラミングはI/O待ちを「他のタスクに制御を譲る」形で表現し、少ないスレッドで大量の並行処理を実現します。
+
+Pythonのasyncio・JavaScriptのPromise/awaitと概念は同じです。ただしRustのasyncはコンパイル時に状態機械（ステートマシン）に変換されるため、ランタイムコストがほぼゼロという点が異なります。Pythonではasyncioのイベントループが動的にコルーチンを管理しますが、Rustでは実行時にヒープ割り当てが発生しない設計が基本です。
+
+Rustのasyncはゼロコスト抽象化の典型例です。asyncブロックはFutureトレイトを実装した匿名型にコンパイルされ、スレッドをブロックせずに中断・再開できる状態機械として動作します。`,
+table:T.asyncBasics,
+afterTable:`Futureは「まだ完成していない計算」を表す型です。.awaitと書くことで現在のタスクを中断し、ランタイムが他のタスクを実行できるようにします。Futureそのものは値であり、.awaitするまで何も実行されません（Pythonのコルーチンと同じ遅延評価）。`},
+{title:"tokioランタイム",
+body:`Rustのasyncはランタイムを標準ライブラリに含みません。代わりにtokio・async-std・smbioなど複数のランタイムが存在します。現在の業界標準はtokioで、Webフレームワーク・データベースドライバ・クラウドSDKの大半がtokioをベースにしています。
+
+tokioは内部でワークスティーリング方式のスレッドプールを使い、複数のCPUコアを効率よく活用します。#[tokio::main]アトリビュートを付けると、mainをtokioランタイムで包む定型文が自動生成されます。`,
+code:`// Cargo.toml
+// [dependencies]
+// tokio = { version = "1", features = ["full"] }
+
+#[tokio::main]
+async fn main() {
+    let result = fetch_data().await;
+    println!("{}", result);
+}
+
+async fn fetch_data() -> String {
+    // 実際にはHTTPリクエスト等を行う
+    "data".to_string()
+}`,
+afterCode:`features = ["full"]は学習・プロトタイプ向けです。本番では必要なfeatureだけ有効にするとコンパイル時間が短縮されます（例: features = ["rt-multi-thread","macros","io-util"]）。`},
+]},
+{id:"ch2",num:2,title:"Tokioの並行処理パターン",est:"70分",
+goal:"tokio::spawn・join!・select!・チャネルを使いこなし、複数の非同期タスクを安全に協調させる設計ができる。",
+sections:[
+{title:"tokio::spawnでタスクを並列起動",
+body:`tokio::spawnは新しい非同期タスクをランタイムに送り込みます。Pythonのasyncio.create_taskに相当しますが、RustではJoinHandle<T>が返るため結果を後から受け取れます。spawnしたタスクは即座に実行を開始し、JoinHandleを.awaitすることで完了を待てます。
+
+spawnに渡すクロージャはSend + 'staticを満たす必要があります。これはmulti-thread環境で任意のスレッドに移動する可能性があるためで、Mutexで包まれていない&mut参照をキャプチャするとコンパイルエラーになります。この制約はバグを実行時ではなくコンパイル時に検出するRustの強みです。`,
+table:T.tokioTasks,
+afterTable:`select!はPythonのasyncio.waitに相当しますが、マクロとして実装されており構文がより明確です。join!はasyncio.gatherに対応します。タイムアウト付き処理はtime::timeout(Duration, future).awaitで書くのが慣用的です。`},
+{title:"チャネルによるタスク間通信",
+body:`スレッド間・タスク間のデータ転送にはチャネルを使います。Rustにはstd::sync::mpscとtokio::sync::mpscがあり、非同期コードではtokio版を使います。tokio版の.send()は非同期であり、バッファが満杯のとき空きができるまで.awaitします（バックプレッシャー）。
+
+Pythonのasyncio.Queueとよく似ていますが、Rustでは型安全性が保証されます。送信者(Sender)をcloneすることで複数のproducerを作れます（M→1パターン）。チャネルのバッファサイズはシステムのスループットとレイテンシのトレードオフです。`,
+table:T.channelTypes,
+afterTable:`oneshotチャネルはリクエスト/レスポンスパターンに最適です。例えばワーカータスクにoneshotのSenderを渡し、完了したらSenderに結果を送るパターンはよく使われます。watchチャネルは設定のホットリロード等に向いています。`},
+]},
+{id:"ch3",num:3,title:"Webフレームワーク: axum",est:"75分",
+goal:"axumでRESTful APIサーバーを構築し、パス・クエリ・JSONボディのエクストラクタを使いこなせる。共有状態をState経由で渡す設計ができる。",
+sections:[
+{title:"axumの設計思想",
+body:`axumはtokioチームが開発したWebフレームワークで、tower/hyperをベースにしています。actix-webと並ぶ人気がありますが、axumはよりRust的な設計でマクロを最小限にし、通常の関数とトレイトでルーティングを表現します。
+
+Pythonのbottleやflaskと比べると、ルーティングは文字列ではなくRouter::new().route("/path", get(handler))のように型安全に記述します。ハンドラの引数は「エクストラクタ」と呼ばれるパターンで、From<Request>を実装した型を引数に書くだけで自動的にリクエストから情報を取り出せます。Dependency Injectionがコンパイル時に型で検証されるイメージです。`,
+table:T.axumRouting,
+afterTable:`axumのエクストラクタはFromRequest/FromRequestPartsトレイトを実装しています。自分でカスタムエクストラクタを書けば認証チェック等を引数に表現できます。エラー時はIntoResponseを実装した型を返すだけでHTTPエラーレスポンスに変換されます。`},
+{title:"共有状態とミドルウェア",
+body:`複数のハンドラで共有する状態（データベースプール・設定等）はState<T>エクストラクタで受け取ります。Router::with_state(state)でルータに状態を束縛します。内部的にはArc<T>でラップされているため、スレッド間共有が安全です。
+
+ミドルウェアはtower::Layerトレイトで実装し、.layer()でルータに追加します。tower-httpクレートにはTraceLayer（ログ）・CorsLayer・CompressionLayer等の実用的なミドルウェアが揃っています。Pythonのstarlette/fastapi middlewareと同じ概念ですが、型安全にコンパイル時に接続が検証されます。`,
+code:`use axum::{Router, routing::get, extract::{Path, State}, Json};
+use std::sync::Arc;
+use serde::Serialize;
+
+#[derive(Clone)]
+struct AppState { greeting: String }
+
+#[derive(Serialize)]
+struct Resp { message: String }
+
+async fn hello(
+    Path(name): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> Json<Resp> {
+    Json(Resp { message: format!("{}, {}!", state.greeting, name) })
+}
+
+#[tokio::main]
+async fn main() {
+    let state = Arc::new(AppState { greeting: "Hello".into() });
+    let app = Router::new()
+        .route("/hello/:name", get(hello))
+        .with_state(state);
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}`,
+afterCode:`State<Arc<T>>のパターンはaxumの慣用形です。Arc<Mutex<T>>にすることで可変状態も共有できますが、Mutexのロック時間を最小限に保つよう設計してください。`},
+]},
+{id:"ch4",num:4,title:"データベース連携: sqlx",est:"80分",
+goal:"sqlxでPostgreSQL/SQLiteに接続し、型安全なクエリを書ける。コネクションプールとトランザクションを適切に使えるようになる。",
+sections:[
+{title:"sqlxの型安全クエリ",
+body:`sqlxはコンパイル時にSQLを検証できる非同期データベースクレートです。query_as!マクロを使うと、SELECT列とRust構造体のフィールドがコンパイル時に照合されます。SQLの誤りが実行時ではなくビルド時に発覚するため、Pythonのsqlalchemyより安全です。
+
+コンパイル時検証にはDATABASE_URL環境変数と実際のデータベースへの接続が必要です（オフラインモードも用意されています）。query!とquery_as!はマクロ、sqlx::query()とsqlx::query_as()は動的バージョンで後者はコンパイル時検証なしです。`,
+table:T.sqlxTypes,
+afterTable:`NULLの可能性がある列はOption<T>にマッピングします。Option<String>をSomeとNoneで扱うことで、NULL許容列の取り忘れをコンパイラが検出してくれます。これはPythonのNone扱いと比べて圧倒的に安全です。`},
+{title:"コネクションプールとトランザクション",
+body:`本番環境ではPgPoolを使いコネクションを再利用します。PgPoolOptionsでmax_connections・connect_timeout・idle_timeout等を調整できます。プールはArcで包まれているためclone()しても低コストです。
+
+トランザクションはpool.begin()で開始し、tx.commit()またはtx.rollback()で終了します。dropするとrollbackが自動実行されるため、エラー時の安全性が高いです。実務では複数のINSERT/UPDATEをまとめてatomicに実行する際に必須です。`,
+code:`use sqlx::{PgPool, postgres::PgPoolOptions};
+
+async fn run(pool: &PgPool) -> Result<(), sqlx::Error> {
+    // トランザクション例
+    let mut tx = pool.begin().await?;
+
+    sqlx::query!(
+        "INSERT INTO todos (title, done) VALUES ($1, $2)",
+        "Learn sqlx",
+        false,
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    let count = sqlx::query_scalar!("SELECT COUNT(*) FROM todos")
+        .fetch_one(&mut *tx)
+        .await?;
+
+    println!("todos count: {:?}", count);
+    tx.commit().await?;
+    Ok(())
+}`,
+afterCode:`&mut *txというパターンはトランザクションをExecutorとして渡すための慣用表現です。poolとtxの両方がExecutorを実装しているため、ヘルパー関数にExecutor型を受け取らせることで同一関数をプールトランザクション両方で使えます。`},
+]},
+{id:"ch5",num:5,title:"マクロとメタプログラミング",est:"75分",
+goal:"macro_rules!で実用的な宣言的マクロを書ける。thiserror/anyhowのprocマクロを使いこなし、#[derive]の仕組みを説明できる。",
+sections:[
+{title:"macro_rules!: 宣言的マクロ",
+body:`macro_rules!はパターンマッチによるコード生成システムです。Pythonにはデコレータがありますが、macro_rules!はより強力で引数の数を可変にしたり、式・型・識別子など様々なトークンをキャプチャできます。実行時ではなくコンパイル時に展開されるため、ゼロコストです。
+
+vec![]・println!・assert_eq!はすべてmacro_rules!で実装されています。自作マクロを書く場面はそれほど多くありませんが、反復するボイラープレートを削減するために有用です。proc-macroより学習コストが低いため、まずmacro_rules!から始めることをお勧めします。`,
+table:T.macroTypes,
+afterTable:`cargo expandコマンド（cargo install cargo-expand）を使うとマクロ展開後のコードを確認できます。デバッグに非常に役立つので必ず覚えておいてください。`},
+{title:"proc-macroとderiveマクロ",
+body:`proc-macro（手続き的マクロ）はRustコード自体を入力として受け取り、新しいRustコードを出力する関数です。#[derive(Debug, Clone, Serialize)]のようなderiveマクロは最も一般的な使用例です。synクレートでASTをパースし、quote!クレートでコードを生成するのが標準パターンです。
+
+proc-macroは独立したクレートとして定義する必要があり（Cargo.tomlにproc-macro = trueを指定）、学習コストは高めです。しかしserdeのようなエコシステムの要となるクレートはprocマクロで成り立っているため、仕組みを理解しておくことは重要です。thiserror・anyhow・serde・async-traitなど日常的に使うクレートはすべてprocマクロの恩恵を受けています。`,
+code:`// thiserrorでカスタムエラー型を定義
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum AppError {
+    #[error("database error: {0}")]
+    Database(#[from] sqlx::Error),
+
+    #[error("not found: id={0}")]
+    NotFound(i64),
+
+    #[error("validation failed: {field} — {reason}")]
+    Validation { field: String, reason: String },
+}
+
+// anyhowでアプリ層のエラー処理
+use anyhow::{Context, Result};
+
+fn load_config(path: &str) -> Result<String> {
+    std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read config: {}", path))
+}`,
+afterTable:`thiserrorはライブラリクレート向け（型安全なエラー定義）、anyhowはアプリケーション向け（コンテキスト付きエラー伝播）と使い分けるのが定番パターンです。`,
+afterCode:`#[from]アトリビュートを付けるとFromトレイトが自動実装され、?演算子でsqlx::ErrorをAppErrorに自動変換できます。`},
+]},
+{id:"ch6",num:6,title:"unsafe Rustと低レベルプログラミング",est:"70分",
+goal:"unsafeブロックの5種類の操作を説明でき、生ポインタとFFIを安全に扱える。Sendとunsafe traitの関係を理解できる。",
+sections:[
+{title:"unsafeブロックの役割",
+body:`unsafeブロックはRustの安全保証をプログラマが手動で維持することをコンパイラと約束する構文です。Cのポインタ操作をそのまま行えますが、unsafeブロック内のバグはCのバグと同様にUB（未定義動作）を引き起こします。
+
+重要なのは「unsafeブロックはバグを許可するのではなく、バグがないことをプログラマが保証する」という点です。標準ライブラリのVecやStringはunsafeで実装されていますが、安全なAPIの背後に隠蔽されています。これが「unsafeを安全な抽象に包む」パターンで、Rustのエコシステム全体の設計思想です。`,
+table:T.unsafeOps,
+afterTable:`cargo mirはunsafeコードのUBを検出するインタープリタです。unsafeコードを書いたら必ずcargo miri testを実行してください。Valgrindに相当するRustの標準ツールと考えてください。`},
+{title:"FFI: CとRustの橋渡し",
+body:`FFI（Foreign Function Interface）を使うことでCライブラリをRustから呼べます。libcクレートはC標準ライブラリの型とバインディングを提供します。extern "C" {}ブロックで外部関数を宣言し、unsafeブロックで呼び出します。
+
+逆にRustの関数をCから呼ぶには#[no_mangle]と extern "C"を付け、cdylibとしてコンパイルします。Pythonのctypes・cffiと同じ概念ですが、Rustでは型変換の安全性がより厳密に管理されています。bindgenクレートを使うとCヘッダから自動的にFFIバインディングを生成できます。`,
+table:T.ffiBasics,
+code:`// Cの関数をRustから呼ぶ例
+use std::ffi::{CString, CStr};
+use std::os::raw::c_char;
+
+extern "C" {
+    fn strlen(s: *const c_char) -> usize;
+}
+
+fn rust_strlen(s: &str) -> usize {
+    let c_str = CString::new(s).expect("CString::new failed");
+    unsafe { strlen(c_str.as_ptr()) }
+}
+
+fn main() {
+    println!("{}", rust_strlen("hello")); // 5
+}`,
+afterCode:`CStringはRustのStringをNUL終端のCスタイル文字列に変換します。as_ptr()で生ポインタを取得できますが、CStringがdropされると無効になるため、unsafeブロック内でCStringを保持しておく必要があります（dangling pointer防止）。`},
+]},
+{id:"ch7",num:7,title:"パフォーマンスチューニング",est:"75分",
+goal:"criterionでベンチマークを書ける。イテレータチェーンとzero-copyパターンを使った最適化を説明できる。Rc/RefCellとArc/Mutexの使い分けができる。",
+sections:[
+{title:"測定してから最適化",
+body:`パフォーマンス改善は「まず測定」が鉄則です。Rustはデフォルトでかなり高速ですが、アルゴリズムの選択・不必要なクローン・ヒープ割り当てが性能の足を引っ張ることがあります。cargo bench + criterionで統計的に安定したベンチマークを取れます。
+
+Pythonでcython/numbaを使う場面の多くは、Rustであれば標準のリリースビルド（cargo build --release）でカバーされます。--releaseを付けずにベンチマークするのは厳禁です。LLVM最適化（インライン化・ループ展開・SIMD自動ベクタライゼーション）がreleaseでのみ有効になります。`,
+table:T.perfTools,
+afterTable:`flamegraphはホットスポットを視覚的に特定するのに最も効率的なツールです。cargo install flamegraphでインストールし、cargo flamegraph --bin mybinで生成されるSVGをブラウザで開くだけで使えます。`},
+{title:"ゼロコピーとメモリ効率",
+body:`Rustでは所有権システムのおかげで不必要なコピーを排除しやすいです。&strはString、&[T]はVec<T>のゼロコピースライスです。関数がStringやVecを受け取る場合、引数を&strや&[T]にすることでコピーなしに処理できます。
+
+Cow<str>（Clone-on-Write）は「多くの場合は借用だが、変更時だけ所有する」パターンに使います。Pythonでは文字列がimmutableなため常にコピーが発生しますが、Rustでは大半のケースでゼロコピーが実現できます。std::mem::take・swap等を活用し、不必要なcloneを避けることが最初のステップです。`,
+code:`// クローンを減らすパターン集
+
+// BAD: Stringを受け取るとmoveまたはcloneが必要
+fn process_bad(s: String) -> usize { s.len() }
+
+// GOOD: &strはどんな文字列型も受け取れてゼロコピー
+fn process_good(s: &str) -> usize { s.len() }
+
+// Cow: 通常はゼロコピー借用、必要時のみ所有
+use std::borrow::Cow;
+fn ensure_lowercase<'a>(s: &'a str) -> Cow<'a, str> {
+    if s.chars().all(|c| c.is_lowercase()) {
+        Cow::Borrowed(s)  // コピーなし
+    } else {
+        Cow::Owned(s.to_lowercase())  // 変換時のみ割り当て
+    }
+}`,
+afterCode:`clippyの警告 needless_clone はほとんどの場合有効です。cargo clippy -- -D warningsをCIに入れることで不必要なcloneをコードレビュー前に発見できます。`},
+]},
+{id:"ch8",num:8,title:"高度なテスト技法",est:"65分",
+goal:"プロパティテスト・統合テスト・非同期テスト・ドキュメントテストを書ける。テスト設計の戦略を説明できる。",
+sections:[
+{title:"テストの種類と設計方針",
+body:`Rustはテストが言語に組み込まれており、#[test]アトリビュートだけで単体テストが書けます。srcファイル内にmod testsを置くことでプライベート関数もテストできる点はPythonと異なります（Pythonでは通常テストファイルから直接プライベート関数にアクセスできません）。
+
+テストピラミッドの観点では単体テストを多く、統合テストを少なく、E2Eテストをさらに少なくするのが原則ですが、Rustではコンパイル時の型検査が非常に強力なため、型の誤りをテストで検出する必要が少ないです。そのため「動作の正しさ」に集中した意味のあるテストを書くことに注力できます。`,
+table:T.testingTiers,
+afterTable:`ドキュメントテストはドキュメントの例が常に動作することを保証するRust独自の仕組みです。///コメント内に\`\`\`rustで書いたコードはcargo testで自動実行されます。ライブラリを公開する際は全てのpub関数にドキュメントテストを書く習慣をつけてください。`},
+{title:"非同期テストとmockito",
+body:`非同期テストには#[tokio::test]アトリビュートを使います。これはtokioランタイムを自動セットアップするdropinアトリビュートです。非同期関数は通常のテストでは.awaitできないため、async testが必要です。
+
+外部HTTPリクエストのモック化にはmockitoクレートが便利です。実際のHTTPサーバーをテスト内で起動し、URLをオーバーライドすることでネットワーク不要のテストを書けます。Pythonのunittest.mockやresponsesライブラリに相当します。`,
+code:`// ドキュメントテストの例
+/// 2つの数を足し合わせる。
+///
+/// # Examples
+///
+/// \`\`\`
+/// assert_eq!(mylib::add(2, 3), 5);
+/// \`\`\`
+pub fn add(a: i32, b: i32) -> i32 { a + b }
+
+// 非同期テスト例
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn test_async_function() {
+        let result = super::some_async_fn().await;
+        assert_eq!(result, "expected");
+    }
+
+    // プロパティテスト例
+    use proptest::prelude::*;
+    proptest! {
+        #[test]
+        fn add_is_commutative(a: i32, b: i32) {
+            prop_assert_eq!(super::add(a, b), super::add(b, a));
+        }
+    }
+}`,
+afterCode:`proptestは100回（デフォルト）ランダムな入力でテストを実行し、失敗ケースを最小化（shrink）して出力します。境界値バグ・整数オーバーフロー等を自動発見できます。`},
+]},
+{id:"ch9",num:9,title:"WebAssembly (Wasm) へのコンパイル",est:"70分",
+goal:"wasm-packを使ってRustコードをWasmにコンパイルし、JavaScriptから呼び出せる。wasm_bindgenで型安全な境界を設計できる。",
+sections:[
+{title:"RustとWasmの親和性",
+body:`WebAssemblyはブラウザ上でCネイティブ水準の性能を実現するバイナリ形式です。Rustはwasmへのコンパイルサポートが非常に充実しており、ランタイムがなくても動作します。PythonもPyodideでwasm上で動きますが、インタープリタ全体を含むため数MBのダウンロードが必要です。RustのWasmバイナリは機能単位で最適化でき、数十KBに収まることも珍しくありません。
+
+wasm-packはRust→Wasm→npm packageの変換を自動化するツールです。wasm-bindgenはJavaScriptとRustの間の型変換コード（グルーコード）を自動生成します。これにより、RustのStringがJavaScriptのstringとして扱え、所有権の心配なく相互運用できます。`,
+table:T.wasm,
+afterTable:`wasm-pack buildで生成されるpkg/ディレクトリには.wasm・.js（グルー）・.d.ts（TypeScript型定義）が含まれます。npmパッケージとして直接publishできるため、フロントエンドチームにRust実装を提供する際に便利です。`},
+{title:"実践的なWasmの使い方",
+body:`Wasmが最も効果を発揮するのは、CPUバウンドな処理（画像処理・暗号・パース・数値計算）をブラウザ内で行う場合です。DOM操作はweb_sys経由でできますが、JavaScriptとWasmの呼び出しにオーバーヘッドがあるため、DOM操作の多い処理はJavaScript側に残すのが実務的な設計です。
+
+wasm_bindgen_futuresを使えば非同期RustコードもWasmで実行できます。Rust側でasync fnを書き、JavaScriptのPromiseとして公開する設計です。これによりfetchAPI等のWeb APIをRust側から非同期に呼び出せます。`,
+code:`use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{Request, RequestInit, Response};
+
+// JavaScriptのPromiseとして公開される非同期関数
+#[wasm_bindgen]
+pub async fn fetch_text(url: String) -> Result<String, JsValue> {
+    let opts = RequestInit::new();
+    let request = Request::new_with_str_and_init(&url, &opts)?;
+
+    let window = web_sys::window().unwrap();
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+    let resp: Response = resp_value.dyn_into()?;
+
+    let text = JsFuture::from(resp.text()?).await?;
+    Ok(text.as_string().unwrap_or_default())
+}`,
+afterCode:`web_sysはWeb APIのほぼ全てのバインディングを持つ巨大なクレートです。Cargo.tomlのfeaturesで必要なAPIだけ有効化することでバイナリサイズを最小化できます。`},
+]},
+{id:"ch10",num:10,title:"並行性と共有状態の高度な設計",est:"70分",
+goal:"Arc/Mutex/RwLockとosスレッドを組み合わせた設計ができる。デッドロックを回避するパターンを説明できる。crossbeamの基本機能を使える。",
+sections:[
+{title:"Arc/Mutex/RwLockのパターン",
+body:`複数スレッドで可変データを共有するにはArc<Mutex<T>>が基本です。Arcは参照カウントによる共有所有権（Rcのスレッドセーフ版）で、Mutexは排他的アクセスを保証します。PythonのthreadingモジュールのLockに相当しますが、Rustではlock()が失敗した場合の処理（PoisonedError）も型で強制されます。
+
+RwLockはReadWriteLockで、複数の読み取り or 一つの書き込みを許可します。データが主に読まれ稀にしか書かれない場合、Mutexより高いスループットが得られます。デッドロックはMutexの取得順序が一定でない場合に発生するため、複数のMutexを使う場合は常に同じ順序でlock()する設計にしてください。`,
+code:`use std::sync::{Arc, RwLock};
+use std::thread;
+
+fn main() {
+    let data = Arc::new(RwLock::new(Vec::<i32>::new()));
+
+    let mut handles = vec![];
+
+    // 書き込みスレッド
+    let d = Arc::clone(&data);
+    handles.push(thread::spawn(move || {
+        let mut v = d.write().unwrap();
+        v.extend([1, 2, 3]);
+    }));
+
+    // 複数の読み取りスレッド
+    for _ in 0..3 {
+        let d = Arc::clone(&data);
+        handles.push(thread::spawn(move || {
+            let v = d.read().unwrap();
+            println!("len = {}", v.len());
+        }));
+    }
+
+    for h in handles { h.join().unwrap(); }
+}`,
+afterCode:`parking_lotクレートのMutex/RwLockはstd版より高性能で、PoisonedErrorの概念もなくシンプルです。本番コードではparking_lotの採用を検討してください。`},
+{title:"crossbeamとscoped threads",
+body:`std::thread::spawnはクロージャにSend + 'staticを要求するため、スタック上のデータへの参照を渡せません。crossbeam::scopeはスコープ付きスレッドを提供し、スコープの終了まで生存するデータへの参照をスレッドに渡せます。
+
+std::thread::scope（Rust 1.63以降）でも同様のことができ、crossbeamなしで利用可能です。チャネルについてはcrossbeam::channelがstdの mpscより機能豊富で（select!構文・priorityサポート等）、パフォーマンスも優れています。非同期を使わないCPUバウンドな並列処理（例: rayon）ではcrossbeamが活躍します。`,
+code:`use std::thread;
+
+fn main() {
+    let data = vec![1, 2, 3, 4, 5];
+
+    // std::thread::scope (Rust 1.63+)
+    thread::scope(|s| {
+        for chunk in data.chunks(2) {
+            s.spawn(|| {
+                // dataの参照を直接使える
+                println!("{:?}", chunk);
+            });
+        }
+        // スコープ終了時に全スレッドをjoin
+    });
+    println!("done, data still owned: {:?}", data);
+}`,
+afterCode:`rayonクレートはデータ並列処理の決定版です。.par_iter()をiter()に変えるだけでマルチコア並列処理が有効になります。行列計算・画像処理・大規模ソート等でPython+numpyの並列化より実装が簡単です。`},
+]},
+{id:"ch11",num:11,title:"HTTPクライアントとシリアライゼーション",est:"65分",
+goal:"reqwestでREST APIを呼び出し、serde_jsonでデシリアライズできる。カスタムシリアライザを書ける。実務的なAPIクライアント設計ができる。",
+sections:[
+{title:"reqwestによるHTTPクライアント",
+body:`reqwestはRustで最も広く使われているHTTPクライアントです。tokioと組み合わせた非同期版と、非async環境用のblocking版があります。PythonのhttprequestsやhttpxのRust版と考えてください。
+
+ClientはコネクションプールやTLS設定・タイムアウト・ヘッダーのデフォルトをまとめて管理するオブジェクトです。グローバルなClient::new()を一度だけ作りArcで共有するパターンが推奨されます。JSONレスポンスは.json::<T>()でdeserializeできるため、Pythonのresp.json()と同様の感覚で使えます。`,
+code:`use reqwest::Client;
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+struct Post {
+    id: u32,
+    title: String,
+    body: String,
+}
+
+async fn fetch_post(client: &Client, id: u32) -> anyhow::Result<Post> {
+    let url = format!("https://jsonplaceholder.typicode.com/posts/{}", id);
+    let post = client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await?
+        .error_for_status()? // 4xx/5xxをErrに変換
+        .json::<Post>()
+        .await?;
+    Ok(post)
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let client = Client::new();
+    let post = fetch_post(&client, 1).await?;
+    println!("{}: {}", post.id, post.title);
+    Ok(())
+}`,
+afterCode:`error_for_status()はHTTPステータスが4xx/5xxの場合にErrを返す便利メソッドです。Pythonのresp.raise_for_status()に相当します。`},
+{title:"serdeのカスタマイズ",
+body:`serde_jsonはRustで最も使われるJSONライブラリです。#[derive(Serialize, Deserialize)]で通常は十分ですが、フィールド名のリネーム（snake_case→camelCase）・デフォルト値・フラット化等の高度な制御が必要な場合はserde属性を使います。
+
+Pythonのpydanticと機能的に近い部分がありますが、Rustではバリデーションはvalidatorクレートを別途使います。serdeのカスタムシリアライザ/デシリアライザを書くことで、任意の変換ロジックを実装できます。`,
+code:`use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]  // JSONはcamelCase
+struct UserProfile {
+    user_id: u64,           // → userId
+    display_name: String,   // → displayName
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bio: Option<String>,    // nullならシリアライズしない
+    #[serde(default)]
+    is_admin: bool,         // 欠落時はfalse
+    #[serde(rename = "ts")]
+    timestamp: u64,         // フィールド名を"ts"に
+}`,
+afterCode:`#[serde(rename_all = "camelCase")]はREST APIとの連携で最も頻繁に使うattributeです。サーバーがcamelCaseを返し、Rustコードがsnake_caseで扱うという変換を自動で行います。`},
+]},
+{id:"ch12",num:12,title:"クレート設計とエコシステム",est:"60分",
+goal:"ワークスペースとモジュール設計のベストプラクティスを実践できる。ライブラリクレートのpub API設計・semver管理・ドキュメント生成ができる。",
+sections:[
+{title:"ワークスペースとモジュール設計",
+body:`大規模なRustプロジェクトはworkspaceで複数のcrateに分割します。ワークスペースを使うとビルドキャッシュ・依存バージョンを共有でき、cargo testが全crateを対象に実行されます。典型的な構成はmyapp（バイナリ）+ mylib（ライブラリ）+ mylib-macros（procマクロ）の3クレートです。
+
+モジュール設計ではpubとpub(crate)の使い分けが重要です。外部に公開する必要のないものはpub(crate)または非pubにし、public APIを最小化します。pub use を使ったre-exportにより、内部モジュール構造を外部から隠蔽しながら使いやすいAPIを提供できます。Pythonの__all__に相当する役割です。`,
+table:T.macroTypes,
+afterTable:`モジュールシステムはファイルシステムと対応しています。src/foo.rsとsrc/foo/mod.rsのどちらでモジュールを定義してもよいですが、現代のRustではsrc/foo.rs + src/foo/bar.rsの形式が推奨されます。`},
+{title:"semverとAPIの安定性",
+body:`Cargoはsemver（Semantic Versioning）でバージョンを管理します。メジャーバージョンアップ（1.x→2.x）はbreaking changeを許可、マイナー・パッチアップは後方互換が原則です。ライブラリを公開する場合はこのルールを厳守しないと利用者が被害を受けます。
+
+cargo-semver-checksツールはAPIの破壊的変更を自動検出します。ドキュメントはcargo docで生成されHTMLで確認できます。///コメントがrustdocに変換され、\`\`\`rustのコードブロックはコンパイル実行されます。crates.ioに公開する前にcargo doc --openで見た目を確認してください。`,
+code:`// 良いpub API設計の例
+// src/lib.rs
+
+mod internal;        // 外部から見えない
+mod utils;           // 外部から見えない
+
+pub mod error;       // エラー型は公開
+pub use internal::Client;   // 内部型を再エクスポート
+
+/// ライブラリのエントリポイント
+///
+/// # Examples
+///
+/// \`\`\`
+/// let c = mylib::Client::new("https://api.example.com");
+/// assert!(c.is_ok());
+/// \`\`\`
+pub fn create_client(base_url: &str) -> Result<Client, error::Error> {
+    internal::Client::new(base_url)
+}`,
+afterCode:`#![deny(missing_docs)]をlib.rsの先頭に追加すると、ドキュメントなしのpubアイテムがコンパイルエラーになります。公開クレートにはこの設定を入れることをお勧めします。`},
+]},
+];
+
+function DataTable({t}) {
+  if (!t) return null;
+  return (
+    <div>
+      {t.cap && <div className="table-caption">{t.cap}</div>}
+      <table>
+        <thead><tr>{t.h.map((h,i)=><th key={i}>{h}</th>)}</tr></thead>
+        <tbody>{t.r.map((row,i)=><tr key={i}>{row.map((c,j)=><td key={j}>{c}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function CodeBlock({code}) {
+  if (!code) return null;
+  return <pre><code>{code}</code></pre>;
+}
+
+function Exercise({ex, chId}) {
+  const [open, setOpen] = useState(false);
+  const [ansOpen, setAnsOpen] = useState(false);
+  const stars = Array.from({length:3},(_,i)=>(
+    <span key={i} className={i<ex.diff?"star":"star empty"}>★</span>
+  ));
+  return (
+    <div className="exercise">
+      <div className="exercise-header" onClick={()=>{setOpen(!open);setAnsOpen(false);}}>
+        <div className="diff">{stars}</div>
+        <div className="exercise-q">{ex.q}</div>
+        <span>{open?"▲":"▼"}</span>
+      </div>
+      {open && (
+        <div className="exercise-body open">
+          <CodeBlock code={ex.code}/>
+          <button className="answer-toggle" onClick={()=>setAnsOpen(!ansOpen)}>
+            {ansOpen?"解答を隠す":"解答を見る"}
+          </button>
+          {ansOpen && <div className="answer-block open"><CodeBlock code={ex.answer}/></div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Section({s}) {
+  return (
+    <div className="section">
+      <h3>{s.title}</h3>
+      {s.body && s.body.split('\n\n').map((p,i)=><p key={i}>{p}</p>)}
+      {s.table && <DataTable t={s.table}/>}
+      {s.afterTable && <p>{s.afterTable}</p>}
+      {s.code && <CodeBlock code={s.code}/>}
+      {s.afterCode && <p>{s.afterCode}</p>}
+    </div>
+  );
+}
+
+function App() {
+  const [cur, setCur] = useState(0);
+  const [openCh, setOpenCh] = useState(null);
+  const ch = chapters[cur];
+  const exList = EX[ch.id] || [];
+
+  useEffect(()=>{ setOpenCh(null); }, [cur]);
+
+  return (
+    <div>
+      <header className="header">
+        <a href="../index.html">🏠 ホーム</a>
+        <span>›</span>
+        <a href="index.html">Rust</a>
+        <span>›</span>
+        <span>中級</span>
+      </header>
+
+      <div className="hero">
+        <h1>Rust 中級コース</h1>
+        <div className="subtitle">実務レベルのRustエンジニアへ</div>
+        <div className="meta">
+          <span>全12章</span>
+          <span>演習36問</span>
+          <span>Rust 1.78</span>
+        </div>
+        <div className="desc">
+          非同期Rust（tokio）・Webフレームワーク（axum）・データベース（sqlx）・マクロ・unsafe・WebAssemblyまで、実務で必要な技術を体系的に習得します。このコースを修了すると、非同期Webサーバーの実装・FFIによるC連携・Wasmへのコンパイルを自力で行えるようになります。
+        </div>
+      </div>
+
+      <div className="nav-tabs">
+        {chapters.map((c,i)=>(
+          <button key={c.id} className={`nav-tab${cur===i?" active":""}`} onClick={()=>setCur(i)}>
+            Ch{c.num}
+          </button>
+        ))}
+      </div>
+
+      <div className="content">
+        <div className="chapter" key={ch.id}>
+          <div className="chapter-header" onClick={()=>setOpenCh(openCh===ch.id?null:ch.id)}>
+            <div className="chapter-num">{ch.num}</div>
+            <div className="chapter-title">{ch.title}</div>
+            <div className="chapter-est">⏱ {ch.est}</div>
+            <div className={`chapter-arrow${openCh===ch.id?" open":""}`}>▼</div>
+          </div>
+          {openCh===ch.id && (
+            <div className="chapter-body open">
+              <div className="goal-block">
+                <h4>🎯 この章のゴール</h4>
+                <p>{ch.goal}</p>
+              </div>
+              {ch.sections.map((s,i)=><Section key={i} s={s}/>)}
+              {exList.length>0 && (
+                <div className="exercises">
+                  <h4>演習問題</h4>
+                  {exList.map((ex,i)=><Exercise key={i} ex={ex} chId={ch.id}/>)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="chapter-nav">
+          <button className="nav-btn" onClick={()=>setCur(c=>c-1)} disabled={cur===0}>← 前の章</button>
+          <span style={{color:"#7c2d12",fontSize:".9rem"}}>第{ch.num}章 / 全{chapters.length}章</span>
+          <button className="nav-btn" onClick={()=>setCur(c=>c+1)} disabled={cur===chapters.length-1}>次の章 →</button>
+        </div>
+
+        {cur===chapters.length-1 && (
+          <div className="complete-banner">
+            <h2>🎉 中級コース完了!</h2>
+            <p>非同期・Webサーバー・データベース・unsafe・Wasm——実務Rustエンジニアとして必要なスキルを習得しました。</p>
+            <a href="advanced.html" className="home-btn">上級コースへ進む →</a>
+          </div>
+        )}
+      </div>
+
+      <footer>
+        Rust 1.78 (2024-05リリース) 準拠 · rustc 1.78 / cargo 1.78 基準 · 2026年4月時点<br/>
+        tokio 1.x · axum 0.7 · sqlx 0.7 · wasm-bindgen 0.2 基準
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
