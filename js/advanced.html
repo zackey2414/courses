@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JavaScript 上級コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのJavaScript上級コース。V8内部・イベントループ・メタプログラミング・WASM・TypeScript深化・並行処理・パフォーマンス・ライブラリ設計。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+/* ── Table definitions ── */
+const T = {
+  v8Pipeline: {
+    h: ["ステージ", "担当コンポーネント", "役割"],
+    r: [
+      ["パース", "Parser", "ソースを AST に変換"],
+      ["バイトコード生成", "Ignition", "AST → バイトコード（実行開始）"],
+      ["プロファイル収集", "Ignition", "型・呼び出し回数などのフィードバック収集"],
+      ["JIT コンパイル", "TurboFan", "ホット関数を最適化マシンコードに変換"],
+      ["脱最適化", "Deoptimizer", "型変化などで最適化コードを破棄しIgnitionに戻す"],
+      ["GC", "Orinoco", "並行・並列 GC でメモリ回収"]
+    ]
+  },
+  gcGen: {
+    h: ["世代", "対象", "収集方式", "特徴"],
+    r: [
+      ["Young (Nursery)", "新規オブジェクト", "Scavenge（コピー）", "高速。生存率が低い前提"],
+      ["Old Space", "長命オブジェクト", "Mark-Compact", "より低頻度で実行"],
+      ["Large Object Space", "1MB超オブジェクト", "別管理", "移動せず参照で管理"]
+    ]
+  },
+  taskQueue: {
+    h: ["キュー種別", "登録方法", "優先度", "例"],
+    r: [
+      ["マイクロタスク", "Promise.then / queueMicrotask", "最高（コールスタック後すぐ）", "fetch().then(...)"],
+      ["マクロタスク（タスク）", "setTimeout / setInterval / I/O", "次のイベントループティック", "setTimeout(fn, 0)"],
+      ["アニメーションフレーム", "requestAnimationFrame", "ペイント前", "アニメーション更新"]
+    ]
+  },
+  wellKnownSymbols: {
+    h: ["シンボル", "用途", "Python対応"],
+    r: [
+      ["Symbol.iterator", "for...of のプロトコル定義", "__iter__"],
+      ["Symbol.asyncIterator", "for await...of のプロトコル定義", "__aiter__"],
+      ["Symbol.toPrimitive", "型変換時の挙動制御", "__int__ / __float__ / __str__"],
+      ["Symbol.hasInstance", "instanceof の挙動制御", "__instancecheck__"],
+      ["Symbol.toStringTag", "Object.prototype.toString の表示文字列", "__class__"],
+      ["Symbol.species", "派生クラスのコンストラクタ指定", "—"]
+    ]
+  },
+  wasmVsJs: {
+    h: ["観点", "JavaScript", "WebAssembly"],
+    r: [
+      ["実行形式", "JIT コンパイル", "事前コンパイル済みバイナリ"],
+      ["型", "動的型", "静的型（i32/f64 等）"],
+      ["ピーク性能", "TurboFan 最適化後に近い", "予測可能な高速実行"],
+      ["DOM アクセス", "直接可能", "JS経由が必要（境界コスト発生）"],
+      ["主な用途", "汎用ロジック・UI", "数値演算・画像処理・ゲームエンジン等"]
+    ]
+  },
+  tsAdvancedTypes: {
+    h: ["機能", "構文例", "用途"],
+    r: [
+      ["Conditional Types", "T extends U ? X : Y", "型レベルの条件分岐"],
+      ["Mapped Types", "{ [K in keyof T]: T[K] }", "型の変換・制限"],
+      ["Template Literal Types", "`prefix_${string}`", "文字列パターンの型"],
+      ["satisfies 演算子", "const x = { ... } satisfies T", "型チェックしつつ推論を保持"],
+      ["infer キーワード", "T extends Promise<infer U>", "型引数の取り出し"],
+      ["Discriminated Union", "{ kind: 'a' } | { kind: 'b' }", "パターンマッチング風の型絞り込み"]
+    ]
+  },
+  sharedBuffer: {
+    h: ["API", "説明", "用途"],
+    r: [
+      ["SharedArrayBuffer", "複数 Worker 間で共有できる ArrayBuffer", "メモリ共有"],
+      ["Atomics.load(ta, i)", "アトミックな読み取り", "競合なし読み取り"],
+      ["Atomics.store(ta, i, v)", "アトミックな書き込み", "競合なし書き込み"],
+      ["Atomics.add(ta, i, v)", "アトミックな加算", "カウンタ"],
+      ["Atomics.wait(ta, i, v)", "値が変わるまでスリープ（Worker専用）", "Mutex 実装"],
+      ["Atomics.notify(ta, i, n)", "待機中の Worker を起こす", "Mutex 解放"]
+    ]
+  },
+  perfApi: {
+    h: ["API", "説明", "Python対応"],
+    r: [
+      ["performance.now()", "高精度タイムスタンプ（ms）", "time.perf_counter()"],
+      ["performance.mark(name)", "タイムラインにマーカーを打つ", "—"],
+      ["performance.measure(name, s, e)", "2マーカー間を計測", "timeit"],
+      ["PerformanceObserver", "Long Task / Paint 等を購読", "—"],
+      ["performance.getEntriesByType(t)", "収集されたエントリを取得", "—"]
+    ]
+  },
+  npmPublish: {
+    h: ["手順", "コマンド / ファイル", "説明"],
+    r: [
+      ["1. ビルド", "npm run build", "dist/ に CJS + ESM 両方を生成"],
+      ["2. 型定義", "tsc --declaration --emitDeclarationOnly", ".d.ts ファイルを生成"],
+      ["3. バージョン更新", "npm version patch/minor/major", "CHANGELOG + git tag"],
+      ["4. Dry run", "npm publish --dry-run", "公開内容を事前確認"],
+      ["5. 公開", "npm publish --access public", "npm レジストリに公開"],
+      ["6. Changeset", "changeset add / changeset publish", "モノレポでのバージョン管理"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 2,
+    q: "以下の関数は Hidden Class の問題を抱えています。\nどこが問題か説明し、最適化版に書き直してください。",
+    code: `function makePoint(x, y) {
+  const p = {};
+  if (x !== undefined) p.x = x;
+  if (y !== undefined) p.y = y;
+  return p;
+}
+// 1000万回呼ぶループで遅い`,
+    answer: `// 問題: プロパティを動的に追加するたびに Hidden Class が分岐する。
+// V8 はオブジェクト形状（Shape）ごとに最適化するが、
+// 形状が異なるオブジェクトが混在するとインラインキャッシュが汚染される。
+
+// 修正版: 常に同じ形状のオブジェクトを返す
+function makePoint(x = 0, y = 0) {
+  return { x, y };  // 必ず同じ Hidden Class
+}
+
+// モノモーフィック呼び出し例
+const pts = [];
+for (let i = 0; i < 10_000_000; i++) {
+  pts.push(makePoint(i, i * 2));
+}
+// 同じ形状のオブジェクトが連続するため TurboFan が最適化しやすい`
+  }, {
+    diff: 3,
+    q: "GC プレッシャーを下げるため、オブジェクトプールを実装してください。\nPoint オブジェクトを再利用し、GC を減らすパターンです。",
+    code: `// オブジェクトプールを使って Point を使い回す
+class PointPool {
+  // acquire() と release() を実装
+}`,
+    answer: `class PointPool {
+  #pool = [];
+  #size;
+
+  constructor(size = 1000) {
+    this.#size = size;
+    for (let i = 0; i < size; i++) {
+      this.#pool.push({ x: 0, y: 0 }); // 事前確保
+    }
+  }
+
+  acquire(x = 0, y = 0) {
+    const p = this.#pool.pop();
+    if (!p) return { x, y }; // プール枯渇時はフォールバック
+    p.x = x; p.y = y;
+    return p;
+  }
+
+  release(p) {
+    if (this.#pool.length < this.#size) {
+      this.#pool.push(p); // 使い終わったら返却
+    }
+  }
+}
+
+const pool = new PointPool();
+const p = pool.acquire(10, 20);
+console.log(p); // { x: 10, y: 20 }
+pool.release(p); // GC させずに再利用`
+  }],
+  ch2: [{
+    diff: 2,
+    q: "以下のコードの実行順序を答え、なぜその順になるか説明してください。",
+    code: `console.log('A');
+setTimeout(() => console.log('B'), 0);
+Promise.resolve().then(() => console.log('C'));
+queueMicrotask(() => console.log('D'));
+console.log('E');`,
+    answer: `// 実行順序: A → E → C → D → B
+
+// 解説:
+// 1. 'A' — 同期コード（コールスタック）
+// 2. setTimeout のコールバックをタスクキューに登録
+// 3. Promise.then のコールバックをマイクロタスクキューに登録
+// 4. queueMicrotask のコールバックをマイクロタスクキューに登録
+// 5. 'E' — 同期コード（コールスタック）
+//
+// コールスタックが空になった後:
+// マイクロタスクキューをすべて処理 → 'C' → 'D'
+// その後タスクキューから1件処理 → 'B'
+//
+// 重要: マイクロタスクは「タスクとタスクの間」を埋める形で全件処理される。
+// setTimeoutは0msでも必ず次のタスクとして後回しにされる。`
+  }, {
+    diff: 2,
+    q: "Node.js で setImmediate と process.nextTick の違いを示すコードを書き、\n実行順序を説明してください。",
+    code: `// Node.js 専用 (ブラウザでは動かない)
+setImmediate(() => console.log('immediate'));
+process.nextTick(() => console.log('nextTick'));
+Promise.resolve().then(() => console.log('promise'));
+console.log('sync');`,
+    answer: `// 実行順序: sync → nextTick → promise → immediate
+
+// process.nextTick は Promise マイクロタスクよりさらに優先される
+// 「次のイベントループティックの開始前」に必ず実行される
+
+// setImmediate は I/O コールバックの後、タイマーの前に実行される
+// setTimeout(fn, 0) とほぼ同じタイミングだが、
+// I/O コールバック内で呼ぶと setImmediate が先になる保証がある
+
+// 実務ポイント:
+// - process.nextTick は再帰的に呼ぶとスタックオーバーフローに近い状態になる
+// - 深いネストには setImmediate か Promise を使う
+// - Node.js 22 では process.nextTick の過度な使用を避けることが推奨されている`
+  }],
+  ch3: [{
+    diff: 2,
+    q: "Symbol.iterator を使ってフィボナッチ数列を生成する\nイテラブルオブジェクトを実装してください。",
+    code: `const fibonacci = {
+  // Symbol.iterator を実装して for...of で使えるようにする
+  // 引数で上限値を受け取れるようにする
+};`,
+    answer: `function makeFibonacci(limit) {
+  return {
+    [Symbol.iterator]() {
+      let a = 0, b = 1;
+      return {
+        next() {
+          if (a > limit) return { done: true, value: undefined };
+          const value = a;
+          [a, b] = [b, a + b];
+          return { done: false, value };
+        }
+      };
+    }
+  };
+}
+
+for (const n of makeFibonacci(100)) {
+  console.log(n); // 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
+}
+
+// スプレッドでも使える（Symbol.iterator があるため）
+const arr = [...makeFibonacci(50)]; // [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]`
+  }, {
+    diff: 3,
+    q: "Proxy を使ってプロパティアクセスをログに記録し、\n存在しないプロパティへのアクセスで例外を投げる\n「厳格オブジェクト」を実装してください。",
+    code: `function strict(obj) {
+  // Proxy で get トラップを実装
+}
+
+const s = strict({ name: 'Alice', age: 30 });
+console.log(s.name); // 'Alice'（ログ出力）
+console.log(s.phone); // エラー: property 'phone' does not exist`,
+    answer: `function strict(obj) {
+  return new Proxy(obj, {
+    get(target, prop, receiver) {
+      if (!(prop in target)) {
+        throw new ReferenceError(\`property '\${String(prop)}' does not exist\`);
+      }
+      console.log(\`[access] \${String(prop)} = \${target[prop]}\`);
+      return Reflect.get(target, prop, receiver);
+    },
+    set(target, prop, value, receiver) {
+      if (!(prop in target)) {
+        throw new ReferenceError(\`cannot set unknown property '\${String(prop)}'\`);
+      }
+      return Reflect.set(target, prop, value, receiver);
+    }
+  });
+}
+
+const s = strict({ name: 'Alice', age: 30 });
+console.log(s.name); // [access] name = Alice  →  'Alice'
+// s.phone → ReferenceError: property 'phone' does not exist`
+  }],
+  ch4: [{
+    diff: 2,
+    q: "以下の WAT (WebAssembly Text Format) を読んで、\nこのモジュールが何をするか説明し、JS から呼び出すコードを書いてください。",
+    code: `(module
+  (func $add (export "add")
+    (param $a i32) (param $b i32)
+    (result i32)
+    local.get $a
+    local.get $b
+    i32.add)
+  (func $factorial (export "factorial")
+    (param $n i32) (result i32)
+    (if (result i32)
+      (i32.le_s (local.get $n) (i32.const 1))
+      (then (i32.const 1))
+      (else
+        (i32.mul
+          (local.get $n)
+          (call $factorial (i32.sub (local.get $n) (i32.const 1)))
+        )
+      )
+    )
+  )
+)`,
+    answer: `// このモジュールは2つの関数を export している:
+// - add(a, b): 2つの32bit整数を加算
+// - factorial(n): n の階乗（再帰）
+
+// WAT を wasm にコンパイルしてから JS で呼ぶ:
+// wat2wasm math.wat -o math.wasm  (wabt ツールが必要)
+
+// JS から呼び出し
+const response = await fetch('math.wasm');
+const buffer = await response.arrayBuffer();
+const { instance } = await WebAssembly.instantiate(buffer);
+
+const { add, factorial } = instance.exports;
+console.log(add(3, 4));       // 7
+console.log(factorial(10));   // 3628800
+
+// 注意: WASM の i32 は符号付き32bit整数
+// factorial(13) = 1932053504 (オーバーフロー！)
+// 大きな数には BigInt + i64 を使う`
+  }, {
+    diff: 3,
+    q: "JavaScript から WASM モジュールにメモリを通じて文字列を渡す方法を説明し、\nサンプルコードを書いてください（Emscripten 使用を想定）。",
+    code: `// WASM のメモリに文字列を書き込み、WASM 側で処理させる
+// instance.exports.memory を使う`,
+    answer: `// WASM モジュールはネイティブ文字列を知らない。
+// JS → WASM へ文字列を渡すには線形メモリ上にバイト列として書き込む。
+
+async function loadWasm() {
+  const { instance } = await WebAssembly.instantiateStreaming(fetch('str.wasm'));
+  return instance;
+}
+
+function writeString(memory, str, ptr) {
+  // UTF-8 エンコードして WASM メモリに書き込む
+  const encoded = new TextEncoder().encode(str + '\0'); // null終端
+  const view = new Uint8Array(memory.buffer, ptr, encoded.length);
+  view.set(encoded);
+}
+
+const inst = await loadWasm();
+const { memory, processString, malloc, free } = inst.exports;
+
+const str = 'Hello, WASM!';
+const ptr = malloc(str.length + 1); // WASM側でメモリ確保
+writeString(memory, str, ptr);
+processString(ptr);                 // WASM側で処理
+free(ptr);                          // 解放
+
+// ポイント: JS↔WASM の境界を越えるたびにコストが発生する
+// 頻繁なやり取りより、WASM 側でまとめて処理する設計が効率的`
+  }],
+  ch5: [{
+    diff: 2,
+    q: "Conditional Types を使って、Promise<T> の T を取り出す型ユーティリティ\n`Awaited<T>` を自前実装してください（標準組込みは使わずに）。",
+    code: `// MyAwaited<T> を実装する
+// Promise<string> → string
+// Promise<Promise<number>> → number
+// string → string (非Promiseはそのまま)`,
+    answer: `// infer で Promise の型引数を取り出す
+type MyAwaited<T> =
+  T extends Promise<infer U>
+    ? MyAwaited<U>  // 再帰でネストした Promise も展開
+    : T;
+
+// テスト
+type A = MyAwaited<Promise<string>>;           // string
+type B = MyAwaited<Promise<Promise<number>>>;  // number
+type C = MyAwaited<string>;                    // string
+
+// satisfies との組み合わせ例
+const config = {
+  port: 3000,
+  host: 'localhost',
+} satisfies Record<string, string | number>;
+
+// config.port は number 型として推論される（as より安全）
+const p: number = config.port; // OK`
+  }, {
+    diff: 3,
+    q: "Mapped Types と Template Literal Types を組み合わせて、\nオブジェクトの各プロパティに対する getter 名の型を生成してください。\n例: { name: string } → { getName: () => string }",
+    code: `// Getterify<T> を実装する
+type Getterify<T> = {
+  // { name: string } → { getName: () => string }
+};`,
+    answer: `type Capitalize<S extends string> =
+  S extends \`\${infer F}\${infer R}\` ? \`\${Uppercase<F>}\${R}\` : S;
+
+type Getterify<T> = {
+  [K in keyof T as \`get\${Capitalize<string & K>}\`]: () => T[K];
+};
+
+// テスト
+type User = { name: string; age: number; email: string };
+type UserGetters = Getterify<User>;
+// {
+//   getName: () => string;
+//   getAge: () => number;
+//   getEmail: () => string;
+// }
+
+// 実装例
+function createGetters<T extends object>(obj: T): Getterify<T> {
+  const result = {} as any;
+  for (const key of Object.keys(obj) as (keyof T)[]) {
+    const getterName = \`get\${String(key).charAt(0).toUpperCase() + String(key).slice(1)}\`;
+    result[getterName] = () => obj[key];
+  }
+  return result;
+}
+
+const user = createGetters({ name: 'Alice', age: 30, email: 'a@example.com' });
+console.log(user.getName()); // 'Alice'`
+  }],
+  ch6: [{
+    diff: 2,
+    q: "SharedArrayBuffer と Atomics を使って、\nメインスレッドと Worker が安全に共有カウンタをインクリメントする\nコードを書いてください。",
+    code: `// main.js — Worker を起動して共有カウンタをインクリメントさせる
+// worker.js — 共有バッファを受け取ってアトミックにインクリメント`,
+    answer: `// main.js
+const sab = new SharedArrayBuffer(4); // 4バイト = int32 x 1
+const counter = new Int32Array(sab);
+Atomics.store(counter, 0, 0); // 初期値 0
+
+const workers = [];
+for (let i = 0; i < 4; i++) {
+  const w = new Worker('./worker.js');
+  w.postMessage({ sab, iterations: 25_000 });
+  workers.push(w);
+}
+
+let done = 0;
+for (const w of workers) {
+  w.addEventListener('message', () => {
+    if (++done === workers.length) {
+      console.log(Atomics.load(counter, 0)); // 100000 (競合なし)
+    }
+  });
+}
+
+// worker.js
+self.addEventListener('message', ({ data: { sab, iterations } }) => {
+  const counter = new Int32Array(sab);
+  for (let i = 0; i < iterations; i++) {
+    Atomics.add(counter, 0, 1); // アトミックな加算
+  }
+  self.postMessage('done');
+});`
+  }, {
+    diff: 3,
+    q: "Node.js の worker_threads を使って、CPU バウンドな素数計算を\n並列化してください。メインスレッドはブロックされてはいけません。",
+    code: `// Node.js worker_threads でピタゴラス数を並列探索
+// npm: worker_threads は組込みなのでインストール不要`,
+    answer: `// primes-worker.js
+const { workerData, parentPort } = require('worker_threads');
+const { from, to } = workerData;
+
+function isPrime(n) {
+  if (n < 2) return false;
+  for (let i = 2; i <= Math.sqrt(n); i++) {
+    if (n % i === 0) return false;
+  }
+  return true;
+}
+
+const primes = [];
+for (let i = from; i <= to; i++) {
+  if (isPrime(i)) primes.push(i);
+}
+parentPort.postMessage(primes);
+
+// main.js
+const { Worker } = require('worker_threads');
+
+function findPrimesInRange(from, to) {
+  return new Promise((resolve, reject) => {
+    const w = new Worker('./primes-worker.js', { workerData: { from, to } });
+    w.on('message', resolve);
+    w.on('error', reject);
+  });
+}
+
+const cpus = 4;
+const total = 1_000_000;
+const chunk = total / cpus;
+
+const tasks = Array.from({ length: cpus }, (_, i) =>
+  findPrimesInRange(i * chunk + 1, (i + 1) * chunk)
+);
+
+const results = await Promise.all(tasks);
+const all = results.flat().sort((a, b) => a - b);
+console.log('素数の個数:', all.length); // 78498`
+  }],
+  ch7: [{
+    diff: 2,
+    q: "performance.mark と performance.measure を使って、\n関数の実行時間を計測するデコレータ（高階関数）を実装してください。",
+    code: `// measure(fn, name) — fn を実行して計測結果を返す高階関数
+function measure(fn, name = fn.name) {
+  // performance API を使う
+}`,
+    answer: `function measure(fn, name = fn.name) {
+  return async function(...args) {
+    const startMark = \`\${name}-start\`;
+    const endMark = \`\${name}-end\`;
+    performance.mark(startMark);
+    const result = await fn.apply(this, args);
+    performance.mark(endMark);
+    performance.measure(name, startMark, endMark);
+    const [entry] = performance.getEntriesByName(name, 'measure');
+    console.log(\`[\${name}] \${entry.duration.toFixed(2)}ms\`);
+    performance.clearMarks(startMark);
+    performance.clearMarks(endMark);
+    performance.clearMeasures(name);
+    return result;
+  };
+}
+
+// 使用例
+async function fetchData(url) {
+  const res = await fetch(url);
+  return res.json();
+}
+
+const measuredFetch = measure(fetchData, 'fetchData');
+const data = await measuredFetch('https://api.example.com/data');
+// [fetchData] 123.45ms`
+  }, {
+    diff: 2,
+    q: "Layout Thrashing を引き起こすコードと、\nそれを修正したコードを対比して示してください。",
+    code: `// NG: Layout Thrashing が発生するコード
+const boxes = document.querySelectorAll('.box');
+boxes.forEach(box => {
+  // ここで何が問題か？
+  const h = box.offsetHeight;
+  box.style.height = (h * 2) + 'px';
+});`,
+    answer: `// 問題: 読み取り（offsetHeight）と書き込み（style.height）が交互に発生すると
+// ブラウザは毎回レイアウト計算（Reflow）を強制される。
+// 10要素なら10回 Reflow が走る = Layout Thrashing
+
+// NG: 読み書きが混在
+boxes.forEach(box => {
+  const h = box.offsetHeight; // 読み取り（Reflow 強制）
+  box.style.height = (h * 2) + 'px'; // 書き込み（dirty flag）
+});
+
+// OK: 読み取りをまとめて先に行い、書き込みをまとめて後から
+const heights = Array.from(boxes).map(box => box.offsetHeight); // 読み取り一括
+heights.forEach((h, i) => {
+  boxes[i].style.height = (h * 2) + 'px'; // 書き込み一括
+});
+
+// さらに良い: requestAnimationFrame でバッチ処理
+requestAnimationFrame(() => {
+  const heights = Array.from(boxes).map(b => b.offsetHeight);
+  heights.forEach((h, i) => { boxes[i].style.height = (h * 2) + 'px'; });
+});
+// ブラウザのペイントタイミングに合わせるため最も効率的`
+  }],
+  ch8: [{
+    diff: 2,
+    q: "Tree-Shakeable な named export のみを持つライブラリ設計と、\nrollup / tsup でデュアル CJS/ESM を出力する package.json を書いてください。",
+    code: `// src/index.ts — Tree-Shaking に適した export の仕方
+// package.json — exports フィールドで CJS/ESM を出し分け`,
+    answer: `// src/index.ts (Tree-Shakeable: default export を避ける)
+export { add } from './math.js';
+export { formatDate } from './date.js';
+export type { Point } from './types.js';
+// default export は避ける（バンドラが全体を取り込んでしまうため）
+
+// package.json
+{
+  "name": "my-lib",
+  "version": "1.0.0",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts"
+  }
+}
+// tsup は tsconfig を読んで ESM (.js) と CJS (.cjs) を同時生成し
+// .d.ts も自動的に出力してくれる`
+  }, {
+    diff: 3,
+    q: "JSDoc で型情報を付与し、TypeScript なしに型安全にライブラリを使える\nコードを書いてください。また、そのコードの .d.ts 定義ファイルも書いてください。",
+    code: `// utils.js — JSDoc で型アノテーション
+// utils.d.ts — 型定義ファイル`,
+    answer: `// utils.js
+/**
+ * 2つの数値を加算する
+ * @param {number} a
+ * @param {number} b
+ * @returns {number}
+ */
+export function add(a, b) {
+  return a + b;
+}
+
+/**
+ * ユーザーオブジェクトを生成する
+ * @param {string} name
+ * @param {number} age
+ * @returns {{ id: string, name: string, age: number, createdAt: Date }}
+ */
+export function createUser(name, age) {
+  return { id: crypto.randomUUID(), name, age, createdAt: new Date() };
+}
+
+// utils.d.ts (手書き or tsc --allowJs --declaration で自動生成)
+export declare function add(a: number, b: number): number;
+
+export interface User {
+  id: string;
+  name: string;
+  age: number;
+  createdAt: Date;
+}
+
+export declare function createUser(name: string, age: number): User;
+
+// tsconfig.json で checkJs: true にすれば JSDoc を TS が検証してくれる`
+  }]
+};
+
+/* ── Chapters ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "V8エンジン内部",
+  est: "65分",
+  goal: "V8 の実行パイプライン（Ignition→TurboFan）を説明できるようになる。Hidden Class とインラインキャッシュの仕組みを理解して、パフォーマンスに悪影響を与えるコードパターンを避けられるようになる。世代別 GC の概要と Orinoco の設計思想を把握する。",
+  sections: [{
+    title: "Ignition と TurboFan — 実行パイプライン",
+    body: "JavaScript は動的型言語であるため、C や Java のように事前にコンパイルすることができません。V8 はこの問題を「適応的 JIT（Just-In-Time）コンパイル」で解決しています。ソースコードはまず Ignition というバイトコードインタープリタで即座に実行され、実行回数が多い「ホット」な関数が検出されると、TurboFan という最適化コンパイラが機械語に変換します。\n\nこのアプローチの重要な点は、型情報のフィードバックにあります。Ignition は実行中に「この変数はいつも number だ」というプロファイル情報を収集し、TurboFan はその情報をもとに「number 専用の高速な加算命令」を生成します。しかし後で string が渡されると最適化が無効化（脱最適化）され、Ignition に戻ります。これを理解すると「型を安定させる」ことがなぜ重要かが分かります。",
+    table: T.v8Pipeline,
+    afterTable: "ポイント: 同じ関数に異なる型の引数を渡すと、TurboFan の最適化が破棄される（脱最適化）。Python では型を気にせず書けますが、JS でパフォーマンスを追求するなら「型の安定性」を意識することが重要です。"
+  }, {
+    title: "Hidden Class とインラインキャッシュ",
+    body: "動的型言語でプロパティアクセスを高速化するために V8 が採用しているのが Hidden Class（内部的には Shape/Map と呼ばれる）という概念です。同じプロパティを同じ順序で持つオブジェクトは同じ Hidden Class を共有し、V8 はそのオフセット情報をキャッシュして直接メモリアクセスに近い速度でプロパティを読み取れます。\n\nインラインキャッシュ（IC）はこれをさらに推し進めた最適化で、プロパティアクセスのサイト（コード上の位置）が「いつも同じ Hidden Class のオブジェクトを受け取る」パターン（モノモーフィック）を検出して、型チェックをスキップした高速パスを生成します。複数の Hidden Class が混在する場合（ポリモーフィック〜メガモーフィック）はこのキャッシュが機能しなくなります。",
+    code: `// 悪い例: Hidden Class が分岐する
+function bad(obj) {
+  obj.x = 1; // Shape A
+  if (Math.random() > 0.5) obj.y = 2; // Shape A か Shape B か不定
+}
+
+// 良い例: 常に同じ Hidden Class
+function good(x, y) {
+  return { x, y }; // 常に { x, y } の Shape
+}
+
+// プロパティは定義順に影響する
+const a = { x: 1, y: 2 }; // Shape X
+const b = { y: 2, x: 1 }; // Shape Y（別 Class！）
+// a と b は同じプロパティを持つが Hidden Class が異なる`,
+    afterCode: "実務では delete 演算子でプロパティを削除するのも Hidden Class の変化を引き起こします。不要なプロパティは undefined を代入して「形状」を保つか、最初から設計に含めないことが推奨されます。"
+  }, {
+    title: "Orinoco GC — メモリ管理の仕組み",
+    body: "V8 のガベージコレクタ「Orinoco」は世代別 GC を採用しています。多くのオブジェクトは生成後すぐに不要になる（「多くは若くして死ぬ」）という観察に基づき、新しいオブジェクトを Young 世代、長命なオブジェクトを Old 世代で別々に管理します。Young の GC は小さい領域を高速にコピーするだけで済むため、メインスレッドのブロックが最小限に抑えられます。\n\nOrinoco の大きな特徴は「並行・並列 GC」です。メインスレッドと並行して GC スレッドがマーキングを行い（Concurrent Marking）、Old 世代の回収も複数スレッドで並列化（Parallel Scavenge）されます。Python の GIL とは異なり、V8 の GC はメインスレッドをできるだけブロックしない設計になっています。",
+    table: T.gcGen,
+    afterTable: "GC プレッシャーを下げる実践的な方法: 短命なオブジェクトの大量生成を避ける、オブジェクトプールを使う、大きな配列は TypedArray（ArrayBuffer）を使う。TypedArray は V8 の管理外の連続メモリ領域に確保されるため GC の対象になりません。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "イベントループ詳細",
+  est: "60分",
+  goal: "コールスタック・タスクキュー・マイクロタスクキューの優先順位を正確に説明できるようになる。queueMicrotask と Promise の関係を理解し、Node.js の libuv が提供する I/O 非同期化の仕組みを把握する。実行順序のデバッグができるレベルになる。",
+  sections: [{
+    title: "コールスタックとイベントループ",
+    body: "JavaScript はシングルスレッドです。同時に実行できるコードは常に1つだけで、その実行状態を管理するのがコールスタックです。関数を呼ぶと積まれ、returnすると取り出されます。イベントループは「コールスタックが空になったら、キューから次のタスクを取り出して実行する」という単純なループです。\n\nPython でも GIL があるためマルチスレッドは同時実行されませんが、asyncio はコルーチンを「await ポイント」で切り替えることで並行実行を実現しています。JavaScript のイベントループも同じ発想で、await（= Promiseの解決待ち）はコールスタックから関数を取り除き、他のコードが実行できる隙間を作ります。",
+    code: `// イベントループの擬似コード
+while (true) {
+  // 1. コールスタックが空になるまで実行
+  // 2. マイクロタスクキューをすべて処理（Promise.then, queueMicrotask）
+  // 3. 必要ならレンダリング（ブラウザのみ）
+  // 4. タスクキューから1件取り出して実行（setTimeout, I/O）
+  //    → 1に戻る
+}`,
+    afterCode: "重要: ステップ2のマイクロタスクは「すべて処理」します。マイクロタスクの中でさらにマイクロタスクを登録し続けると、タスクキューに制御が戻らずUIがフリーズします。この無限ループはエラーにならず、ブラウザが「応答なし」になる原因です。"
+  }, {
+    title: "タスクキュー vs マイクロタスクキュー",
+    body: "「setTimeout(fn, 0) と Promise.then(fn) のどちらが先か」は JavaScript を深く理解するための重要な問いです。答えは常に Promise.then（マイクロタスク）が先です。マイクロタスクキューはコールスタックが空になるたびに「全件」処理されますが、タスクキューは1回のイベントループティックで1件だけ処理されます。\n\nqueueMicrotask() は Promise を使わずに直接マイクロタスクキューに関数を登録する API です。Promise のオーバーヘッド（Promise オブジェクトの生成）なしにマイクロタスクを使えるため、パフォーマンスクリティカルな場面で便利です。Node.js の process.nextTick はさらに特殊で、マイクロタスクキューよりも優先される「nextTick キュー」に登録されます。",
+    table: T.taskQueue,
+    afterTable: "実務での使い分け: UIの更新後に処理したい場合は setTimeout(fn, 0)。現在のタスクが終わり次第すぐ実行したい場合は queueMicrotask または Promise.resolve().then(fn)。Node.js で他の非同期処理より先に実行したい場合は process.nextTick（ただし乱用は禁物）。"
+  }, {
+    title: "Node.js の libuv と非同期 I/O",
+    body: "Node.js がシングルスレッドでも高い I/O スループットを発揮できる理由は、libuv というクロスプラットフォームの非同期 I/O ライブラリにあります。ファイル読み込みやネットワーク通信は libuv がOSの非同期 API（Linux: epoll、macOS: kqueue、Windows: IOCP）に委譲し、完了したらイベントキューに積み直します。\n\nlibuv はスレッドプールも管理しており、OS がネイティブで非同期をサポートしない操作（一部のファイルシステム操作や DNS ルックアップなど）はスレッドプール内で実行されます。デフォルトサイズは4スレッドで、UV_THREADPOOL_SIZE 環境変数で増やせます。これは Python の ThreadPoolExecutor と似た概念ですが、Node.js 側から意識する必要はほとんどありません。",
+    code: `// Node.js の非同期 I/O の流れ
+import fs from 'fs/promises';
+
+// この呼び出しは libuv に委譲される
+const data = await fs.readFile('large.json', 'utf-8');
+// readFile の間、イベントループは他のリクエストを処理できる
+
+// CPU バウンドな処理はイベントループをブロックする（NG）
+function slowSync() {
+  // 100ms かかる同期処理はすべてのリクエストをブロック
+  const result = JSON.parse(hugeJsonString);
+  return result;
+}
+
+// Worker Threads に逃がすのが正解（Ch.6 で詳説）`,
+    afterCode: "注意: I/O バウンドな処理はイベントループをブロックしませんが、CPU バウンドな処理（重い計算・巨大 JSON パース）は同期実行されるためブロックします。Node.js サーバで重い計算が必要なら Worker Threads に委譲することが重要です。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "高度なメタプログラミング",
+  est: "55分",
+  goal: "Well-Known Symbols を使ってオブジェクトの組み込み動作をカスタマイズできるようになる。Proxy と Reflect を組み合わせて実用的なパターン（バリデーション・ロギング・遅延計算）を実装できる。TC39 Stage 3 の Decorators の設計思想を理解する。",
+  sections: [{
+    title: "Well-Known Symbols",
+    body: "Symbol はユニークで衝突しない識別子を作るためのプリミティブ型です。Well-Known Symbols は JavaScript 言語自体が内部で使う特別な Symbol で、これをオブジェクトに定義することで for...of・instanceof・型変換などの組み込み動作をカスタマイズできます。Python の `__iter__`・`__len__`・`__str__` などのダンダーメソッドと同じ発想です。\n\n最も使用頻度が高いのは Symbol.iterator です。このメソッドを実装したオブジェクトは for...of、スプレッド（...）、Array.from()、分割代入で使えるようになります。自前のコレクションクラスや無限シーケンスジェネレータを作る際に必須の知識です。",
+    table: T.wellKnownSymbols,
+    afterTable: "Symbol.toPrimitive はオブジェクトが数値・文字列・汎用プリミティブに変換される際の挙動を制御します。hint パラメータが 'number'・'string'・'default' のいずれかで渡されるため、コンテキストに応じた変換を実装できます。"
+  }, {
+    title: "Proxy と Reflect の実用パターン",
+    body: "Proxy はオブジェクトへの操作をインターセプトするラッパーで、プロパティの読み取り（get）・書き込み（set）・削除（deleteProperty）・関数呼び出し（apply）など13種類のトラップを定義できます。Python の __getattr__・__setattr__ に相当しますが、より細かい粒度でコントロールできます。\n\nReflect は Proxy のトラップと対応する静的メソッドを提供し、「デフォルトの挙動をそのまま実行しつつ何か追加する」というパターンを書きやすくします。Reflect.get(target, prop, receiver) は target[prop] と同じですが、Proxy 内で使うことで継承チェーンやアクセサを正しく扱えます。",
+    code: `// バリデーション付きプロキシ
+function validated(obj, schema) {
+  return new Proxy(obj, {
+    set(target, prop, value, receiver) {
+      const validator = schema[prop];
+      if (validator && !validator(value)) {
+        throw new TypeError(\`Invalid value for \${String(prop)}: \${value}\`);
+      }
+      return Reflect.set(target, prop, value, receiver);
+    }
+  });
+}
+
+const user = validated(
+  { name: '', age: 0 },
+  {
+    name: v => typeof v === 'string' && v.length > 0,
+    age: v => Number.isInteger(v) && v >= 0 && v <= 150
+  }
+);
+
+user.name = 'Alice'; // OK
+user.age = 30;       // OK
+user.age = -1;       // TypeError: Invalid value for age: -1`,
+    afterCode: "Proxy の性能コストは小さくはありません。頻繁に呼ばれるホットパスに使うと TurboFan の最適化が妨げられることがあります。バリデーションや設定オブジェクトのような「書き込みが少ないもの」に使うのが実務的です。"
+  }, {
+    title: "Decorators (Stage 3)",
+    body: "Decorators は TC39 Stage 3（2024年時点）のプロポーザルで、クラスのメソッドやフィールドに宣言的にメタデータや動作を付加する構文です。Python の @decorator と非常に似た概念ですが、JavaScript の Decorators は関数だけでなくクラス・フィールド・アクセサなども対象にできます。TypeScript 5.0 以降で実験的フラグなしに使えるようになっています。\n\nDecorators の典型的なユースケースは、ロギング・メモ化・バリデーション・依存性注入です。Angular や NestJS などのフレームワークはすでにこのパターンを多用しており、@Component・@Injectable などのアノテーションがすべて Decorators で実装されています。",
+    code: `// TypeScript 5.0+ での Decorator 実装例
+function log(target, context) {
+  const name = context.name;
+  return function(...args) {
+    console.log(\`\${name} called with\`, args);
+    const result = target.apply(this, args);
+    console.log(\`\${name} returned\`, result);
+    return result;
+  };
+}
+
+function memoize(target, context) {
+  const cache = new Map();
+  return function(...args) {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) return cache.get(key);
+    const result = target.apply(this, args);
+    cache.set(key, result);
+    return result;
+  };
+}
+
+class Calculator {
+  @log
+  @memoize
+  fibonacci(n) {
+    if (n <= 1) return n;
+    return this.fibonacci(n - 1) + this.fibonacci(n - 2);
+  }
+}`,
+    afterCode: "注意: Decorators の仕様は長い歴史の中で何度も変更されています。TypeScript の experimentalDecorators（旧仕様）と ECMAScript 標準の Decorators（新仕様）は動作が異なります。2024年以降のプロジェクトでは tsconfig の useDefineForClassFields: true を確認してから使いましょう。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "WebAssembly連携",
+  est: "60分",
+  goal: "WAT（WebAssembly Text Format）の基本文法を読めるようになる。JS から WASM モジュールをインスタンス化して関数を呼び出せる。JS↔WASM の境界コスト（メモリ転送・型変換）を理解し、適切な設計判断ができる。WASI の概念とユースケースを説明できる。",
+  sections: [{
+    title: "WebAssembly の概要と WAT 基礎",
+    body: "WebAssembly（WASM）はブラウザおよびサーバで実行できるバイナリ形式の中間言語です。C/C++・Rust・Go などで書いたコードをコンパイルして実行できるため、JavaScript では難しい高速な数値演算・画像処理・暗号処理などを実現できます。Python の ctypes や cffi でCライブラリを呼ぶ感覚に近いですが、WAMは完全にサンドボックス化されており、明示的にメモリや関数をエクスポートしない限り外部にアクセスできません。\n\nWAT（WebAssembly Text Format）はバイナリの WASM を人間が読める S 式形式で表したものです。デバッグや学習目的で使われ、wat2wasm ツールでバイナリに変換できます。スタックベースの仮想マシンで動作し、命令は i32.add のように「型.操作」の形式で書かれます。",
+    table: T.wasmVsJs,
+    afterTable: "WASM が JS を「置き換える」という誤解がよくあります。実際には WASM は数値演算の内部処理を担い、DOM 操作・非同期処理・UI は引き続き JS が担うという「協調」のモデルです。figma・Google Meet・Unity WebGL などがこのパターンの実例です。"
+  }, {
+    title: "JS から WASM を呼ぶ — インスタンス化と境界コスト",
+    body: "JavaScript から WASM を呼ぶには WebAssembly.instantiate() または WebAssembly.instantiateStreaming() を使います。後者は fetch のレスポンスを直接受け取りストリーミングでコンパイルするため、より高速です。インスタンス化された WASM モジュールは instance.exports 経由で関数・メモリ・グローバル変数にアクセスできます。\n\nJS↔WASM の境界を越えるたびにオーバーヘッドが発生します。関数呼び出しのコストは小さいですが、文字列や複雑なデータ構造は WASM の線形メモリ上にバイト列として書き込む必要があるため、大量のデータのやり取りは避けるべきです。設計の原則は「大きな仕事を WASM に渡し、結果だけを JS で受け取る」です。",
+    code: `// WASM モジュールのインスタンス化
+async function loadWasm(path, imports = {}) {
+  if (WebAssembly.instantiateStreaming) {
+    const { instance } = await WebAssembly.instantiateStreaming(
+      fetch(path), imports
+    );
+    return instance;
+  }
+  // フォールバック（古いブラウザ）
+  const resp = await fetch(path);
+  const buf = await resp.arrayBuffer();
+  const { instance } = await WebAssembly.instantiate(buf, imports);
+  return instance;
+}
+
+// imports: JS関数をWASMに渡す（境界を渡るコールバック）
+const imports = {
+  env: {
+    log: (x) => console.log('from wasm:', x) // WASM から JS を呼ぶ
+  }
+};
+
+const inst = await loadWasm('./math.wasm', imports);
+console.log(inst.exports.add(3, 4)); // 7`,
+    afterCode: "WASM の Memory は ArrayBuffer の拡張版で、grow() で動的に拡張できます。Rust の wasm-bindgen や AssemblyScript を使うと、メモリ管理や型変換のグルーコードを自動生成してくれるため、実務では直接 WAT を書くことは稀です。"
+  }, {
+    title: "WASI — サーバサイド WASM",
+    body: "WASI（WebAssembly System Interface）はブラウザ外で WASM を実行するための標準 API セットです。POSIX ライクなファイル・ネットワーク・プロセスの API を提供し、WASM バイナリをブラウザ・Node.js・Deno・Wasmtime（スタンドアロンランタイム）など複数の環境で動かせます。Docker の代替として注目されており、「一度コンパイルしてどこでも安全に実行」がコンセプトです。\n\nNode.js 21 以降では WASI の実験的サポートが組み込まれており、node:wasi モジュールを通じて使えます。Python の ctypes でシステムコールを使うのと似ていますが、WASI はサンドボックス内で許可されたリソースへしかアクセスできないため、より安全なプラグインシステムや FaaS の実行環境として有望です。",
+    code: `// Node.js で WASI を使う例（Node.js 21+）
+import { WASI } from 'node:wasi';
+import { readFile } from 'node:fs/promises';
+
+const wasi = new WASI({
+  version: 'preview1',
+  args: ['wasm-app', '--flag'],
+  env: { HOME: '/tmp' },
+  preopens: { '/sandbox': '/tmp/sandbox' } // 許可するディレクトリ
+});
+
+const wasmBuffer = await readFile('app.wasm');
+const { instance } = await WebAssembly.instantiate(
+  wasmBuffer,
+  wasi.getImportObject()
+);
+
+wasi.start(instance); // _start (main関数相当) を呼ぶ`,
+    afterCode: "WASI はまだ preview1/preview2 と仕様が進化中です（2024年時点）。本番利用前に対象ランタイムのサポートバージョンを確認してください。Cloudflare Workers・Fastly Compute でも WASM + WASI 対応が広まっており、エッジコンピューティングの文脈で注目されています。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "型システムとTypeScript深化",
+  est: "60分",
+  goal: "Conditional Types・Mapped Types・Template Literal Types を使った型レベルの変換を実装できるようになる。satisfies 演算子と型推論の関係を理解する。infer キーワードで型引数を抽出できる。実用的なユーティリティ型を自前で設計できるレベルになる。",
+  sections: [{
+    title: "Conditional Types と infer",
+    body: "TypeScript の型システムはチューリング完全であり、型レベルで条件分岐・再帰・マッピングを行うことができます。Conditional Types は `T extends U ? X : Y` という構文で、型引数に対する条件分岐を表現します。Python の型ヒントは実行時チェックを行いませんが、TypeScript の Conditional Types はコンパイル時に型を変換するため、ランタイムコストゼロで型安全性を高められます。\n\ninfer キーワードは Conditional Types と組み合わせて、パターンマッチした型の一部を取り出すために使います。`T extends Promise<infer U>` と書くと、T が Promise 型の場合に内側の型 U を変数として使えます。これは正規表現のキャプチャグループに似た概念で、TypeScript 標準の Awaited<T>・ReturnType<T>・Parameters<T> などすべてこのパターンで実装されています。",
+    table: T.tsAdvancedTypes,
+    afterTable: "Conditional Types はdistributiveな性質を持ちます。`T extends U ? X : Y` に Union 型を渡すと各メンバーに個別に適用されます。これを防ぐには `[T] extends [U] ? X : Y` のようにタプル型でラップします。"
+  }, {
+    title: "Mapped Types と Template Literal Types",
+    body: "Mapped Types は `{ [K in keyof T]: ... }` 構文で、既存の型のすべてのプロパティに変換を適用した新しい型を生成します。Partial<T>・Readonly<T>・Required<T>・Pick<T,K>・Omit<T,K> など、TypeScript 標準のユーティリティ型はすべて Mapped Types で実装されています。プロパティを追加・削除・変更する型変換を宣言的に記述できる強力な機能です。\n\nTemplate Literal Types は文字列の型を文字列テンプレートのように組み合わせる機能です。`type EventName = \`on\${Capitalize<string>}\`` のように書くと onFoo・onBar などの文字列パターンを型として表現できます。Mapped Types と組み合わせると、APIのエンドポイント名やイベント名を型安全に管理するユーティリティが作れます。",
+    code: `// Mapped Types: すべてのメソッドを Promise 化する
+type Promisify<T> = {
+  [K in keyof T]: T[K] extends (...args: infer A) => infer R
+    ? (...args: A) => Promise<R>
+    : T[K];
+};
+
+// Template Literal Types: イベントハンドラ名の生成
+type EventMap = { click: MouseEvent; focus: FocusEvent; input: InputEvent };
+type HandlerMap = {
+  [K in keyof EventMap as \`on\${Capitalize<string & K>}\`]:
+    (e: EventMap[K]) => void
+};
+// HandlerMap = { onClick: (e: MouseEvent) => void; ... }
+
+// satisfies: 型チェックしつつ推論を保持
+const palette = {
+  red: [255, 0, 0],
+  green: '#00ff00',
+} satisfies Record<string, string | number[]>;
+
+palette.red.map(v => v * 2); // OK: number[] として推論される
+// 'as' だと unknown になってしまう箇所が安全になる`,
+    afterCode: "satisfies は TypeScript 4.9 で導入されました。`const x: T = value` とすると x の型は T になりますが、`const x = value satisfies T` なら x は value から推論された具体的な型のまま、T への適合チェックだけが行われます。ライブラリの設定オブジェクト定義に特に便利です。"
+  }, {
+    title: "実用的な型パターン集",
+    body: "TypeScript の型システムは、設計を誤ると「型のための型」を大量生産してしまいます。実務では「型の表現力」よりも「チームが読んで理解できるか」を優先することが重要です。ここでは実用頻度が高く、コードの品質向上に直結する型パターンをまとめます。\n\nDiscriminated Union（判別可能な共用体型）は、kind・type・tag などの共通のリテラル型フィールドで分岐するパターンで、TypeScript の型絞り込みと非常に相性が良いです。Redux のアクション型や API レスポンスの分岐、状態管理の状態遷移を表現する際に多用されます。Python の Enum + match 文に近い役割を果たします。",
+    code: `// Discriminated Union: 型安全な状態管理
+type FetchState<T> =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: T }
+  | { status: 'error'; error: Error };
+
+function renderUser(state: FetchState<User>) {
+  switch (state.status) {
+    case 'idle':    return 'まだ読み込んでいません';
+    case 'loading': return '読み込み中...';
+    case 'success': return state.data.name; // state.data は User 型
+    case 'error':   return state.error.message;
+  }
+}
+
+// Branded Types: 型エイリアスに意味を持たせる
+type UserId = string & { __brand: 'UserId' };
+type OrderId = string & { __brand: 'OrderId' };
+
+function getUser(id: UserId) { /* ... */ }
+// getUser('abc' as UserId); // キャスト必要 → 意図しない混在を防ぐ`,
+    afterCode: "Branded Types は実行時には通常の string ですが、型レベルでは別の型として扱われます。UserId と OrderId を誤って入れ替えるバグをコンパイル時に検出できます。ユーザー入力を検証してBranded Typeにキャストするファクトリ関数（parseUserId 等）を作るパターンが実務で一般的です。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "並行・並列処理",
+  est: "55分",
+  goal: "SharedArrayBuffer と Atomics を使ったスレッド間メモリ共有を実装できる。Node.js の worker_threads でCPUバウンドな処理を並列化できる。ブラウザの Web Workers との違いを説明できる。Mutex・セマフォなどの同期プリミティブを JavaScript で実装できる。",
+  sections: [{
+    title: "SharedArrayBuffer と Atomics",
+    body: "通常の Worker 間通信は postMessage でデータをコピーして渡しますが、大きなデータのコピーはオーバーヘッドになります。SharedArrayBuffer は複数のスレッドが同一のメモリ領域を参照できる特殊なバッファで、コピーなしに大量データを共有できます。ただし複数スレッドが同時に読み書きすると競合状態（Race Condition）が発生します。\n\nAtomics は SharedArrayBuffer への操作をアトミック（中断不可能）に行うための静的メソッド群です。Python の threading.Lock や multiprocessing.Value に相当する役割を果たし、カウンタのインクリメントや旗の立て方を競合なく行えます。Atomics.wait() / Atomics.notify() を組み合わせると、Worker 間の Mutex（排他制御）を実装できます。",
+    table: T.sharedBuffer,
+    afterTable: "セキュリティ注意: SharedArrayBuffer は Spectre 攻撃の対象になりうるため、ブラウザで使うには Cross-Origin Isolation が必要です。サーバで以下のヘッダを設定する必要があります: `Cross-Origin-Opener-Policy: same-origin` と `Cross-Origin-Embedder-Policy: require-corp`。"
+  }, {
+    title: "Worker Threads (Node.js)",
+    body: "Node.js の worker_threads モジュールはスレッドベースの並列実行を提供します。ブラウザの Web Workers と似ていますが、worker_threads は同じプロセス内でメモリを（SharedArrayBufferで）共有でき、Node.js のモジュールシステムをそのまま使えます。Python の multiprocessing モジュールはプロセスを分離しますが、worker_threads はスレッドなのでオーバーヘッドが小さい点が特徴です。\n\nCPUバウンドな処理（画像処理・暗号計算・データ変換）を Worker に逃がすことで、メインスレッドのイベントループを解放できます。実際の設計では Worker を使い回す「ワーカープール」を作るのが効率的で、piscina というライブラリがこのパターンを提供しています。",
+    code: `// ワーカープールの簡易実装
+// npm install piscina (本番では推奨)
+import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
+
+if (isMainThread) {
+  // メインスレッド: Worker を生成してタスクを投げる
+  function runInWorker(data) {
+    return new Promise((resolve, reject) => {
+      const w = new Worker(new URL(import.meta.url), { workerData: data });
+      w.on('message', resolve);
+      w.on('error', reject);
+    });
+  }
+  const result = await runInWorker({ n: 40 });
+  console.log('fib(40) =', result); // 102334155
+} else {
+  // Worker スレッド: CPU バウンドな計算
+  function fib(n) {
+    return n <= 1 ? n : fib(n - 1) + fib(n - 2);
+  }
+  parentPort.postMessage(fib(workerData.n));
+}`,
+    afterCode: "isMainThread を使うと1ファイルにメインスレッドと Worker の両方のコードを書けます。import.meta.url は現在のファイルの URL を返すため、Worker のスクリプトパスとして自分自身を指定できます。これは Python の if __name__ == '__main__' に相当するパターンです。"
+  }, {
+    title: "ブラウザの Web Workers とマルチスレッドパターン",
+    body: "ブラウザの Web Workers はメインスレッドとは別のグローバルスコープで動作します。DOM・window・document へのアクセスは完全に禁止されており、postMessage によるメッセージパッシングのみで通信します。通信コストを最小化するには、Transferable Objects（ArrayBuffer・MessagePort・OffscreenCanvas等）を使います。これらは転送時にコピーではなく「所有権移転」されるため、ゼロコピーで大きなデータを渡せます。\n\nOffscreenCanvas は Web Worker 内でキャンバス描画を行えるAPIで、WebGL の描画処理をバックグラウンドに追い出しメインスレッドをUIの応答性維持に専念させることができます。また、Service Worker はネットワークリクエストをインターセプトするための特殊な Worker で、オフラインキャッシュや Push 通知の処理に使われます。",
+    code: `// Transferable Object でゼロコピー転送
+const buffer = new ArrayBuffer(1024 * 1024 * 100); // 100MB
+const worker = new Worker('worker.js');
+
+// transfer: buffer の所有権を Worker に移す（メインスレッドはアクセス不可に）
+worker.postMessage({ buffer }, [buffer]);
+// buffer を postMessage に渡した後はアクセスできない
+// console.log(buffer.byteLength); // 0 (転送済み)
+
+// worker.js 内
+self.addEventListener('message', ({ data }) => {
+  const view = new Uint8Array(data.buffer);
+  // 100MB の処理...
+  // 処理後はメインスレッドに返せる
+  self.postMessage({ result: view.slice(0, 10) }, [data.buffer]);
+});`,
+    afterCode: "Service Worker はページが閉じても動作し続けるため、Push 通知の受信やバックグラウンド同期に使えます。ただしインストール・アクティベーション・フェッチのライフサイクルを正しく管理しないと古いキャッシュが残り続ける問題が発生します。Workbox ライブラリを使うと安全に管理できます。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "パフォーマンス計測・最適化",
+  est: "55分",
+  goal: "Performance API を使って正確なタイムスタンプ計測ができる。PerformanceObserver で Long Task を検出できる。Layout Thrashing の原因と修正方法を説明できる。RAIL モデルに基づいた最適化目標を設定し、Lighthouse CI をパイプラインに組み込める。",
+  sections: [{
+    title: "Performance API と計測の基礎",
+    body: "JavaScript のパフォーマンス計測で Date.now() を使うのは避けましょう。Date.now() はミリ秒精度でタイムゾーンの影響を受けますが、performance.now() はマイクロ秒精度（小数点以下）でページ読み込み開始からの経過時間を返します。Python の time.perf_counter() に相当します。\n\nperformance.mark() と performance.measure() を組み合わせると、コードの特定区間を名前付きでタイムラインに記録できます。Chrome DevTools の Performance タブでこれらのマーカーが可視化されるため、プロファイリングと組み合わせて使うと強力です。PerformanceObserver API を使えば、Long Task（50ms を超えるタスク）・Paint・Layout など特定のパフォーマンスエントリをリアルタイムに監視できます。",
+    table: T.perfApi,
+    afterTable: "Long Task とは50ms以上メインスレッドを占有するタスクで、ユーザーがクリックしてから反応するまでの遅延（INP: Interaction to Next Paint）に直結します。Chrome の Core Web Vitals でも重視される指標で、PerformanceObserver で { type: 'longtask' } を監視することで検出できます。"
+  }, {
+    title: "Layout Thrashing と描画最適化",
+    body: "ブラウザのレンダリングパイプラインは「JavaScript実行 → スタイル計算 → レイアウト → ペイント → コンポジット」の順に進みます。Layout Thrashing（強制同期レイアウト）は、JavaScript がレイアウトに影響するプロパティ（offsetHeight・scrollTop・getBoundingClientRect 等）を読み取った直後に、スタイルを変更した場合に発生します。ブラウザは「最新の値を返すため」に強制的にレイアウト計算を行う必要があり、これが繰り返されると深刻な性能低下を引き起こします。\n\nRAIL モデル（Response・Animation・Idle・Load）はGoogleが提唱するパフォーマンス目標の枠組みです。Response（応答）は100ms以内、Animation（アニメーション）は16ms/フレーム（60fps）、Load（ロード）はTime to Interactive 5秒以内が目安です。これらの目標に基づいて最適化の優先度を決めることが重要で、「測定してから最適化する」というアプローチが基本です。",
+    code: `// Layout Thrashing を検出・修正する
+// FastDOM ライブラリのパターンを自前実装
+const reads = [];
+const writes = [];
+let scheduled = false;
+
+function read(fn) { reads.push(fn); schedule(); }
+function write(fn) { writes.push(fn); schedule(); }
+
+function schedule() {
+  if (scheduled) return;
+  scheduled = true;
+  requestAnimationFrame(() => {
+    const r = reads.splice(0);
+    const w = writes.splice(0);
+    r.forEach(fn => fn()); // 読み取りをまとめて実行
+    w.forEach(fn => fn()); // 書き込みをまとめて実行
+    scheduled = false;
+  });
+}
+
+// 使い方
+read(() => { const h = el.offsetHeight; write(() => { el.style.height = h * 2 + 'px'; }); });`,
+    afterCode: "will-change: transform を CSS で指定すると、要素をコンポジターレイヤーに昇格させてGPUで処理されます。アニメーション対象の要素に使うと Layout・Paint をスキップできますが、多用するとVRAM消費が増えます。transform・opacity のみをアニメーションする限りコンポジットのみで処理されるため、これら2つが「アニメーション安全プロパティ」と呼ばれます。"
+  }, {
+    title: "Lighthouse CI とパフォーマンス予算",
+    body: "Lighthouse は Google が提供するウェブアプリの品質計測ツールで、パフォーマンス・アクセシビリティ・SEO・PWA の各カテゴリをスコア化します。Lighthouse CI は Lighthouse をCI/CDパイプラインに組み込むためのツールで、PRごとにスコアを計測し、設定した閾値を下回ったらビルドを失敗させる「パフォーマンス予算」を実施できます。\n\nCore Web Vitals（LCP・INP・CLS）はGoogleの検索ランキングにも影響するため、本番サービスでは継続的な計測が重要です。LCP（Largest Contentful Paint）は最大要素の描画時間で2.5秒以内、INP（Interaction to Next Paint）はインタラクションから次の描画まで200ms以内、CLS（Cumulative Layout Shift）はレイアウトのずれが0.1以下が合格基準です。",
+    code: `# Lighthouse CI のセットアップ
+npm install -g @lhci/cli
+
+# lighthouserc.js を作成
+# module.exports = {
+#   ci: {
+#     collect: { startServerCommand: 'npm start', url: ['http://localhost:3000'] },
+#     assert: {
+#       assertions: {
+#         'categories:performance': ['warn', { minScore: 0.9 }],
+#         'first-contentful-paint': ['error', { maxNumericValue: 2000 }],
+#         'interactive': ['error', { maxNumericValue: 5000 }]
+#       }
+#     },
+#     upload: { target: 'temporary-public-storage' }
+#   }
+# };
+
+# GitHub Actions での実行例
+# - run: lhci autorun`,
+    afterCode: "パフォーマンス予算の設定は「何を計測するか」から始めましょう。全てのスコアを100にすることが目的ではなく、ユーザー体験に影響する指標（LCP・INP）を中心に目標値を設定するのが現実的です。Lighthouse のスコアはラボデータ（合成テスト）であり、実ユーザーのデータとは差異があることも認識しておく必要があります。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "ライブラリ設計と公開",
+  est: "55分",
+  goal: "Tree-Shakeable なライブラリ設計の原則を説明できる。tsup や rollup を使ってデュアル CJS/ESM パッケージをビルドできる。JSDoc で型情報を付与し、.d.ts ファイルを生成できる。npm publish の手順とセマンティックバージョニングを理解し、Changeset を使ったモノレポでのリリース管理ができる。",
+  sections: [{
+    title: "Tree-Shakeable 設計と デュアル CJS/ESM",
+    body: "Tree Shaking とは、バンドラが import されていないコードをビルド成果物から除外する最適化です。ESM の静的 import/export 構文はビルド時に解析できるため Tree Shaking が効きますが、CJS の require() は動的なため除外できません。ライブラリを Tree-Shakeable にするには、ESM 形式で配布し、named export のみを使い、副作用（side effects）を最小化することが重要です。\n\npackage.json の exports フィールドを使うと、import（ESM）と require（CJS）で異なるファイルを提供できます。これにより Node.js・バンドラ・TypeScript のどの環境からも適切な形式のファイルが読み込まれます。tsup は TypeScript プロジェクトを ESM + CJS + 型定義の3点セットで出力できるツールで、設定が最小限で済むため現在最も人気のライブラリビルドツールです。",
+    table: T.npmPublish,
+    afterTable: "sideEffects: false を package.json に追加すると、バンドラに「このパッケージのどのファイルも副作用がない」と伝えられます。これにより import されていないファイルを丸ごと Tree Shaking できます。CSS のインポートやポリフィルのような副作用があるファイルは sideEffects 配列に明示してください。"
+  }, {
+    title: "JSDoc による型情報付与と .d.ts 生成",
+    body: "TypeScript を使わない JavaScript プロジェクトでも、JSDoc コメントで型アノテーションを書くと VS Code や TypeScript の型チェッカーがその情報を活用します。tsconfig.json で allowJs: true と checkJs: true を設定すると、JS ファイルに対して型チェックが走ります。Python の型ヒント（mypy）と同様に、既存コードに段階的に型情報を追加していくことができます。\n\n.d.ts ファイルは TypeScript の型定義のみを含む宣言ファイルです。ライブラリを TypeScript ユーザー向けに配布する際に必要で、tsc --declaration または tsup --dts で自動生成できます。npm の @types/xxx パッケージは、JS ライブラリに対して後付けで .d.ts を提供するパターンです（DefinitelyTyped リポジトリで管理）。",
+    code: `// tsconfig.json (型チェック + 宣言ファイル生成)
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "outDir": "./dist",
+    "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["src/**/*"]
+}
+
+// 生成コマンド
+// tsc --emitDeclarationOnly  → dist/ に .d.ts を生成
+// tsup src/index.ts --dts    → .js + .cjs + .d.ts を一括生成`,
+    afterCode: "declarationMap: true を設定すると .d.ts.map が生成され、型定義からソースの JS/TS ファイルへ「定義へ移動」できるようになります。ライブラリ利用者が型定義を見てすぐに実装を確認できるため、開発体験が向上します。"
+  }, {
+    title: "npm publish と Changeset によるリリース管理",
+    body: "ライブラリを npm に公開する前に、セマンティックバージョニング（SemVer）の原則を理解しておく必要があります。major.minor.patch の3部構成で、破壊的変更は major、後方互換の機能追加は minor、バグ修正は patch を上げます。npm version コマンドは package.json の更新と git tag の作成を一括で行ってくれます。\n\nChangeset はモノレポ（複数パッケージをひとつのリポジトリで管理）でのバージョン管理・CHANGELOG 生成・公開を自動化するツールです。PR ごとに changeset ファイルを追加し、リリース時にまとめてバージョンを上げる運用をとることで、大規模なライブラリ管理でも混乱なくリリースを行えます。Python のポエトリや twine に相当するワークフローを提供します。",
+    code: `# Changeset を使ったリリースフロー
+npm install -D @changesets/cli
+npx changeset init
+
+# 機能を追加したら PR ごとに changeset を追加
+npx changeset add
+# → 対話的に変更種別(major/minor/patch)とサマリーを入力
+
+# リリース時: バージョン更新 + CHANGELOG 生成
+npx changeset version
+
+# npm に公開
+npx changeset publish
+
+# .changeset/config.json (モノレポ設定例)
+# {
+#   "changelog": "@changesets/cli/changelog",
+#   "commit": false,
+#   "linked": [],
+#   "access": "public",
+#   "baseBranch": "main"
+# }`,
+    afterCode: "npm publish --provenance フラグ（npm 9.5+）を使うと、公開パッケージに GitHub Actions の実行情報が署名として付与され、パッケージのサプライチェーン攻撃を防ぐための透明性を提供できます。セキュリティを重視するライブラリでは積極的に使うことが推奨されます。"
+  }]
+}];
+
+/* ── UI Components ── */
+function DataTable({ data }) {
+  return React.createElement("div", {
+    style: { overflowX: "auto", margin: "12px 0", borderRadius: 10, border: "1px solid #d1d5db", background: "#fff" }
+  }, React.createElement("table", {
+    style: { width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }
+  }, React.createElement("thead", null, React.createElement("tr", null, data.h.map((h, i) => React.createElement("th", {
+    key: i,
+    style: { background: "linear-gradient(180deg,#eef2ff,#e0e7ff)", color: "#312e81", fontWeight: 800, fontSize: 12.5, padding: "10px 14px", textAlign: "left", borderBottom: "2px solid #a5b4fc", borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none" }
+  }, h)))), React.createElement("tbody", null, data.r.map((row, ri) => React.createElement("tr", { key: ri }, row.map((cell, ci) => React.createElement("td", {
+    key: ci,
+    style: { padding: "9px 14px", borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none", borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none", color: ci === 0 ? "#1e1b4b" : "#374151", fontWeight: ci === 0 ? 700 : 400, fontSize: 13, lineHeight: 1.65, verticalAlign: "top", whiteSpace: "pre-line", background: ri % 2 === 0 ? "#fff" : "#f9fafb" }
+  }, cell)))))), data.cap && React.createElement("div", {
+    style: { padding: "8px 14px", fontSize: 12, color: "#6b7280", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }
+  }, data.cap));
+}
+
+function Code({ code, hl }) {
+  return React.createElement("pre", {
+    style: { background: hl ? "#1a1a2e" : "#0d0d1a", color: "#d0d0f0", padding: "14px 16px", borderRadius: 10, fontSize: 12, lineHeight: 1.65, overflowX: "auto", margin: "8px 0 0", fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace", border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)", whiteSpace: "pre-wrap", wordBreak: "break-word" }
+  }, React.createElement("code", null, code));
+}
+
+const diffLabel = d => d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+
+function Exercise({ ex, idx }) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: { borderRadius: 12, border: "2px solid #f59e0b", overflow: "hidden", background: "#fff", marginBottom: 8 }
+  }, React.createElement("div", {
+    style: { padding: "12px 16px", background: "linear-gradient(135deg,#fffbeb,#fef3c7)" }
+  }, React.createElement("div", {
+    style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }
+  }, React.createElement("span", {
+    style: { background: "#f59e0b", color: "#fff", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 6 }
+  }, "\u554F", idx + 1), React.createElement("span", {
+    style: { fontSize: 12, fontWeight: 700, color: diffColor(ex.diff) }
+  }, diffLabel(ex.diff))), React.createElement("p", {
+    style: { margin: 0, fontSize: 13.5, lineHeight: 1.8, color: "#92400e", whiteSpace: "pre-line" }
+  }, ex.q)), React.createElement("div", {
+    style: { padding: "0 16px 12px" }
+  }, React.createElement(Code, { code: ex.code, hl: true })), React.createElement("div", {
+    style: { borderTop: "1px dashed #fcd34d", padding: "10px 16px" }
+  }, React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: { background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", width: "100%" }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && React.createElement("div", {
+    style: { marginTop: 10 }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), React.createElement(Code, { code: ex.answer }))));
+}
+
+function Section({ section, idx, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: { borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", background: "#fff" }
+  }, React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: { width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", border: "none", background: "#fafafa", cursor: "pointer", textAlign: "left", fontSize: 14, fontWeight: 700, color: "#1e1b4b" }
+  }, React.createElement("span", {
+    style: { flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: "#6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }
+  }, idx + 1), React.createElement("span", { style: { flex: 1 } }, section.title), React.createElement("span", {
+    style: { fontSize: 18, color: "#9ca3af", transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0)" }
+  }, "\u203A")), open && React.createElement("div", {
+    style: { padding: "12px 16px 16px" }
+  }, section.body && React.createElement("p", {
+    style: { margin: "0 0 8px", fontSize: 13.5, lineHeight: 1.85, color: "#374151", whiteSpace: "pre-line" }
+  }, section.body), section.table && React.createElement(DataTable, { data: section.table }), section.afterTable && React.createElement("p", {
+    style: { margin: "8px 0", fontSize: 13.5, lineHeight: 1.85, color: "#374151", whiteSpace: "pre-line" }
+  }, section.afterTable), section.code && React.createElement(Code, { code: section.code }), section.afterCode && React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 13, lineHeight: 1.8, color: "#555", whiteSpace: "pre-line", background: "#f9fafb", padding: "10px 14px", borderRadius: 8, border: "1px solid #e5e7eb" }
+  }, section.afterCode)));
+}
+
+/* ── Main App ── */
+function JSAdvancedCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+
+  return React.createElement("div", {
+    style: { minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif" }
+  }, React.createElement("div", {
+    style: { maxWidth: 1100, margin: "0 auto", padding: "20px 14px" }
+  },
+    /* Hero */
+    React.createElement("div", {
+      style: { background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)", borderRadius: 16, padding: "24px 20px", marginBottom: 16, position: "relative", overflow: "hidden" }
+    },
+      React.createElement("div", { style: { position: "absolute", top: -30, right: -10, fontSize: 140, opacity: 0.05 } }, "\u26A1"),
+      React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 } }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"),
+      React.createElement("h1", { style: { margin: 0, fontSize: 22, fontWeight: 900, color: "#fff" } }, "JavaScript \u4E0A\u7D1A\u30B3\u30FC\u30B9"),
+      React.createElement("p", { style: { margin: "6px 0 0", fontSize: 12.5, color: "#c4b5fd" } },
+        "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u2B50\u301C\u2B50\u2B50\u2B50"),
+      React.createElement("p", {
+        style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+      }, "V8\u30A8\u30F3\u30B8\u30F3\u306E\u5185\u90E8\u69CB\u9020\u304B\u3089\u59CB\u307E\u308A\u3001\u30A4\u30D9\u30F3\u30C8\u30EB\u30FC\u30D7\u306E\u7CBE\u5BC6\u306A\u52D5\u4F5C\u3001\u30E1\u30BF\u30D7\u30ED\u30B0\u30E9\u30DF\u30F3\u30B0\u30FB WASM\u9023\u643A\u30FB TypeScript\u578B\u30B7\u30B9\u30C6\u30E0\u306E\u6DF1\u5316\u3001\u4E26\u884C\u51E6\u7406\u3001\u30D1\u30D5\u30A9\u30FC\u30DE\u30F3\u30B9\u8A08\u6E2C\u3001\u30E9\u30A4\u30D6\u30E9\u30EA\u516C\u958B\u307E\u3067\u3092\u4E00\u6C17\u306B\u5B66\u3073\u307E\u3059\u3002\u4E2D\u7D1A\u30B3\u30FC\u30B9\u4FEE\u4E86\u5F8C\u306E Python \u958B\u767A\u8005\u304C\u300C\u306A\u305C\u305D\u3046\u306A\u308B\u306E\u304B\u300D\u3092\u7406\u89E3\u3057\u3001\u5B9F\u52D9\u3067\u5F3A\u3044\u8A2D\u8A08\u5224\u65AD\u304C\u3067\u304D\u308B\u30A8\u30F3\u30B8\u30CB\u30A2\u3092\u76EE\u6307\u3057\u307E\u3059\u3002"),
+      React.createElement("div", { style: { marginTop: 14, display: "flex", gap: 3 } },
+        chapters.map((_, i) => React.createElement("div", {
+          key: i,
+          onClick: () => { setCh(i); setMenuOpen(false); },
+          style: { flex: 1, height: 5, borderRadius: 3, background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)", cursor: "pointer" }
+        }))
+      )
+    ),
+    /* Chapter menu */
+    React.createElement("div", { style: { marginBottom: 14 } },
+      React.createElement("button", {
+        onClick: () => setMenuOpen(!menuOpen),
+        style: { width: "100%", padding: "10px 16px", border: "1px solid #d1d5db", borderRadius: 10, background: "#fff", fontSize: 14, fontWeight: 700, color: "#1e1b4b", cursor: "pointer", display: "flex", justifyContent: "space-between" }
+      }, React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), React.createElement("span", { style: { fontSize: 12, color: "#9ca3af" } }, menuOpen ? "\u25B2" : "\u25BC")),
+      menuOpen && React.createElement("div", {
+        style: { marginTop: 4, border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#fff", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }
+      }, chapters.map((c, i) => React.createElement("button", {
+        key: c.id,
+        onClick: () => { setCh(i); setMenuOpen(false); },
+        style: { width: "100%", padding: "10px 16px", border: "none", borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none", background: i === ch ? "#eef2ff" : "#fff", fontSize: 13, fontWeight: i === ch ? 700 : 500, color: i === ch ? "#4338ca" : "#374151", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }
+      },
+        React.createElement("span", {
+          style: { width: 22, height: 22, borderRadius: "50%", background: i === ch ? "#6366f1" : "#e5e7eb", color: i === ch ? "#fff" : "#6b7280", fontWeight: 800, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+        }, c.num),
+        React.createElement("span", { style: { flex: 1 } }, c.title),
+        EX[c.id] && React.createElement("span", { style: { fontSize: 11, color: "#f59e0b", fontWeight: 700 } }, EX[c.id].length, "\u554F")
+      )))
+    ),
+    /* Chapter header */
+    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } },
+      React.createElement("span", {
+        style: { width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontWeight: 900, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }
+      }, chapter.num),
+      React.createElement("div", null,
+        React.createElement("div", { style: { fontWeight: 800, fontSize: 18, color: "#1e1b4b" } }, chapter.title),
+        React.createElement("div", { style: { fontSize: 12, color: "#6b7280" } }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` \u30FB \u6F14\u7FD2${exercises.length}\u554F` : "")
+      )
+    ),
+    /* Chapter goal */
+    chapter.goal && React.createElement("div", {
+      style: { background: "linear-gradient(135deg,#eef2ff,#f5f3ff)", border: "1px solid #c7d2fe", borderLeft: "4px solid #6366f1", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }
+    },
+      React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 } }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"),
+      React.createElement("div", { style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" } }, chapter.goal)
+    ),
+    /* Sections */
+    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+      chapter.sections.map((sec, i) => React.createElement(Section, { key: ch + "-" + i, section: sec, idx: i, defaultOpen: false }))
+    ),
+    /* Exercises */
+    exercises.length > 0 && React.createElement("div", { style: { marginTop: 20 } },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
+        React.createElement("span", { style: { background: "#f59e0b", color: "#fff", fontWeight: 800, fontSize: 13, padding: "4px 14px", borderRadius: 8 } }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"),
+        React.createElement("span", { style: { fontSize: 13, color: "#92400e" } }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")
+      ),
+      exercises.map((ex, i) => React.createElement(Exercise, { key: ch + "-ex-" + i, ex: ex, idx: i }))
+    ),
+    /* Navigation */
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 20, gap: 10 } },
+      ch > 0 ? React.createElement("button", {
+        onClick: () => { setCh(ch - 1); window.scrollTo(0, 0); },
+        style: { flex: 1, padding: "12px 16px", border: "1px solid #d1d5db", borderRadius: 10, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#6b7280" }
+      }, "\u2190 Ch.", chapters[ch - 1].num) : React.createElement("div", { style: { flex: 1 } }),
+      ch < chapters.length - 1 ? React.createElement("button", {
+        onClick: () => { setCh(ch + 1); window.scrollTo(0, 0); },
+        style: { flex: 1, padding: "12px 16px", border: "none", borderRadius: 10, background: "linear-gradient(135deg,#6366f1,#8b5cf6)", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#fff" }
+      }, "Ch.", chapters[ch + 1].num, " \u2192") : React.createElement("a", {
+        href: "../index.html",
+        style: { flex: 1, padding: "12px 16px", borderRadius: 10, background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", fontWeight: 700, fontSize: 13, textAlign: "center", textDecoration: "none" }
+      }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")
+    ),
+    /* Footer */
+    React.createElement("p", {
+      style: { textAlign: "center", fontSize: 11, color: "#9ca3af", marginTop: 20 }
+    }, "v8.dev \u30FB developer.mozilla.org \u30FB ECMAScript 2024 \u6642\u70B9 \u00B7 2026\u5E744\u6708\u6642\u70B9")
+  ));
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(JSAdvancedCourse));
+  </script>
+</body>
+</html>
