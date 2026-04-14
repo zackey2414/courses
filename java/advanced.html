@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java 上級コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのJava上級コース。JVM内部・並行処理・リアクティブ・マイクロサービス・パフォーマンスチューニング・メタプログラミング・Java21最新機能 全8章。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+/* ── Table definitions ── */
+const T = {
+  heapRegions: {
+    h: ["領域", "別名", "説明", "GC種別"],
+    r: [
+      ["Eden", "Young Gen", "新規オブジェクトが最初に配置される領域", "Minor GC"],
+      ["Survivor 0/1", "Young Gen", "Minor GC後の生存オブジェクトが移動する2面バッファ", "Minor GC"],
+      ["Old Gen", "Tenured", "一定回数Minorを生き残ったオブジェクトの長期保管領域", "Major/Full GC"],
+      ["Metaspace", "（JDK8+）", "クラスメタデータ・メソッドバイトコードを格納", "特定条件でGC"]
+    ]
+  },
+  gcAlgorithms: {
+    h: ["GCアルゴリズム", "JVMフラグ", "特徴", "推奨用途"],
+    r: [
+      ["Serial GC", "-XX:+UseSerialGC", "シングルスレッド。メモリ・CPU省エネ", "組み込み・小規模"],
+      ["Parallel GC", "-XX:+UseParallelGC", "複数スレッドでスループット重視", "バッチ処理"],
+      ["G1GC", "-XX:+UseG1GC", "Region分割・低レイテンシと高スループットを両立（JDK9+デフォルト）", "汎用サーバー"],
+      ["ZGC", "-XX:+UseZGC", "ほぼ停止なし（数ms以下）。Java15でプロダクション対応", "低レイテンシ必須"],
+      ["Shenandoah", "-XX:+UseShenandoahGC", "並行コンパクション。Red Hat主導", "低レイテンシ"]
+    ]
+  },
+  concurrencyPrimitives: {
+    h: ["クラス/機構", "パッケージ", "用途"],
+    r: [
+      ["AtomicInteger/Long", "java.util.concurrent.atomic", "ロックなしのCAS操作でカウンタ更新"],
+      ["ReentrantLock", "java.util.concurrent.locks", "synchronized より高機能なロック（タイムアウト対応）"],
+      ["StampedLock", "java.util.concurrent.locks", "楽観的読み取りロック。読み書き比率が高い場合に高速"],
+      ["CompletableFuture", "java.util.concurrent", "非同期処理のパイプライン合成"],
+      ["ForkJoinPool", "java.util.concurrent", "分割統治型並列処理。commonPoolはStream並列化に使用"],
+      ["Virtual Thread", "java.lang (Java21)", "軽量スレッド。スレッド数を気にせず書ける"]
+    ]
+  },
+  reactorOps: {
+    h: ["オペレータ", "Mono/Flux", "Python asyncio対応"],
+    r: [
+      ["map", "両方", "同期変換。asyncio なし（通常関数適用）"],
+      ["flatMap", "両方", "非同期変換・結果を平坦化。asyncio.gather に近い"],
+      ["filter", "Flux", "条件でアイテムを除外"],
+      ["zip", "両方", "複数ストリームを結合。asyncio.gather(a,b)"],
+      ["retry", "両方", "エラー時にリトライ"],
+      ["onErrorResume", "両方", "エラー時に代替ストリームへ切替"]
+    ]
+  },
+  designPatterns: {
+    h: ["パターン", "目的", "Javaでの実装ポイント"],
+    r: [
+      ["CQRS", "コマンド（書き込み）とクエリ（読み取り）を分離", "CommandBus / QueryBus インターフェース"],
+      ["Event Sourcing", "状態変化をイベントとして永続化", "EventStore + aggregate replay"],
+      ["Circuit Breaker", "連鎖障害を防ぐ遮断機", "Resilience4j CircuitBreaker"],
+      ["Saga", "マイクロサービス間の分散トランザクション管理", "Choreography / Orchestration"]
+    ]
+  },
+  microservicesComponents: {
+    h: ["コンポーネント", "ライブラリ", "役割"],
+    r: [
+      ["API Gateway", "Spring Cloud Gateway", "ルーティング・レート制限・認証"],
+      ["Service Discovery", "Eureka / Consul", "サービスの動的登録・検索"],
+      ["Config Server", "Spring Cloud Config", "設定の一元管理・動的更新"],
+      ["Load Balancer", "Spring Cloud LoadBalancer", "クライアントサイド負荷分散"],
+      ["HTTP Client", "OpenFeign", "宣言的REST呼び出し"],
+      ["Tracing", "Micrometer Tracing + Zipkin", "分散トレーシング"]
+    ]
+  },
+  jvmFlags: {
+    h: ["JVMフラグ", "説明", "典型値"],
+    r: [
+      ["-Xms / -Xmx", "ヒープ初期/最大サイズ", "-Xms512m -Xmx2g"],
+      ["-XX:NewRatio", "Old/Young比率", "-XX:NewRatio=2"],
+      ["-XX:MaxGCPauseMillis", "G1GCの目標停止時間(ms)", "-XX:MaxGCPauseMillis=200"],
+      ["-XX:+PrintGCDetails", "GCログ出力（JDK8）", "JDK9+は -Xlog:gc* を使用"],
+      ["-XX:+UseStringDeduplication", "G1で重複String検出・解放", "メモリ削減に有効"],
+      ["-XX:+FlightRecorder", "JFR有効化（JDK11+は常時有効）", ""]
+    ]
+  },
+  java21Features: {
+    h: ["機能", "JEP", "概要"],
+    r: [
+      ["Record", "395 (Java16 GA)", "不変データクラスを簡潔に定義"],
+      ["Sealed Class", "409 (Java17 GA)", "継承を特定サブクラスに限定"],
+      ["Pattern Matching switch", "441 (Java21 GA)", "switchでの型テスト・分解"],
+      ["Virtual Threads", "444 (Java21 GA)", "軽量スレッドでスケーラブルI/O"],
+      ["Sequenced Collections", "431 (Java21 GA)", "順序付きコレクションの統一インターフェース"],
+      ["Foreign Function & Memory API", "454 (Java22 GA)", "ネイティブライブラリとの安全な相互運用"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [
+    {
+      diff: 1,
+      q: "JVMのヒープダンプを取得し、オブジェクトの種類と数を確認するコマンドを書いてください。\nまた、G1GCを有効にしてアプリを起動するJVMフラグも示してください。",
+      code: `# アプリを起動するコマンド（G1GC + GCログ有効）
+java ??? -jar myapp.jar
+
+# 実行中プロセスのPIDを確認
+jps -l
+
+# ヒープダンプ取得
+???`,
+      answer: `# G1GC + GCログ有効でアプリ起動
+java -XX:+UseG1GC \\
+     -Xms512m -Xmx2g \\
+     -Xlog:gc*:file=gc.log:time,uptime \\
+     -jar myapp.jar
+
+# 実行中プロセスのPIDを確認
+jps -l
+
+# ヒープダンプ取得（live=生存オブジェクトのみ）
+jmap -dump:live,format=b,file=heap.hprof <PID>
+
+# VisualVM や Eclipse MAT でheap.hprofを開いて分析`
+    },
+    {
+      diff: 2,
+      q: "クラスローダーの階層を確認するコードを書いてください。\nBootstrapClassLoader / PlatformClassLoader / AppClassLoader の3層を出力し、カスタムクラスがどのローダーで読み込まれているかを確認してください。",
+      code: `public class ClassLoaderDemo {
+    public static void main(String[] args) {
+        // 各クラスのClassLoaderを表示
+        // String (Bootstrap)
+        // ClassLoaderDemo (App)
+        // 親ローダーを辿って表示
+    }
+}`,
+      answer: `public class ClassLoaderDemo {
+    public static void main(String[] args) {
+        // String は Bootstrap (null で表示される)
+        System.out.println("String loader: "
+            + String.class.getClassLoader());
+
+        // アプリクラスは AppClassLoader
+        ClassLoader cl = ClassLoaderDemo.class.getClassLoader();
+        System.out.println("App class loader: " + cl);
+
+        // 親ローダーを辿る
+        while (cl != null) {
+            System.out.println("  -> parent: " + cl.getParent());
+            cl = cl.getParent();
+        }
+        // 最終的に null (Bootstrap) に到達
+    }
+}`
+    }
+  ],
+  ch2: [
+    {
+      diff: 1,
+      q: "CompletableFutureを使って3つの非同期タスク（各1秒のsleep）を並列実行し、全部完了したら結果をまとめて表示してください。\nPythonのasyncio.gatherに相当する処理をJavaで実装してください。",
+      code: `import java.util.concurrent.CompletableFuture;
+
+public class AsyncDemo {
+    public static void main(String[] args) throws Exception {
+        // 3つの非同期タスクを定義・並列実行
+        // allOfで全完了を待つ
+        // 結果を表示
+    }
+}`,
+      answer: `import java.util.concurrent.*;
+
+public class AsyncDemo {
+    public static void main(String[] args) throws Exception {
+        CompletableFuture<String> f1 = CompletableFuture.supplyAsync(() -> {
+            sleep(1000); return "タスク1完了";
+        });
+        CompletableFuture<String> f2 = CompletableFuture.supplyAsync(() -> {
+            sleep(1000); return "タスク2完了";
+        });
+        CompletableFuture<String> f3 = CompletableFuture.supplyAsync(() -> {
+            sleep(1000); return "タスク3完了";
+        });
+
+        long start = System.currentTimeMillis();
+        CompletableFuture.allOf(f1, f2, f3).join();
+        System.out.printf("全完了: %dms%n", System.currentTimeMillis() - start);
+        System.out.println(f1.get() + " / " + f2.get() + " / " + f3.get());
+    }
+    static void sleep(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) { throw new RuntimeException(e); }
+    }
+}`
+    },
+    {
+      diff: 2,
+      q: "Java 21のVirtual Threadsを使って、1万件のHTTPリクエスト（モック）を並列処理するサンプルを書いてください。\nThread.ofVirtual()を使い、従来のPlatformThreadとの書き方の違いも示すこと。",
+      code: `import java.util.concurrent.*;
+
+public class VirtualThreadDemo {
+    // 1万件を並列処理
+    // Platform Thread版とVirtual Thread版を比較
+}`,
+      answer: `import java.util.concurrent.*;
+
+public class VirtualThreadDemo {
+    static void fakeHttpCall(int id) throws InterruptedException {
+        Thread.sleep(100); // I/O待ちをシミュレート
+    }
+
+    public static void main(String[] args) throws Exception {
+        int tasks = 10_000;
+
+        // --- Virtual Threads (Java 21) ---
+        long start = System.currentTimeMillis();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var futures = new java.util.ArrayList<Future<?>>();
+            for (int i = 0; i < tasks; i++) {
+                int id = i;
+                futures.add(executor.submit(() -> { fakeHttpCall(id); return null; }));
+            }
+            for (var f : futures) f.get();
+        }
+        System.out.printf("Virtual Threads: %dms%n",
+            System.currentTimeMillis() - start);
+
+        // 従来: new Thread(() -> ...).start() では10,000スレッドは困難
+        // Platform Thread版は Executors.newFixedThreadPool(200) 等で上限を設ける必要がある
+    }
+}`
+    }
+  ],
+  ch3: [
+    {
+      diff: 1,
+      q: "Project ReactorのFluxを使って、1〜10の数値を生成し、偶数だけをフィルタして2倍にして出力するパイプラインを作成してください。",
+      code: `import reactor.core.publisher.Flux;
+
+public class FluxDemo {
+    public static void main(String[] args) {
+        Flux.range(1, 10)
+            // 偶数フィルタ
+            // 2倍にmap
+            // subscribe して出力
+    }
+}`,
+      answer: `import reactor.core.publisher.Flux;
+
+public class FluxDemo {
+    public static void main(String[] args) {
+        Flux.range(1, 10)
+            .filter(n -> n % 2 == 0)
+            .map(n -> n * 2)
+            .subscribe(
+                v -> System.out.println("値: " + v),
+                err -> System.err.println("エラー: " + err),
+                () -> System.out.println("完了")
+            );
+    }
+}`
+    },
+    {
+      diff: 2,
+      q: "Monoを使って非同期なユーザー取得とプロフィール取得をflatMapで連鎖させ、エラー時はデフォルト値を返すパイプラインを実装してください。",
+      code: `import reactor.core.publisher.Mono;
+
+public class MonoChain {
+    static Mono<String> fetchUser(int id) { /* 実装済み */ }
+    static Mono<String> fetchProfile(String userId) { /* 実装済み */ }
+
+    public static void main(String[] args) {
+        // fetchUser -> fetchProfile の連鎖
+        // エラー時は "ゲスト" を返す
+        // blockして結果出力
+    }
+}`,
+      answer: `import reactor.core.publisher.Mono;
+import java.time.Duration;
+
+public class MonoChain {
+    static Mono<String> fetchUser(int id) {
+        return Mono.just("user-" + id).delayElement(Duration.ofMillis(50));
+    }
+    static Mono<String> fetchProfile(String userId) {
+        if (userId.endsWith("0")) return Mono.error(new RuntimeException("プロフィール取得失敗"));
+        return Mono.just("Profile[" + userId + "]");
+    }
+
+    public static void main(String[] args) {
+        String result = fetchUser(42)
+            .flatMap(MonoChain::fetchProfile)
+            .onErrorReturn("ゲスト")
+            .block();
+        System.out.println("結果: " + result);
+    }
+}`
+    }
+  ],
+  ch4: [
+    {
+      diff: 1,
+      q: "Resilience4jのCircuit Breakerを使って、外部APIを呼び出すサービスに障害耐性を実装してください。\n失敗率50%超でオープン（遮断）し、fallbackメソッドを返す設定を示してください。",
+      code: `// build.gradle
+// implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
+
+@Service
+public class ExternalApiService {
+    // Circuit Breakerを適用したメソッド
+    public String callExternalApi() { /* 外部API呼び出し */ }
+    // fallback
+}`,
+      answer: `// application.yml
+// resilience4j.circuitbreaker.instances.externalApi:
+//   slidingWindowSize: 10
+//   failureRateThreshold: 50
+//   waitDurationInOpenState: 10s
+//   permittedNumberOfCallsInHalfOpenState: 3
+
+@Service
+public class ExternalApiService {
+
+    @CircuitBreaker(name = "externalApi", fallbackMethod = "fallback")
+    public String callExternalApi() {
+        // 実際の外部API呼び出し（失敗すると例外がスロー）
+        if (Math.random() < 0.6) throw new RuntimeException("API障害");
+        return "OK";
+    }
+
+    public String fallback(Throwable t) {
+        return "フォールバック応答: " + t.getMessage();
+    }
+}`
+    },
+    {
+      diff: 2,
+      q: "DDDのValueObjectパターンをJava Recordで実装してください。\nEmailアドレス・Moneyの2つのValueObjectを定義し、バリデーションとビジネスメソッドを持たせてください。",
+      code: `// Email.java - record + バリデーション
+// Money.java - record + add/subtract メソッド`,
+      answer: `// Email.java
+public record Email(String value) {
+    public Email {
+        if (value == null || !value.matches("^[\\w.+\\-]+@[\\w\\-]+\\.[a-z]{2,}$"))
+            throw new IllegalArgumentException("不正なメールアドレス: " + value);
+        value = value.toLowerCase();
+    }
+    public String domain() { return value.substring(value.indexOf('@') + 1); }
+}
+
+// Money.java
+public record Money(long amount, String currency) {
+    public Money {
+        if (amount < 0) throw new IllegalArgumentException("金額は0以上");
+        if (currency == null || currency.length() != 3) throw new IllegalArgumentException("通貨コードは3文字");
+    }
+    public Money add(Money other) {
+        if (!currency.equals(other.currency)) throw new IllegalArgumentException("通貨が異なる");
+        return new Money(amount + other.amount, currency);
+    }
+    public Money subtract(Money other) {
+        if (!currency.equals(other.currency)) throw new IllegalArgumentException("通貨が異なる");
+        if (amount < other.amount) throw new IllegalArgumentException("残高不足");
+        return new Money(amount - other.amount, currency);
+    }
+}`
+    }
+  ],
+  ch5: [
+    {
+      diff: 1,
+      q: "Spring Cloud GatewayのルーティングをJava DSLで設定してください。\n/api/users/** を user-service へ、/api/orders/** を order-service へルーティングし、リクエストヘッダーにX-Gateway-Versionを追加してください。",
+      code: `@Configuration
+public class GatewayConfig {
+    @Bean
+    public RouteLocator routes(RouteLocatorBuilder builder) {
+        // /api/users/** → user-service
+        // /api/orders/** → order-service
+        // ヘッダー追加
+    }
+}`,
+      answer: `@Configuration
+public class GatewayConfig {
+    @Bean
+    public RouteLocator routes(RouteLocatorBuilder builder) {
+        return builder.routes()
+            .route("user-service", r -> r
+                .path("/api/users/**")
+                .filters(f -> f.addRequestHeader("X-Gateway-Version", "1.0"))
+                .uri("lb://user-service"))
+            .route("order-service", r -> r
+                .path("/api/orders/**")
+                .filters(f -> f.addRequestHeader("X-Gateway-Version", "1.0"))
+                .uri("lb://order-service"))
+            .build();
+    }
+}`
+    },
+    {
+      diff: 2,
+      q: "OpenFeignを使って、別マイクロサービスのREST APIを宣言的に呼び出すクライアントを実装してください。\nユーザーIDでユーザー情報を取得するエンドポイントを定義し、フォールバックも実装すること。",
+      code: `// UserClient.java - @FeignClient
+// UserClientFallback.java - Circuit Breaker fallback
+// pom.xml の依存も示すこと`,
+      answer: `// pom.xml
+// <dependency>
+//   <groupId>org.springframework.cloud</groupId>
+//   <artifactId>spring-cloud-starter-openfeign</artifactId>
+// </dependency>
+
+// UserClient.java
+@FeignClient(name = "user-service", fallback = UserClientFallback.class)
+public interface UserClient {
+    @GetMapping("/api/users/{id}")
+    UserDto getUserById(@PathVariable("id") Long id);
+}
+
+// UserDto.java
+public record UserDto(Long id, String name, String email) {}
+
+// UserClientFallback.java
+@Component
+public class UserClientFallback implements UserClient {
+    @Override
+    public UserDto getUserById(Long id) {
+        return new UserDto(id, "不明なユーザー", "");
+    }
+}
+
+// @EnableFeignClients を @SpringBootApplication クラスに追加`
+    }
+  ],
+  ch6: [
+    {
+      diff: 1,
+      q: "JMH（Java Microbenchmark Harness）を使って、StringのconcatとStringBuilderのappendのパフォーマンスを比較するベンチマークを書いてください。",
+      code: `// pom.xml にjmhを追加してベンチマーククラスを実装
+@BenchmarkMode(Mode.AverageTime)
+@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@State(Scope.Thread)
+public class StringBenchmark {
+    // concat版とStringBuilder版
+}`,
+      answer: `// pom.xml
+// <dependency>
+//   <groupId>org.openjdk.jmh</groupId>
+//   <artifactId>jmh-core</artifactId><version>1.37</version>
+// </dependency>
+
+@BenchmarkMode(Mode.AverageTime)
+@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@State(Scope.Thread)
+@Warmup(iterations = 3, time = 1)
+@Measurement(iterations = 5, time = 1)
+@Fork(1)
+public class StringBenchmark {
+    private final int N = 100;
+
+    @Benchmark
+    public String concat() {
+        String s = "";
+        for (int i = 0; i < N; i++) s += i;
+        return s;
+    }
+
+    @Benchmark
+    public String builder() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < N; i++) sb.append(i);
+        return sb.toString();
+    }
+
+    public static void main(String[] args) throws Exception {
+        org.openjdk.jmh.Main.main(args);
+    }
+}`
+    },
+    {
+      diff: 2,
+      q: "Java Flight Recorder (JFR) を使ってアプリのプロファイリングを行う手順を示してください。\nJFRの開始・停止・ダンプのコマンド（jcmd）と、記録を確認するJDK Missionコントロール(JMC)の操作フローを説明してください。",
+      code: `# JFRのコマンド手順を示してください
+# 1. プロセスのPIDを確認
+# 2. JFR開始
+# 3. 60秒後にダンプ
+# 4. JFR停止`,
+      answer: `# 1. プロセスのPIDを確認
+jps -l
+
+# 2. JFR開始（継続記録モード）
+jcmd <PID> JFR.start name=myrecording settings=profile
+
+# 3. 任意タイミングでダンプ取得
+jcmd <PID> JFR.dump name=myrecording filename=/tmp/app.jfr
+
+# 4. JFR停止
+jcmd <PID> JFR.stop name=myrecording
+
+# アプリ起動時から記録する場合
+java -XX:StartFlightRecording=duration=60s,filename=app.jfr \\
+     -jar myapp.jar
+
+# JDK Mission Control (JMC) で app.jfr を開き
+# ・CPU使用率・GC停止時間・ホットメソッド
+# ・スレッドプロファイル・メモリ配置を確認する`
+    }
+  ],
+  ch7: [
+    {
+      diff: 1,
+      q: "リフレクションを使って、クラス名（文字列）からインスタンスを生成し、メソッドを動的に呼び出してください。\nフィールド一覧とメソッド一覧も表示してください。",
+      code: `public class ReflectionDemo {
+    public static void main(String[] args) throws Exception {
+        // "com.example.MyService" からインスタンス生成
+        // greet(String) メソッドを動的呼び出し
+        // フィールド一覧・メソッド一覧を表示
+    }
+}`,
+      answer: `public class ReflectionDemo {
+    public static void main(String[] args) throws Exception {
+        Class<?> clazz = Class.forName("com.example.MyService");
+        Object instance = clazz.getDeclaredConstructor().newInstance();
+
+        // メソッド動的呼び出し
+        java.lang.reflect.Method method = clazz.getMethod("greet", String.class);
+        Object result = method.invoke(instance, "World");
+        System.out.println("結果: " + result);
+
+        // フィールド一覧
+        System.out.println("--- Fields ---");
+        for (var f : clazz.getDeclaredFields()) {
+            System.out.printf("  %s %s%n", f.getType().getSimpleName(), f.getName());
+        }
+
+        // メソッド一覧
+        System.out.println("--- Methods ---");
+        for (var m : clazz.getDeclaredMethods()) {
+            System.out.printf("  %s %s(%s)%n",
+                m.getReturnType().getSimpleName(), m.getName(),
+                java.util.Arrays.stream(m.getParameterTypes())
+                    .map(Class::getSimpleName).collect(java.util.stream.Collectors.joining(",")));
+        }
+    }
+}`
+    },
+    {
+      diff: 2,
+      q: "カスタムアノテーション @Log(level=\"INFO\") を定義し、アノテーション処理でそのアノテーションがついたメソッドのシグネチャとlevel値をコンパイル時に標準出力するAnnotationProcessorを実装してください。",
+      code: `// Log.java - カスタムアノテーション定義
+// LogProcessor.java - AbstractProcessor継承`,
+      answer: `// Log.java
+@Retention(RetentionPolicy.SOURCE)
+@Target(ElementType.METHOD)
+public @interface Log {
+    String level() default "INFO";
+}
+
+// LogProcessor.java
+@SupportedAnnotationTypes("com.example.Log")
+@SupportedSourceVersion(SourceVersion.RELEASE_21)
+public class LogProcessor extends AbstractProcessor {
+
+    @Override
+    public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        for (TypeElement ann : annotations) {
+            for (Element elem : roundEnv.getElementsAnnotatedWith(ann)) {
+                Log log = elem.getAnnotation(Log.class);
+                processingEnv.getMessager().printMessage(
+                    javax.tools.Diagnostic.Kind.NOTE,
+                    String.format("[LogProcessor] %s - level=%s", elem.getSimpleName(), log.level())
+                );
+            }
+        }
+        return true;
+    }
+}`
+    }
+  ],
+  ch8: [
+    {
+      diff: 1,
+      q: "Java 21のPattern Matching for switch を使って、Shape（Circle, Rectangle, Triangle）の面積を計算するメソッドを実装してください。\nSealed classとRecordを組み合わせてください。",
+      code: `// Shape.java - sealed interface
+// Circle, Rectangle, Triangle - record実装
+// area(Shape s) メソッドを実装`,
+      answer: `// Shape.java
+public sealed interface Shape
+    permits Circle, Rectangle, Triangle {}
+
+public record Circle(double radius) implements Shape {}
+public record Rectangle(double width, double height) implements Shape {}
+public record Triangle(double base, double height) implements Shape {}
+
+// Calculator.java
+public class Calculator {
+    public static double area(Shape s) {
+        return switch (s) {
+            case Circle c    -> Math.PI * c.radius() * c.radius();
+            case Rectangle r -> r.width() * r.height();
+            case Triangle t  -> 0.5 * t.base() * t.height();
+        };
+    }
+    public static void main(String[] args) {
+        System.out.println(area(new Circle(5)));      // 78.53...
+        System.out.println(area(new Rectangle(4, 6))); // 24.0
+        System.out.println(area(new Triangle(3, 8)));  // 12.0
+    }
+}`
+    },
+    {
+      diff: 2,
+      q: "Virtual Threadsを使ったHTTPサーバーのスレッドモデルを設定してください。\nSpring Boot 3.2+ でVirtual Threads executor を有効化し、従来のPlatformThread(Tomcat)との設定の違いを示してください。",
+      code: `// application.yml または @Bean で設定
+// Virtual Threads を Tomcat / Spring MVC で有効にする`,
+      answer: `# application.yml (Spring Boot 3.2+)
+spring:
+  threads:
+    virtual:
+      enabled: true
+# これだけで Tomcat のスレッドが Virtual Thread に切り替わる
+
+# --- または @Bean で明示設定 ---
+@Configuration
+public class VirtualThreadConfig {
+
+    // Spring MVC (Tomcat) にVirtual Threadを適用
+    @Bean
+    public TomcatProtocolHandlerCustomizer<?> protocolHandlerCustomizer() {
+        return handler -> handler.setExecutor(
+            Executors.newVirtualThreadPerTaskExecutor()
+        );
+    }
+
+    // @Async のスレッドプール にも適用
+    @Bean
+    public AsyncTaskExecutor applicationTaskExecutor() {
+        return new TaskExecutorAdapter(
+            Executors.newVirtualThreadPerTaskExecutor()
+        );
+    }
+}
+# Platform Thread版（比較用）: server.tomcat.threads.max=200`
+    }
+  ]
+};
+
+/* ── Chapter data ── */
+const chapters = [
+  {
+    id: "ch1", num: 1, title: "JVM内部構造", est: "60分",
+    goal: "JVMのヒープ領域（Eden/Survivor/Old Gen）の役割を理解し、G1GC・ZGCの違いを説明できる。JITコンパイラとクラスローダー階層の仕組みを把握し、GCログを読んでパフォーマンス問題を診断する第一歩を踏み出せる。",
+    sections: [
+      {
+        title: "ヒープ領域とGarbage Collection",
+        body: `Javaのメモリ管理の核心はJVM（Java Virtual Machine）が担うGarbage Collection（GC）です。Pythonの参照カウント方式と異なり、JVMは到達可能性（Reachability）を基準にオブジェクトの生死を判断します。参照カウントでは循環参照の解放に別機構が必要ですが、JVMのGCは循環参照も確実に回収できます。
+
+ヒープはYoung Generationと Old Generation に大別されます。新しいオブジェクトはまずEden領域に配置され、Minor GCで生存したオブジェクトはSurvivor 0/1 を交互に移動します。一定回数のGCを生き延びたオブジェクトはOld Genへ昇格（Promotion）します。大部分のオブジェクトは短命なため、Young GenのMinor GCは高頻度だが高速に完了します。この設計を「世代別GC仮説（Generational Hypothesis）」と呼びます。`,
+        table: T.heapRegions,
+        afterTable: "JDK 8 まで存在した PermGen（クラスメタデータ格納）は JDK 8 で廃止され、ネイティブメモリ上の Metaspace に置き換えられました。Metaspace のデフォルトは無制限のため、-XX:MaxMetaspaceSize で上限を設定しておくことが推奨されます。"
+      },
+      {
+        title: "GCアルゴリズムの選択",
+        body: `JVMには複数のGCアルゴリズムが搭載されており、ワークロードに応じて選択できます。JDK 9 以降のデフォルトはG1GC（Garbage First GC）で、ヒープをRegionと呼ぶ小区画に分割し、最もゴミが多いRegionから優先回収することで「目標停止時間（-XX:MaxGCPauseMillis）」を達成しようとします。
+
+ZGCはJava 15でプロダクション対応した次世代GCで、STW（Stop-The-World）をほぼ数ms以下に抑えます。これは並行マーキング・並行コンパクションを実現しているためで、ヒープが数百GBに及ぶ大規模アプリケーション（金融・広告配信など）で特に有効です。GCアルゴリズムの選択はアプリの特性（レイテンシ重視かスループット重視か）に基づいて決定します。`,
+        table: T.gcAlgorithms,
+        afterTable: "GCアルゴリズムの切り替えはJVMフラグ1行で完結します。まずG1GCで運用し、GCログ（-Xlog:gc*）を分析してStopTheWorld時間が問題になった場合にZGCへ移行するのが一般的な手順です。"
+      },
+      {
+        title: "JITコンパイラとクラスローダー",
+        body: `JVMはインタプリタとJITコンパイラを組み合わせた二段構えの実行モデルを持ちます。最初はバイトコードをインタプリタが逐次実行し、実行回数が閾値を超えたホットメソッドをJIT（Just-In-Time）コンパイラがネイティブコードに変換します。C1コンパイラが素早く最適化し、さらにホットなメソッドはC2コンパイラが積極的な最適化（インライン化・ループ展開）を施します。これがJavaが「ウォームアップ後に高速」と言われる理由です。
+
+クラスローダーはBootstrap（JDKコアクラス）→Platform（拡張クラス）→App（アプリクラス）の親委譲モデル（Parent Delegation Model）で動作します。クラスのロード要求は必ず親ローダーに委譲され、親が見つけられない場合のみ自分がロードします。これにより java.lang.String をアプリ側で差し替えることを防ぎ、セキュリティを確保しています。Spring BootのファットJARはカスタムクラスローダーを使ってこの制約内で動作します。`
+      }
+    ]
+  },
+  {
+    id: "ch2", num: 2, title: "高度な並行処理", est: "65分",
+    goal: "CompletableFutureで非同期パイプラインを構築でき、ForkJoinPoolとAtomicInteger/CASの仕組みを理解できる。Java 21のVirtual Threadsを用いてI/Oバウンドな処理を大規模にスケールさせる実装を書ける。",
+    sections: [
+      {
+        title: "CompletableFutureによる非同期合成",
+        body: `Java 8で導入されたCompletableFutureは、Pythonのasyncio.Future / asyncio.gatherに相当する非同期処理の合成APIです。thenApply（同期変換）・thenCompose（非同期変換・flatMap相当）・thenCombine（2つのFutureを結合）・allOf（全完了待ち）などのオペレータをメソッドチェーンで組み合わせられます。
+
+Pythonのasync/awaitと大きく異なるのは、CompletableFutureはデフォルトでForkJoinPool.commonPoolで実行されるという点です。I/OバウンドなタスクにcommonPoolを使うとCPUバウンドなタスクを圧迫するため、専用のExecutorService（Executors.newVirtualThreadPerTaskExecutor()等）を明示的に渡すことが実務では推奨されます。`,
+        table: T.concurrencyPrimitives,
+        afterTable: "AtomicIntegerのincrementAndGet()はCAS（Compare-And-Swap）命令をCPUレベルで使用するため、synchronizedブロックより高速かつデッドロック不要です。ただしCASは競合が多い状況ではスピン待ちが増えるため、LongAdderの方が高スループットになるケースもあります。"
+      },
+      {
+        title: "Virtual Threads（Java 21）",
+        body: `Java 21のProject Loomで正式採用されたVirtual Threads（仮想スレッド）は、OSスレッドに1:1でマップされる従来のPlatform Threadと異なり、JVM内で多数のVirtual Threadを少数のCarrier Thread（OS Thread）上で多重化します。PythonのCoroutine（async/await）が「1スレッドで多数の協調タスク」をこなすのに対し、Virtual Threadsは「スレッドAPIをそのまま使いながら大規模並行処理」を実現します。
+
+I/O待ちの間、Virtual ThreadはCarrier Threadを解放して他のタスクに譲り、I/O完了後に再スケジュールされます。これにより従来は数百が限界だったスレッド数を数万〜数百万まで扱えるようになります。Spring Boot 3.2以降では spring.threads.virtual.enabled=true の1行設定でTomcatのスレッドをVirtual Threadに切り替えられます。`,
+        code: `// Java 21 Virtual Thread の作成方法
+// 1. Thread.ofVirtual()
+Thread vt = Thread.ofVirtual().start(() ->
+    System.out.println("Virtual: " + Thread.currentThread().isVirtual())
+);
+
+// 2. Executors.newVirtualThreadPerTaskExecutor()
+try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    for (int i = 0; i < 100_000; i++) {
+        executor.submit(() -> Thread.sleep(100)); // 10万スレッドも余裕
+    }
+}`,
+        afterCode: "synchronizedブロックとVirtual Threadsは現在（Java 21時点）相性が悪く、synchronizedによるpinning問題（Carrier Threadが解放されない）が発生します。Java 24でこの制約は大幅改善予定です。ReentrantLockを使うことで回避できます。"
+      }
+    ]
+  },
+  {
+    id: "ch3", num: 3, title: "リアクティブプログラミング", est: "60分",
+    goal: "Project ReactorのMono/Fluxを使った非同期ストリームパイプラインを構築できる。バックプレッシャーの概念を理解し、WebFluxを使ったノンブロッキングHTTPエンドポイントを実装できる。",
+    sections: [
+      {
+        title: "Mono / Flux の基礎",
+        body: `Project Reactorはリアクティブストリームの標準仕様（Reactive Streams Specification）に基づくライブラリで、Spring WebFluxの基盤です。MonoはPythonのawaitableな単一値（coroutine返り値）に、FluxはPythonのasync generatorに対応します。
+
+重要な点はReactorのパイプラインは「宣言するだけでは実行されない」遅延評価である点です。subscribe()を呼んで初めてデータフローが開始します。これはPythonのgenerator（next()を呼ぶまで実行されない）に近い概念です。実務では通常subscribe()を直接呼ぶのではなく、Spring WebFluxがサブスクリプションを管理します。`,
+        table: T.reactorOps,
+        afterTable: "エラーハンドリングにはonErrorReturn（デフォルト値）・onErrorResume（代替Mono/Flux）・onErrorMap（例外変換）があります。try-catchを使うと宣言的パイプラインが崩れるため、これらのオペレータで統一的に処理することが重要です。"
+      },
+      {
+        title: "バックプレッシャーとWebFlux",
+        body: `バックプレッシャー（Backpressure）はデータの生産速度が消費速度を超えたときに、消費者が「今は受け取れない」と上流に伝達する仕組みです。Reactive Streams仕様では、ConsumerがSubscription.request(n)で「n件分だけ送ってほしい」と要求します。これにより無限ストリームを扱う際のメモリ枯渇を防げます。
+
+Spring WebFluxはNetty（ノンブロッキングI/O）上で動作し、従来のSpring MVCのスレッドプールモデルと根本的に異なります。1リクエスト1スレッドではなく、少数のEvent Loopスレッドで多数のリクエストを非同期処理します。ただし、WebFluxはコードの複雑度が上がるため、Virtual Threads + Spring MVCで十分なスループットが出るケースも多く、移行前にベンチマーク検証が必要です。`,
+        code: `// WebFlux コントローラの例（@RestController はMVCと同じ）
+@RestController
+@RequestMapping("/api/stream")
+public class StreamController {
+
+    // Server-Sent Events でFluxをクライアントに流す
+    @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> stream() {
+        return Flux.interval(Duration.ofSeconds(1))
+                   .map(i -> "イベント #" + i)
+                   .take(10);
+    }
+
+    // Monoを返す通常エンドポイント
+    @GetMapping("/{id}")
+    public Mono<String> getItem(@PathVariable String id) {
+        return Mono.just("アイテム: " + id)
+                   .delayElement(Duration.ofMillis(50));
+    }
+}`,
+        afterCode: "WebFluxのコントローラではブロッキング処理（JDBC・synchronizedブロック等）を絶対に呼んではいけません。Event Loopスレッドをブロックすると全リクエストが止まります。RDBアクセスにはR2DBC（リアクティブJDBC代替）を使用します。"
+      }
+    ]
+  },
+  {
+    id: "ch4", num: 4, title: "高度なデザインパターン", est: "60分",
+    goal: "CQRS・イベントソーシング・Circuit Breakerの設計意図と実装方法を理解できる。DDDのValueObjectをJava Recordで実装し、Resilience4jで障害耐性のあるサービスを構築できる。",
+    sections: [
+      {
+        title: "CQRS・イベントソーシング・Saga",
+        body: `CQRS（Command Query Responsibility Segregation）は書き込み（Command）と読み取り（Query）のモデルを分離するパターンです。Pythonでは小規模プロジェクトでは単一モデルで処理することが多いですが、大規模システムでは書き込みの整合性保証と読み取りのパフォーマンス最適化を別々にチューニングする必要が生じます。
+
+イベントソーシングはシステムの状態変化をイベントとして永続化し、イベントを再生（replay）することで任意時点の状態を復元できる設計です。Axon Frameworkを使うとCQRS + イベントソーシングを簡潔に実装できます。Sagaパターンはマイクロサービス間にまたがるビジネストランザクションを、ローカルトランザクションとイベントの連鎖で実現します。2フェーズコミットが使えない分散環境でのデータ整合性を保証するための必須パターンです。`,
+        table: T.designPatterns,
+        afterTable: "CQRSはシステムの複雑度を大きく引き上げます。小規模・中規模アプリケーションでは過剰設計になりやすいため、まず通常のCRUDで構築し、読み取りと書き込みのパフォーマンス乖離が問題になってから導入を検討するのが現実的です。"
+      },
+      {
+        title: "Resilience4jとDDD実装",
+        body: `Resilience4jはJava 8+向けの軽量な障害耐性ライブラリで、Circuit Breaker・Retry・RateLimiter・Bulkheadを提供します。Spring Cloud Netflix Hystrixの後継として広く採用されています。Circuit Breakerは「Closed（通常）→Open（遮断）→Half-Open（試験）」の状態機械で動作し、連鎖障害を防ぎます。
+
+DDD（Domain-Driven Design）の実装パターンでは、ValueObjectは不変でビジネスルールをカプセル化するオブジェクトです。Java 21のRecordはValueObjectの実装に最適で、equals/hashCode/toStringが自動生成され、コンパクトコンストラクタでバリデーションも簡潔に書けます。Pythonのdataclass（frozen=True）に相当しますが、より型安全でバリデーションが組み込みやすい設計です。`
+      }
+    ]
+  },
+  {
+    id: "ch5", num: 5, title: "マイクロサービス", est: "65分",
+    goal: "Spring Cloud Gateway・OpenFeign・Config Serverを組み合わせたマイクロサービスアーキテクチャを設計・実装できる。分散トレーシングの仕組みを理解しMicrometer TracingでTraceIDを伝播させるコードを書ける。",
+    sections: [
+      {
+        title: "Spring Cloudコンポーネント群",
+        body: `Spring Cloudはマイクロサービスアーキテクチャに必要なインフラ機能を提供するフレームワーク群です。各コンポーネントを組み合わせてシステムを構成します。Pythonエコシステムで個別ライブラリを組み合わせる感覚と同様ですが、Spring Cloudは統一されたプログラミングモデルとSpring Bootの自動設定で組み合わせコストを大幅に下げています。
+
+マイクロサービスの課題のひとつはサービス間通信の複雑さです。OpenFeignはインターフェースに@FeignClientとHTTPメソッドアノテーションを付けるだけで、REST呼び出しクライアントを自動生成します。Pythonのhttpxクライアントを手書きする代わりに、宣言的なインターフェース定義でタイプセーフな呼び出しが実現できます。`,
+        table: T.microservicesComponents,
+        afterTable: "Spring Cloud Config Serverはapplication.yml・application-{profile}.ymlをGitリポジトリで一元管理し、各サービスが起動時に設定を取得します。設定の動的更新には@RefreshScopeと/actuator/refreshエンドポイントを組み合わせます。"
+      },
+      {
+        title: "分散トレーシングとDockerデプロイ",
+        body: `マイクロサービス環境では1リクエストが複数サービスを横断するため、単純なログだけでは問題特定が困難です。分散トレーシングはTraceID（リクエスト全体を通したID）とSpanID（各サービス内の処理単位ID）を全サービスのログ・HTTPヘッダーに伝播させることで、リクエストの流れを可視化します。
+
+Micrometer Tracing（Spring Boot 3.x標準）はOpenTelemetryとZipkin/Jaegerに対応し、@NewSpanや自動計装でTraceIDを伝播します。DockerではDokercfile内でjava -jar app.jarを実行し、Kubernetes(K8s)ではDeploymentとServiceリソースを定義します。JVMの-XX:MaxRAMPercentage=75.0フラグでコンテナのメモリ上限に対してヒープサイズを自動調整することが重要です（固定値-Xmxではコンテナ制限と乖離が生じます）。`,
+        code: `# Dockerfile (Spring Boot)
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY target/myapp.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java",
+  "-XX:MaxRAMPercentage=75.0",
+  "-XX:+UseZGC",
+  "-jar", "app.jar"]
+
+# kubernetes/deployment.yaml (抜粋)
+# resources:
+#   requests: { memory: "512Mi", cpu: "0.5" }
+#   limits:   { memory: "1Gi",   cpu: "1.0" }`,
+        afterCode: "eclipse-temurin:21-jre-alpineはJREのみを含む軽量イメージ（約90MB）です。JDKフルイメージ（約300MB+）は本番には不要です。Spring Boot 3.x のLayered JARや Build Packsを使うとキャッシュ効率が良いDockerビルドが実現できます。"
+      }
+    ]
+  },
+  {
+    id: "ch6", num: 6, title: "パフォーマンスチューニング", est: "65分",
+    goal: "JVMフラグとGCアルゴリズムを適切に選択・設定でき、JFRプロファイリングでホットスポットを特定できる。JMHでマイクロベンチマークを作成し、コード変更の効果を定量的に計測できる。",
+    sections: [
+      {
+        title: "JVMフラグとGCチューニング",
+        body: `JVMのパフォーマンスチューニングはまず計測から始まります。PythonのcProfileやline_profilerに相当するJavaのツールがJFR（Java Flight Recorder）とJVM診断コマンド群（jstat、jmap、jcmd）です。チューニングは「測定→仮説→変更→再測定」のサイクルを繰り返します。勘に頼ったJVMフラグの設定変更は逆効果になることが多いため、GCログ分析を必ず先行させてください。
+
+G1GCのチューニングで最重要なのは-XX:MaxGCPauseMillisの設定です。デフォルト200msを目標とし、GCログで実際の停止時間を確認して調整します。ヒープサイズは-Xms=-Xmxとして初期値と最大値を同一にすることで、ヒープリサイズによるSTWを排除できます。Old Gen使用率が高い場合は-XX:InitiatingHeapOccupancyPercentを下げてG1のマーキング開始を早めます。`,
+        table: T.jvmFlags,
+        afterTable: "JDK 9以降のUnified Logging（-Xlog:gc*:file=gc.log:time,uptime,level）はGCログの書式を統一しました。GCEasy.io などのGCログ解析サービスに投げるとStopTheWorld時間・GC頻度・昇格速度が視覚的に確認できます。"
+      },
+      {
+        title: "JFRプロファイリングとJMHベンチマーク",
+        body: `JFR（Java Flight Recorder）はJVM内部に組み込まれた低オーバーヘッドプロファイラで、JDK 11以降は商用ライセンス不要で利用できます。CPU・GC・スレッド・I/O・メモリ配置をほぼゼロオーバーヘッドで記録でき、本番稼働中にも有効化できます。記録ファイル（.jfr）をJDK Mission Control（JMC）で開くと、ホットメソッド・ロック競合・GC停止の詳細が可視化されます。
+
+JMH（Java Microbenchmark Harness）はJVMのJIT最適化の影響を排除して正確なマイクロベンチマークを実施するツールです。単純なSystem.currentTimeMillis()での計測は JITがループを最適化して意味のない数値になるリスクがあります。JMHは@Warmup・@Measurement・@Forkによるウォームアップ・統計的多回計測・複数JVM起動を自動化し、信頼性の高いベンチマーク結果を出力します。`
+      }
+    ]
+  },
+  {
+    id: "ch7", num: 7, title: "メタプログラミング", est: "60分",
+    goal: "リフレクションAPIでクラス情報を動的取得・操作でき、アノテーション処理（APT）でコンパイル時コード生成を理解できる。Byte Buddyを使ったバイトコード操作の概念を把握し、Javaエージェントの仕組みを説明できる。",
+    sections: [
+      {
+        title: "リフレクションとアノテーション処理",
+        body: `Javaのリフレクション（java.lang.reflect）はPythonのgetattr/setattr/inspect モジュールに相当しますが、型情報がより豊富で、private フィールド・メソッドへのアクセスも setAccessible(true) で可能です。フレームワーク（Spring・JPA・JUnit）の内部はほぼリフレクションで成立しています。ただしリフレクションはJITの最適化対象外でオーバーヘッドが大きいため、ホットパスでの多用は避け、初期化時の一度限りの処理に限定すべきです。
+
+アノテーション処理（APT: Annotation Processing Tool）はコンパイル時にソースコードを解析してコードを生成する仕組みです。Lombokの@Data・@Builder、MapStructのMapper生成、Dagger 2のDIコードはすべてAPTで実現されています。AbstractProcessorを継承してprocess()メソッドに処理を書き、META-INF/services/javax.annotation.processing.Processorに登録することでjavacに組み込まれます。`,
+        table: {
+          h: ["用途", "技術", "実行タイミング"],
+          r: [
+            ["動的プロキシ生成", "java.lang.reflect.Proxy", "実行時"],
+            ["ボイラープレート削減", "Lombok (APT)", "コンパイル時"],
+            ["DIコード生成", "Dagger 2 (APT)", "コンパイル時"],
+            ["バイトコード書き換え", "Byte Buddy / ASM", "実行時/エージェント起動時"],
+            ["AOP実装", "Spring AOP (CGLIB/JDK Proxy)", "実行時（Bean生成時）"]
+          ]
+        },
+        afterTable: "Java 16以降はstrong encapsulationにより、JDKの内部クラスへのリフレクションアクセスがデフォルトで禁止されています。--add-opens フラグで一時的に解放できますが、これはAPIの安定性保証外となるため長期的な回避策にはなりません。"
+      },
+      {
+        title: "Byte BuddyとJavaエージェント",
+        body: `Byte Buddyは実行時にJavaクラスを動的生成・書き換えするライブラリです。ASMや Javassistよりも高水準なAPIを提供し、Mockito（モックオブジェクト）・Hibernate（プロキシエンティティ）・New Relic（APMエージェント）など多くのライブラリが内部で使用しています。new ByteBuddy().subclass(SomeClass.class).method(...).intercept(...)でサブクラスを動的生成し、メソッドのインターセプト（前後処理挿入）が可能です。
+
+Javaエージェント（-javaagent:agent.jar）はJVMの起動前にバイトコードを書き換えるフックです。MANIFEST.MFにPremain-Class（起動前）またはAgent-Class（実行中アタッチ）を指定します。Instrumentation APIのaddTransformer()でClassFileTransformerを登録し、ロードされる全クラスのバイトコードを変換できます。APMツール（Datadog・Dynatrace）のJavaエージェントはこの仕組みでアプリコードを無修正でトレーシングを注入しています。`,
+        code: `// Byte Buddyでメソッドをインターセプト
+import net.bytebuddy.ByteBuddy;
+import net.bytebuddy.implementation.MethodDelegation;
+import static net.bytebuddy.matcher.ElementMatchers.named;
+
+public class ByteBuddyDemo {
+    public static void main(String[] args) throws Exception {
+        Class<?> dynamicType = new ByteBuddy()
+            .subclass(Object.class)
+            .method(named("toString"))
+            .intercept(MethodDelegation.to(MyInterceptor.class))
+            .make()
+            .load(ByteBuddyDemo.class.getClassLoader())
+            .getLoaded();
+
+        System.out.println(dynamicType.getDeclaredConstructor()
+            .newInstance().toString()); // MyInterceptorが呼ばれる
+    }
+}
+
+public class MyInterceptor {
+    public static String intercept() { return "動的に書き換えられたtoString"; }
+}`,
+        afterCode: "Byte Buddyの生成クラスはデフォルトでClassLoaderのメモリに蓄積されます。大量生成する場合はClassLoadingStrategyに WeakReferenceを使うか、動的クラスを専用ClassLoaderに分離してGCで解放できるようにします。"
+      }
+    ]
+  },
+  {
+    id: "ch8", num: 8, title: "Java 21最新機能", est: "55分",
+    goal: "Java 21のRecord・Sealed Class・Pattern Matching switchを使った簡潔で型安全なコードを書ける。Virtual Threadsの設定とトレードオフを理解し、Foreign Function & Memory APIの用途を把握する。実務でのJava 21採用判断の根拠を説明できる。",
+    sections: [
+      {
+        title: "Record・Sealed Class・Pattern Matching",
+        body: `Java 16で正式採用されたRecordは不変データクラスを1行で定義する構文で、equals・hashCode・toStringが自動生成されます。Pythonの@dataclass(frozen=True)に近いですが、コンパクトコンストラクタでバリデーションを簡潔に追加できる点が優れています。RecordはJPAエンティティ（mutable必須）には使えませんが、DTO・ValueObject・APIレスポンスには最適です。
+
+Sealed Class（Java 17正式）は継承できるサブクラスをpermitsで明示的に制限します。これによりコンパイラがすべての継承クラスを把握でき、Pattern Matching for switchと組み合わせると「全ケース網羅チェック」がコンパイル時に行われます。Pythonのcase文（match）との大きな違いは「型による分岐」と「コンパイル時の網羅性検証」が同時に実現される点です。`,
+        table: T.java21Features,
+        afterTable: "Recordは継承できません（暗黙的にfinal）。継承が必要な場合はSealed Classとinterfaceを組み合わせます。また、Recordのカスタムコンストラクタはコンパクトコンストラクタ（パラメータリストを省略した形式）を使うと、フィールド代入を自動的に行いつつバリデーションのみ記述できます。"
+      },
+      {
+        title: "Virtual Threads・Foreign Function API",
+        body: `Virtual Threads（Java 21）は第2章で詳述しましたが、実務採用のポイントを整理します。既存のSpring MVCアプリは設定1行（spring.threads.virtual.enabled=true）で恩恵を受けられます。一方で、C拡張ライブラリに頼るPythonのNumPy/Pandasのような処理はJavaではnativeライブラリ呼び出しが必要で、従来はJNI（Java Native Interface）を使う必要がありました。
+
+Foreign Function & Memory API（FFM API）はJava 22でGAになりましたが、Java 21のPreview版として利用可能です。JNIを使わずにCのライブラリを型安全に呼び出せる新しいAPIで、Pythonのctypesやcffiにあたります。jextractツールでCヘッダーファイルからJavaバインディングを自動生成でき、ネイティブメモリのアロケーション・操作も安全に行えます。高性能画像処理・機械学習推論（ONNX Runtime等）との連携でJava上級者が活用する場面が増えています。`,
+        code: `// Pattern Matching for switch (Java 21)
+sealed interface Notification permits Email, Push, SMS {}
+record Email(String to, String subject) implements Notification {}
+record Push(String token, String body) implements Notification {}
+record SMS(String phone, String text) implements Notification {}
+
+public class NotificationSender {
+    public static String send(Notification n) {
+        return switch (n) {
+            case Email e  -> "メール送信: " + e.to() + " / " + e.subject();
+            case Push p   -> "プッシュ通知: " + p.token();
+            case SMS s    -> "SMS送信: " + s.phone();
+            // すべてのケースを網羅しないとコンパイルエラー
+        };
+    }
+}`,
+        afterCode: "Java 21はLTS（Long-Term Support）リリースです。Java 17（前LTS）からのアップグレードは比較的安全で、Spring Boot 3.2以降がJava 21を正式サポートしています。本番システムへのJava 21採用は2025年時点で急速に拡大しています。"
+      }
+    ]
+  }
+];
+
+/* ── UI Components ── */
+function DataTable({ data }) {
+  return React.createElement("div", {
+    style: { overflowX: "auto", margin: "12px 0", borderRadius: 10, border: "1px solid #d1d5db", background: "#fff" }
+  }, React.createElement("table", {
+    style: { width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }
+  }, React.createElement("thead", null, React.createElement("tr", null,
+    data.h.map((h, i) => React.createElement("th", {
+      key: i,
+      style: {
+        background: "linear-gradient(180deg,#eef2ff,#e0e7ff)", color: "#312e81",
+        fontWeight: 800, fontSize: 12.5, padding: "10px 14px", textAlign: "left",
+        borderBottom: "2px solid #a5b4fc",
+        borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+      }
+    }, h))
+  )), React.createElement("tbody", null,
+    data.r.map((row, ri) => React.createElement("tr", { key: ri },
+      row.map((cell, ci) => React.createElement("td", {
+        key: ci,
+        style: {
+          padding: "9px 14px",
+          borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+          borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+          color: ci === 0 ? "#1e1b4b" : "#374151",
+          fontWeight: ci === 0 ? 700 : 400,
+          fontSize: 13, lineHeight: 1.65, verticalAlign: "top",
+          whiteSpace: "pre-line", background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+        }
+      }, cell))
+    ))
+  )));
+}
+
+function Code({ code, hl }) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a", color: "#d0d0f0",
+      padding: "14px 16px", borderRadius: 10, fontSize: 12, lineHeight: 1.65,
+      overflowX: "auto", margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap", wordBreak: "break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+
+const diffLabel = d => d === 1 ? "⭐ 基本" : d === 2 ? "⭐⭐ 応用" : "⭐⭐⭐ 発展";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+
+function Exercise({ ex, idx }) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: { borderRadius: 12, border: "2px solid #f59e0b", overflow: "hidden", background: "#fff", marginBottom: 8 }
+  },
+    React.createElement("div", { style: { padding: "12px 16px", background: "linear-gradient(135deg,#fffbeb,#fef3c7)" } },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } },
+        React.createElement("span", { style: { background: "#f59e0b", color: "#fff", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 6 } }, "問", idx + 1),
+        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: diffColor(ex.diff) } }, diffLabel(ex.diff))
+      ),
+      React.createElement("p", { style: { margin: 0, fontSize: 13.5, lineHeight: 1.8, color: "#92400e", whiteSpace: "pre-line" } }, ex.q)
+    ),
+    React.createElement("div", { style: { padding: "0 16px 12px" } }, React.createElement(Code, { code: ex.code, hl: true })),
+    React.createElement("div", { style: { borderTop: "1px dashed #fcd34d", padding: "10px 16px" } },
+      React.createElement("button", {
+        onClick: () => setShowAnswer(!showAnswer),
+        style: {
+          background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+          color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px",
+          fontSize: 13, fontWeight: 700, cursor: "pointer", width: "100%"
+        }
+      }, showAnswer ? "🙈 解答を隠す" : "👀 解答例を見る"),
+      showAnswer && React.createElement("div", { style: { marginTop: 10 } },
+        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 } }, "✅ 解答例"),
+        React.createElement(Code, { code: ex.answer })
+      )
+    )
+  );
+}
+
+function Section({ section, idx }) {
+  const [open, setOpen] = useState(false);
+  return React.createElement("div", {
+    style: { borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", background: "#fff" }
+  },
+    React.createElement("button", {
+      onClick: () => setOpen(!open),
+      style: {
+        width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
+        border: "none", background: "#fafafa", cursor: "pointer", textAlign: "left",
+        fontSize: 14, fontWeight: 700, color: "#1e1b4b"
+      }
+    },
+      React.createElement("span", {
+        style: { flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: "#6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }
+      }, idx + 1),
+      React.createElement("span", { style: { flex: 1 } }, section.title),
+      React.createElement("span", { style: { fontSize: 18, color: "#9ca3af", transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0)" } }, "›")
+    ),
+    open && React.createElement("div", { style: { padding: "12px 16px 16px" } },
+      section.body && React.createElement("p", { style: { margin: "0 0 8px", fontSize: 13.5, lineHeight: 1.85, color: "#374151", whiteSpace: "pre-line" } }, section.body),
+      section.table && React.createElement(DataTable, { data: section.table }),
+      section.afterTable && React.createElement("p", { style: { margin: "8px 0", fontSize: 13.5, lineHeight: 1.85, color: "#374151", whiteSpace: "pre-line" } }, section.afterTable),
+      section.code && React.createElement(Code, { code: section.code }),
+      section.afterCode && React.createElement("p", { style: { margin: "10px 0 0", fontSize: 13, lineHeight: 1.8, color: "#555", whiteSpace: "pre-line", background: "#f9fafb", padding: "10px 14px", borderRadius: 8, border: "1px solid #e5e7eb" } }, section.afterCode)
+    )
+  );
+}
+
+/* ── Main App ── */
+function JavaAdvancedCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exercises = EX[chapter.id] || [];
+
+  return React.createElement("div", {
+    style: { minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif" }
+  }, React.createElement("div", { style: { maxWidth: 1100, margin: "0 auto", padding: "20px 14px" } },
+
+    /* Hero */
+    React.createElement("div", {
+      style: { background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)", borderRadius: 16, padding: "24px 20px", marginBottom: 16, position: "relative", overflow: "hidden" }
+    },
+      React.createElement("div", { style: { position: "absolute", top: -30, right: -10, fontSize: 140, opacity: 0.05 } }, "☕"),
+      React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 } }, "Python開発者のための"),
+      React.createElement("h1", { style: { margin: 0, fontSize: 22, fontWeight: 900, color: "#fff" } }, "Java 上級コース"),
+      React.createElement("p", { style: { margin: "6px 0 0", fontSize: 12.5, color: "#c4b5fd" } },
+        "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問 ・ 難易度⭐〜⭐⭐⭐"
+      ),
+      React.createElement("p", { style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 } },
+        "JVM内部からVirtual Threads・リアクティブ・マイクロサービス・パフォーマンスチューニング・メタプログラミング・Java 21最新機能まで網羅し、実務で即戦力となる上級Java力を養います。"
+      ),
+      React.createElement("div", { style: { marginTop: 14, display: "flex", gap: 3 } },
+        chapters.map((_, i) => React.createElement("div", {
+          key: i,
+          onClick: () => { setCh(i); setMenuOpen(false); },
+          style: { flex: 1, height: 5, borderRadius: 3, background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)", cursor: "pointer" }
+        }))
+      )
+    ),
+
+    /* Chapter menu */
+    React.createElement("div", { style: { marginBottom: 14 } },
+      React.createElement("button", {
+        onClick: () => setMenuOpen(!menuOpen),
+        style: { width: "100%", padding: "10px 16px", border: "1px solid #d1d5db", borderRadius: 10, background: "#fff", fontSize: 14, fontWeight: 700, color: "#1e1b4b", cursor: "pointer", display: "flex", justifyContent: "space-between" }
+      },
+        React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+        React.createElement("span", { style: { fontSize: 12, color: "#9ca3af" } }, menuOpen ? "▲" : "▼")
+      ),
+      menuOpen && React.createElement("div", {
+        style: { marginTop: 4, border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#fff", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }
+      },
+        chapters.map((c, i) => React.createElement("button", {
+          key: c.id,
+          onClick: () => { setCh(i); setMenuOpen(false); },
+          style: {
+            width: "100%", padding: "10px 16px", border: "none",
+            borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+            background: i === ch ? "#eef2ff" : "#fff", fontSize: 13,
+            fontWeight: i === ch ? 700 : 500, color: i === ch ? "#4338ca" : "#374151",
+            cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10
+          }
+        },
+          React.createElement("span", {
+            style: { width: 22, height: 22, borderRadius: "50%", background: i === ch ? "#6366f1" : "#e5e7eb", color: i === ch ? "#fff" : "#6b7280", fontWeight: 800, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+          }, c.num),
+          React.createElement("span", { style: { flex: 1 } }, c.title),
+          EX[c.id] && React.createElement("span", { style: { fontSize: 11, color: "#f59e0b", fontWeight: 700 } }, EX[c.id].length, "問")
+        ))
+      )
+    ),
+
+    /* Chapter header */
+    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } },
+      React.createElement("span", {
+        style: { width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontWeight: 900, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }
+      }, chapter.num),
+      React.createElement("div", null,
+        React.createElement("div", { style: { fontWeight: 800, fontSize: 18, color: "#1e1b4b" } }, chapter.title),
+        React.createElement("div", { style: { fontSize: 12, color: "#6b7280" } }, "目安: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : "")
+      )
+    ),
+
+    /* Goal block */
+    chapter.goal && React.createElement("div", {
+      style: { background: "linear-gradient(135deg,#eef2ff,#f5f3ff)", border: "1px solid #c7d2fe", borderLeft: "4px solid #6366f1", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }
+    },
+      React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 } }, "🎯 この章のゴール"),
+      React.createElement("div", { style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" } }, chapter.goal)
+    ),
+
+    /* Sections */
+    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+      chapter.sections.map((sec, i) => React.createElement(Section, { key: ch + "-" + i, section: sec, idx: i }))
+    ),
+
+    /* Exercises */
+    exercises.length > 0 && React.createElement("div", { style: { marginTop: 20 } },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
+        React.createElement("span", { style: { background: "#f59e0b", color: "#fff", fontWeight: 800, fontSize: 13, padding: "4px 14px", borderRadius: 8 } }, "🏋️ 演習問題"),
+        React.createElement("span", { style: { fontSize: 13, color: "#92400e" } }, "易しい順に", exercises.length, "問")
+      ),
+      exercises.map((ex, i) => React.createElement(Exercise, { key: ch + "-" + i, ex: ex, idx: i }))
+    ),
+
+    /* Navigation */
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 20, gap: 10 } },
+      ch > 0
+        ? React.createElement("button", {
+            onClick: () => { setCh(ch - 1); window.scrollTo(0, 0); },
+            style: { flex: 1, padding: "12px 16px", border: "1px solid #d1d5db", borderRadius: 10, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#6b7280" }
+          }, "← Ch.", chapters[ch - 1].num)
+        : React.createElement("div", { style: { flex: 1 } }),
+      ch < chapters.length - 1
+        ? React.createElement("button", {
+            onClick: () => { setCh(ch + 1); window.scrollTo(0, 0); },
+            style: { flex: 1, padding: "12px 16px", border: "none", borderRadius: 10, background: "linear-gradient(135deg,#6366f1,#8b5cf6)", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#fff" }
+          }, "Ch.", chapters[ch + 1].num, " →")
+        : React.createElement("a", {
+            href: "../index.html",
+            style: { flex: 1, padding: "12px 16px", borderRadius: 10, background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", fontWeight: 700, fontSize: 13, textAlign: "center", textDecoration: "none" }
+          }, "🎉 コース完了！")
+    ),
+
+    /* Footer */
+    React.createElement("p", { style: { textAlign: "center", fontSize: 11, color: "#9ca3af", marginTop: 20 } },
+      "docs.spring.io ・ openjdk.java.net ・ Java 21 時点 ・ 2026年4月時点"
+    )
+
+  ));
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(JavaAdvancedCourse));
+  </script>
+</body>
+</html>
