@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>React 中級コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのReact中級コース。全8章・16問の演習付き。useReducer/カスタムフック/React Query/Server Componentsなど実務直結の技術を学びます。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+/* ── Table definitions ── */
+const T = {
+  reducerVsState: {
+    h: ["項目", "useState", "useReducer"],
+    r: [
+      ["適する場面", "単純な値・独立した状態", "複数の状態が連動・遷移が複雑"],
+      ["更新ロジック", "setX(nextValue) をその場に書く", "reducer 関数に集約"],
+      ["テスト容易性", "コンポーネントごとテスト必要", "reducer は純粋関数なので単体テスト可"],
+      ["デバッグ", "state の変化を追跡しにくい", "action で変化の理由が明示される"],
+      ["コード量", "少ない（シンプルな場合）", "やや多い（複雑な場合に逆転）"]
+    ]
+  },
+  memoGuide: {
+    h: ["API", "いつ使うか", "使わないケース"],
+    r: [
+      ["React.memo", "親が頻繁に再レンダリングされ、子のpropsが変わらないことが多い", "propsが毎回変わる・コンポーネントが軽い"],
+      ["useCallback", "関数をReact.memoした子に渡す・useEffect依存に入れる", "単純なイベントハンドラ・メモ化コストが高い"],
+      ["useMemo", "重い計算（1000件ソート等）・参照同一性が必要なオブジェクト", "プリミティブ値・軽い計算"]
+    ]
+  },
+  customHookPatterns: {
+    h: ["フック名", "目的", "戻り値の例"],
+    r: [
+      ["useLocalStorage", "localStorage と state を同期", "[value, setValue]"],
+      ["useFetch", "汎用データ取得", "{ data, loading, error }"],
+      ["useDebounce", "入力値の遅延確定", "debouncedValue"],
+      ["useWindowSize", "ウィンドウサイズ監視", "{ width, height }"],
+      ["useMediaQuery", "メディアクエリのマッチ判定", "boolean"]
+    ]
+  },
+  contextPitfalls: {
+    h: ["問題", "原因", "対策"],
+    r: [
+      ["全消費コンポーネントが再レンダリング", "Context値が変わると全useContextが再実行", "Contextを細かく分割・useMemoでvalue安定化"],
+      ["Provider地獄", "Contextが増えてネストが深くなる", "Contextをまとめる・Zustandに移行"],
+      ["テストが難しい", "コンポーネントが暗黙でContextに依存", "テスト用Providerでラップ"]
+    ]
+  },
+  compoundPattern: {
+    h: ["パターン", "特徴", "適する場面"],
+    r: [
+      ["Compound Components", "親子で暗黙の状態共有（Context利用）", "Tab/Accordion/Selectなど複合UI"],
+      ["Render Props", "JSXを返す関数をpropsで受け取る", "ロジック共有・描画の柔軟性が必要"],
+      ["HOC", "コンポーネントを受け取りコンポーネントを返す", "横断的関心事（認証チェック等）"],
+      ["Headless UI", "スタイルなしでロジックだけ提供", "デザインシステムの基盤"]
+    ]
+  },
+  reactQueryKeys: {
+    h: ["概念", "説明", "Pythonとの対比"],
+    r: [
+      ["QueryKey", "キャッシュのキー（配列）", "Redisのキー名"],
+      ["staleTime", "データが「古い」とみなすまでの時間", "キャッシュの有効期限（TTL）"],
+      ["gcTime", "未使用キャッシュを削除するまでの時間", "メモリキャッシュのGC期間"],
+      ["refetchOnWindowFocus", "ウィンドウフォーカス時に再フェッチ", "—"],
+      ["invalidateQueries", "キャッシュを無効化して再フェッチ", "キャッシュの削除・更新"]
+    ]
+  },
+  rhfZodIntegration: {
+    h: ["ステップ", "コード", "説明"],
+    r: [
+      ["スキーマ定義", "z.object({ name: z.string().min(2) })", "バリデーションルールをZodで宣言"],
+      ["型推論", "type Form = z.infer<typeof schema>", "スキーマから型を自動生成"],
+      ["リゾルバ接続", "useForm({ resolver: zodResolver(schema) })", "RHFにZodを接続"],
+      ["エラー取得", "formState.errors.name?.message", "Zodのメッセージがそのまま表示"]
+    ]
+  },
+  rscVsClient: {
+    h: ["項目", "Server Component", "Client Component"],
+    r: [
+      ["実行環境", "サーバのみ", "ブラウザ（+ハイドレーション）"],
+      ["状態管理", "不可（useState等使えない）", "可（useState/useEffect等）"],
+      ["データ取得", "async/await直接使用可", "useEffect/React Query等"],
+      ["バンドルサイズ", "JSを一切送らない", "JSがブラウザに送られる"],
+      ["宣言方法", "デフォルト（何も書かない）", "ファイル先頭に 'use client'"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "useReducer を使って以下の状態を管理してください。\n・count（数値）\n・step（増減幅、デフォルト1）\nアクション: INCREMENT / DECREMENT / SET_STEP / RESET",
+    code: `// CounterReducer.tsx
+// action type を定義し、reducer 関数を実装する
+// useReducer(reducer, { count: 0, step: 1 }) で初期化`,
+    answer: `type Action =
+  | { type: 'INCREMENT' }
+  | { type: 'DECREMENT' }
+  | { type: 'SET_STEP'; payload: number }
+  | { type: 'RESET' };
+
+interface State { count: number; step: number; }
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case 'INCREMENT': return { ...state, count: state.count + state.step };
+    case 'DECREMENT': return { ...state, count: state.count - state.step };
+    case 'SET_STEP':  return { ...state, step: action.payload };
+    case 'RESET':     return { count: 0, step: state.step };
+    default:          return state;
+  }
+}
+
+function Counter() {
+  const [state, dispatch] = React.useReducer(reducer, { count: 0, step: 1 });
+  return (
+    <div>
+      <p>count: {state.count} (step: {state.step})</p>
+      <button onClick={() => dispatch({ type: 'DECREMENT' })}>-</button>
+      <button onClick={() => dispatch({ type: 'INCREMENT' })}>+</button>
+      <input type="number" value={state.step}
+        onChange={e => dispatch({ type: 'SET_STEP', payload: +e.target.value })} />
+      <button onClick={() => dispatch({ type: 'RESET' })}>Reset</button>
+    </div>
+  );
+}`
+  }, {
+    diff: 2,
+    q: "useMemo と useCallback を組み合わせて最適化してください。\n・todos（配列）と filter（文字列）を状態で持つ\n・filteredTodos を useMemo で計算\n・addTodo, deleteTodo を useCallback でメモ化\n・子コンポーネントは React.memo でラップ",
+    code: `// App.tsx
+// React.memo でラップした TodoList コンポーネントに
+// useCallback でメモ化した関数を渡す`,
+    answer: `const { useState, useMemo, useCallback, memo } = React;
+
+const TodoList = memo(function TodoList({ todos, onDelete }) {
+  console.log('TodoList rendered');
+  return (
+    <ul>
+      {todos.map(t => (
+        <li key={t.id}>
+          {t.text}
+          <button onClick={() => onDelete(t.id)}>削除</button>
+        </li>
+      ))}
+    </ul>
+  );
+});
+
+function App() {
+  const [todos, setTodos] = useState([]);
+  const [filter, setFilter] = useState('all');
+  const [input, setInput] = useState('');
+
+  const filteredTodos = useMemo(() =>
+    filter === 'done' ? todos.filter(t => t.done)
+    : filter === 'active' ? todos.filter(t => !t.done)
+    : todos
+  , [todos, filter]);
+
+  const addTodo = useCallback((text) => {
+    setTodos(prev => [...prev, { id: Date.now(), text, done: false }]);
+  }, []);
+
+  const deleteTodo = useCallback((id) => {
+    setTodos(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  return (
+    <div>
+      <input value={input} onChange={e => setInput(e.target.value)} />
+      <button onClick={() => { addTodo(input); setInput(''); }}>追加</button>
+      <TodoList todos={filteredTodos} onDelete={deleteTodo} />
+    </div>
+  );
+}`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "useLocalStorage カスタムフックを実装してください。\n・初期値を引数で受け取る\n・setValueで更新するとlocalStorageにも保存\n・ページリロード後も値が復元される",
+    code: `// hooks/useLocalStorage.ts
+// useState の初期値に localStorage の値を使う
+// setValue で state と localStorage を同時更新`,
+    answer: `function useLocalStorage(key, initialValue) {
+  const [value, setValue] = React.useState(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item !== null ? JSON.parse(item) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+
+  const setStoredValue = React.useCallback((newValue) => {
+    setValue(newValue);
+    try {
+      window.localStorage.setItem(key, JSON.stringify(newValue));
+    } catch (e) {
+      console.error('localStorage write error:', e);
+    }
+  }, [key]);
+
+  return [value, setStoredValue];
+}
+
+// 使い方
+function App() {
+  const [name, setName] = useLocalStorage('username', '');
+  return (
+    <input
+      value={name}
+      onChange={e => setName(e.target.value)}
+      placeholder="名前（リロードしても保持）"
+    />
+  );
+}`
+  }, {
+    diff: 2,
+    q: "useFetch カスタムフックを実装してください。\n・url を受け取り { data, loading, error } を返す\n・url が変わると再フェッチ\n・コンポーネントがアンマウントされた後に setState しない（AbortController利用）",
+    code: `// hooks/useFetch.ts
+// AbortController でクリーンアップ
+// url の変化で useEffect が再実行される`,
+    answer: `function useFetch(url) {
+  const [state, setState] = React.useState({
+    data: null, loading: true, error: null
+  });
+
+  React.useEffect(() => {
+    if (!url) return;
+    const controller = new AbortController();
+    setState({ data: null, loading: true, error: null });
+
+    fetch(url, { signal: controller.signal })
+      .then(res => {
+        if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+        return res.json();
+      })
+      .then(data => setState({ data, loading: false, error: null }))
+      .catch(err => {
+        if (err.name === 'AbortError') return; // アンマウント時は無視
+        setState({ data: null, loading: false, error: err.message });
+      });
+
+    return () => controller.abort();
+  }, [url]);
+
+  return state;
+}
+
+// 使い方
+function UserCard({ userId }) {
+  const { data, loading, error } = useFetch(
+    userId ? \`https://jsonplaceholder.typicode.com/users/\${userId}\` : null
+  );
+  if (loading) return <p>読み込み中...</p>;
+  if (error) return <p>エラー: {error}</p>;
+  return <p>{data?.name}</p>;
+}`
+  }],
+  ch3: [{
+    diff: 1,
+    q: "createContext と useContext を使って、テーマ（ライト/ダーク）を切り替えるグローバル状態を実装してください。\n・ThemeContext を作成\n・useTheme カスタムフックでコンテキストを取得\n・任意のコンポーネントからテーマを切り替えられること",
+    code: `// contexts/ThemeContext.tsx
+// createContext → Provider → useTheme フック
+// App をラップして任意の子から切替可能に`,
+    answer: `const ThemeContext = React.createContext(null);
+
+function ThemeProvider({ children }) {
+  const [theme, setTheme] = React.useState('light');
+  const toggle = React.useCallback(
+    () => setTheme(t => t === 'light' ? 'dark' : 'light'),
+    []
+  );
+  const value = React.useMemo(() => ({ theme, toggle }), [theme, toggle]);
+  return (
+    <ThemeContext.Provider value={value}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+function useTheme() {
+  const ctx = React.useContext(ThemeContext);
+  if (!ctx) throw new Error('useTheme must be used inside ThemeProvider');
+  return ctx;
+}
+
+function ThemeToggle() {
+  const { theme, toggle } = useTheme();
+  return (
+    <button onClick={toggle}
+      style={{ background: theme === 'dark' ? '#1e1b4b' : '#eef2ff', color: theme === 'dark' ? '#fff' : '#1e1b4b', padding: '8px 16px', border: 'none', borderRadius: 8 }}>
+      現在: {theme} → 切り替え
+    </button>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <ThemeToggle />
+    </ThemeProvider>
+  );
+}`
+  }, {
+    diff: 2,
+    q: "Contextの再レンダリング問題を確認し、useMemoで防いでください。\n・CounterContextとUserContextを別々に作成\n・カウンタが増えてもUserDisplayが再レンダリングされないことをconsole.logで確認",
+    code: `// Context を分割して不要な再レンダリングを防ぐ
+// console.log('UserDisplay rendered') で確認`,
+    answer: `const CounterContext = React.createContext(null);
+const UserContext = React.createContext(null);
+
+function CounterProvider({ children }) {
+  const [count, setCount] = React.useState(0);
+  // value を useMemo で安定化
+  const value = React.useMemo(() => ({ count, setCount }), [count]);
+  return <CounterContext.Provider value={value}>{children}</CounterContext.Provider>;
+}
+
+function UserProvider({ children }) {
+  const [user] = React.useState({ name: '太郎' });
+  const value = React.useMemo(() => ({ user }), [user]);
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
+}
+
+const UserDisplay = React.memo(function UserDisplay() {
+  const { user } = React.useContext(UserContext);
+  console.log('UserDisplay rendered'); // カウンタ変化では出ないはず
+  return <p>ユーザー: {user.name}</p>;
+});
+
+function Counter() {
+  const { count, setCount } = React.useContext(CounterContext);
+  return <button onClick={() => setCount(c => c + 1)}>Count: {count}</button>;
+}
+
+function App() {
+  return (
+    <UserProvider>
+      <CounterProvider>
+        <UserDisplay />
+        <Counter />
+      </CounterProvider>
+    </UserProvider>
+  );
+}`
+  }],
+  ch4: [{
+    diff: 1,
+    q: "Compound Components パターンを使って Tabs コンポーネントを実装してください。\n以下のように使えること:\n<Tabs defaultValue='a'>\n  <Tabs.List>\n    <Tabs.Trigger value='a'>タブA</Tabs.Trigger>\n  </Tabs.List>\n  <Tabs.Panel value='a'>内容A</Tabs.Panel>\n</Tabs>",
+    code: `// Tabs, Tabs.List, Tabs.Trigger, Tabs.Panel を実装
+// Context で activeTab を共有`,
+    answer: `const TabsContext = React.createContext(null);
+
+function Tabs({ defaultValue, children }) {
+  const [active, setActive] = React.useState(defaultValue);
+  const ctx = React.useMemo(() => ({ active, setActive }), [active]);
+  return (
+    <TabsContext.Provider value={ctx}>
+      <div>{children}</div>
+    </TabsContext.Provider>
+  );
+}
+
+Tabs.List = function TabsList({ children }) {
+  return <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e5e7eb', marginBottom: 12 }}>{children}</div>;
+};
+
+Tabs.Trigger = function TabsTrigger({ value, children }) {
+  const { active, setActive } = React.useContext(TabsContext);
+  return (
+    <button
+      onClick={() => setActive(value)}
+      style={{
+        padding: '8px 16px', border: 'none', borderRadius: '8px 8px 0 0',
+        background: active === value ? '#6366f1' : 'transparent',
+        color: active === value ? '#fff' : '#6b7280',
+        fontWeight: active === value ? 700 : 400, cursor: 'pointer'
+      }}>
+      {children}
+    </button>
+  );
+};
+
+Tabs.Panel = function TabsPanel({ value, children }) {
+  const { active } = React.useContext(TabsContext);
+  if (active !== value) return null;
+  return <div>{children}</div>;
+};
+
+// 使い方
+function App() {
+  return (
+    <Tabs defaultValue="a">
+      <Tabs.List>
+        <Tabs.Trigger value="a">概要</Tabs.Trigger>
+        <Tabs.Trigger value="b">詳細</Tabs.Trigger>
+      </Tabs.List>
+      <Tabs.Panel value="a">概要の内容</Tabs.Panel>
+      <Tabs.Panel value="b">詳細の内容</Tabs.Panel>
+    </Tabs>
+  );
+}`
+  }, {
+    diff: 2,
+    q: "Render Props パターンを使って DataFetcher コンポーネントを作ってください。\n・url と children（関数）を props で受け取る\n・children({ data, loading, error }) を呼び出す\n・2つの異なるUIで同じ DataFetcher を再利用",
+    code: `// <DataFetcher url={...}>
+//   {({ data, loading, error }) => <div>...</div>}
+// </DataFetcher>`,
+    answer: `function DataFetcher({ url, children }) {
+  const [state, setState] = React.useState({ data: null, loading: true, error: null });
+
+  React.useEffect(() => {
+    fetch(url)
+      .then(r => r.json())
+      .then(data => setState({ data, loading: false, error: null }))
+      .catch(err => setState({ data: null, loading: false, error: err.message }));
+  }, [url]);
+
+  return children(state);
+}
+
+// 同じ DataFetcher を2種類のUIで再利用
+function App() {
+  return (
+    <div>
+      {/* カード表示 */}
+      <DataFetcher url="https://jsonplaceholder.typicode.com/users/1">
+        {({ data, loading, error }) => {
+          if (loading) return <p>読み込み中...</p>;
+          if (error) return <p style={{color:'red'}}>{error}</p>;
+          return <div style={{padding:12,border:'1px solid #e5e7eb',borderRadius:8}}>
+            <strong>{data.name}</strong><br/>{data.email}
+          </div>;
+        }}
+      </DataFetcher>
+
+      {/* テーブル表示 */}
+      <DataFetcher url="https://jsonplaceholder.typicode.com/users/2">
+        {({ data, loading }) =>
+          loading ? <span>...</span> : <p>→ {data?.username}</p>
+        }
+      </DataFetcher>
+    </div>
+  );
+}`
+  }],
+  ch5: [{
+    diff: 1,
+    q: "TanStack Query (React Query) を使ってユーザー一覧を取得・表示してください。\n・useQuery でデータ取得\n・ローディング・エラー状態を表示\n・QueryClient と QueryClientProvider を設定",
+    code: `// npm install @tanstack/react-query
+// QueryClientProvider でアプリをラップ
+// useQuery({ queryKey: ['users'], queryFn: fetchUsers })`,
+    answer: `// npm install @tanstack/react-query が必要
+// ここでは概念コードを示す（UMD環境ではCDN追加が必要）
+
+// queryClient の設定
+// const queryClient = new QueryClient({
+//   defaultOptions: { queries: { staleTime: 1000 * 60 } }
+// });
+
+// フェッチ関数（純粋なasync関数）
+async function fetchUsers() {
+  const res = await fetch('https://jsonplaceholder.typicode.com/users');
+  if (!res.ok) throw new Error('fetch failed');
+  return res.json();
+}
+
+// コンポーネント
+function UserList() {
+  // useQuery フック
+  const { data: users, isLoading, error, refetch } = useQuery({
+    queryKey: ['users'],     // キャッシュキー
+    queryFn: fetchUsers,
+    staleTime: 1000 * 60,   // 1分間はキャッシュを使い再フェッチしない
+  });
+
+  if (isLoading) return <p>読み込み中...</p>;
+  if (error) return <p>エラー: {error.message} <button onClick={refetch}>再試行</button></p>;
+
+  return (
+    <ul>
+      {users.map(u => <li key={u.id}>{u.name} — {u.email}</li>)}
+    </ul>
+  );
+}
+
+// エントリポイント
+// root.render(
+//   <QueryClientProvider client={queryClient}>
+//     <UserList />
+//   </QueryClientProvider>
+// );`
+  }, {
+    diff: 2,
+    q: "useMutation を使ってTodoの追加・楽観的更新を実装してください。\n・addTodo の mutation を作成\n・onMutate でUIを即時更新（楽観的更新）\n・onError でロールバック\n・onSettled で再フェッチ",
+    code: `// useMutation + onMutate で楽観的更新
+// queryClient.setQueryData でキャッシュを先に更新`,
+    answer: `// 楽観的更新パターン（React Query v5 スタイル）
+
+async function createTodo(text) {
+  const res = await fetch('https://jsonplaceholder.typicode.com/todos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: text, completed: false, userId: 1 }),
+  });
+  return res.json();
+}
+
+function TodoForm() {
+  const queryClient = useQueryClient();
+  const [text, setText] = React.useState('');
+
+  const mutation = useMutation({
+    mutationFn: createTodo,
+    onMutate: async (newText) => {
+      // 進行中のフェッチをキャンセル
+      await queryClient.cancelQueries({ queryKey: ['todos'] });
+      // 現在のキャッシュを保存（ロールバック用）
+      const previous = queryClient.getQueryData(['todos']);
+      // キャッシュを楽観的に更新
+      queryClient.setQueryData(['todos'], old => [
+        ...(old ?? []),
+        { id: Date.now(), title: newText, completed: false }
+      ]);
+      return { previous }; // context として渡す
+    },
+    onError: (_err, _vars, context) => {
+      // エラー時はロールバック
+      queryClient.setQueryData(['todos'], context.previous);
+    },
+    onSettled: () => {
+      // 成功・失敗どちらでも再フェッチして整合性を担保
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+    },
+  });
+
+  return (
+    <form onSubmit={e => { e.preventDefault(); mutation.mutate(text); setText(''); }}>
+      <input value={text} onChange={e => setText(e.target.value)} />
+      <button type="submit" disabled={mutation.isPending}>
+        {mutation.isPending ? '送信中...' : '追加'}
+      </button>
+    </form>
+  );
+}`
+  }],
+  ch6: [{
+    diff: 1,
+    q: "React Hook Form と Zod を組み合わせて登録フォームを作ってください。\n以下のバリデーションを実装:\n・name: 必須、2文字以上\n・email: 必須、メール形式\n・password: 必須、8文字以上",
+    code: `// npm install react-hook-form zod @hookform/resolvers
+// zodResolver を使ってスキーマを接続`,
+    answer: `// npm install react-hook-form zod @hookform/resolvers が必要
+// 概念コード（実際の環境では import が必要）
+
+// スキーマ定義
+const schema = z.object({
+  name: z.string().min(2, '2文字以上入力してください'),
+  email: z.string().email('メールアドレスの形式が正しくありません'),
+  password: z.string().min(8, '8文字以上入力してください'),
+});
+
+// type FormData = z.infer<typeof schema>;
+// → { name: string; email: string; password: string }
+
+function RegisterForm() {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting }
+  } = useForm({ resolver: zodResolver(schema) });
+
+  const onSubmit = async (data) => {
+    await new Promise(r => setTimeout(r, 1000)); // API呼び出しの模擬
+    console.log('送信データ:', data);
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <div>
+        <input {...register('name')} placeholder="名前" />
+        {errors.name && <p style={{color:'red'}}>{errors.name.message}</p>}
+      </div>
+      <div>
+        <input {...register('email')} placeholder="メール" />
+        {errors.email && <p style={{color:'red'}}>{errors.email.message}</p>}
+      </div>
+      <div>
+        <input type="password" {...register('password')} placeholder="パスワード" />
+        {errors.password && <p style={{color:'red'}}>{errors.password.message}</p>}
+      </div>
+      <button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? '送信中...' : '登録'}
+      </button>
+    </form>
+  );
+}`
+  }, {
+    diff: 2,
+    q: "useFieldArray を使って動的フィールドを実装してください。\n・スキルを複数追加・削除できるフォーム\n・各スキルに name と level（1〜5）を持つ\n・最低1件のスキルが必要（バリデーション）",
+    code: `// useFieldArray で動的なフィールド配列を管理
+// fields.map でレンダリング、append/remove で操作`,
+    answer: `const skillSchema = z.object({
+  skills: z.array(z.object({
+    name: z.string().min(1, '必須'),
+    level: z.number().min(1).max(5),
+  })).min(1, '最低1つのスキルを入力してください'),
+});
+
+function SkillForm() {
+  const { register, control, handleSubmit, formState: { errors } } = useForm({
+    resolver: zodResolver(skillSchema),
+    defaultValues: { skills: [{ name: '', level: 3 }] }
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'skills',
+  });
+
+  return (
+    <form onSubmit={handleSubmit(data => console.log(data))}>
+      {fields.map((field, index) => (
+        <div key={field.id} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <input
+            {...register(\`skills.\${index}.name\`)}
+            placeholder="スキル名"
+          />
+          <input
+            type="number" min={1} max={5}
+            {...register(\`skills.\${index}.level\`, { valueAsNumber: true })}
+          />
+          <button type="button" onClick={() => remove(index)}>削除</button>
+          {errors.skills?.[index]?.name && (
+            <span style={{color:'red'}}>{errors.skills[index].name.message}</span>
+          )}
+        </div>
+      ))}
+      {errors.skills?.root && <p style={{color:'red'}}>{errors.skills.root.message}</p>}
+      <button type="button" onClick={() => append({ name: '', level: 3 })}>
+        スキルを追加
+      </button>
+      <button type="submit">保存</button>
+    </form>
+  );
+}`
+  }],
+  ch7: [{
+    diff: 1,
+    q: "React Testing Library を使って以下のコンポーネントをテストしてください。\n・テキストが表示されること\n・ボタンクリックでカウントが増えること\n・getByRole / userEvent を使うこと",
+    code: `// Counter.test.tsx
+// render → screen.getByRole → userEvent.click → expect
+function Counter() {
+  const [n, setN] = React.useState(0);
+  return <div><p>Count: {n}</p><button onClick={() => setN(n+1)}>+1</button></div>;
+}`,
+    answer: `import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect } from 'vitest';
+
+function Counter() {
+  const [n, setN] = React.useState(0);
+  return (
+    <div>
+      <p role="status">Count: {n}</p>
+      <button onClick={() => setN(n + 1)}>+1</button>
+    </div>
+  );
+}
+
+describe('Counter', () => {
+  it('初期値0が表示される', () => {
+    render(<Counter />);
+    expect(screen.getByRole('status')).toHaveTextContent('Count: 0');
+  });
+
+  it('+1ボタンをクリックするとカウントが増える', async () => {
+    const user = userEvent.setup();
+    render(<Counter />);
+    const btn = screen.getByRole('button', { name: '+1' });
+    await user.click(btn);
+    await user.click(btn);
+    expect(screen.getByRole('status')).toHaveTextContent('Count: 2');
+  });
+});`
+  }, {
+    diff: 2,
+    q: "MSWを使ってAPIをモックし、非同期コンポーネントをテストしてください。\n・GET /api/user をモック（{ name: 'テストユーザー' }を返す）\n・ローディング → データ表示の遷移を waitFor で検証",
+    code: `// msw の http.get でハンドラを定義
+// setupServer で起動、beforeAll/afterAll で管理`,
+    answer: `// npm install msw が必要
+import { render, screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+
+// MSWサーバの設定
+const server = setupServer(
+  http.get('/api/user', () => {
+    return HttpResponse.json({ name: 'テストユーザー' });
+  })
+);
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+// テスト対象コンポーネント
+function UserProfile() {
+  const [user, setUser] = React.useState(null);
+  React.useEffect(() => {
+    fetch('/api/user').then(r => r.json()).then(setUser);
+  }, []);
+  if (!user) return <p>読み込み中...</p>;
+  return <p role="heading">{user.name}</p>;
+}
+
+describe('UserProfile', () => {
+  it('APIレスポンスを表示する', async () => {
+    render(<UserProfile />);
+    // 最初はローディング
+    expect(screen.getByText('読み込み中...')).toBeInTheDocument();
+    // データが表示されるまで待機
+    await waitFor(() => {
+      expect(screen.getByRole('heading')).toHaveTextContent('テストユーザー');
+    });
+  });
+
+  it('APIエラー時にハンドラを上書きできる', async () => {
+    server.use(
+      http.get('/api/user', () => HttpResponse.error())
+    );
+    render(<UserProfile />);
+    // エラーハンドリングの確認（実装に合わせてアサート）
+    await waitFor(() => {
+      expect(screen.queryByText('読み込み中...')).not.toBeInTheDocument();
+    });
+  });
+});`
+  }],
+  ch8: [{
+    diff: 1,
+    q: "Next.js の App Router で Server Component と Client Component を使い分けてください。\n・ページコンポーネント（サーバ）でデータをfetch\n・検索ボックス（クライアント）でuseStateを使用\n・'use client' の位置を正しく記述",
+    code: `// app/page.tsx (Server Component)
+// app/components/SearchBox.tsx (Client Component)
+// それぞれの役割と 'use client' の位置を示す`,
+    answer: `// app/components/SearchBox.tsx
+'use client'; // ← この宣言でClient Componentになる
+
+import { useState } from 'react';
+
+export function SearchBox({ onSearch }) {
+  const [query, setQuery] = useState('');
+  return (
+    <input
+      value={query}
+      onChange={e => { setQuery(e.target.value); onSearch(e.target.value); }}
+      placeholder="検索..."
+    />
+  );
+}
+
+// app/page.tsx（Server Component — 'use client'不要）
+// async/await が直接使える
+async function getUsers() {
+  const res = await fetch('https://jsonplaceholder.typicode.com/users', {
+    next: { revalidate: 60 }, // 60秒ごとに再検証（ISR）
+  });
+  return res.json();
+}
+
+export default async function Page() {
+  const users = await getUsers(); // サーバ側でデータ取得
+
+  return (
+    <main>
+      <h1>ユーザー一覧</h1>
+      {/* Client Component はServer Component内で使用可能 */}
+      {/* <SearchBox onSearch={...} /> */}
+      <ul>
+        {users.map(u => <li key={u.id}>{u.name}</li>)}
+      </ul>
+    </main>
+  );
+}
+// ※ このファイルにはuseState等を書けない（サーバ専用）`
+  }, {
+    diff: 2,
+    q: "Server Actions を使ってフォーム送信を実装してください。\n・サーバ側でバリデーションと保存を行う\n・'use server' ディレクティブを正しく付与\n・useFormState でサーバのレスポンスをUIに反映",
+    code: `// app/actions/createPost.ts に 'use server'
+// app/components/PostForm.tsx で useFormState を使用`,
+    answer: `// app/actions/createPost.ts
+'use server'; // ← サーバ専用コード（ブラウザに送られない）
+
+export async function createPost(prevState, formData) {
+  const title = formData.get('title');
+
+  // サーバ側バリデーション
+  if (!title || title.toString().length < 2) {
+    return { error: 'タイトルは2文字以上必要です', success: false };
+  }
+
+  // DBへの保存（例）
+  // await db.post.create({ data: { title: title.toString() } });
+  console.log('サーバで保存:', title);
+
+  return { error: null, success: true, title: title.toString() };
+}
+
+// app/components/PostForm.tsx
+'use client';
+import { useFormState, useFormStatus } from 'react-dom';
+import { createPost } from '../actions/createPost';
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" disabled={pending}>
+      {pending ? '送信中...' : '投稿する'}
+    </button>
+  );
+}
+
+export function PostForm() {
+  const [state, formAction] = useFormState(createPost, {
+    error: null, success: false
+  });
+
+  return (
+    <form action={formAction}>
+      <input name="title" placeholder="タイトル" />
+      {state.error && <p style={{color:'red'}}>{state.error}</p>}
+      {state.success && <p style={{color:'green'}}>投稿しました: {state.title}</p>}
+      <SubmitButton />
+    </form>
+  );
+}`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "useReducer・useCallback・useMemo",
+  est: "55分",
+  goal: "useState だけでは管理しにくい複雑な状態遷移を useReducer で整理できるようになること。useMemo と useCallback の使いどころを判断し、React DevTools の Profiler で効果を計測できる状態がゴール。「なんでもメモ化」ではなく、計測に基づいた適切な最適化を判断できること。",
+  sections: [{
+    title: "useReducer — 複雑な状態遷移の整理",
+    body: "useState は単純な値の管理に最適ですが、複数の状態が連動して変化する場合や、同じ更新ロジックが複数箇所に散らばる場合には限界を感じ始めます。useReducer はそういった複雑な状態遷移を「アクション」と「reducer 関数」に分離して整理するためのフックです。\n\nPython の関数型プログラミングになぞらえると、reducer は「現在の状態とイベントを受け取り、新しい状態を返す純粋関数」です。副作用がないため、単独でユニットテストが書けます。Redux を使ったことがあれば同じ概念ですが、useReducer はコンポーネントローカルな用途に使います。\n\n目安として、「同じ state に対して 3 種類以上の更新パターンがある」「複数の state が同時に変わる」場合は useReducer への移行を検討しましょう。",
+    table: T.reducerVsState,
+    afterTable: "ポイント: dispatch({ type: 'INCREMENT' }) という形でアクションを飛ばすことで、「何をしたか」が明示的になります。将来ログ収集やデバッグツール連携が必要になった際、この明示性が大きな助けになります。"
+  }, {
+    title: "useMemo と useCallback の判断基準",
+    body: "「とりあえず全部メモ化する」はアンチパターンです。React.memo・useMemo・useCallback にはいずれもメモ化のコスト（メモリ消費・依存配列の比較）がかかるため、再レンダリングのコストより大きい場合は逆効果になります。\n\n使うべき場面は「計測して遅いと確認できた計算」「React.memo した子コンポーネントに渡す関数・オブジェクト」の2つに絞るのが基本です。Python の @functools.lru_cache と同様、「重いとわかっているもの」にだけキャッシュを使います。\n\nまた、依存配列を意図的に省略する（eslint の exhaustive-deps 警告を無視する）と、古いクロージャを参照し続ける「stale closure」バグが発生します。依存配列は常に正直に書き、警告は必ず解消しましょう。",
+    table: T.memoGuide,
+    afterTable: "ポイント: React DevTools の Profiler タブで「Record why each component rendered」を有効にすると、どの props の変化が再レンダリングを引き起こしたか一目でわかります。最適化の前後で必ず計測してください。"
+  }, {
+    title: "useReducer + useCallback の組み合わせ",
+    body: "useReducer と useCallback を組み合わせるパターンは非常に強力です。dispatch 関数は React が保証する安定した参照を持つため、子コンポーネントに dispatch を直接渡せば useCallback でラップする必要がありません。\n\nつまり、「onDelete を useCallback でメモ化して子に渡す」代わりに「dispatch を直接子に渡す」設計にすると、コードがシンプルになります。子コンポーネントは dispatch({ type: 'DELETE', payload: id }) を呼ぶだけです。大規模なコンポーネントツリーでは、この設計が保守性を大きく向上させます。",
+    code: `// dispatch は安定した参照 → useCallback 不要
+function reducer(state, action) {
+  switch (action.type) {
+    case 'ADD':    return [...state, { id: Date.now(), text: action.payload, done: false }];
+    case 'DELETE': return state.filter(t => t.id !== action.payload);
+    case 'TOGGLE': return state.map(t =>
+      t.id === action.payload ? { ...t, done: !t.done } : t
+    );
+    default: return state;
+  }
+}
+
+function TodoItem({ todo, dispatch }) {
+  // dispatch は安定 → React.memo と相性◎
+  return (
+    <li>
+      <input type="checkbox" checked={todo.done}
+        onChange={() => dispatch({ type: 'TOGGLE', payload: todo.id })} />
+      {todo.text}
+      <button onClick={() => dispatch({ type: 'DELETE', payload: todo.id })}>削除</button>
+    </li>
+  );
+}
+
+function App() {
+  const [todos, dispatch] = React.useReducer(reducer, []);
+  return (
+    <ul>
+      {todos.map(t => <TodoItem key={t.id} todo={t} dispatch={dispatch} />)}
+    </ul>
+  );
+}`,
+    afterCode: "ポイント: React.useReducer が返す dispatch は参照安定（レンダリングをまたいで同一オブジェクト）です。これは React の仕様として保証されているため、useCallback でラップしなくても子の React.memo が正常に動作します。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "カスタムフックの設計",
+  est: "50分",
+  goal: "ロジックをカスタムフックに抽出し、コンポーネントを「UIだけ」に集中させる設計ができるようになること。useLocalStorage / useFetch / useDebounce の実装パターンを理解し、汎用フックを自分で設計・命名できる状態がゴール。フックの単体テスト（renderHook）についても把握していること。",
+  sections: [{
+    title: "カスタムフックの設計原則",
+    body: "カスタムフックは「use で始まる関数で、React フックを呼び出せる関数」です。コンポーネントのロジックを抽出してフックにすると、同じロジックを複数コンポーネントで再利用でき、ロジックだけを独立してテストできるようになります。\n\nPython でいえば、クラスのメソッドを独立した関数に切り出すリファクタリングに近い感覚です。ただし React のルール（トップレベルでのみ呼ぶ、条件分岐の中で呼ばない等）はフック内でも適用されます。\n\n設計のコツは「戻り値のシェイプを決めてから実装する」ことです。useState 風の [value, setValue] か、オブジェクト形式 { data, loading, error } かを先に決めると、実装が自然に決まります。",
+    table: T.customHookPatterns,
+    afterTable: "ポイント: カスタムフックのテストには @testing-library/react の renderHook を使います。コンポーネントを描画せずにフックだけをテストできるため、UIのテストと分離してロジックの正確性を検証できます。"
+  }, {
+    title: "useLocalStorage の実装",
+    body: "useLocalStorage は useState の拡張で、値が変わるたびに localStorage にも書き込むフックです。初期値の読み込みは useState の関数初期化形式（() => を渡す形）を使い、コストの高い localStorage の読み込みが初回レンダリング時にだけ実行されるようにします。\n\nエラーハンドリングが重要です。localStorage はプライベートブラウジングモードや容量制限超過で例外を投げることがあります。try-catch でラップし、失敗した場合は fallback の initialValue を使うように設計しましょう。",
+    code: `function useLocalStorage(key, initialValue) {
+  const [value, setValue] = React.useState(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item !== null ? JSON.parse(item) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+
+  const setStoredValue = React.useCallback((newValue) => {
+    setValue(newValue);
+    try {
+      window.localStorage.setItem(key, JSON.stringify(newValue));
+    } catch (e) {
+      console.error('localStorage write error:', e);
+    }
+  }, [key]);
+
+  return [value, setStoredValue];
+}`,
+    afterCode: "ポイント: key が変わった場合（例えば userId に応じてキーを変える設計）、useEffect で localStorage.getItem を再読み込みするロジックが必要になります。シンプルな実装から始めて、必要になったら拡張するアプローチが実践的です。"
+  }, {
+    title: "useDebounce の実装",
+    body: "デバウンスは「連続するイベントの最後の1回だけを処理する」テクニックです。検索ボックスへの入力でAPIを叩く場合、キーを押すたびにリクエストを送ると無駄なネットワーク通信が発生します。300ms 入力が止まってから初めてAPIを呼ぶのがデバウンスです。\n\nuseEffect のクリーンアップ関数を活用するのがポイントです。新しい値が来るたびに前の setTimeout をキャンセル（clearTimeout）し、新しいタイマーをセットします。このパターンは React でのデバウンス実装の定石です。",
+    code: `function useDebounce(value, delay = 300) {
+  const [debounced, setDebounced] = React.useState(value);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer); // 新しい値が来たらキャンセル
+  }, [value, delay]);
+
+  return debounced;
+}
+
+// 使い方: 検索フォーム
+function SearchBox({ onSearch }) {
+  const [query, setQuery] = React.useState('');
+  const debouncedQuery = useDebounce(query, 400);
+
+  React.useEffect(() => {
+    if (debouncedQuery) onSearch(debouncedQuery);
+  }, [debouncedQuery, onSearch]);
+
+  return (
+    <input
+      value={query}
+      onChange={e => setQuery(e.target.value)}
+      placeholder="検索（400ms後に実行）"
+    />
+  );
+}`,
+    afterCode: "ポイント: useDebounce はジェネリクスで任意の型に対応できます（TypeScript の場合: function useDebounce<T>(value: T, delay = 300): T）。文字列だけでなく、数値・オブジェクトのデバウンスにも使えます。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "コンテキストとグローバル状態",
+  est: "55分",
+  goal: "createContext / useContext を使ってコンポーネントツリーをまたいだ状態共有ができるようになること。Context の再レンダリング問題を理解し、useMemo による最適化・Context 分割の判断ができる状態がゴール。Zustand の基本的な使い方を把握し、Context との使い分けを説明できること。",
+  sections: [{
+    title: "createContext / useContext の基本",
+    body: "Context は「props のバケツリレーを使わずにデータを渡す仕組み」です。ログイン中のユーザー情報・テーマ設定・言語設定など、アプリ全体で参照するが頻繁に変わらないデータに適しています。\n\nPython の Flask の g オブジェクト（リクエストスコープの共有データ）に概念が近いですが、React の Context はコンポーネントツリーのスコープで動作します。createContext でコンテキストを作り、Provider で値を提供し、useContext で消費するという3ステップです。\n\nカスタムフックでラップするのがベストプラクティスです。useTheme() のような専用フックを作ることで、Context への直接依存がフック内に隠蔽され、Provider の変更やモックが容易になります。",
+    code: `const AuthContext = React.createContext(null);
+
+function AuthProvider({ children }) {
+  const [user, setUser] = React.useState(null);
+
+  const login = React.useCallback(async (email, password) => {
+    // API呼び出し（省略）
+    setUser({ id: 1, name: '太郎', email });
+  }, []);
+
+  const logout = React.useCallback(() => setUser(null), []);
+
+  // value を useMemo で安定化（再レンダリング防止）
+  const value = React.useMemo(
+    () => ({ user, login, logout }),
+    [user, login, logout]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+// カスタムフックでラップ
+function useAuth() {
+  const ctx = React.useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
+  return ctx;
+}`,
+    afterCode: "ポイント: useContext を直接コンポーネントに書くのではなく、useAuth のようなカスタムフックを一枚挟む設計が推奨されます。こうすることで、テスト時にモックを差し込みやすくなります。"
+  }, {
+    title: "Context の再レンダリング問題と対策",
+    body: "Context の最大の落とし穴は「値が変わると、その Context を useContext している全コンポーネントが再レンダリングされる」点です。ひとつの大きな Context にユーザー情報・テーマ・通知数をまとめると、通知数が変わるだけでユーザー情報を表示するコンポーネントも再レンダリングされます。\n\n対策は2つです。①Context を目的別に細かく分割する（AuthContext / ThemeContext / NotificationContext）。②Provider コンポーネント内で value を useMemo でラップし、参照の安定性を確保する。①が根本的な解決策で、②は補助的な最適化です。",
+    table: T.contextPitfalls,
+    afterTable: "ポイント: Context の再レンダリング問題が深刻になってきたら、Zustand への移行を検討してください。Zustand はセレクタを使って購読する値を絞り込めるため、関係ない変更での再レンダリングが発生しません。"
+  }, {
+    title: "Zustand で Context を置き換える",
+    body: "Zustand は「バンドルサイズ約1KB・ボイラープレートほぼゼロ」のグローバル状態管理ライブラリです。Context と比べて優れている点は、セレクタによる細粒度の購読と、Provider コンポーネントが不要な点です。\n\ncreate 関数でストアを定義し、コンポーネントからカスタムフックとして呼び出すだけで使えます。Redux のような action type / reducer の分離は必要なく、setState に相当する set 関数を直接呼びます。小〜中規模のアプリで Context + useState の代替として最も導入コストが低い選択肢です。",
+    code: `// npm install zustand
+import { create } from 'zustand';
+
+const useAuthStore = create((set) => ({
+  user: null,
+  login: (userData) => set({ user: userData }),
+  logout: () => set({ user: null }),
+}));
+
+// コンポーネントでの使用（Provider 不要！）
+function Header() {
+  // セレクタで必要な値だけ購読 → user が変わった時だけ再レンダリング
+  const user = useAuthStore(s => s.user);
+  const logout = useAuthStore(s => s.logout);
+
+  return (
+    <header>
+      {user ? (
+        <><span>{user.name}</span><button onClick={logout}>ログアウト</button></>
+      ) : (
+        <span>未ログイン</span>
+      )}
+    </header>
+  );
+}`,
+    afterCode: "ポイント: useAuthStore(s => s.user) のようにセレクタを使うと、user が変わった時だけ再レンダリングされます。useAuthStore() と全体を取得するとストアのどの値が変わっても再レンダリングされるので注意。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "コンポーネント設計パターン",
+  est: "50分",
+  goal: "Compound Components / Render Props / HOC / Headless UI の4パターンを理解し、それぞれ適切な場面で使い分けられるようになること。特に Compound Components は実務で頻出するため、Context を使った実装を自力で書けることがゴール。",
+  sections: [{
+    title: "Compound Components パターン",
+    body: "Compound Components は「親コンポーネントと子コンポーネントが暗黙に状態を共有する」パターンです。<select> と <option> の関係がわかりやすい例で、select が選択状態を管理し、option はそれを知って自分がアクティブかどうかを判断します。\n\nReact での実装は Context を使います。親が Context で状態を提供し、子は Context を購読して自分の見た目を決定します。利用者は内部の Context を意識せず、宣言的な JSX を書くだけで複雑なUIが動作します。Radix UI や Headless UI などのUIライブラリもこのパターンを多用しています。\n\nPython の「プロトコル」に近い設計思想です。特定のインターフェースを満たすコンポーネントを組み合わせることで、柔軟なUIを構成できます。",
+    table: T.compoundPattern,
+    afterTable: "ポイント: Compound Components パターンを採用すると、利用者側は内部実装を知らなくても直感的に使えます。コンポーネントライブラリを設計する際の基本パターンとして覚えておきましょう。"
+  }, {
+    title: "HOC と Render Props",
+    body: "HOC（Higher-Order Component）は「コンポーネントを受け取りコンポーネントを返す関数」です。Python のデコレータ（@login_required など）に非常に近い概念で、認証チェック・ローディング表示・ログ収集など横断的関心事を注入するのに使われていました。\n\nRender Props は「JSXを返す関数をpropsで渡す」パターンで、ロジックを共有しながらUIの描画を外部に委ねられます。ただし、HOC も Render Props も Hooks の登場以降は多くの場面でカスタムフックに置き換えられています。既存コードを読む際に理解できれば十分で、新規に書く場合はカスタムフックを検討しましょう。",
+    code: `// HOC の例: 認証ガード
+function withAuth(WrappedComponent) {
+  return function AuthGuard(props) {
+    const { user } = useAuth(); // 認証情報を取得
+    if (!user) return <p>ログインが必要です</p>;
+    return <WrappedComponent {...props} user={user} />;
+  };
+}
+
+// 使い方
+const ProtectedPage = withAuth(function DashboardPage({ user }) {
+  return <h1>ようこそ、{user.name}さん</h1>;
+});
+
+// Render Props の例: マウス位置追跡
+function MouseTracker({ children }) {
+  const [pos, setPos] = React.useState({ x: 0, y: 0 });
+  return (
+    <div onMouseMove={e => setPos({ x: e.clientX, y: e.clientY })}>
+      {children(pos)} {/* 関数として呼び出す */}
+    </div>
+  );
+}
+
+// 使い方: UIは呼び出し側が決める
+function App() {
+  return (
+    <MouseTracker>
+      {({ x, y }) => <p>マウス位置: {x}, {y}</p>}
+    </MouseTracker>
+  );
+}`,
+    afterCode: "ポイント: HOC の代替は「withXxx → useXxx」、Render Props の代替は「children関数 → カスタムフック」で書き換えられる場合がほとんどです。コードレビューやリファクタリングで遭遇した際にパターンを認識できるようにしておきましょう。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "React Query（TanStack Query）",
+  est: "55分",
+  goal: "TanStack Query の useQuery / useMutation を使ってデータフェッチとキャッシュ管理ができるようになること。楽観的更新パターンを実装し、手動の useEffect + useState によるデータ管理よりも堅牢なデータ層を構築できる状態がゴール。staleTime / gcTime / invalidateQueries を理解していること。",
+  sections: [{
+    title: "React Query の解決する問題",
+    body: "useEffect + useState による手動フェッチには多くの落とし穴があります。ローディング・エラー・データの3状態管理、コンポーネントのアンマウント後の setState、同じデータを複数コンポーネントが重複フェッチ、キャッシュの無効化タイミングの管理……これらを全て手で実装すると、データ取得コードが肥大化します。\n\nTanStack Query はこれらを自動で解決します。同じクエリキーへのリクエストは自動でキャッシュ・重複排除され、ウィンドウフォーカス時の自動再フェッチ、バックグラウンドでの更新なども設定ひとつで動きます。Python の requests-cache や Django のキャッシュフレームワークに相当するような、「フェッチに関するベストプラクティスを内包したライブラリ」です。",
+    table: T.reactQueryKeys,
+    afterTable: "ポイント: staleTime のデフォルトは 0 です。つまりコンポーネントがマウントされるたびに再フェッチします。ユーザー情報など変化が少ないデータには staleTime: 1000 * 60 * 5（5分）のような値を設定すると、無駄なリクエストを大幅に削減できます。"
+  }, {
+    title: "useQuery の基本と設定",
+    body: "useQuery は最もよく使うフックです。queryKey（キャッシュのキー）と queryFn（データを返す async 関数）を渡すと、isLoading・data・error・refetch などを返します。queryFn は純粋な async 関数として書け、fetch でも axios でも Prisma でも何でも使えます。\n\nQueryClient の設定はアプリ全体で共通のデフォルト値を定義できます。全クエリのデフォルト staleTime を設定したり、エラー時のリトライ回数を制御したりできます。React.StrictMode との組み合わせでは開発時に useEffect が2回実行されますが、TanStack Query は重複リクエストを自動で排除するため問題ありません。",
+    code: `// npm install @tanstack/react-query
+
+// main.tsx でのセットアップ
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60,     // 1分間はキャッシュを再利用
+      retry: 2,                  // エラー時2回まで自動リトライ
+      refetchOnWindowFocus: true, // ウィンドウフォーカスで再フェッチ
+    },
+  },
+});
+
+// フェッチ関数（純粋な async 関数として分離）
+const fetchUser = async (id) => {
+  const res = await fetch(\`/api/users/\${id}\`);
+  if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+  return res.json();
+};
+
+// コンポーネントでの使用
+function UserProfile({ userId }) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['user', userId], // userId が変わると自動で再フェッチ
+    queryFn: () => fetchUser(userId),
+    enabled: !!userId,          // userId がある場合だけ実行
+  });
+
+  if (isLoading) return <p>読み込み中...</p>;
+  if (error) return <button onClick={refetch}>再読み込み</button>;
+  return <p>{data.name}</p>;
+}`,
+    afterCode: "ポイント: queryKey は配列で指定します。['user', userId] とすることで userId が変わると別のキャッシュエントリとして管理されます。['users'] は一覧、['user', 1] はID=1のユーザー、という階層的なキー設計が推奨されます。"
+  }, {
+    title: "useMutation と楽観的更新",
+    body: "useMutation はデータの作成・更新・削除に使います。useQuery と異なり、自動では実行されず、mutation.mutate() を明示的に呼んだ時だけ実行されます。onSuccess・onError・onSettled のコールバックで結果に応じた処理を書けます。\n\n楽観的更新は「APIレスポンスを待たずにUIを先に更新する」技術です。ユーザーが削除ボタンを押した瞬間にリストから消え、もしAPIが失敗したら元に戻す。この UX が現代のアプリでは標準的になっています。onMutate でキャッシュを先に書き換え、onError でロールバック、onSettled で再フェッチ、という3段階のパターンを覚えましょう。",
+    code: `function deleteTodo(id) {
+  return fetch(\`/api/todos/\${id}\`, { method: 'DELETE' });
+}
+
+function TodoList() {
+  const queryClient = useQueryClient();
+  const { data: todos } = useQuery({ queryKey: ['todos'], queryFn: fetchTodos });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteTodo,
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['todos'] });
+      const previous = queryClient.getQueryData(['todos']);
+      // 即時UIから削除（楽観的更新）
+      queryClient.setQueryData(['todos'], old => old.filter(t => t.id !== id));
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      // 失敗したら元に戻す
+      queryClient.setQueryData(['todos'], context.previous);
+    },
+    onSettled: () => {
+      // 成功・失敗どちらでもサーバと同期
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+    },
+  });
+
+  return (
+    <ul>
+      {todos?.map(t => (
+        <li key={t.id}>
+          {t.text}
+          <button onClick={() => deleteMutation.mutate(t.id)}>削除</button>
+        </li>
+      ))}
+    </ul>
+  );
+}`,
+    afterCode: "ポイント: invalidateQueries はキャッシュを「古い（stale）」としてマークし、次のアクセス時に再フェッチを促します。DELETE に成功した後は必ず invalidateQueries を呼び、サーバとの整合性を担保する習慣をつけましょう。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "フォームとバリデーション",
+  est: "50分",
+  goal: "React Hook Form + Zod を組み合わせて型安全なフォームを実装できるようになること。controlled/uncontrolled コンポーネントの違いを理解し、useFieldArray で動的フィールドを扱えること。バリデーションエラーのUX設計についても判断できる状態がゴール。",
+  sections: [{
+    title: "controlled vs uncontrolled コンポーネント",
+    body: "React のフォーム入力には2種類あります。controlled（制御）コンポーネントは value と onChange を React の state で管理します。uncontrolled（非制御）コンポーネントはDOMにデータを持たせ、必要な時だけ ref で読み出します。\n\ncontrolled は入力のたびに再レンダリングされるため、大きなフォームでパフォーマンス問題が起きることがあります。React Hook Form はデフォルトで uncontrolled を採用し、バリデーションに必要な時だけ state を更新することで再レンダリングを最小化します。100フィールドのフォームでも快適に動く理由がこれです。\n\nPython の Flask-WTF / Django Forms がサーバサイドでフォームのバリデーションを担うのと同様、React Hook Form + Zod はクライアントサイドでそれを担います。スキーマ駆動のバリデーションは宣言的で、テストも書きやすくなります。",
+    table: T.rhfZodIntegration,
+    afterTable: "ポイント: Zod の z.infer<typeof schema> でスキーマから TypeScript の型を自動生成できます。フォームの型定義とバリデーションルールが1箇所にまとまり、型の二重管理が不要になります。"
+  }, {
+    title: "React Hook Form + Zod の実装",
+    body: "React Hook Form と Zod の接続には @hookform/resolvers パッケージの zodResolver を使います。useForm に resolver を渡すだけで、Zod スキーマがそのままバリデーションルールとして機能します。エラーメッセージも Zod で定義したメッセージがそのまま formState.errors に反映されます。\n\nregister 関数の戻り値をスプレッド構文で input に展開するのが基本パターンです。{...register('email')} とすることで name・onChange・onBlur・ref が自動で設定されます。TypeScript を使っている場合、register に渡せるフィールド名はスキーマの型から自動で絞り込まれます。",
+    code: `// npm install react-hook-form zod @hookform/resolvers
+// （概念コードのため import は省略）
+
+const loginSchema = z.object({
+  email: z.string().email('有効なメールアドレスを入力してください'),
+  password: z.string().min(8, 'パスワードは8文字以上です'),
+  rememberMe: z.boolean().optional(),
+});
+
+// type LoginForm = z.infer<typeof loginSchema>;
+
+function LoginForm({ onLogin }) {
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting, isDirty }
+  } = useForm({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '', rememberMe: false }
+  });
+
+  const onSubmit = async (data) => {
+    try {
+      await onLogin(data);
+    } catch (e) {
+      // サーバエラーをフィールドに反映
+      setError('email', { message: 'メールアドレスまたはパスワードが正しくありません' });
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register('email')} type="email" placeholder="メール" />
+      {errors.email && <p>{errors.email.message}</p>}
+
+      <input {...register('password')} type="password" placeholder="パスワード" />
+      {errors.password && <p>{errors.password.message}</p>}
+
+      <label>
+        <input {...register('rememberMe')} type="checkbox" />
+        ログイン状態を保持
+      </label>
+
+      <button type="submit" disabled={isSubmitting || !isDirty}>
+        {isSubmitting ? 'ログイン中...' : 'ログイン'}
+      </button>
+    </form>
+  );
+}`,
+    afterCode: "ポイント: setError を使うとサーバから返ってきたエラー（メール重複など）をフォームフィールドに紐づけて表示できます。クライアントバリデーションとサーババリデーションを統一的なUIで扱えるのが React Hook Form の強みです。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "テスト",
+  est: "55分",
+  goal: "React Testing Library + Vitest でコンポーネントテストが書けるようになること。userEvent で実際のユーザー操作を模倣し、waitFor で非同期の状態変化を検証できること。MSW でAPIをモックして統合テストを書けること。「何をテストすべきか」の判断基準を持てる状態がゴール。",
+  sections: [{
+    title: "Testing Library の設計思想",
+    body: "Testing Library の核心は「ユーザーが実際に操作するものをテストする」という哲学です。コンポーネントの内部実装（state の値、関数の呼び出し回数）ではなく、「画面に何が表示されているか」「ボタンを押したら何が変わるか」という振る舞いをテストします。\n\nクエリの優先順位が明確に定められており、getByRole（ARIA ロール）が最優先です。これはスクリーンリーダーがアクセスするのと同じ方法で要素を取得するため、テストを書くことがアクセシビリティの改善に直結します。getByTestId（data-testid）は最終手段で、他の方法で取得できない場合のみ使います。\n\nPython の pytest と比較すると、describe は test class、it は test function に対応します。beforeEach / afterEach は pytest の setup/teardown に相当します。",
+    code: `// セットアップ
+// npm install -D vitest @testing-library/react
+//   @testing-library/jest-dom @testing-library/user-event jsdom
+
+// vite.config.ts
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+  },
+});
+
+// src/test/setup.ts
+import '@testing-library/jest-dom'; // toBeInTheDocument 等を追加
+
+// 基本的なテストパターン
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+describe('Button', () => {
+  it('クリックハンドラが呼ばれる', async () => {
+    const onClick = vi.fn();
+    const user = userEvent.setup();
+
+    render(<button onClick={onClick}>送信</button>);
+    await user.click(screen.getByRole('button', { name: '送信' }));
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+});`,
+    afterCode: "ポイント: userEvent.setup() を使うことで、実際のブラウザ操作（キーボードイベントの発火順序・フォーカス移動・ペースト操作）を正確にシミュレートできます。fireEvent より高精度で、フォームのテストに特に効果的です。"
+  }, {
+    title: "非同期テストと MSW",
+    body: "APIを呼ぶコンポーネントのテストでは、実際のAPIを叩かずにモックで代替します。vi.fn() で fetch をモックする方法は手軽ですが、MSW（Mock Service Worker）を使うとネットワークレベルでリクエストをインターセプトでき、本番と同じ fetch コードがそのままテストで動きます。\n\nwaitFor は非同期で変化する UI 要素を検証するユーティリティです。APIレスポンスが返ってきてstateが更新され画面に反映されるまでの間、内部でリトライし続けます。findBy クエリ（findByText など）は waitFor + getBy の組み合わせのショートカットです。タイムアウトのデフォルトは1000msですが、遅いAPIのテストでは timeout オプションで延ばせます。",
+    code: `import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import { render, screen, waitFor } from '@testing-library/react';
+
+const server = setupServer(
+  http.get('/api/todos', () => {
+    return HttpResponse.json([
+      { id: 1, title: 'テストTodo', completed: false }
+    ]);
+  }),
+  http.post('/api/todos', async ({ request }) => {
+    const body = await request.json();
+    return HttpResponse.json({ id: 2, ...body }, { status: 201 });
+  })
+);
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEach(() => server.resetHandlers()); // テスト間でハンドラをリセット
+afterAll(() => server.close());
+
+describe('TodoList（APIあり）', () => {
+  it('取得したTodoを表示する', async () => {
+    render(<TodoList />);
+    // 非同期でデータが表示されるまで待機
+    await waitFor(() => {
+      expect(screen.getByText('テストTodo')).toBeInTheDocument();
+    });
+  });
+
+  it('404エラー時にエラーメッセージを表示', async () => {
+    server.use(
+      http.get('/api/todos', () => HttpResponse.json(null, { status: 404 }))
+    );
+    render(<TodoList />);
+    expect(await screen.findByText(/エラー/)).toBeInTheDocument();
+  });
+});`,
+    afterCode: "ポイント: server.resetHandlers() を afterEach に入れることで、テスト内で上書きしたハンドラが次のテストに影響しません。onUnhandledRequest: 'error' を設定すると、モックしていないリクエストを即座に検知できます。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "Server Components（Next.js入門）",
+  est: "55分",
+  goal: "Next.js App Router における Server Component と Client Component の違いを理解し、'use client' の境界を適切に設計できるようになること。Server Actions でフォーム送信をサーバ側で処理でき、RSC によるデータフェッチのメリット（バンドルサイズ削減・ウォーターフォール排除）を説明できる状態がゴール。",
+  sections: [{
+    title: "Server Component とは何か",
+    body: "React Server Components（RSC）は React 19 で正式化された、サーバ側でのみ実行されるコンポーネントです。Next.js App Router では、app/ ディレクトリ内のコンポーネントはデフォルトで Server Component になります。\n\n最大の利点は「コンポーネントから直接データベースや API を async/await で呼べる」ことです。これまで useEffect + fetch で行っていたデータ取得を、async function Page() { const data = await fetch(...); } と書けます。Python の Django ビューに近い感覚で、サーバサイドのデータ取得とHTMLの生成をReactコンポーネントで書くイメージです。\n\nもう一つの利点はバンドルサイズです。Server Component で import したモジュールは JS バンドルに含まれないため、大きなライブラリ（markdown パーサー、日付ライブラリ等）をブラウザに送らずに済みます。",
+    table: T.rscVsClient,
+    afterTable: "ポイント: Server Component は useState・useEffect・ブラウザ専用 API（window, document）を使えません。これらが必要なコンポーネントだけ 'use client' を付けてClient Componentにします。できるだけ末端の葉コンポーネントに 'use client' を移動させるのがパフォーマンス上の推奨です。"
+  }, {
+    title: "'use client' の境界設計",
+    body: "'use client' はファイルの先頭に書くディレクティブで、そのファイルと依存する全てのモジュールをクライアントバンドルに含めます。つまり 'use client' を書いたコンポーネントの子コンポーネントは、明示的に分離しない限り全てClient Componentになります。\n\n設計の原則は「インタラクティブなUIだけをClient Componentにし、データ表示はServer Componentに残す」です。例えばページ全体をClient Componentにするのではなく、検索ボックスだけを切り出してClient Componentにし、検索結果表示はServer Componentとして残す、という粒度が理想的です。\n\n'use client' ファイルに props として渡せるのはシリアライズ可能な値（文字列・数値・配列・プレーンオブジェクト）のみです。関数やクラスインスタンスはそのまま渡せません（Server Actions は例外）。",
+    code: `// ❌ ページ全体をClient Componentにするのは避ける
+'use client'; // ← ここに書くとページ全体がクライアントに
+import { useState } from 'react';
+
+export default function Page() {
+  const [query, setQuery] = useState('');
+  // データフェッチも全部クライアントに...
+}
+
+// ✅ インタラクティブな部分だけを分離する
+
+// app/components/SearchBox.tsx
+'use client';
+import { useState } from 'react';
+
+export function SearchBox({ onSearch }) {
+  const [q, setQ] = useState('');
+  return (
+    <input
+      value={q}
+      onChange={e => { setQ(e.target.value); onSearch(e.target.value); }}
+    />
+  );
+}
+
+// app/page.tsx（Server Component）
+import { SearchBox } from './components/SearchBox';
+
+async function searchPosts(query) {
+  return fetch(\`/api/posts?q=\${query}\`).then(r => r.json());
+}
+
+export default async function Page({ searchParams }) {
+  const q = searchParams?.q ?? '';
+  const posts = await searchPosts(q); // サーバで直接フェッチ
+
+  return (
+    <div>
+      <SearchBox onSearch={/* URLパラメータ更新ロジック */() => {}} />
+      <ul>{posts.map(p => <li key={p.id}>{p.title}</li>)}</ul>
+    </div>
+  );
+}`,
+    afterCode: "ポイント: Next.js の App Router では searchParams を使ったURL駆動のフィルタリングがServer Componentと相性抜群です。検索ボックスでURLを更新→ページ全体がサーバで再レンダリング、というパターンはシンプルかつ強力です。"
+  }, {
+    title: "Server Actions",
+    body: "Server Actions は 'use server' ディレクティブを付けた関数で、クライアントから呼び出せるサーバサイドの処理です。フォーム送信・ミューテーション処理をクライアントの JavaScript なしでサーバに委譲できます。\n\nフォームの action 属性に Server Action を直接渡せるのが最大の特徴です。JavaScript が読み込まれていない段階でもフォームが動作し（Progressive Enhancement）、JS 有効時は useFormState / useFormStatus でリッチなUXを追加できます。\n\nセキュリティの観点では、Server Actions は認証・認可のチェックをサーバ側で確実に実行できます。クライアントのバリデーションを通過しても、サーバ側で再バリデーションするのが鉄則です。Python の Django ビュー関数が常にサーバサイドで実行されるのと同様の安全性が確保されます。",
+    code: `// app/actions/posts.ts
+'use server'; // このファイルはサーバ専用
+
+import { revalidatePath } from 'next/cache';
+
+export async function createPost(prevState, formData) {
+  const title = formData.get('title')?.toString().trim();
+
+  // サーバサイドバリデーション（必須）
+  if (!title || title.length < 2) {
+    return { error: 'タイトルは2文字以上入力してください', post: null };
+  }
+
+  // DBへの保存（例: Prismaの場合）
+  // const post = await prisma.post.create({ data: { title } });
+
+  // キャッシュを無効化して一覧を再フェッチ
+  revalidatePath('/posts');
+
+  return { error: null, post: { id: Date.now(), title } };
+}
+
+// app/components/PostForm.tsx
+'use client';
+import { useFormState, useFormStatus } from 'react-dom';
+import { createPost } from '../actions/posts';
+
+function SubmitBtn() {
+  const { pending } = useFormStatus();
+  return <button type="submit" disabled={pending}>{pending ? '投稿中...' : '投稿'}</button>;
+}
+
+export function PostForm() {
+  const [state, action] = useFormState(createPost, { error: null, post: null });
+  return (
+    <form action={action}>
+      <input name="title" placeholder="タイトル" required />
+      {state.error && <p style={{color:'red'}}>{state.error}</p>}
+      {state.post && <p style={{color:'green'}}>投稿完了: {state.post.title}</p>}
+      <SubmitBtn />
+    </form>
+  );
+}`,
+    afterCode: "コース完了: useReducer によるパフォーマンス最適化・カスタムフック設計・Context とグローバル状態・コンポーネントパターン・React Query・フォームバリデーション・テスト・Server Components まで、実務で必要な React の中級スキルを一通り習得しました。次のステップとして Next.js の深掘り・TypeScript 上級・パフォーマンスチューニングへ進みましょう。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({ data }) {
+  return React.createElement("div", {
+    style: { overflowX: "auto", margin: "12px 0", borderRadius: 10, border: "1px solid #d1d5db", background: "#fff" }
+  }, React.createElement("table", {
+    style: { width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }
+  }, React.createElement("thead", null, React.createElement("tr", null, data.h.map((h, i) => React.createElement("th", {
+    key: i,
+    style: { background: "linear-gradient(180deg,#eef2ff,#e0e7ff)", color: "#312e81", fontWeight: 800, fontSize: 12.5, padding: "10px 14px", textAlign: "left", borderBottom: "2px solid #a5b4fc", borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none" }
+  }, h)))), React.createElement("tbody", null, data.r.map((row, ri) => React.createElement("tr", { key: ri }, row.map((cell, ci) => React.createElement("td", {
+    key: ci,
+    style: { padding: "9px 14px", borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none", borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none", color: ci === 0 ? "#1e1b4b" : "#374151", fontWeight: ci === 0 ? 700 : 400, fontSize: 13, lineHeight: 1.65, verticalAlign: "top", whiteSpace: "pre-line", background: ri % 2 === 0 ? "#fff" : "#f9fafb" }
+  }, cell)))))), data.cap && React.createElement("div", {
+    style: { padding: "8px 14px", fontSize: 12, color: "#6b7280", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }
+  }, data.cap));
+}
+
+function Code({ code, hl }) {
+  return React.createElement("pre", {
+    style: { background: hl ? "#1a1a2e" : "#0d0d1a", color: "#d0d0f0", padding: "14px 16px", borderRadius: 10, fontSize: 12, lineHeight: 1.65, overflowX: "auto", margin: "8px 0 0", fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace", border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)", whiteSpace: "pre-wrap", wordBreak: "break-word" }
+  }, React.createElement("code", null, code));
+}
+
+const diffLabel = d => d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+
+function Exercise({ ex, idx }) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: { borderRadius: 12, border: "2px solid #f59e0b", overflow: "hidden", background: "#fff", marginBottom: 8 }
+  }, React.createElement("div", {
+    style: { padding: "12px 16px", background: "linear-gradient(135deg,#fffbeb,#fef3c7)" }
+  }, React.createElement("div", {
+    style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }
+  }, React.createElement("span", {
+    style: { background: "#f59e0b", color: "#fff", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 6 }
+  }, "\u554F", idx + 1), React.createElement("span", {
+    style: { fontSize: 12, fontWeight: 700, color: diffColor(ex.diff) }
+  }, diffLabel(ex.diff))), React.createElement("p", {
+    style: { margin: 0, fontSize: 13.5, lineHeight: 1.8, color: "#92400e", whiteSpace: "pre-line" }
+  }, ex.q)), React.createElement("div", {
+    style: { padding: "0 16px 12px" }
+  }, React.createElement(Code, { code: ex.code, hl: true })), React.createElement("div", {
+    style: { borderTop: "1px dashed #fcd34d", padding: "10px 16px" }
+  }, React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: { background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", width: "100%" }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && React.createElement("div", {
+    style: { marginTop: 10 }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), React.createElement(Code, { code: ex.answer }))));
+}
+
+function Section({ section, idx, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: { borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", background: "#fff" }
+  }, React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: { width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", border: "none", background: "#fafafa", cursor: "pointer", textAlign: "left", fontSize: 14, fontWeight: 700, color: "#1e1b4b" }
+  }, React.createElement("span", {
+    style: { flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: "#6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }
+  }, idx + 1), React.createElement("span", { style: { flex: 1 } }, section.title), React.createElement("span", {
+    style: { fontSize: 18, color: "#9ca3af", transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0)" }
+  }, "\u203A")), open && React.createElement("div", {
+    style: { padding: "12px 16px 16px" }
+  }, section.body && React.createElement("p", {
+    style: { margin: "0 0 8px", fontSize: 13.5, lineHeight: 1.85, color: "#374151", whiteSpace: "pre-line" }
+  }, section.body), section.table && React.createElement(DataTable, { data: section.table }), section.afterTable && React.createElement("p", {
+    style: { margin: "8px 0", fontSize: 13.5, lineHeight: 1.85, color: "#374151", whiteSpace: "pre-line" }
+  }, section.afterTable), section.code && React.createElement(Code, { code: section.code }), section.afterCode && React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 13, lineHeight: 1.8, color: "#555", whiteSpace: "pre-line", background: "#f9fafb", padding: "10px 14px", borderRadius: 8, border: "1px solid #e5e7eb" }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function ReactIntermediateCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+
+  return React.createElement("div", {
+    style: { minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif" }
+  }, React.createElement("div", {
+    style: { maxWidth: 1100, margin: "0 auto", padding: "20px 14px" }
+  },
+  /* Hero */
+  React.createElement("div", {
+    style: { background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)", borderRadius: 16, padding: "24px 20px", marginBottom: 16, position: "relative", overflow: "hidden" }
+  }, React.createElement("div", {
+    style: { position: "absolute", top: -30, right: -10, fontSize: 140, opacity: 0.05 }
+  }, "\u269B\uFE0F"),
+  React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"),
+  React.createElement("h1", {
+    style: { margin: 0, fontSize: 22, fontWeight: 900, color: "#fff" }
+  }, "React \u4E2D\u7D1A\u30B3\u30FC\u30B9"),
+  React.createElement("p", {
+    style: { margin: "6px 0 0", fontSize: 12.5, color: "#c4b5fd" }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50"),
+  React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "React \u521D\u7D1A\u3092\u4FEE\u4E86\u3057\u305F\u65B9\u306E\u6B21\u306E\u30B9\u30C6\u30C3\u30D7\u3002useReducer \u30FB\u30AB\u30B9\u30BF\u30E0\u30D5\u30C3\u30AF\u8A2D\u8A08\u30FBContext\u6700\u9069\u5316\u30FB\u30B3\u30F3\u30DD\u30FC\u30CD\u30F3\u30C8\u30D1\u30BF\u30FC\u30F3\u30FBReact Query\u30FB\u30D5\u30A9\u30FC\u30E0\u30D0\u30EA\u30C7\u30FC\u30B7\u30E7\u30F3\u30FB\u30C6\u30B9\u30C8\u30FBServer Components\u307E\u3067\u3001\u5B9F\u52D9\u3067\u6226\u3048\u308B\u4E2D\u7D1A\u30B9\u30AD\u30EB\u3092\u4E00\u901A\u308A\u7FD2\u5F97\u3057\u307E\u3059\u3002"),
+  React.createElement("div", {
+    style: { marginTop: 14, display: "flex", gap: 3 }
+  }, chapters.map((_, i) => React.createElement("div", {
+    key: i,
+    onClick: () => { setCh(i); setMenuOpen(false); },
+    style: { flex: 1, height: 5, borderRadius: 3, background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)", cursor: "pointer" }
+  })))),
+
+  /* Chapter menu */
+  React.createElement("div", { style: { marginBottom: 14 } },
+    React.createElement("button", {
+      onClick: () => setMenuOpen(!menuOpen),
+      style: { width: "100%", padding: "10px 16px", border: "1px solid #d1d5db", borderRadius: 10, background: "#fff", fontSize: 14, fontWeight: 700, color: "#1e1b4b", cursor: "pointer", display: "flex", justifyContent: "space-between" }
+    }, React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), React.createElement("span", { style: { fontSize: 12, color: "#9ca3af" } }, menuOpen ? "\u25B2" : "\u25BC")),
+    menuOpen && React.createElement("div", {
+      style: { marginTop: 4, border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#fff", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }
+    }, chapters.map((c, i) => React.createElement("button", {
+      key: c.id,
+      onClick: () => { setCh(i); setMenuOpen(false); },
+      style: { width: "100%", padding: "10px 16px", border: "none", borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none", background: i === ch ? "#eef2ff" : "#fff", fontSize: 13, fontWeight: i === ch ? 700 : 500, color: i === ch ? "#4338ca" : "#374151", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }
+    }, React.createElement("span", {
+      style: { width: 22, height: 22, borderRadius: "50%", background: i === ch ? "#6366f1" : "#e5e7eb", color: i === ch ? "#fff" : "#6b7280", fontWeight: 800, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+    }, c.num), React.createElement("span", { style: { flex: 1 } }, c.title), EX[c.id] && React.createElement("span", {
+      style: { fontSize: 11, color: "#f59e0b", fontWeight: 700 }
+    }, EX[c.id].length, "\u554F"))))),
+
+  /* Chapter header */
+  React.createElement("div", {
+    style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }
+  }, React.createElement("span", {
+    style: { width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontWeight: 900, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }
+  }, chapter.num), React.createElement("div", null,
+    React.createElement("div", { style: { fontWeight: 800, fontSize: 18, color: "#1e1b4b" } }, chapter.title),
+    React.createElement("div", { style: { fontSize: 12, color: "#6b7280" } }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? " \u30FB \u6F14\u7FD2" + exercises.length + "\u554F" : "")
+  )),
+
+  /* Goal block */
+  chapter.goal && React.createElement("div", {
+    style: { background: "linear-gradient(135deg,#eef2ff,#f5f3ff)", border: "1px solid #c7d2fe", borderLeft: "4px solid #6366f1", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"), React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)),
+
+  /* Sections */
+  React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+    chapter.sections.map((sec, i) => React.createElement(Section, {
+      key: ch + "-" + i,
+      section: sec,
+      idx: i,
+      defaultOpen: false
+    }))
+  ),
+
+  /* Exercises */
+  exercises.length > 0 && React.createElement("div", { style: { marginTop: 20 } },
+    React.createElement("div", {
+      style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }
+    }, React.createElement("span", {
+      style: { background: "#f59e0b", color: "#fff", fontWeight: 800, fontSize: 13, padding: "4px 14px", borderRadius: 8 }
+    }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), React.createElement("span", {
+      style: { fontSize: 13, color: "#92400e" }
+    }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")),
+    exercises.map((ex, i) => React.createElement(Exercise, { key: ch + "-" + i, ex, idx: i }))
+  ),
+
+  /* Navigation */
+  React.createElement("div", {
+    style: { display: "flex", justifyContent: "space-between", marginTop: 20, gap: 10 }
+  },
+    ch > 0 ? React.createElement("button", {
+      onClick: () => { setCh(ch - 1); window.scrollTo(0, 0); },
+      style: { flex: 1, padding: "12px 16px", border: "1px solid #d1d5db", borderRadius: 10, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#6b7280" }
+    }, "\u2190 Ch.", chapters[ch - 1].num) : React.createElement("div", { style: { flex: 1 } }),
+    ch < chapters.length - 1 ? React.createElement("button", {
+      onClick: () => { setCh(ch + 1); window.scrollTo(0, 0); },
+      style: { flex: 1, padding: "12px 16px", border: "none", borderRadius: 10, background: "linear-gradient(135deg,#6366f1,#8b5cf6)", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#fff" }
+    }, "Ch.", chapters[ch + 1].num, " \u2192") : React.createElement("a", {
+      href: "../index.html",
+      style: { flex: 1, padding: "12px 16px", borderRadius: 10, background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", fontWeight: 700, fontSize: 13, textAlign: "center", textDecoration: "none" }
+    }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")
+  ),
+
+  /* Footer */
+  React.createElement("p", {
+    style: { textAlign: "center", fontSize: 11, color: "#9ca3af", marginTop: 20 }
+  }, "react.dev \u30FB React 19 / Next.js 15 \u6642\u70B9")
+  ));
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(ReactIntermediateCourse));
+  </script>
+</body>
+</html>
