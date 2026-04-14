@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Java 中級コース — Python開発者向け</title>
-  <meta name="description" content="Python開発者のためのJava中級コース。Spring Boot・Spring Security・JPA・テスト戦略など全12章・36問の演習付き。">
+  <title>Java 中級コース</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
@@ -49,9 +48,9 @@
   <script>
 const { useState } = React;
 
-/* ── Table definitions ── */
 const T = {
   springLayers: {
+    cap: "Spring Boot レイヤー構成",
     h: ["レイヤー", "アノテーション", "役割"],
     r: [
       ["Presentation", "@RestController", "HTTPリクエストを受け取りJSONを返す"],
@@ -60,25 +59,8 @@ const T = {
       ["Domain", "@Entity", "DBテーブルに対応するデータ構造"]
     ]
   },
-  autoConfig: {
-    h: ["仕組み", "説明"],
-    r: [
-      ["spring.factories / AutoConfiguration.imports", "クラスパスにJARがあると自動的に@Configurationクラスが読み込まれる"],
-      ["@ConditionalOnClass", "特定のクラスが存在するときだけ設定を適用"],
-      ["@ConditionalOnMissingBean", "同じ型のBeanがなければデフォルトBeanを登録"],
-      ["application.properties", "自動設定の挙動をプロパティで上書き可能"]
-    ]
-  },
-  beanScope: {
-    h: ["スコープ", "デフォルト?", "ライフサイクル", "用途"],
-    r: [
-      ["singleton", "✅", "アプリ起動〜終了", "ステートレスなService・Repository"],
-      ["prototype", "❌", "getBean()のたびに新生成", "ステートフルなオブジェクト"],
-      ["request", "❌", "HTTPリクエスト1回", "Web層の一時データ"],
-      ["session", "❌", "HTTPセッション期間", "ユーザーセッション情報"]
-    ]
-  },
   requestMapping: {
+    cap: "HTTPメソッドとアノテーション対応",
     h: ["アノテーション", "HTTPメソッド", "典型的な用途"],
     r: [
       ["@GetMapping", "GET", "リソース取得"],
@@ -88,19 +70,8 @@ const T = {
       ["@DeleteMapping", "DELETE", "リソース削除"]
     ]
   },
-  validationAnnotations: {
-    h: ["アノテーション", "対象", "説明"],
-    r: [
-      ["@NotNull", "任意", "nullを許可しない"],
-      ["@NotBlank", "String", "null・空文字・空白のみを禁止"],
-      ["@Size(min,max)", "String/Collection", "長さ・サイズの範囲指定"],
-      ["@Min/@Max", "数値", "数値の最小・最大"],
-      ["@Email", "String", "メールアドレス形式"],
-      ["@Pattern(regexp)", "String", "正規表現でバリデーション"],
-      ["@Positive", "数値", "正の数のみ許可"]
-    ]
-  },
   jpaAnnotations: {
+    cap: "主要JPAアノテーション",
     h: ["アノテーション", "説明"],
     r: [
       ["@Entity", "このクラスがDBテーブルに対応することを示す"],
@@ -112,6 +83,7 @@ const T = {
     ]
   },
   fetchType: {
+    cap: "FetchType 比較",
     h: ["FetchType", "タイミング", "デフォルト", "注意点"],
     r: [
       ["LAZY", "関連エンティティに初めてアクセスしたとき", "@OneToMany/@ManyToMany", "セッション外アクセスでLazyInitializationException"],
@@ -119,17 +91,18 @@ const T = {
     ]
   },
   securityFilter: {
+    cap: "Spring Security フィルターチェーン（主要フィルター）",
     h: ["フィルター", "順序", "役割"],
     r: [
       ["SecurityContextPersistenceFilter", "1", "SecurityContextをリクエスト間で引き継ぐ"],
       ["UsernamePasswordAuthenticationFilter", "5", "フォームログインの認証処理"],
-      ["BasicAuthenticationFilter", "6", "HTTP Basic認証"],
       ["BearerTokenAuthenticationFilter", "7", "JWT Bearerトークン認証"],
       ["ExceptionTranslationFilter", "14", "認証・認可例外を適切なHTTPレスポンスに変換"],
       ["AuthorizationFilter", "15", "認可（アクセス制御）"]
     ]
   },
   testAnnotations: {
+    cap: "Spring Boot テストアノテーション比較",
     h: ["アノテーション", "用途", "起動コンテキスト"],
     r: [
       ["@SpringBootTest", "フルコンテキストでの統合テスト", "全Bean起動"],
@@ -139,660 +112,1612 @@ const T = {
       ["@ExtendWith(MockitoExtension)", "Mockitoを使ったピュアユニットテスト", "Springなし"]
     ]
   },
-  cacheLevels: {
-    h: ["レベル", "実装例", "特徴"],
+  completableFuture: {
+    cap: "CompletableFuture 主要メソッド",
+    h: ["メソッド", "説明", "戻り値"],
     r: [
-      ["アプリ内メモリ", "ConcurrentHashMap / Caffeine", "超高速・JVMヒープ使用・再起動でクリア"],
-      ["分散キャッシュ", "Redis / Memcached", "複数インスタンス間で共有・永続化可"],
-      ["DBクエリキャッシュ", "Hibernate 2ndレベルキャッシュ", "JPA内部で透過的にキャッシュ"]
+      ["supplyAsync(Supplier)", "別スレッドで値を生成", "CompletableFuture<T>"],
+      ["thenApply(Function)", "結果を変換（同期）", "CompletableFuture<U>"],
+      ["thenCompose(Function)", "次の非同期処理に連鎖", "CompletableFuture<U>"],
+      ["thenCombine(other, BiFunction)", "2つの結果を合成", "CompletableFuture<V>"],
+      ["exceptionally(Function)", "例外時のフォールバック値", "CompletableFuture<T>"],
+      ["allOf(futures...)", "全て完了を待つ", "CompletableFuture<Void>"]
+    ]
+  },
+  reactorOperators: {
+    cap: "Project Reactor 主要オペレーター",
+    h: ["オペレーター", "説明", "対応RxJS"],
+    r: [
+      ["map()", "要素を変換する", "map()"],
+      ["flatMap()", "非同期変換・平坦化", "mergeMap()"],
+      ["filter()", "条件に合う要素だけ通す", "filter()"],
+      ["take(n)", "最初のn個だけ取得", "take()"],
+      ["zip()", "複数ストリームを合成", "zip()"],
+      ["onErrorResume()", "エラー時に別Publisherに切替", "catchError()"],
+      ["subscribeOn()", "購読開始スレッドを指定", "subscribeOn()"],
+      ["publishOn()", "以降の処理スレッドを変更", "observeOn()"]
     ]
   }
 };
 
-/* ── Exercises ── */
 const EX = {
   ch1: [
     {
-      diff: 1,
-      q: "Spring Initializrで生成したプロジェクトのmain classに、アプリ起動時に「Spring Boot アプリ起動！」とログ出力する処理を追加してください。\nCommandLineRunnerを実装する方法を使うこと。",
-      code: `@SpringBootApplication
-public class DemoApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(DemoApplication.class, args);
-    }
-    // ここにCommandLineRunnerを追加
-}`,
-      answer: `@SpringBootApplication
-public class DemoApplication implements CommandLineRunner {
-    private static final Logger log =
-        LoggerFactory.getLogger(DemoApplication.class);
-
-    public static void main(String[] args) {
-        SpringApplication.run(DemoApplication.class, args);
-    }
-
-    @Override
-    public void run(String... args) {
-        log.info("Spring Boot アプリ起動！");
-    }
-}`
-    },
-    {
       diff: 2,
-      q: "application.propertiesに独自プロパティ app.name=MyApp と app.version=1.0 を定義し、@Valueで読み込んでCommandLineRunnerで出力してください。",
-      code: `# application.properties
-# ここにプロパティを追加
+      q: "TodoエンティティのCRUD APIを実装してください。GET /todos でリスト取得、POST /todos で新規作成、DELETE /todos/{id} で削除できるようにすること。インメモリ（Listで管理）で構いません。",
+      code: `// Todo.java (record)
+public record Todo(Long id, String title, boolean done) {}
 
-// AppRunner.java
-@Component
-public class AppRunner implements CommandLineRunner {
-    // @Valueで注入
-    @Override
-    public void run(String... args) {
-        // 出力
-    }
+// TodoController.java
+@RestController
+@RequestMapping("/todos")
+public class TodoController {
+    // ConcurrentHashMapかArrayListで管理
+    // GET /todos, POST /todos, DELETE /todos/{id} を実装
 }`,
-      answer: `# application.properties
-app.name=MyApp
-app.version=1.0
+      answer: `@RestController
+@RequestMapping("/todos")
+public class TodoController {
+    private final Map<Long, Todo> store = new ConcurrentHashMap<>();
+    private final AtomicLong seq = new AtomicLong(1);
 
-// AppRunner.java
-@Component
-public class AppRunner implements CommandLineRunner {
-    @Value("\${app.name}")
-    private String appName;
-
-    @Value("\${app.version}")
-    private String appVersion;
-
-    @Override
-    public void run(String... args) {
-        System.out.println("アプリ名: " + appName + " v" + appVersion);
+    @GetMapping
+    public Collection<Todo> list() {
+        return store.values();
     }
-}`
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Todo create(@RequestBody @Valid TodoRequest req) {
+        long id = seq.getAndIncrement();
+        Todo todo = new Todo(id, req.title(), false);
+        store.put(id, todo);
+        return todo;
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        if (store.remove(id) == null)
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+}
+
+record TodoRequest(@NotBlank String title) {}`
     },
     {
       diff: 3,
-      q: "@ConfigurationPropertiesを使って、以下のプロパティをタイプセーフに読み込むクラスを定義してください。\napp.database.host=localhost\napp.database.port=5432\napp.database.name=mydb",
-      code: `// AppConfig.java - @ConfigurationPropertiesを実装
-// AppRunner.java - 注入して出力`,
-      answer: `// AppProperties.java
-@ConfigurationProperties(prefix = "app.database")
-@Component
-public class AppProperties {
-    private String host;
-    private int port;
-    private String name;
-    // getter/setter省略（Lombokの@Dataでも可）
-    public String getHost() { return host; }
-    public void setHost(String host) { this.host = host; }
-    public int getPort() { return port; }
-    public void setPort(int port) { this.port = port; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-}
+      q: "グローバル例外ハンドラーを @ControllerAdvice で実装してください。NotFoundException が発生したら 404、IllegalArgumentException なら 400 を返し、レスポンスボディは { \"error\": \"メッセージ\" } 形式にしてください。",
+      code: `// ErrorResponse.java
+public record ErrorResponse(String error) {}
 
-// AppRunner.java
-@Component
-public class AppRunner implements CommandLineRunner {
-    @Autowired
-    private AppProperties props;
+// GlobalExceptionHandler.java
+// @ControllerAdviceで実装`,
+      answer: `// ErrorResponse.java
+public record ErrorResponse(String error) {}
 
-    @Override
-    public void run(String... args) {
-        System.out.printf("DB: %s:%d/%s%n",
-            props.getHost(), props.getPort(), props.getName());
+// GlobalExceptionHandler.java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(NoSuchElementException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleNotFound(NoSuchElementException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleBadRequest(IllegalArgumentException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleValidation(MethodArgumentNotValidException ex) {
+        String msg = ex.getBindingResult().getFieldErrors().stream()
+            .map(e -> e.getField() + ": " + e.getDefaultMessage())
+            .collect(Collectors.joining(", "));
+        return new ErrorResponse(msg);
     }
 }`
     }
   ],
   ch2: [
     {
-      diff: 1,
-      q: "@Componentと@Autowiredを使って、GreetingServiceを作成しHelloControllerで使用してください。\nGreetingServiceのgreet(String name)メソッドは「こんにちは、{name}！」を返すものとします。",
-      code: `// GreetingService.java - 作成してください
-// HelloController.java
-@RestController
-public class HelloController {
-    // GreetingServiceを注入
-    @GetMapping("/hello")
-    public String hello(@RequestParam String name) {
-        // サービスを呼ぶ
-    }
-}`,
-      answer: `// GreetingService.java
-@Service
-public class GreetingService {
-    public String greet(String name) {
-        return "こんにちは、" + name + "！";
-    }
-}
-
-// HelloController.java
-@RestController
-public class HelloController {
-    private final GreetingService greetingService;
-
-    public HelloController(GreetingService greetingService) {
-        this.greetingService = greetingService;
-    }
-
-    @GetMapping("/hello")
-    public String hello(@RequestParam String name) {
-        return greetingService.greet(name);
-    }
-}`
-    },
-    {
       diff: 2,
-      q: "GreetingServiceのインターフェースを定義し、JapaneseGreetingServiceとEnglishGreetingServiceの2実装を作成してください。\n@Qualifier(\"japanese\")/@Qualifier(\"english\")で切り替えられるようにすること。",
-      code: `// GreetingService.java - インターフェース
-// JapaneseGreetingService.java
-// EnglishGreetingService.java
-// GreetingController.java - 両方注入して使う`,
-      answer: `// GreetingService.java
-public interface GreetingService {
-    String greet(String name);
+      q: "UserエンティティとUserRepositoryを作成し、メールアドレスで検索するカスタムクエリメソッドを実装してください。またユーザー名の部分一致検索も追加してください。",
+      code: `// User.java
+@Entity
+public class User {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String username;
+    private String email;
+    // getter/setter は省略
 }
 
-// JapaneseGreetingService.java
-@Service("japanese")
-public class JapaneseGreetingService implements GreetingService {
-    public String greet(String name) { return "こんにちは、" + name + "！"; }
-}
+// UserRepository.java
+public interface UserRepository extends JpaRepository<User, Long> {
+    // メールで検索
+    // ユーザー名の部分一致検索
+}`,
+      answer: `// UserRepository.java
+public interface UserRepository extends JpaRepository<User, Long> {
 
-// EnglishGreetingService.java
-@Service("english")
-public class EnglishGreetingService implements GreetingService {
-    public String greet(String name) { return "Hello, " + name + "!"; }
-}
+    Optional<User> findByEmail(String email);
 
-// GreetingController.java
-@RestController
-public class GreetingController {
-    private final GreetingService japaneseService;
-    private final GreetingService englishService;
+    List<User> findByUsernameContainingIgnoreCase(String keyword);
 
-    public GreetingController(
-        @Qualifier("japanese") GreetingService japaneseService,
-        @Qualifier("english") GreetingService englishService) {
-        this.japaneseService = japaneseService;
-        this.englishService = englishService;
-    }
+    @Query("SELECT u FROM User u WHERE u.email = :email AND u.username LIKE %:name%")
+    List<User> findByEmailAndUsernameLike(
+        @Param("email") String email,
+        @Param("name") String name
+    );
 
-    @GetMapping("/greet/ja")
-    public String ja(@RequestParam String name) {
-        return japaneseService.greet(name);
-    }
-
-    @GetMapping("/greet/en")
-    public String en(@RequestParam String name) {
-        return englishService.greet(name);
-    }
+    boolean existsByEmail(String email);
 }`
     },
     {
       diff: 3,
-      q: "@Scopeを使ってprototypスコープのCounterBeanを作成し、DIコンテナから取得するたびに新しいインスタンスが生成されることを確認するテストを書いてください。",
-      code: `// CounterBean.java - @Scope("prototype")
-// CounterBeanTest.java - ApplicationContextから2回取得して別インスタンスを確認`,
-      answer: `// CounterBean.java
-@Component
-@Scope("prototype")
-public class CounterBean {
-    private int count = 0;
-    public void increment() { count++; }
-    public int getCount() { return count; }
+      q: "OrderエンティティとOrderItemの1対多リレーションを定義し、JOIN FETCHを使ってN+1問題を回避するクエリを実装してください。",
+      code: `// Order.java
+@Entity
+@Table(name = "orders")
+public class Order {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String customerName;
+    // @OneToMany で items を持つ
 }
 
-// CounterBeanTest.java
-@SpringBootTest
-class CounterBeanTest {
-    @Autowired
-    private ApplicationContext context;
+// OrderItem.java
+@Entity
+public class OrderItem {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String productName;
+    private int quantity;
+    // @ManyToOne で order を参照
+}
 
-    @Test
-    void prototypeCreatesNewInstance() {
-        CounterBean bean1 = context.getBean(CounterBean.class);
-        CounterBean bean2 = context.getBean(CounterBean.class);
+// OrderRepository.java - JOIN FETCHクエリを実装`,
+      answer: `// Order.java
+@Entity
+@Table(name = "orders")
+public class Order {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String customerName;
 
-        bean1.increment();
-        bean1.increment();
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<OrderItem> items = new ArrayList<>();
+}
 
-        assertThat(bean1.getCount()).isEqualTo(2);
-        assertThat(bean2.getCount()).isEqualTo(0);
-        assertThat(bean1).isNotSameAs(bean2);
-    }
+// OrderItem.java
+@Entity
+public class OrderItem {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String productName;
+    private int quantity;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
+    private Order order;
+}
+
+// OrderRepository.java
+public interface OrderRepository extends JpaRepository<Order, Long> {
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.items")
+    List<Order> findAllWithItems();
 }`
     }
   ],
   ch3: [
     {
-      diff: 1,
-      q: "商品情報を返すAPIを実装してください。\nGET /products/{id} で商品IDを受け取り、仮データ（Map）を返すエンドポイントを作成すること。",
-      code: `@RestController
-@RequestMapping("/products")
-public class ProductController {
-    // GET /products/{id} を実装
-}`,
-      answer: `@RestController
-@RequestMapping("/products")
-public class ProductController {
-    private final Map<Long, Map<String, Object>> products = Map.of(
-        1L, Map.of("id", 1, "name", "ノートPC", "price", 80000),
-        2L, Map.of("id", 2, "name", "マウス", "price", 3000)
-    );
-
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getProduct(@PathVariable Long id) {
-        Map<String, Object> product = products.get(id);
-        if (product == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(product);
-    }
-}`
-    },
-    {
       diff: 2,
-      q: "クエリパラメータで商品検索を行うエンドポイントを実装してください。\nGET /products?category=electronics&minPrice=1000&maxPrice=100000\n@RequestParamでデフォルト値も設定すること。",
-      code: `@GetMapping
-public List<Map<String, Object>> searchProducts(
-    // クエリパラメータを受け取る
-) {
-    // フィルタリングロジック
+      q: "Spring Security で /api/public/** は全員アクセス可、/api/admin/** は ADMIN ロールのみ、それ以外は認証済みユーザーのみアクセス可となる SecurityFilterChain を実装してください。",
+      code: `@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        // ここに認可ルールを実装
+        return http.build();
+    }
 }`,
-      answer: `@GetMapping
-public List<Map<String, Object>> searchProducts(
-    @RequestParam(required = false) String category,
-    @RequestParam(defaultValue = "0") int minPrice,
-    @RequestParam(defaultValue = "999999") int maxPrice) {
+      answer: `@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
 
-    List<Map<String, Object>> allProducts = List.of(
-        Map.of("name", "ノートPC", "category", "electronics", "price", 80000),
-        Map.of("name", "マウス", "category", "electronics", "price", 3000),
-        Map.of("name", "デスク", "category", "furniture", "price", 50000)
-    );
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(sm ->
+                sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/public/**").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
 
-    return allProducts.stream()
-        .filter(p -> category == null || category.equals(p.get("category")))
-        .filter(p -> (int)p.get("price") >= minPrice)
-        .filter(p -> (int)p.get("price") <= maxPrice)
-        .collect(java.util.stream.Collectors.toList());
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 }`
     },
     {
       diff: 3,
-      q: "RESTfulなCRUD APIのスケルトンをProductControllerに実装してください。\n作成(POST)・取得(GET)・更新(PUT)・削除(DELETE)の全エンドポイントを定義し、適切なHTTPステータスコードを返すこと。",
-      code: `// ProductController.java
-// ProductDto.java (record使用)`,
-      answer: `// ProductDto.java
-public record ProductDto(Long id, String name, int price) {}
+      q: "JWTトークンを生成・検証するJwtUtilクラスを実装してください。generateToken(username)でトークンを生成し、validateToken(token)でBooleanを返すこと。有効期限は24時間とします。",
+      code: `// build.gradle に io.jsonwebtoken:jjwt-api:0.12.x を追加済みとします
+@Component
+public class JwtUtil {
+    @Value("\${jwt.secret}")
+    private String secret;
 
-// ProductController.java
-@RestController
-@RequestMapping("/api/v1/products")
-public class ProductController {
-    private final Map<Long, ProductDto> store = new ConcurrentHashMap<>();
-    private final AtomicLong seq = new AtomicLong(1);
+    // generateToken(String username): String
+    // validateToken(String token): boolean
+    // extractUsername(String token): String
+}`,
+      answer: `@Component
+public class JwtUtil {
+    @Value("\${jwt.secret}")
+    private String secret;
 
-    @GetMapping
-    public List<ProductDto> list() {
-        return new ArrayList<>(store.values());
+    private SecretKey key() {
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ProductDto> get(@PathVariable Long id) {
-        ProductDto p = store.get(id);
-        return p != null ? ResponseEntity.ok(p) : ResponseEntity.notFound().build();
+    public String generateToken(String username) {
+        return Jwts.builder()
+            .subject(username)
+            .issuedAt(new Date())
+            .expiration(new Date(System.currentTimeMillis() + 86400000L))
+            .signWith(key())
+            .compact();
     }
 
-    @PostMapping
-    public ResponseEntity<ProductDto> create(@RequestBody ProductDto dto) {
-        long id = seq.getAndIncrement();
-        ProductDto saved = new ProductDto(id, dto.name(), dto.price());
-        store.put(id, saved);
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().verifyWith(key()).build().parseSignedClaims(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<ProductDto> update(
-            @PathVariable Long id, @RequestBody ProductDto dto) {
-        if (!store.containsKey(id)) return ResponseEntity.notFound().build();
-        ProductDto updated = new ProductDto(id, dto.name(), dto.price());
-        store.put(id, updated);
-        return ResponseEntity.ok(updated);
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        if (store.remove(id) == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.noContent().build();
+    public String extractUsername(String token) {
+        return Jwts.parser().verifyWith(key()).build()
+            .parseSignedClaims(token).getPayload().getSubject();
     }
 }`
     }
   ],
   ch4: [
     {
-      diff: 1,
-      q: "ユーザー登録APIのリクエストボディにバリデーションを追加してください。\n・name: 空白禁止、2〜50文字\n・email: メールアドレス形式\n・age: 1〜120の整数",
-      code: `// UserRequest.java - バリデーションアノテーションを追加
-public class UserRequest {
-    private String name;
-    private String email;
-    private int age;
-    // getter/setter
-}
-
-// UserController.java
-@PostMapping("/users")
-public ResponseEntity<?> createUser(@RequestBody UserRequest req) {
-    // @Validを追加
-}`,
-      answer: `// UserRequest.java
-public class UserRequest {
-    @NotBlank(message = "名前は必須です")
-    @Size(min = 2, max = 50, message = "名前は2〜50文字で入力してください")
-    private String name;
-
-    @NotBlank(message = "メールアドレスは必須です")
-    @Email(message = "メールアドレスの形式が正しくありません")
-    private String email;
-
-    @Min(value = 1, message = "年齢は1以上で入力してください")
-    @Max(value = 120, message = "年齢は120以下で入力してください")
-    private int age;
-
-    // getter/setter省略
-}
-
-// UserController.java
-@PostMapping("/users")
-public ResponseEntity<?> createUser(@Valid @RequestBody UserRequest req) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(req);
-}`
-    },
-    {
       diff: 2,
-      q: "@ExceptionHandlerを使って、MethodArgumentNotValidExceptionをキャッチしフィールドごとのエラーメッセージをJSON形式で返す@ControllerAdviceを実装してください。",
-      code: `// ErrorResponse.java (record)
-// GlobalExceptionHandler.java - @ControllerAdvice`,
-      answer: `// ErrorResponse.java
-public record ErrorResponse(
-    int status,
-    String message,
-    Map<String, String> fieldErrors
-) {}
+      q: "@WebMvcTest を使って、TodoController の GET /todos エンドポイントをテストしてください。TodoService はモックにして、3件のTodoを返すように設定します。",
+      code: `@WebMvcTest(TodoController.class)
+class TodoControllerTest {
 
-// GlobalExceptionHandler.java
-@ControllerAdvice
-public class GlobalExceptionHandler {
+    @Autowired
+    private MockMvc mockMvc;
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(
-            MethodArgumentNotValidException ex) {
-        Map<String, String> errors = new LinkedHashMap<>();
-        ex.getBindingResult().getFieldErrors().forEach(err ->
-            errors.put(err.getField(), err.getDefaultMessage())
-        );
-        ErrorResponse body = new ErrorResponse(400, "バリデーションエラー", errors);
-        return ResponseEntity.badRequest().body(body);
+    @MockBean
+    private TodoService todoService;
+
+    @Test
+    void getTodos_returns200WithList() throws Exception {
+        // given: todoServiceが3件返すように設定
+        // when: GET /todos を呼ぶ
+        // then: 200 + JSONに3件含まれることを確認
     }
+}`,
+      answer: `@WebMvcTest(TodoController.class)
+class TodoControllerTest {
 
-    @ExceptionHandler(NoSuchElementException.class)
-    public ResponseEntity<ErrorResponse> handleNotFound(NoSuchElementException ex) {
-        ErrorResponse body = new ErrorResponse(404, ex.getMessage(), Map.of());
-        return ResponseEntity.status(404).body(body);
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private TodoService todoService;
+
+    @Test
+    void getTodos_returns200WithList() throws Exception {
+        List<Todo> todos = List.of(
+            new Todo(1L, "買い物", false),
+            new Todo(2L, "洗濯", true),
+            new Todo(3L, "掃除", false)
+        );
+        given(todoService.findAll()).willReturn(todos);
+
+        mockMvc.perform(get("/todos")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(3))
+            .andExpect(jsonPath("$[0].title").value("買い物"))
+            .andExpect(jsonPath("$[1].done").value(true));
     }
 }`
     },
     {
       diff: 3,
-      q: "カスタムバリデーションアノテーション@ValidPostalCodeを作成してください。\n日本の郵便番号形式（「123-4567」または「1234567」）を許可する制約を実装すること。",
-      code: `// ValidPostalCode.java - アノテーション定義
-// PostalCodeValidator.java - ConstraintValidator実装
-// AddressRequest.java - @ValidPostalCodeを使用`,
-      answer: `// ValidPostalCode.java
-@Documented
-@Constraint(validatedBy = PostalCodeValidator.class)
-@Target({ ElementType.FIELD })
-@Retention(RetentionPolicy.RUNTIME)
-public @interface ValidPostalCode {
-    String message() default "郵便番号の形式が正しくありません（例: 123-4567）";
-    Class<?>[] groups() default {};
-    Class<? extends Payload>[] payload() default {};
-}
+      q: "Testcontainers を使って PostgreSQL コンテナ上での統合テストを書いてください。UserRepository の save と findByEmail をテストしてください。",
+      code: `@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Testcontainers
+class UserRepositoryIT {
 
-// PostalCodeValidator.java
-public class PostalCodeValidator
-        implements ConstraintValidator<ValidPostalCode, String> {
-    private static final Pattern PATTERN =
-        Pattern.compile("^\\d{3}-?\\d{4}$");
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
 
-    @Override
-    public boolean isValid(String value, ConstraintValidatorContext ctx) {
-        if (value == null) return true; // @NotNullと組み合わせる
-        return PATTERN.matcher(value).matches();
+    @DynamicPropertySource
+    static void props(DynamicPropertyRegistry r) {
+        // Testcontainersの接続情報を設定
     }
-}
 
-// AddressRequest.java
-public class AddressRequest {
-    @ValidPostalCode
-    private String postalCode;
-    private String address;
+    @Autowired
+    private UserRepository userRepository;
+
+    @Test
+    void saveAndFindByEmail() {
+        // テストを実装
+    }
+}`,
+      answer: `@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Testcontainers
+class UserRepositoryIT {
+
+    @Container
+    static PostgreSQLContainer<?> postgres =
+        new PostgreSQLContainer<>("postgres:16-alpine");
+
+    @DynamicPropertySource
+    static void props(DynamicPropertyRegistry r) {
+        r.add("spring.datasource.url", postgres::getJdbcUrl);
+        r.add("spring.datasource.username", postgres::getUsername);
+        r.add("spring.datasource.password", postgres::getPassword);
+    }
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Test
+    void saveAndFindByEmail() {
+        User user = new User();
+        user.setUsername("alice");
+        user.setEmail("alice@example.com");
+        userRepository.save(user);
+
+        Optional<User> found = userRepository.findByEmail("alice@example.com");
+        assertThat(found).isPresent();
+        assertThat(found.get().getUsername()).isEqualTo("alice");
+    }
 }`
     }
   ],
   ch5: [
     {
-      diff: 1,
-      q: "ProductエンティティとProductRepositoryを作成してください。\nフィールド: id(Long), name(String), price(int), createdAt(LocalDateTime)\nJpaRepositoryを継承し、findByNameContainingメソッドも定義すること。",
-      code: `// Product.java - @Entityを使ったエンティティ
-// ProductRepository.java - JpaRepositoryを継承`,
-      answer: `// Product.java
-@Entity
-@Table(name = "products")
-public class Product {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, length = 100)
-    private String name;
-
-    @Column(nullable = false)
-    private int price;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
-
-    // getter/setter/コンストラクタ省略
-}
-
-// ProductRepository.java
-public interface ProductRepository extends JpaRepository<Product, Long> {
-    List<Product> findByNameContaining(String keyword);
-}`
-    },
-    {
       diff: 2,
-      q: "@QueryアノテーションでJPQLを使って、価格が指定範囲内の商品を価格昇順で取得するメソッドをProductRepositoryに追加してください。\nさらに、ネイティブSQLで全商品の平均価格を取得するメソッドも追加すること。",
-      code: `public interface ProductRepository extends JpaRepository<Product, Long> {
-    // findByNameContaining は既存
+      q: "CompletableFuture を使って、3つの外部API呼び出しを並列実行し、すべての結果が揃ったら合計を返すメソッドを実装してください。各API呼び出しは100msかかるものとします。",
+      code: `@Service
+public class AggregatorService {
 
-    // JPQL: 価格範囲検索（価格昇順）
+    // fetchScore1(), fetchScore2(), fetchScore3() はそれぞれ
+    // 100ms待機後に整数値を返すとします
 
-    // ネイティブSQL: 平均価格
+    public int fetchTotalScore() {
+        // 3つを並列実行し、合計を返す
+    }
 }`,
-      answer: `public interface ProductRepository extends JpaRepository<Product, Long> {
-    List<Product> findByNameContaining(String keyword);
+      answer: `@Service
+public class AggregatorService {
 
-    @Query("SELECT p FROM Product p WHERE p.price BETWEEN :minPrice AND :maxPrice ORDER BY p.price ASC")
-    List<Product> findByPriceRange(
-        @Param("minPrice") int minPrice,
-        @Param("maxPrice") int maxPrice
-    );
+    private int fetchScore1() { sleep(100); return 80; }
+    private int fetchScore2() { sleep(100); return 90; }
+    private int fetchScore3() { sleep(100); return 75; }
 
-    @Query(value = "SELECT AVG(price) FROM products", nativeQuery = true)
-    Double findAveragePrice();
+    private void sleep(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public int fetchTotalScore() {
+        CompletableFuture<Integer> f1 = CompletableFuture.supplyAsync(this::fetchScore1);
+        CompletableFuture<Integer> f2 = CompletableFuture.supplyAsync(this::fetchScore2);
+        CompletableFuture<Integer> f3 = CompletableFuture.supplyAsync(this::fetchScore3);
+
+        return CompletableFuture.allOf(f1, f2, f3)
+            .thenApply(v -> {
+                try { return f1.get() + f2.get() + f3.get(); }
+                catch (Exception e) { throw new RuntimeException(e); }
+            })
+            .join();
+    }
 }`
     },
     {
       diff: 3,
-      q: "ProductServiceを作成し、以下の機能を実装してください。\n1. 商品作成（重複名チェック付き）\n2. 商品取得（見つからない場合はNoSuchElementExceptionをスロー）\n3. ページネーション付き商品一覧取得（Pageableを使用）",
-      code: `@Service
-public class ProductService {
-    private final ProductRepository productRepository;
-    // コンストラクタインジェクション
-
-    // create(ProductRequest dto) → Product
-    // findById(Long id) → Product
-    // findAll(int page, int size) → Page<Product>
+      q: "@Async を使って非同期でメールを送信するサービスを実装してください。sendWelcomeEmail(String to) は CompletableFuture<String> を返し、成功時は \"sent\" を返します。また @EnableAsync を設定クラスに追加してください。",
+      code: `// AsyncConfig.java - @EnableAsync を追加
+// EmailService.java
+@Service
+public class EmailService {
+    // @Async で非同期メール送信
+    public CompletableFuture<String> sendWelcomeEmail(String to) {
+        // 実装
+    }
 }`,
-      answer: `@Service
-public class ProductService {
-    private final ProductRepository productRepository;
-
-    public ProductService(ProductRepository productRepository) {
-        this.productRepository = productRepository;
+      answer: `// AsyncConfig.java
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+    @Bean
+    public Executor taskExecutor() {
+        ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
+        exec.setCorePoolSize(4);
+        exec.setMaxPoolSize(10);
+        exec.setQueueCapacity(50);
+        exec.setThreadNamePrefix("mail-");
+        exec.initialize();
+        return exec;
     }
+}
 
-    public Product create(String name, int price) {
-        if (productRepository.findByNameContaining(name).stream()
-                .anyMatch(p -> p.getName().equals(name))) {
-            throw new IllegalArgumentException("同名の商品が既に存在します: " + name);
+// EmailService.java
+@Service
+public class EmailService {
+    private static final Logger log = LoggerFactory.getLogger(EmailService.class);
+
+    @Async
+    public CompletableFuture<String> sendWelcomeEmail(String to) {
+        log.info("Sending welcome email to {} on thread {}", to, Thread.currentThread().getName());
+        // 実際はJavaMailSenderなどを使用
+        try { Thread.sleep(200); } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
-        Product product = new Product();
-        product.setName(name);
-        product.setPrice(price);
-        product.setCreatedAt(LocalDateTime.now());
-        return productRepository.save(product);
-    }
-
-    public Product findById(Long id) {
-        return productRepository.findById(id)
-            .orElseThrow(() -> new NoSuchElementException("商品が見つかりません: " + id));
-    }
-
-    public Page<Product> findAll(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return productRepository.findAll(pageable);
+        log.info("Email sent to {}", to);
+        return CompletableFuture.completedFuture("sent");
     }
 }`
     }
   ],
   ch6: [
     {
-      diff: 1,
-      q: "OrderとOrderItemのエンティティを作成し、@OneToMany/@ManyToOneの双方向関係を定義してください。\nOrder: id, orderDate, items\nOrderItem: id, productName, quantity, unitPrice",
-      code: `// Order.java
-// OrderItem.java`,
-      answer: `// Order.java
-@Entity
-@Table(name = "orders")
-public class Order {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+      diff: 2,
+      q: "Spring Cloud OpenFeign を使って、外部の User API（GET /api/users/{id}）を呼び出すクライアントを実装してください。UserDto を返すこと。また @FeignClient のフォールバック（Fallback）も実装してください。",
+      code: `// UserDto.java
+public record UserDto(Long id, String username, String email) {}
 
-    @Column(name = "order_date", nullable = false)
-    private LocalDateTime orderDate = LocalDateTime.now();
-
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<OrderItem> items = new ArrayList<>();
-
-    public void addItem(OrderItem item) {
-        items.add(item);
-        item.setOrder(this);
-    }
-    // getter/setter省略
+// UserClient.java - FeignClientを実装
+// UserClientFallback.java - フォールバックを実装`,
+      answer: `// UserClient.java
+@FeignClient(
+    name = "user-service",
+    url = "\${user.service.url}",
+    fallback = UserClientFallback.class
+)
+public interface UserClient {
+    @GetMapping("/api/users/{id}")
+    UserDto findById(@PathVariable("id") Long id);
 }
 
-// OrderItem.java
-@Entity
-@Table(name = "order_items")
-public class OrderItem {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+// UserClientFallback.java
+@Component
+public class UserClientFallback implements UserClient {
+    private static final Logger log = LoggerFactory.getLogger(UserClientFallback.class);
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false)
-    private Order order;
+    @Override
+    public UserDto findById(Long id) {
+        log.warn("Fallback triggered for user id={}", id);
+        return new UserDto(id, "unknown", "unknown@fallback.local");
+    }
+}
 
-    private String productName;
-    private int quantity;
-    private int unitPrice;
-    // getter/setter省略
+// Application.java に @EnableFeignClients を追加
+@SpringBootApplication
+@EnableFeignClients
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
 }`
     },
     {
+      diff: 3,
+      q: "Spring Cloud Gateway でリバースプロキシを設定してください。/api/users/** を user-service へ、/api/orders/** を order-service へルーティングし、リトライ（3回）とサーキットブレーカーを設定してください。",
+      code: `# application.yml に Gateway の設定を書いてください
+# user-service は http://localhost:8081
+# order-service は http://localhost:8082
+# リトライ3回、サーキットブレーカー名は userCB / orderCB`,
+      answer: `# application.yml
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: user-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - name: Retry
+              args:
+                retries: 3
+                statuses: BAD_GATEWAY,SERVICE_UNAVAILABLE
+            - name: CircuitBreaker
+              args:
+                name: userCB
+                fallbackUri: forward:/fallback/users
+
+        - id: order-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - name: Retry
+              args:
+                retries: 3
+                statuses: BAD_GATEWAY,SERVICE_UNAVAILABLE
+            - name: CircuitBreaker
+              args:
+                name: orderCB
+                fallbackUri: forward:/fallback/orders
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      userCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s`
+    }
+  ],
+  ch7: [
+    {
       diff: 2,
-      q: "@Transactionalを使って「注文作成」のサービスメソッドを実装してください。\n注文と明細を同時に保存し、在庫不足の場合はRuntimeExceptionをスローしてロールバックされることを確認すること。",
+      q: "Spring Cache (@Cacheable) を使って、findUserById(Long id) の結果をキャッシュするサービスを実装してください。また findAllUsers() のキャッシュは updateUser() 呼び出し時に @CacheEvict で無効化してください。",
       code: `@Service
-public class OrderService {
-    // createOrder(List<OrderItemRequest> items) → Order
-    // 在庫チェック: quantityが0以下の場合は例外
+public class UserService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    // @Cacheable で id ごとにキャッシュ
+    public User findUserById(Long id) { ... }
+
+    // @Cacheable で全件キャッシュ
+    public List<User> findAllUsers() { ... }
+
+    // @CacheEvict で "allUsers" キャッシュを削除
+    public User updateUser(Long id, UserRequest req) { ... }
 }`,
       answer: `@Service
-public class OrderService {
-    private final OrderRepository orderRepository;
+public class UserService {
 
-    public OrderService(OrderRepository orderRepository) {
-        this.orderRepository = orderRepository;
+    @Autowired
+    private UserRepository userRepository;
+
+    @Cacheable(value = "users", key = "#id")
+    public User findUserById(Long id) {
+        return userRepository.findById(id)
+            .orElseThrow(() -> new NoSuchElementException("User not found: " + id));
     }
 
-    @Transactional
-    public Order createOrder(List<OrderItemRequest> itemRequests) {
-        Order order = new Order();
-
-        for (OrderItemRequest req : itemRequests) {
-            if (req.quantity() <= 0) {
-                throw new IllegalArgumentException(
-                    "在庫不足または数量不正: " + req.productName()
-                );
-            }
-            OrderItem item = new OrderItem();
-            item.setProductName(req.productName());
-            item.setQuantity(req.quantity());
-            item.setUnitPrice(req.unitPrice());
-            order.addItem(item);
-        }
-
-        return orderRepository.save(order); // cascadeでitemsも保存
+    @Cacheable(value = "allUsers")
+    public List<User> findAllUsers() {
+        return userRepository.findAll();
     }
-}
 
-// OrderItemRequest.java
-public record OrderItemRequest(String productName, int quantity, int unitPrice) {}`
+    @CachePut(value = "users", key = "#id")
+    @CacheEvict(value = "allUsers", allEntries = true)
+    public User updateUser(Long id, UserRequest req) {
+        User user = findUserById(id);
+        user.setUsername(req.username());
+        return userRepository.save(user);
+    }
+}`
     },
     {
       diff: 3,
-      q: "@OneToManyのN+1問題を確認し、@EntityGraph（またはJPQL JOIN FETCH）で解決してください。\nログにSQL出力を有効にして、クエリ数が削減されることを確認する方法も示すこと。",
-      code: `// application.properties - SQL出力設定
-// OrderRepository.java - N+1を起こすメソッドと解決済みメソッド`,
-      answer: `# application.properties
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.format_sql=true
-logging.level.org.hibernate.SQL=DEBUG
-logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+      q: "JVM のヒープダンプを取得し、メモリリークを調査するコマンドを示してください。また、@Scheduled でメモリ使用量を定期ログ出力するクラスも実装してください（10秒間隔）。",
+      code: `// MemoryMonitor.java
+@Component
+public class MemoryMonitor {
+    // @Scheduled で10秒ごとにヒープ使用量をログ出力
+}
 
-// OrderRepository.java
-public interface OrderRepository extends JpaRepository<Order, Long> {
+// ヒープダンプ取得コマンドも示すこと（コメントで）`,
+      answer: `// MemoryMonitor.java
+@Component
+public class MemoryMonitor {
+    private static final Logger log = LoggerFactory.getLogger(MemoryMonitor.class);
 
-    // N+1が起きるパターン（Orderを取得 → items毎に1クエリ追加）
-    List<Order> findAll();
+    @Scheduled(fixedRate = 10_000)
+    public void logMemoryUsage() {
+        Runtime rt = Runtime.getRuntime();
+        long total = rt.totalMemory() / 1024 / 1024;
+        long free  = rt.freeMemory()  / 1024 / 1024;
+        long used  = total - free;
+        long max   = rt.maxMemory()   / 1024 / 1024;
+        log.info("Heap used={} MB / total={} MB / max={} MB", used, total, max);
+    }
+}
 
-    // JOIN FETCHで解決（1クエリで全データ取得）
-    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.items")
-    List<Order> findAllWithItems();
+// ヒープダンプ取得コマンド（application.pidでPIDを取得）:
+// $ jps -l                          → PID を確認
+// $ jmap -dump:format=b,file=heap.hprof <PID>
+// $ java -Xmx256m -XX:+HeapDumpOnOutOfMemoryError \\
+//        -XX:HeapDumpPath=/tmp/oom.hprof -jar app.jar
 
-    // @EntityGraphを使う方法
-    @EntityGraph(attributePaths = {"items"})
-    @Override
-    List<Order> findAll(Sort sort);
+// 起動オプション（JFR: Java Flight Recorder）
+// $ java -XX:StartFlightRecording=duration=60s,filename=app.jfr -jar app.jar
+// Eclipse Memory Analyzer (MAT) で heap.hprof を分析`
+    }
+  ],
+  ch8: [
+    {
+      diff: 2,
+      q: "WebFlux の RouterFunction を使って、GET /products と GET /products/{id} のルートを定義してください。ProductHandler に各処理を委譲し、Mono<ServerResponse> を返すようにしてください。",
+      code: `// ProductRouter.java
+@Configuration
+public class ProductRouter {
+    @Bean
+    public RouterFunction<ServerResponse> routes(ProductHandler handler) {
+        // GET /products と GET /products/{id} を定義
+    }
+}
+
+// ProductHandler.java
+@Component
+public class ProductHandler {
+    public Mono<ServerResponse> list(ServerRequest req) { ... }
+    public Mono<ServerResponse> findById(ServerRequest req) { ... }
+}`,
+      answer: `// ProductRouter.java
+@Configuration
+public class ProductRouter {
+    @Bean
+    public RouterFunction<ServerResponse> routes(ProductHandler handler) {
+        return RouterFunctions.route()
+            .GET("/products", handler::list)
+            .GET("/products/{id}", handler::findById)
+            .build();
+    }
+}
+
+// ProductHandler.java
+@Component
+public class ProductHandler {
+    @Autowired
+    private ReactiveProductRepository repo;
+
+    public Mono<ServerResponse> list(ServerRequest req) {
+        Flux<Product> products = repo.findAll();
+        return ServerResponse.ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(products, Product.class);
+    }
+
+    public Mono<ServerResponse> findById(ServerRequest req) {
+        Long id = Long.parseLong(req.pathVariable("id"));
+        return repo.findById(id)
+            .flatMap(p -> ServerResponse.ok().bodyValue(p))
+            .switchIfEmpty(ServerResponse.notFound().build());
+    }
+}`
+    },
+    {
+      diff: 3,
+      q: "Flux を使って、100ms間隔で株価データをストリーミングする SSE (Server-Sent Events) エンドポイントを実装してください。価格は乱数で変動するものとします。",
+      code: `@RestController
+@RequestMapping("/stocks")
+public class StockController {
+
+    // GET /stocks/stream をSSEで実装
+    // Flux.interval を使って100msごとに価格を生成
+    // StockPrice record: symbol, price, timestamp
+}`,
+      answer: `public record StockPrice(String symbol, double price, String timestamp) {}
+
+@RestController
+@RequestMapping("/stocks")
+public class StockController {
+
+    private final Random random = new Random();
+
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<StockPrice> streamPrices(@RequestParam(defaultValue = "JAVA") String symbol) {
+        return Flux.interval(Duration.ofMillis(100))
+            .map(tick -> {
+                double price = 1000.0 + random.nextGaussian() * 20;
+                String ts = java.time.Instant.now().toString();
+                return new StockPrice(symbol, Math.round(price * 100.0) / 100.0, ts);
+            })
+            .take(200)  // 最大200件（20秒分）
+            .onErrorResume(e -> Flux.empty());
+    }
 }`
     }
   ]
 };
+
+const chapters = [
+  {
+    id: "ch1", num: 1, title: "Spring Boot入門・RESTful API構築", est: "65分",
+    goal: "Spring Bootプロジェクトの構成を理解し、@RestControllerでCRUD APIを実装できる。バリデーションや例外ハンドリングを適切に組み込んだRESTful設計ができるようになる。",
+    sections: [
+      {
+        title: "Spring Bootのアーキテクチャと自動構成",
+        body: "Spring Bootは「設定より規約（Convention over Configuration）」の思想に基づき、最小限のコードで本番品質のSpringアプリを起動できる仕組みを提供しています。Pythonで言えばFastAPIがデコレーターだけでAPIを定義できるのと同様に、Spring BootではアノテーションだけでDIコンテナ・サーブレット・JDBCプールまでが自動的に構成されます。\n\nその中核を担うのが自動構成（Auto Configuration）です。@SpringBootApplicationはクラスパスを走査し、存在するライブラリに合わせてBeanを自動登録します。たとえばspring-boot-starter-webがあればTomcatを起動し、spring-boot-starter-data-jpaがあればHibernateとDataSourceを設定します。これを「スターター」と呼び、依存1つ追加するだけで大量の設定が完了するのです。\n\nアプリケーションはPresentation（Controller）・Business（Service）・Persistence（Repository）・Domain（Entity）という4層で設計するのが標準です。各層を分離することで、テストのしやすさと変更の局所化を同時に実現できます。",
+        table: T.springLayers,
+        afterTable: "ポイント：層をまたぐ呼び出しは「上から下（Controller → Service → Repository）」が原則です。逆向きの依存はアーキテクチャを崩します。ServiceからControllerを呼んだり、RepositoryからServiceを呼ぶ設計は避けましょう。Pythonのモジュール設計でも同様の分離が推奨されますが、Javaではアノテーションとインターフェースによって構造がより明示的に強制されます。",
+        code: `// 最小構成のSpring Bootアプリ
+@SpringBootApplication
+public class DemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+}
+
+// application.properties で基本設定
+// server.port=8080
+// spring.application.name=demo
+// logging.level.com.example=DEBUG
+
+// @ConfigurationProperties でタイプセーフな設定読み込み
+@ConfigurationProperties(prefix = "app")
+@Component
+public class AppProperties {
+    private String name = "default";
+    private int maxConnections = 10;
+    // getter/setter
+}`,
+        afterCode: "application.propertiesまたはapplication.ymlで設定を外部化することで、環境（dev/staging/prod）ごとに振る舞いを変えられます。Spring ProfilesのACTIVE_PROFILEを使えば、環境変数1つで設定ファイルを切り替えられます。"
+      },
+      {
+        title: "RESTful APIの実装とバリデーション",
+        body: "RESTful APIの設計では、リソース（名詞）をURLで表し、HTTP動詞（GET/POST/PUT/DELETE）で操作を表現します。たとえば「ユーザーの一覧取得」はGET /usersで、「ユーザー作成」はPOST /usersです。PythonのFastAPIでも同じ設計思想ですが、SpringではアノテーションでHTTPメソッドとパスをマッピングします。\n\n入力バリデーションはBean Validationアノテーション（@NotBlank・@Emailなど）をDTOに付与し、@Validをメソッド引数に付けるだけで自動実行されます。バリデーション失敗時はMethodArgumentNotValidExceptionがスローされるため、@ControllerAdviceでグローバルにハンドリングすると、すべてのエンドポイントで統一したエラーレスポンスを返せます。\n\n@PathVariable（URLパス変数）と@RequestParam（クエリパラメータ）・@RequestBody（JSONボディ）を組み合わせることで、様々なリクエスト形式を処理できます。PythonのFastAPIでもPath・Query・Body型で同様の区別をしますが、SpringではコンパイルタイムにType安全性が保証されます。",
+        table: T.requestMapping,
+        afterTable: "RESTのステータスコードは意味を持って選択してください。作成成功は201 CREATED、削除成功は204 NO CONTENT、リソース未発見は404 NOT FOUND を返すのが一般的です。@ResponseStatus でデフォルトのステータスコードを変更できます。",
+        code: `@RestController
+@RequestMapping("/api/users")
+@Validated
+public class UserController {
+    private final UserService userService;
+
+    public UserController(UserService userService) {
+        this.userService = userService;  // コンストラクタ注入（推奨）
+    }
+
+    @GetMapping
+    public Page<UserDto> list(@RequestParam(defaultValue="0") int page,
+                              @RequestParam(defaultValue="20") int size) {
+        return userService.findAll(PageRequest.of(page, size));
+    }
+
+    @GetMapping("/{id}")
+    public UserDto findById(@PathVariable Long id) {
+        return userService.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND, "User not found: " + id));
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public UserDto create(@RequestBody @Valid UserRequest req) {
+        return userService.create(req);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        userService.delete(id);
+    }
+}`,
+        afterCode: "コンストラクタ注入は@Autowiredより推奨されます。理由は3つ：①フィールドがfinalにでき不変性を保てる ②テスト時にモックを直接渡せる ③循環依存をコンパイルタイムに検出できる。Lombokの@RequiredArgsConstructorを使えば、コンストラクタのボイラープレートをゼロにできます。"
+      }
+    ]
+  },
+  {
+    id: "ch2", num: 2, title: "Spring Data JPA・Hibernateとデータベース操作", est: "70分",
+    goal: "JPAアノテーションでエンティティを定義し、Spring Data JPAのリポジトリで基本的なCRUD・カスタムクエリを実装できる。N+1問題を理解し、JOIN FETCHや@EntityGraphで回避できるようになる。",
+    sections: [
+      {
+        title: "JPAエンティティとリポジトリの定義",
+        body: "JPA（Jakarta Persistence API）はJavaのORMの標準仕様で、HibernateがそのデフォルトImplementationです。PythonのSQLAlchemyと対比すると、@EntityはSQLAlchemyの宣言的ベースクラス相当、@ColumnはColumnオブジェクト相当ですが、Javaではすべてアノテーションで記述します。\n\nSpring Data JPAはJPAのさらに上にある抽象レイヤーで、JpaRepositoryを継承するだけでfindById・save・delete等の基本CRUDメソッドが自動的に使えるようになります。さらにメソッド名からクエリを自動生成する機能があり、findByEmailはSELECT … WHERE email = ?のSQLを自動生成します。Pythonで言えばDjango ORMのobjects.filter(email=...)に近い感覚です。\n\nリレーションシップは@OneToMany・@ManyToOne・@ManyToManyで表現します。この際にfetchStrategyの選択が重要で、デフォルトのままにすると「N+1問題」（親エンティティN件取得後、子エンティティをN回追加クエリ）が発生します。",
+        table: T.jpaAnnotations,
+        afterTable: "エンティティクラスにはLombokの@Getter・@Setter・@NoArgsConstructor・@Entityを組み合わせるのが実務では一般的です。ただし@Data（@equalsAndHashCodeを含む）はエンティティに使うと双方向リレーションでスタックオーバーフローを起こす場合があるため注意が必要です。",
+        code: `@Entity
+@Table(name = "users")
+@Getter @Setter @NoArgsConstructor
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 50)
+    private String username;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Post> posts = new ArrayList<>();
+
+    @CreatedDate
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+}
+
+// UserRepository.java
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByEmail(String email);
+    List<User> findByUsernameContainingIgnoreCase(String keyword);
+    boolean existsByEmail(String email);
+}`,
+        afterCode: "@CreatedDateや@LastModifiedDateを使うには@EntityListeners(AuditingEntityListener.class)をエンティティに付け、設定クラスに@EnableJpaAuditingを追加します。これでcreatedAt・updatedAtが自動的に設定されます。"
+      },
+      {
+        title: "カスタムクエリとN+1問題の解決",
+        body: "メソッド名クエリだけでは複雑な検索条件を表現できないことがあります。そのような場合は@QueryアノテーションでJPQL（Java Persistence Query Language）またはネイティブSQLを直接記述します。JPQLはテーブル名ではなくエンティティ名を使い、SQL標準に近い構文で書けます。\n\nN+1問題はORMを使う上で最も頻繁に遭遇するパフォーマンス問題です。たとえばOrderを10件取得し（1クエリ）、各Orderのitemsにアクセスするたびに追加クエリが発生（10クエリ）、合計11クエリになるケースがN+1問題です。Python SQLAlchemyでも同様の問題が起き、joinedload()で解決するのと同様に、JpaではJOIN FETCHや@EntityGraphを使います。\n\nSpring Bootのapplication.propertiesに「spring.jpa.show-sql=true」と「logging.level.org.hibernate.SQL=DEBUG」を設定すると実行SQLが確認でき、N+1問題の検出に役立ちます。実務では本番投入前にSlowクエリログとHibernateのstatistics機能を組み合わせてボトルネックを特定します。",
+        table: T.fetchType,
+        afterTable: "EAGER取得はN+1問題の温床です。@ManyToOneのデフォルトがEAGERであることに注意し、実務では明示的に@ManyToOne(fetch = FetchType.LAZY)を指定することを習慣づけてください。必要なときだけJOIN FETCHで取得する「LAZYデフォルト＋必要時FETCH」の戦略が最も一般的です。",
+        code: `// カスタムJPQLクエリ
+public interface OrderRepository extends JpaRepository<Order, Long> {
+
+    // N+1が起きるパターン（findAll()した後にo.getItems()を呼ぶたびに追加クエリ）
+    List<Order> findAll();
+
+    // JOIN FETCHで解決 - 1クエリで全データ取得
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.items WHERE o.status = :status")
+    List<Order> findByStatusWithItems(@Param("status") OrderStatus status);
+
+    // @EntityGraph を使う方法（よりシンプル）
+    @EntityGraph(attributePaths = {"items", "items.product"})
+    @Override
+    List<Order> findAll();
+
+    // ページング + カスタムクエリ（countQueryを明示することで最適化）
+    @Query(value = "SELECT o FROM Order o JOIN FETCH o.items WHERE o.customerId = :cid",
+           countQuery = "SELECT COUNT(o) FROM Order o WHERE o.customerId = :cid")
+    Page<Order> findByCustomerId(@Param("cid") Long customerId, Pageable pageable);
+}`,
+        afterCode: "Hibernateのstatisticsを有効にするには「spring.jpa.properties.hibernate.generate_statistics=true」を設定します。ログに「x statements executed, y cache hits」のようなサマリーが出力され、本番前のパフォーマンス確認に役立ちます。"
+      }
+    ]
+  },
+  {
+    id: "ch3", num: 3, title: "Spring Security・JWT認証", est: "65分",
+    goal: "Spring Securityの仕組みを理解し、JWT認証フィルターを実装できる。エンドポイントごとに認証・認可ルールを設定し、BCryptでパスワードをハッシュ化した登録・ログイン機能を構築できるようになる。",
+    sections: [
+      {
+        title: "Spring Securityのフィルターチェーン",
+        body: "Spring Securityはサーブレットフィルターのチェーンとして動作します。HTTPリクエストはDispatcherServletに到達する前に、複数のセキュリティフィルターを順番に通過します。Pythonのmiddlewareスタック（FastAPIのMiddleware・DjangoのMIDDLEWARE）と概念は同じですが、Springでは各フィルターの責務が明確に分離されており、必要なフィルターだけを有効化する設計が推奨されます。\n\nSpring Boot 3.x（Spring Security 6.x）からは、WebSecurityConfigurerAdapterが廃止されSecurityFilterChain Beanを直接定義するスタイルになりました。`http.authorizeHttpRequests()`でエンドポイントごとにアクセス制御を宣言し、`http.addFilterBefore()`でカスタムフィルターをチェーンに挿入します。\n\nCSRFプロテクションはブラウザベースのフォーム認証で必要ですが、ステートレスなREST APIではセッションを使わないため不要です。JWT認証ではSessionCreationPolicyをSTATELESSに設定し、CSRFを無効化します。",
+        table: T.securityFilter,
+        afterTable: "UsernamePasswordAuthenticationFilterはフォームログイン用です。REST APIにJWT認証を使う場合はこのフィルターを無効化し（.formLogin(AbstractHttpConfigurer::disable)）、代わりに自作のJwtAuthenticationFilterをBearerTokenAuthenticationFilterの前後に挿入します。",
+        code: `@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity  // @PreAuthorize を有効化
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           JwtAuthFilter jwtAuthFilter) throws Exception {
+        return http
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(sm ->
+                sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+            .build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12);  // コスト係数12（デフォルト10）
+    }
+
+    @Bean
+    public AuthenticationManager authManager(AuthenticationConfiguration cfg) throws Exception {
+        return cfg.getAuthenticationManager();
+    }
+}`,
+        afterCode: "@EnableMethodSecurity を有効にすると、Serviceメソッドに@PreAuthorize(\"hasRole('ADMIN')\")や@PreAuthorize(\"#userId == authentication.principal.id\")のような式ベースのメソッドレベル認可が使えます。コントローラ側だけでなくサービス層でも認可を行う、二重防御の実装に役立ちます。"
+      },
+      {
+        title: "JWT認証フィルターの実装",
+        body: "JWT（JSON Web Token）は「ヘッダー.ペイロード.署名」の3部構成のトークンです。サーバーはステートを保持せず、トークンの署名を検証するだけで認証を行います。PythonのPyJWT・python-joseと同様の仕組みですが、Javaでは jjwt（JJWT）ライブラリが広く使われます。\n\n認証フローは①ユーザーがID/PW送信→②サーバーが認証成功時にJWTを発行→③クライアントはリクエストヘッダーに「Authorization: Bearer <token>」を付与→④JwtAuthFilterがトークン検証→⑤SecurityContextにAuthenticationをセットという流れです。\n\nJWTの弱点は「ログアウトが難しい」点です。発行済みトークンをサーバー側から無効化できないため、実務ではRedisにブラックリストを管理するか、トークンの有効期限を短く（15分）しリフレッシュトークンで再発行する仕組みを組み合わせます。",
+        code: `// JwtAuthFilter.java
+@Component
+@RequiredArgsConstructor
+public class JwtAuthFilter extends OncePerRequestFilter {
+    private final JwtUtil jwtUtil;
+    private final UserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest req,
+                                    HttpServletResponse res,
+                                    FilterChain chain) throws IOException, ServletException {
+        String header = req.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) {
+            chain.doFilter(req, res);
+            return;
+        }
+        String token = header.substring(7);
+        if (jwtUtil.validateToken(token)) {
+            String username = jwtUtil.extractUsername(token);
+            UserDetails ud = userDetailsService.loadUserByUsername(username);
+            UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(ud, null, ud.getAuthorities());
+            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
+            SecurityContextHolder.getContext().setAuthentication(auth);
+        }
+        chain.doFilter(req, res);
+    }
+}
+
+// AuthController.java（ログイン→JWT発行）
+@PostMapping("/api/auth/login")
+public Map<String, String> login(@RequestBody LoginRequest req) {
+    authManager.authenticate(
+        new UsernamePasswordAuthenticationToken(req.username(), req.password()));
+    String token = jwtUtil.generateToken(req.username());
+    return Map.of("token", token, "type", "Bearer");
+}`,
+        afterCode: "JWTのペイロードには機密情報を含めないでください。JWTはBase64エンコードされているだけで暗号化はされていないため、中間者がペイロードを読めます。ユーザーIDや権限ロールはペイロードに含めても問題ありませんが、パスワードやクレジットカード番号などは絶対に含めないこと。"
+      }
+    ]
+  },
+  {
+    id: "ch4", num: 4, title: "テスト（JUnit 5・Mockito・Testcontainers）", est: "60分",
+    goal: "JUnit 5とMockitoを使ってユニットテストを書き、@WebMvcTest/@DataJpaTestでスライステストを実装できる。TestcontainersでDockerを使った本物のDBへの統合テストを自動化できるようになる。",
+    sections: [
+      {
+        title: "ユニットテストとスライステスト",
+        body: "Javaのテストエコシステムは、JUnit 5（テストランナー）・Mockito（モック）・AssertJ（アサーション）の3つが事実上の標準です。PythonのPytest・unittest.mock・assertに対応すると考えるとわかりやすいでしょう。Spring Bootのテストは「ユニットテスト」「スライステスト」「統合テスト」の3層で設計します。\n\nスライステストは全Beanを起動せず、テスト対象のレイヤーに必要なBeanだけをロードする仕組みです。@WebMvcTestはMVC層（Controller・Filter・ControllerAdvice）のみを起動し、Serviceは@MockBeanでモックにします。@DataJpaTestはJPA層のみを起動しH2インメモリDBを使うため、実際のDBなしで高速にRepositoryをテストできます。\n\nMockitoのgiven/when/thenスタイル（BDD Mockito）はPytestのmonkeypatch・MagicMockに近い感覚です。`given(service.findAll()).willReturn(list)`のように「何を呼んだら何を返す」という振る舞いを定義し、`verify(repository).save(any(User.class))`のように実際に呼ばれたかを検証します。",
+        table: T.testAnnotations,
+        afterTable: "テストの速度：@SpringBootTest（数秒〜数十秒）> @WebMvcTest/@DataJpaTest（数秒）> @ExtendWith(MockitoExtension)（ミリ秒）。ユニットテストはできるだけSpringコンテキストを起動せず、MockitoだけでServiceのビジネスロジックをテストするほうが開発サイクルが速くなります。",
+        code: `// UserServiceTest.java（Mockitoのみ・Spring不要）
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @InjectMocks
+    private UserService userService;
+
+    @Test
+    void findById_whenExists_returnsUser() {
+        User user = new User(1L, "alice", "alice@example.com");
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        UserDto result = userService.findById(1L);
+
+        assertThat(result.username()).isEqualTo("alice");
+        verify(userRepository).findById(1L);
+    }
+
+    @Test
+    void findById_whenNotFound_throwsException() {
+        given(userRepository.findById(99L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.findById(99L))
+            .isInstanceOf(NoSuchElementException.class)
+            .hasMessageContaining("99");
+    }
+}`,
+        afterCode: "AssertJのassertThat()はJUnitのassertEquals()より可読性が高く、チェーンで複数の検証を書けます。特にコレクション検証（.hasSize(3)・.contains(...)・.extracting(...)）はJUnit標準より圧倒的に書きやすいため、チームで積極的に採用することをお勧めします。"
+      },
+      {
+        title: "Testcontainersで本物のDBを使う統合テスト",
+        body: "H2インメモリDBはJPAテストを高速化しますが、PostgreSQL固有の機能（JSONB・配列型・全文検索）やDB制約の微妙な動作はH2では再現できません。Testcontainersは実際のDockerコンテナをテスト内で起動・停止するライブラリで、本物のPostgreSQLやRedisに対してテストを実行できます。Pythonのpytest-dockerや`docker-py`を使ったフィクスチャに相当します。\n\nTestcontainers + Spring Bootでは@DynamicPropertySourceを使ってコンテナの接続情報を動的にSpringのプロパティに注入します。@Containerをstaticにすることでテストクラス内で1つのコンテナを共有でき、起動コストを最小化できます。\n\n実務では、LocalStack（AWSサービスのモック）・WireMock（外部HTTP APIのモック）・Testcontainersを組み合わせることで、CIパイプライン上で完全なE2Eテストを自動化できます。Dockerが必要ですが、GitHub Actions・GitLab CI・CircleCIはいずれもDockerを標準サポートしているため問題なく動作します。",
+        code: `@SpringBootTest
+@Testcontainers
+@ActiveProfiles("test")
+class UserServiceIT {
+
+    @Container
+    static PostgreSQLContainer<?> postgres =
+        new PostgreSQLContainer<>("postgres:16-alpine")
+            .withDatabaseName("testdb")
+            .withUsername("test")
+            .withPassword("test");
+
+    @DynamicPropertySource
+    static void overrideProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+    }
+
+    @Autowired
+    private UserService userService;
+
+    @Test
+    @Transactional
+    void createAndFind_withRealPostgres() {
+        UserRequest req = new UserRequest("bob", "bob@example.com", "password123");
+        UserDto created = userService.create(req);
+
+        assertThat(created.id()).isNotNull();
+
+        UserDto found = userService.findById(created.id());
+        assertThat(found.email()).isEqualTo("bob@example.com");
+    }
+}`,
+        afterCode: "Testcontainersは最初の実行時にDockerイメージをプルするため数分かかる場合があります。CI環境ではDockerイメージをキャッシュし、テスト実行を高速化してください。また@Testcontainersとstaticフィールドを組み合わせるとクラス間でコンテナを再利用（Singleton Container Pattern）でき、テストスイート全体の起動時間を削減できます。"
+      }
+    ]
+  },
+  {
+    id: "ch5", num: 5, title: "非同期処理・CompletableFuture・Spring Async", est: "60分",
+    goal: "CompletableFutureで複数の非同期タスクを並列実行・合成できる。@Asyncと専用スレッドプールを設定し、メール送信や外部API呼び出しをノンブロッキングで処理できるようになる。",
+    sections: [
+      {
+        title: "CompletableFutureによる非同期並列処理",
+        body: "Javaの非同期処理はJava 8で導入されたCompletableFutureが現在の標準です。PythonのasyncioやFutureに対応しますが、Javaでは複数スレッドを使ったCPUバウンドな並列処理にも対応しているのが大きな違いです。CompletableFutureはMonadicなAPIで、thenApply（変換）・thenCompose（連鎖）・thenCombine（合成）・exceptionally（エラー処理）を組み合わせてパイプラインを構築します。\n\nForkJoinPool.commonPool()がデフォルトのスレッドプールですが、Webアプリでは専用のExecutorを使うべきです。共有プールをブロッキング処理に使うと、他のリクエスト処理が飢餓状態になる可能性があります。ThreadPoolTaskExecutorをBeanとして定義し、supplyAsync(task, executor)の第2引数に渡すのが実務のベストプラクティスです。\n\n複数のCompletableFutureを組み合わせる場合、allOf()で全完了を待つか、anyOf()で最初の完了を取るかを選べます。エラーハンドリングはexceptionally()またはhandle()で行い、一部の処理が失敗しても他の処理結果を活かせる設計にします。",
+        table: T.completableFuture,
+        afterTable: "CompletableFuture.join()はスレッドをブロックするため、Spring MVCのコントローラースレッド上では使用に注意が必要です。DeferredResultや@Asyncを使えば、Springのスレッド管理に組み込みながら非同期処理を行えます。",
+        code: `@Service
+public class ReportService {
+    private final Executor executor;  // 専用スレッドプール
+
+    // 3つのデータを並列取得して合成するレポート生成
+    public ReportDto generateReport(Long userId) {
+        CompletableFuture<UserDto> userFuture =
+            CompletableFuture.supplyAsync(() -> userService.findById(userId), executor);
+
+        CompletableFuture<List<OrderDto>> orderFuture =
+            CompletableFuture.supplyAsync(() -> orderService.findByUser(userId), executor);
+
+        CompletableFuture<List<ActivityDto>> actFuture =
+            CompletableFuture.supplyAsync(() -> activityService.findByUser(userId), executor);
+
+        return CompletableFuture.allOf(userFuture, orderFuture, actFuture)
+            .thenApply(v -> {
+                try {
+                    return new ReportDto(
+                        userFuture.get(),
+                        orderFuture.get(),
+                        actFuture.get()
+                    );
+                } catch (ExecutionException | InterruptedException e) {
+                    throw new CompletionException(e);
+                }
+            })
+            .exceptionally(ex -> {
+                log.error("Report generation failed for user={}", userId, ex);
+                return ReportDto.empty(userId);
+            })
+            .join();
+    }
+}`,
+        afterCode: "実務では3つの並列リクエストを直列で行うと合計300ms、並列なら最も遅い1つ分（100ms）で済みます。外部APIが多いマイクロサービスアーキテクチャではこの差が体感レイテンシに直結するため、並列化は非常に重要な最適化手段です。"
+      },
+      {
+        title: "@Asyncと専用スレッドプールの設定",
+        body: "@Asyncアノテーションを使うと、メソッドが呼ばれると別スレッドで非同期実行され、呼び出し元はすぐに制御を返します。Pythonのasyncio + awaitに近いですが、Javaはマルチスレッドベースであるため、コルーチンではなく本物のOSスレッドが使われます。戻り値をCompletableFuture<T>にすることで、呼び出し元が完了を待ったり結果を取得したりできます。\n\n@Asyncはデフォルトではアプリケーション共有のSimpleAsyncTaskExecutorを使いますが、これはスレッドを再利用せず毎回新規作成するため本番環境には不適切です。必ずThreadPoolTaskExecutorをBean定義してCorePoolSize・MaxPoolSize・QueueCapacityを適切に設定し、@Asyncの実行先として使われるよう設定してください。\n\nスレッドプールのサイジングはCPUコア数・処理特性（CPUバウンドかIOバウンドか）・同時実行数を考慮します。IOバウンド（HTTP呼び出し・DB待機が主体）の場合はコア数の数倍のスレッドを設定し、CPUバウンドの場合はコア数と同数またはコア数+1程度が目安です。",
+        code: `// AsyncConfig.java
+@Configuration
+@EnableAsync
+public class AsyncConfig implements AsyncConfigurer {
+
+    @Override
+    public Executor getAsyncExecutor() {
+        ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
+        exec.setCorePoolSize(Runtime.getRuntime().availableProcessors());
+        exec.setMaxPoolSize(Runtime.getRuntime().availableProcessors() * 2);
+        exec.setQueueCapacity(100);
+        exec.setThreadNamePrefix("async-");
+        exec.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        exec.initialize();
+        return exec;
+    }
+
+    @Override
+    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+        return (ex, method, params) ->
+            log.error("Async error in {}: {}", method.getName(), ex.getMessage(), ex);
+    }
+}
+
+// NotificationService.java
+@Service
+public class NotificationService {
+    @Async
+    public CompletableFuture<Void> sendPushNotification(Long userId, String message) {
+        log.info("Sending push to user={} on thread={}", userId, Thread.currentThread().getName());
+        // 外部プッシュ通知APIを呼ぶ
+        pushClient.send(userId, message);
+        return CompletableFuture.completedFuture(null);
+    }
+}`,
+        afterCode: "CallerRunsPolicy はキューが溢れたとき、呼び出し元スレッドでタスクを実行するポリシーです。これにより新規リクエストの受け入れが自然に遅くなり、バックプレッシャーとして機能します。AbortPolicyやDiscardPolicyは例外を投げたりタスクを捨てたりするため、重要な処理には使わないほうが安全です。"
+      }
+    ]
+  },
+  {
+    id: "ch6", num: 6, title: "マイクロサービス・Spring Cloud", est: "65分",
+    goal: "Spring Cloud OpenFeignで他サービスをHTTP呼び出しでき、サーキットブレーカー（Resilience4j）とリトライを設定できる。Spring Cloud Gatewayでルーティングとフィルタリングを実装し、分散トレーシングの概念を理解できるようになる。",
+    sections: [
+      {
+        title: "OpenFeignとサービス間通信",
+        body: "マイクロサービスアーキテクチャでは、サービス間のHTTP通信が不可欠です。JavaのRestTemplateは古い同期クライアントで、現在はWebClient（リアクティブ）またはOpenFeign（宣言的HTTPクライアント）が推奨されます。PythonのhttpxやRequestsに比べ、Feignはインターフェースとアノテーションだけで実装が自動生成されるため、ボイラープレートが極めて少ないのが特徴です。\n\nFeignクライアントにはフォールバック（Fallback）を設定できます。呼び出し先サービスが障害時にデフォルト値やキャッシュ済みデータを返すことで、カスケード障害（依存先の障害が連鎖して全体停止）を防ぎます。Resilience4jのサーキットブレーカーと組み合わせると、一定の失敗率を超えた時点でリクエストをショートサーキット（即失敗）させ、復旧するまで待機する仕組みが実現できます。\n\nサービスディスカバリーにはEureka（Netflix OSS）やConsulが使われますが、Kubernetes環境では標準のServiceリソースがサービスディスカバリーを担うためEurekaは不要なことも多いです。本番ではKubernetesのServiceとIngressで十分なケースが増えています。",
+        code: `// UserClient.java（Feign）
+@FeignClient(
+    name = "user-service",
+    url = "\${services.user-service.url}",
+    fallbackFactory = UserClientFallbackFactory.class
+)
+public interface UserClient {
+    @GetMapping("/api/users/{id}")
+    UserDto findById(@PathVariable Long id);
+
+    @PostMapping("/api/users")
+    UserDto create(@RequestBody UserRequest req);
+}
+
+// UserClientFallbackFactory.java
+@Component
+public class UserClientFallbackFactory implements FallbackFactory<UserClient> {
+    @Override
+    public UserClient create(Throwable cause) {
+        return id -> {
+            log.warn("Fallback for user id={}, cause={}", id, cause.getMessage());
+            return UserDto.unknown(id);
+        };
+    }
+}
+
+// application.yml（Resilience4j設定）
+// resilience4j:
+//   circuitbreaker:
+//     instances:
+//       user-service:
+//         slidingWindowSize: 10
+//         failureRateThreshold: 50
+//         waitDurationInOpenState: 10s`,
+        afterCode: "FallbackFactoryはFallbackより優れています。Fallbackでは例外の情報にアクセスできませんが、FallbackFactoryではcause（原因例外）を受け取れるため、ログ出力やメトリクス記録に使えます。本番コードでは必ずFallbackFactoryを使ってください。"
+      },
+      {
+        title: "Spring Cloud Gatewayとフィルタリング",
+        body: "API Gatewayはマイクロサービスの「玄関口」として、ルーティング・認証・レート制限・ロードバランシングを一元管理します。Spring Cloud GatewayはNetflixのZuulに代わるSpring公式のリアクティブGatewayで、WebFlux上で動作します。Pythonで言えばNginxやFastAPIでプロキシを構築するイメージですが、Springの設定とフィルタープラグインで柔軟に設定できます。\n\nGatewayのフィルターには「Pre（リクエスト前）」と「Post（レスポンス後）」の2種類があります。Preフィルターで認証ヘッダーの検証・リクエストID付与を行い、Postフィルターでレスポンスヘッダーの追加・レスポンスタイムの記録を行うのが典型的な使い方です。\n\n分散トレーシングはマイクロサービスのデバッグに不可欠です。Micrometer Tracingを使うとSpring Boot 3.xでOpenTelemetryやZipkinへのトレース送信が設定1つで有効になります。各サービスをまたぐリクエストにtraceIdとspanIdが付与され、どのサービスでどれだけ時間がかかったかをトレースできます。",
+        code: `// GlobalAuthFilter.java（カスタムGatewayフィルター）
+@Component
+public class GlobalAuthFilter implements GlobalFilter, Ordered {
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        ServerHttpRequest req = exchange.getRequest();
+        String path = req.getPath().value();
+
+        // 公開パスはスキップ
+        if (path.startsWith("/api/auth/") || path.startsWith("/api/public/")) {
+            return chain.filter(exchange);
+        }
+
+        String auth = req.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (auth == null || !auth.startsWith("Bearer ")) {
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
+
+        String token = auth.substring(7);
+        if (!jwtUtil.validateToken(token)) {
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
+
+        // 後続フィルターにユーザー情報を伝える
+        ServerHttpRequest mutated = req.mutate()
+            .header("X-Auth-User", jwtUtil.extractUsername(token))
+            .build();
+        return chain.filter(exchange.mutate().request(mutated).build());
+    }
+
+    @Override
+    public int getOrder() { return -100; }
+}`,
+        afterCode: "X-Auth-UserのようにGatewayでヘッダーを追加することで、下流サービスはJWT検証を自分で行う必要がなくなります。ただしこの設計では「X-Auth-Userヘッダーを直接渡されても信じる」ことになるため、Gateway以外からの直接アクセスをネットワークレベル（SecurityGroupやKubernetesNetworkPolicy）でブロックすることが前提です。"
+      }
+    ]
+  },
+  {
+    id: "ch7", num: 7, title: "パフォーマンスチューニング・JVMプロファイリング", est: "60分",
+    goal: "Spring Cacheを活用してDBクエリを削減できる。JVMのヒープ・GC設定の基礎を理解し、JFRやVisuaVMを使ったプロファイリングの流れを把握できる。本番障害時にヒープダンプとスレッドダンプを取得し分析できるようになる。",
+    sections: [
+      {
+        title: "Spring Cacheとパフォーマンス最適化",
+        body: "Webアプリのボトルネックのほとんどはデータベースアクセスです。Spring Cacheは@Cacheable・@CachePut・@CacheEvictアノテーションでメソッドの結果をキャッシュし、同じ引数で呼ばれた場合はDBアクセスをスキップします。Pythonで言えばfunctools.lru_cacheやRedis-pyでの手動キャッシュに対応しますが、Springではアノテーション1つでDB呼び出しを透過的にキャッシュできます。\n\nキャッシュの種類は用途によって選びます。単一インスタンスの場合はCaffeineキャッシュ（高性能なインメモリキャッシュ）、複数インスタンスのクラスター環境ではRedisを使った分散キャッシュを選択します。Spring Cacheは実装を差し替えやすい抽象レイヤーになっているため、application.propertiesで「spring.cache.type=redis」と変更するだけで切り替えられます。\n\nキャッシュの無効化戦略は「TTL（有効期限）ベース」か「イベントドリブン（データ更新時に明示的に削除）」のどちらかです。TTLベースは実装がシンプルですが古いデータを一定時間返す可能性があります。イベントドリブン（@CacheEvict）はデータの一貫性を保てますが、すべての更新パスで漏れなく呼ぶ必要があります。",
+        code: `// CacheConfig.java（Caffeineキャッシュ設定）
+@Configuration
+@EnableCaching
+public class CacheConfig {
+    @Bean
+    public CacheManager cacheManager() {
+        CaffeineCacheManager manager = new CaffeineCacheManager();
+        manager.setCaffeine(Caffeine.newBuilder()
+            .maximumSize(1000)
+            .expireAfterWrite(10, TimeUnit.MINUTES)
+            .recordStats());  // キャッシュ統計を記録
+        return manager;
+    }
+}
+
+// ProductService.java
+@Service
+public class ProductService {
+
+    @Cacheable(value = "products", key = "#id", unless = "#result == null")
+    public ProductDto findById(Long id) {
+        return productRepository.findById(id)
+            .map(mapper::toDto)
+            .orElse(null);
+    }
+
+    @Cacheable(value = "productList", key = "#category + '_' + #pageable.pageNumber")
+    public Page<ProductDto> findByCategory(String category, Pageable pageable) {
+        return productRepository.findByCategory(category, pageable).map(mapper::toDto);
+    }
+
+    @CachePut(value = "products", key = "#result.id")
+    @CacheEvict(value = "productList", allEntries = true)
+    public ProductDto update(Long id, ProductRequest req) {
+        Product p = productRepository.findById(id).orElseThrow();
+        p.setName(req.name());
+        p.setPrice(req.price());
+        return mapper.toDto(productRepository.save(p));
+    }
+}`,
+        afterCode: "Caffeineの.recordStats()を有効にし、Spring Actuatorの/actuator/cachesエンドポイントでキャッシュヒット率を監視しましょう。ヒット率が低い（50%未満）場合はTTLやキャッシュキーの設計を見直す必要があります。"
+      },
+      {
+        title: "JVMプロファイリングとヒープ分析",
+        body: "JVMの特徴は「GC（ガベージコレクション）が自動でメモリを管理する」点です。Pythonの参照カウントGCと異なり、JVMのGCはヒープを世代別（Young・Old・Metaspace）に管理し、大量のオブジェクトを効率的に回収します。Java 17以降はZGCやShenandoah GCが使えるようになり、GCポーズをミリ秒以下に抑えられます。\n\nプロファイリングツールとしては、JDK付属のjstat・jmap・jstack、GUI툴のVisuaVM・JConsole、そしてJava Flight Recorder（JFR）があります。JFRはJava 11以降無償で使えるプロダクショングレードのプロファイラーで、オーバーヘッドを最小限に抑えながらスレッド・メモリ・GC・I/Oの情報を継続的に記録できます。\n\nメモリリークの調査ではヒープダンプをEclipse Memory Analyzer（MAT）で解析します。「Dominator Tree」でどのオブジェクトが大量のメモリを保持しているか、「Leak Suspects」でリークの疑いがある箇所を特定します。Pythonのobjgraphやmemoryprofilerに相当しますが、JVMはより詳細な情報を提供します。",
+        code: `// アプリ起動時のJVMオプション例（本番推奨設定）
+// java -server \\
+//   -Xms512m -Xmx2g \\
+//   -XX:+UseZGC \\
+//   -XX:+HeapDumpOnOutOfMemoryError \\
+//   -XX:HeapDumpPath=/var/log/app/oom-\$(date +%Y%m%d%H%M%S).hprof \\
+//   -XX:StartFlightRecording=filename=/var/log/app/flight.jfr,duration=60s \\
+//   -jar app.jar
+
+// HealthIndicator でJVM情報をActuatorに公開
+@Component
+public class JvmHealthIndicator implements HealthIndicator {
+    @Override
+    public Health health() {
+        Runtime rt = Runtime.getRuntime();
+        long usedMB  = (rt.totalMemory() - rt.freeMemory()) / 1024 / 1024;
+        long maxMB   = rt.maxMemory() / 1024 / 1024;
+        double ratio = (double) usedMB / maxMB;
+
+        Health.Builder builder = ratio > 0.9 ? Health.down() : Health.up();
+        return builder
+            .withDetail("heap.used", usedMB + " MB")
+            .withDetail("heap.max",  maxMB  + " MB")
+            .withDetail("heap.ratio", String.format("%.1f%%", ratio * 100))
+            .withDetail("threads", Thread.activeCount())
+            .build();
+    }
+}`,
+        afterCode: "Spring Actuatorは本番監視に不可欠です。management.endpoints.web.exposure.include=health,info,metrics,caches,prometheus を設定し、Prometheusとgrafanaと連携することで、ヒープ使用量・GC時間・HTTPリクエスト数・レイテンシをリアルタイムでダッシュボード化できます。"
+      }
+    ]
+  },
+  {
+    id: "ch8", num: 8, title: "リアクティブプログラミング・Project Reactor", est: "65分",
+    goal: "Mono/FluxのAPIを使ってリアクティブなデータパイプラインを構築できる。Spring WebFluxでノンブロッキングなREST APIとSSEエンドポイントを実装し、R2DBCでリアクティブなDBアクセスができるようになる。",
+    sections: [
+      {
+        title: "Mono/FluxとリアクティブAPIの基礎",
+        body: "リアクティブプログラミングは「データのストリームと変化の伝播」を宣言的に扱うパラダイムです。Project ReactorはSpringのリアクティブスタックの基盤で、Mono（0〜1件）とFlux（0〜N件）の2つのPublisherを提供します。PythonのasyncioジェネレーターやRxPYのObservableに近い概念ですが、ProjectReactorはバックプレッシャー（受信側が処理できる速度に合わせて送信速度を制御）をプロトコルレベルでサポートしています。\n\nMonoとFluxは「遅延評価」です。パイプラインを組み立てただけでは何も実行されず、subscribe()が呼ばれた時点で初めてデータが流れ始めます。これはPythonのジェネレーターが呼び出されるまで実行されないのと同じ概念です。Spring WebFluxではフレームワークが自動的にsubscribeするため、通常は自分でsubscribeを呼ぶ必要はありません。\n\nオペレーターの選び方が重要です。map()は同期変換（毎要素にMonoを返さない）、flatMap()は非同期変換（各要素でMonoを返してフラット化）です。flatMap()のデフォルトは無秩序な並列実行で、順序を保ちたい場合はconcatMap()（直列）またはflatMapSequential()を使います。",
+        table: T.reactorOperators,
+        afterTable: "subscribeOn()は購読のスタートスレッドを変える（上流全体に影響）、publishOn()はその行以降のオペレーターを指定スレッドで実行します。IOバウンドな処理（DB・HTTP）はSchedulers.boundedElastic()、CPUバウンド（計算処理）はSchedulers.parallel()を使うのが基本です。",
+        code: `// リアクティブなサービス実装例
+@Service
+public class ProductService {
+
+    private final R2dbcProductRepository repo;
+    private final WebClient priceClient;
+
+    // 複数ソースを合成するパイプライン
+    public Flux<ProductDto> findEnrichedProducts(String category) {
+        return repo.findByCategory(category)
+            .flatMap(product ->
+                fetchPrice(product.getId())
+                    .map(price -> new ProductDto(
+                        product.getId(), product.getName(), price))
+                    .onErrorReturn(new ProductDto(
+                        product.getId(), product.getName(), BigDecimal.ZERO))
+            )
+            .filter(dto -> dto.price().compareTo(BigDecimal.ZERO) > 0)
+            .sort(Comparator.comparing(ProductDto::price))
+            .take(50);
+    }
+
+    private Mono<BigDecimal> fetchPrice(Long productId) {
+        return priceClient.get()
+            .uri("/prices/{id}", productId)
+            .retrieve()
+            .bodyToMono(PriceResponse.class)
+            .map(PriceResponse::price)
+            .timeout(Duration.ofSeconds(2))
+            .retry(2);
+    }
+}`,
+        afterCode: "WebClientはリアクティブ対応のHTTPクライアントです。RestTemplateはブロッキングのため、WebFluxアプリではWebClientを使ってください。retrieve().bodyToMono()でシンプルにレスポンスを取得でき、exchangeToMono()でレスポンスのステータスコードにアクセスしながら処理を分岐できます。"
+      },
+      {
+        title: "Spring WebFluxとSSEエンドポイント",
+        body: "Spring WebFluxはSpring MVCのリアクティブ版で、Netty上で動作するノンブロッキングサーバーです。少数スレッドで大量のコネクションを捌けるため、IoTデータのストリーミング・リアルタイムダッシュボード・WebSocketサーバーに適しています。PythonのFastAPIが非同期対応なのと同様に、WebFluxは全スタックがリアクティブです。\n\nSSE（Server-Sent Events）はHTTPコネクションを維持し続け、サーバーからクライアントへ継続的にデータをプッシュする技術です。WebSocketより軽量でHTTPファイアウォールを透過しやすく、一方向（サーバー→クライアント）のストリーミングに最適です。Spring WebFluxではFluxを返すだけでSSEが実現できます。\n\nr2dbc（Reactive Relational Database Connectivity）はJPAのリアクティブ版で、DBへのクエリもノンブロッキングで実行できます。ただしR2DBCは2024年現在もJPAほど成熟しておらず、複雑なリレーションのマッピングや高度なクエリにはJPAに比べて制約があります。新規のリアクティブシステムでは採用を検討する価値がありますが、既存のJPAスタックをR2DBCに移行するのは慎重に判断してください。",
+        code: `// WebFluxコントローラー（RouterFunction + Handler構成）
+@Configuration
+public class NotificationRouter {
+    @Bean
+    public RouterFunction<ServerResponse> notificationRoutes(NotificationHandler h) {
+        return RouterFunctions.route()
+            .GET("/notifications/stream/{userId}", h::stream)
+            .POST("/notifications/{userId}", h::send)
+            .build();
+    }
+}
+
+@Component
+@RequiredArgsConstructor
+public class NotificationHandler {
+    // Sinkは複数のサブスクライバーにマルチキャストする仕組み
+    private final Sinks.Many<Notification> sink =
+        Sinks.many().multicast().onBackpressureBuffer();
+
+    public Mono<ServerResponse> stream(ServerRequest req) {
+        Long userId = Long.parseLong(req.pathVariable("userId"));
+        Flux<Notification> userNotifs = sink.asFlux()
+            .filter(n -> n.userId().equals(userId))
+            .take(Duration.ofMinutes(30));  // 最大30分間接続を維持
+
+        return ServerResponse.ok()
+            .contentType(MediaType.TEXT_EVENT_STREAM)
+            .body(userNotifs, Notification.class);
+    }
+
+    public Mono<ServerResponse> send(ServerRequest req) {
+        return req.bodyToMono(Notification.class)
+            .doOnNext(n -> sink.tryEmitNext(n))
+            .then(ServerResponse.accepted().build());
+    }
+}`,
+        afterCode: "Sinks.Many はリアクティブなイベントバスとして機能します。multicast().onBackpressureBuffer()は複数のサブスクライバー（接続中のSSEクライアント）にイベントを配信します。本番では/notifications/streamエンドポイントに認証フィルターを適用し、自分宛のNotificationしか受け取れないように必ずアクセス制御してください。"
+      }
+    ]
+  }
+];
+
+function DataTable({data}) {
+  return React.createElement("div", {
+    style:{overflowX:"auto",margin:"12px 0",borderRadius:10,border:"1px solid #d1d5db",background:"#fff"}
+  }, React.createElement("table", {style:{width:"100%",borderCollapse:"collapse",fontSize:13}},
+    data.cap && React.createElement("caption", {style:{padding:"6px 12px",background:"#f3f4f6",fontWeight:700,fontSize:12,color:"#374151",textAlign:"left",borderBottom:"1px solid #e5e7eb"}}, data.cap),
+    React.createElement("thead", null,
+      React.createElement("tr", null, data.h.map((h,i)=>React.createElement("th",{key:i,style:{padding:"8px 12px",background:"#f9fafb",borderBottom:"2px solid #e5e7eb",fontWeight:700,textAlign:"left",color:"#374151",whiteSpace:"nowrap"}},h)))
+    ),
+    React.createElement("tbody", null,
+      data.r.map((row,i)=>React.createElement("tr",{key:i,style:{background:i%2===0?"#fff":"#f9fafb"}},
+        row.map((cell,j)=>React.createElement("td",{key:j,style:{padding:"8px 12px",borderBottom:"1px solid #f3f4f6",color:"#374151",verticalAlign:"top"}},cell))
+      ))
+    )
+  ));
+}
+
+function Code({code}) {
+  const [copied, setCopied] = useState(false);
+  return React.createElement("div", {style:{position:"relative",margin:"10px 0"}},
+    React.createElement("pre", {style:{background:"#1e1b4b",color:"#e2e8f0",padding:"14px 16px",borderRadius:10,overflowX:"auto",fontSize:12.5,lineHeight:1.7,fontFamily:"'JetBrains Mono',monospace"}},
+      React.createElement("code", null, code)
+    ),
+    React.createElement("button", {
+      onClick:()=>{navigator.clipboard?.writeText(code);setCopied(true);setTimeout(()=>setCopied(false),2000);},
+      style:{position:"absolute",top:8,right:8,background:copied?"#22c55e":"rgba(255,255,255,0.15)",
+        color:"#fff",border:"none",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}
+    }, copied?"✓ Copied":"Copy")
+  );
+}
+
+function Exercise({ex, idx}) {
+  const [show, setShow] = useState(false);
+  const stars = "⭐".repeat(ex.diff);
+  return React.createElement("div", {style:{border:"1px solid #fde68a",borderRadius:12,overflow:"hidden",marginBottom:8,background:"#fff"}},
+    React.createElement("div", {style:{padding:"12px 16px",background:"#fffbeb"}},
+      React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}},
+        React.createElement("span", {style:{fontSize:12,fontWeight:700,color:"#92400e"}}, "演習 "+(idx+1)),
+        React.createElement("span", {style:{fontSize:12}}, stars)
+      ),
+      React.createElement("p", {style:{fontSize:13.5,color:"#1c1917",lineHeight:1.75,margin:0,whiteSpace:"pre-line"}}, ex.q)
+    ),
+    ex.code && React.createElement(Code, {code:ex.code}),
+    React.createElement("div", {style:{padding:"8px 16px",borderTop:"1px solid #fde68a",background:"#fffbeb"}},
+      React.createElement("button", {
+        onClick:()=>setShow(!show),
+        style:{background:"none",border:"1px solid #f59e0b",borderRadius:8,padding:"6px 14px",
+          fontSize:12,fontWeight:700,color:"#92400e",cursor:"pointer"}
+      }, show?"▲ 解答を隠す":"▼ 解答を見る"),
+      show && React.createElement(Code, {code:ex.answer})
+    )
+  );
+}
+
+function Section({section, idx, defaultOpen}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style:{borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",background:"#fff"}
+  },
+    React.createElement("button", {
+      onClick:()=>setOpen(!open),
+      style:{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px 16px",
+        border:"none",background:"#fafafa",cursor:"pointer",textAlign:"left",fontSize:14,fontWeight:700,color:"#1e1b4b"}
+    },
+      React.createElement("span", {style:{flexShrink:0,width:24,height:24,borderRadius:6,background:"#6366f1",
+        color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800}}, idx+1),
+      React.createElement("span", {style:{flex:1}}, section.title),
+      React.createElement("span", {style:{fontSize:18,color:"#9ca3af",transition:"transform 0.2s",
+        transform:open?"rotate(90deg)":"rotate(0)"}}, "›")
+    ),
+    open && React.createElement("div", {style:{padding:"12px 16px 16px"}},
+      section.body && React.createElement("p", {style:{margin:"0 0 8px",fontSize:13.5,lineHeight:1.85,color:"#374151",whiteSpace:"pre-line"}}, section.body),
+      section.table && React.createElement(DataTable, {data:section.table}),
+      section.afterTable && React.createElement("p", {style:{margin:"8px 0",fontSize:13.5,lineHeight:1.85,color:"#374151",whiteSpace:"pre-line"}}, section.afterTable),
+      section.code && React.createElement(Code, {code:section.code}),
+      section.afterCode && React.createElement("p", {style:{margin:"10px 0 0",fontSize:13,lineHeight:1.8,color:"#555",
+        whiteSpace:"pre-line",background:"#f9fafb",padding:"10px 14px",borderRadius:8,border:"1px solid #e5e7eb"}}, section.afterCode)
+    )
+  );
+}
+
+function JavaIntermediateCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+
+  const totalChapters = chapters.length;
+  const totalExercises = Object.values(EX).reduce((s,a)=>s+a.length,0);
+
+  const e = React.createElement;
+
+  const heroSection = e("div", {
+    style:{background:"linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#4c1d95 100%)",
+      color:"#fff",padding:"48px 24px 40px",textAlign:"center"}
+  },
+    e("div", {style:{fontSize:48,marginBottom:12}}, "☕"),
+    e("h1", {style:{fontSize:32,fontWeight:900,letterSpacing:"-0.02em",marginBottom:8}}, "Java 中級コース"),
+    e("p", {style:{fontSize:15,color:"#c4b5fd",marginBottom:20,maxWidth:600,margin:"0 auto 20px"}},
+      "Spring Boot・JPA・Security・JUnit・CompletableFuture・マイクロサービス・リアクティブプログラミングを体系的に習得します。コース修了後にはSpring Bootで実務品質のWebアプリを構築できるようになることがゴールです。"
+    ),
+    e("div", {style:{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap",marginTop:20}},
+      e("div", {style:{background:"rgba(255,255,255,0.12)",borderRadius:10,padding:"10px 20px",fontSize:13}},
+        e("span", {style:{fontWeight:800,fontSize:18,display:"block"}}, totalChapters), "章"
+      ),
+      e("div", {style:{background:"rgba(255,255,255,0.12)",borderRadius:10,padding:"10px 20px",fontSize:13}},
+        e("span", {style:{fontWeight:800,fontSize:18,display:"block"}}, totalExercises), "演習"
+      ),
+      e("div", {style:{background:"rgba(255,255,255,0.12)",borderRadius:10,padding:"10px 20px",fontSize:13}},
+        e("span", {style:{fontWeight:800,fontSize:18,display:"block"}}, "中級"), "レベル"
+      )
+    )
+  );
+
+  const navBar = e("div", {style:{background:"#fff",borderBottom:"1px solid #e5e7eb",padding:"0 16px",position:"sticky",top:56,zIndex:50}},
+    e("div", {style:{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",gap:4,overflowX:"auto",padding:"8px 0"}},
+      chapters.map((c,i)=>
+        e("button", {
+          key:c.id,
+          onClick:()=>setCh(i),
+          style:{
+            whiteSpace:"nowrap",padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",
+            fontSize:12.5,fontWeight:i===ch?700:500,
+            background:i===ch?"#6366f1":"transparent",
+            color:i===ch?"#fff":"#374151",
+            transition:"all 0.15s"
+          }
+        }, `第${c.num}章 ${c.title}`)
+      )
+    )
+  );
+
+  const goalBlock = e("div", {
+    style:{background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",border:"1.5px solid #a5b4fc",
+      borderRadius:14,padding:"16px 20px",marginBottom:20}
+  },
+    e("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:8}},
+      e("span", {style:{fontSize:18}}, "🎯"),
+      e("span", {style:{fontWeight:800,fontSize:14,color:"#3730a3"}}, "この章のゴール")
+    ),
+    e("p", {style:{fontSize:13.5,color:"#312e81",lineHeight:1.75,margin:0}}, chapter.goal)
+  );
+
+  const chapterMeta = e("div", {style:{display:"flex",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}},
+    e("span", {style:{background:"#6366f1",color:"#fff",borderRadius:8,padding:"4px 12px",fontSize:12,fontWeight:700}},
+      `第${chapter.num}章`),
+    e("h2", {style:{fontSize:20,fontWeight:800,color:"#1e1b4b",flex:1}},(chapter.title)),
+    e("span", {style:{fontSize:12,color:"#6b7280",background:"#f3f4f6",borderRadius:6,padding:"3px 10px"}},
+      "⏱ "+chapter.est)
+  );
+
+  const sectionsArea = e("div", {style:{display:"flex",flexDirection:"column",gap:10,marginBottom:24}},
+    chapter.sections.map((s,i)=>
+      e(Section, {key:chapter.id+"-s"+i, section:s, idx:i, defaultOpen:i===0})
+    )
+  );
+
+  const exercisesArea = exercises.length > 0 ? e("div", {style:{marginBottom:24}},
+    e("h3", {style:{fontSize:16,fontWeight:800,color:"#92400e",marginBottom:12,display:"flex",alignItems:"center",gap:8}},
+      e("span", null, "📝"), "演習問題"
+    ),
+    exercises.map((ex,i)=>e(Exercise, {key:chapter.id+"-ex"+i, ex, idx:i}))
+  ) : null;
+
+  const prevBtn = ch > 0 ? e("button", {
+    onClick:()=>setCh(ch-1),
+    style:{padding:"10px 20px",borderRadius:10,border:"1.5px solid #6366f1",background:"#fff",
+      color:"#6366f1",fontWeight:700,cursor:"pointer",fontSize:13}
+  }, "← 前の章") : e("div",null);
+
+  const nextBtn = ch < totalChapters - 1
+    ? e("button", {
+        onClick:()=>setCh(ch+1),
+        style:{padding:"10px 20px",borderRadius:10,border:"none",background:"#6366f1",
+          color:"#fff",fontWeight:700,cursor:"pointer",fontSize:13}
+      }, "次の章 →")
+    : e("a", {
+        href:"../index.html",
+        style:{padding:"10px 20px",borderRadius:10,border:"none",background:"#22c55e",
+          color:"#fff",fontWeight:700,cursor:"pointer",fontSize:13,textDecoration:"none",display:"inline-block"}
+      }, "🎓 コース完了！ホームへ");
+
+  const pagination = e("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",
+    padding:"16px 0",borderTop:"1px solid #e5e7eb",marginTop:8}},
+    prevBtn,
+    e("span", {style:{fontSize:12,color:"#9ca3af"}}, `${ch+1} / ${totalChapters}`),
+    nextBtn
+  );
+
+  const footer = e("footer", {style:{textAlign:"center",padding:"24px 16px",color:"#9ca3af",fontSize:11,borderTop:"1px solid #f3f4f6",marginTop:16}},
+    "docs.spring.io ・ Spring Boot 3.x / Java 21 時点"
+  );
+
+  return e("div", {style:{background:"#f8fafc",minHeight:"100vh"}},
+    heroSection,
+    navBar,
+    e("div", {style:{maxWidth:1100,margin:"0 auto",padding:"24px 16px"}},
+      chapterMeta,
+      goalBlock,
+      sectionsArea,
+      exercisesArea,
+      pagination
+    ),
+    footer
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(JavaIntermediateCourse));
+  </script>
+</body>
+</html>
