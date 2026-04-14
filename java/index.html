@@ -1,0 +1,2405 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java 入門コース</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const CHAPTERS = [
+  {
+    id:"ch1",num:1,title:"Java設計思想とJVM",
+    goal:"JVMのコンパイル・実行モデルを説明でき、Pythonとのアーキテクチャ的違いを理解した上でHello Worldを書いて実行できる。",
+    sections:[
+      {
+        title:"Java誕生の背景と設計哲学",
+        body:`JavaはSun Microsystems（現Oracle）が1995年にリリースしたプログラミング言語です。「Write Once, Run Anywhere（一度書けばどこでも動く）」をスローガンに、JVM（Java Virtual Machine）という仮想マシン上でバイトコードを実行することでプラットフォーム非依存性を実現しました。
+
+Pythonが動的型付け・インタープリタ実行を採用しているのに対し、Javaは静的型付け・コンパイル言語です。コードを書いたらまずJavaコンパイラ（javac）でバイトコード（.classファイル）にコンパイルし、そのバイトコードをJVM上で実行します。この二段階プロセスにより、コンパイル時に多くのエラーを検出でき、実行時の型安全性が保証されます。
+
+Javaはオブジェクト指向を言語の中心に据えており、「すべてはオブジェクト」という思想のもと設計されています（プリミティブ型は例外）。現在はJava 21（LTS）が最新の長期サポート版で、パターンマッチング・仮想スレッド（Project Loom）・レコード・sealed classなどのモダンな機能が多数追加されています。`,
+        table:{headers:["項目","Python","Java"],rows:[
+          ["型付け","動的型付け","静的型付け"],
+          ["実行方式","インタープリタ（CPython）","コンパイル + JVM実行"],
+          ["実行ファイル","なし（.pyそのまま）",".classバイトコード"],
+          ["パフォーマンス","中程度","高速（JITコンパイル）"],
+          ["主な用途","ML/データ・スクリプト","Web・Androidなど"],
+        ]},
+        afterTable:"JVMにはJust-In-Time（JIT）コンパイラが組み込まれており、ホットスポット（頻繁に実行されるコード）を実行時にネイティブコードにコンパイルします。これによりJavaはインタープリタ言語より大幅に高速で、長時間稼働サーバーでは特にパフォーマンスが向上します。",
+      },
+      {
+        title:"開発環境のセットアップと初めてのJavaプログラム",
+        body:`Java開発にはJDK（Java Development Kit）が必要です。JREとは異なりコンパイラ（javac）・デバッガ・各種ツールが含まれます。JavaはLTSバージョン（8, 11, 17, 21）を選ぶのが実務での定石です。
+
+インストール後、環境変数 JAVA_HOME にJDKのパスを設定し、PATH に $JAVA_HOME/bin を追加します。ターミナルで java -version と javac -version を実行して確認してください。IDEはIntelliJ IDEA（業界標準）またはVS Code（Java Extension Pack）が推奨です。
+
+Javaの全コードはクラスの中に書く必要があります。クラス名はファイル名と完全一致させる必要があります（大文字小文字含む）。ファイルが HelloWorld.java なら public class HelloWorld と定義します。エントリポイントは public static void main(String[] args) メソッドです。`,
+        code:`// ファイル名: HelloWorld.java
+public class HelloWorld {
+    // プログラムのエントリポイント
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+        System.out.println("Java " + System.getProperty("java.version"));
+
+        // 変数宣言（型を明示）
+        String name = "Java";
+        int version = 21;
+        System.out.printf("Welcome to %s %d!%n", name, version);
+    }
+}
+
+// コンパイルと実行
+// $ javac HelloWorld.java
+// $ java HelloWorld
+// Hello, World!
+// Java 21.x.x
+// Welcome to Java 21!`,
+        afterCode:"Java 11以降はソースファイルを直接 java HelloWorld.java で実行できます（単一ファイルの場合）。ただし実務ではMaven/Gradleを使ったビルドシステムを利用します。",
+      },
+      {
+        title:"Javaのディレクトリ構造とパッケージ",
+        body:`Javaではクラスをパッケージ（package）で整理します。パッケージはディレクトリ構造と対応しており、com.example.app パッケージのクラスは src/com/example/app/ ディレクトリに置きます。
+
+パッケージ名は通常、ドメインを逆順にした命名規則（逆DNS記法）を使います（例: com.mycompany.myapp）。別パッケージのクラスを使うにはimport文で宣言します。java.lang（String, Systemなど）は自動インポートされます。
+
+アクセス修飾子はpublic（どこからでも）、protected（同パッケージ・サブクラス）、（なし：package-private, 同パッケージのみ）、private（同クラスのみ）の4種類です。Pythonにはアクセス制御がありませんが、Javaでは厳密に制御できます。`,
+        code:`package com.example.hello;  // パッケージ宣言
+
+import java.time.LocalDate;      // 必要なクラスをインポート
+import java.util.List;           // ジェネリクス付きインポート
+
+public class Introduction {
+    // 定数: static final で定義
+    public static final String VERSION = "1.0.0";
+
+    // インスタンスフィールド
+    private String message;
+
+    // コンストラクタ
+    public Introduction(String message) {
+        this.message = message;
+    }
+
+    // メソッド
+    public void greet() {
+        System.out.println(message + " - " + LocalDate.now());
+    }
+
+    public static void main(String[] args) {
+        Introduction intro = new Introduction("Hello from package!");
+        intro.greet();
+
+        List<String> items = List.of("Java", "Python", "Go");
+        items.forEach(System.out::println);  // メソッド参照
+    }
+}`,
+        afterCode:"var キーワード（Java 10以降）を使うとローカル変数の型推論が可能です。var items = List.of(\"a\", \"b\") のように書けますが、フィールドやメソッドパラメータには使えません。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"Javaで自分の名前と年齢を表示するプログラムを書いてください。クラス名はPersonInfoとします。",a:`public class PersonInfo {
+    public static void main(String[] args) {
+        String name = "Taro";
+        int age = 25;
+        System.out.println("名前: " + name);
+        System.out.println("年齢: " + age);
+        // または
+        System.out.printf("私の名前は%sで、%d歳です。%n", name, age);
+    }
+}`},
+      {stars:2,q:"HelloWorldクラスのmainメソッドから別のクラスGreeterのsayHello(String name)メソッドを呼び出してください。Greeterはpublicクラスで、別ファイルにしても同ファイル内の非publicクラスでも構いません。",a:`// Greeter.java
+public class Greeter {
+    public void sayHello(String name) {
+        System.out.printf("こんにちは、%sさん！%n", name);
+    }
+}
+
+// HelloWorld.java
+public class HelloWorld {
+    public static void main(String[] args) {
+        Greeter greeter = new Greeter();
+        greeter.sayHello("Taro");
+        greeter.sayHello("Hanako");
+    }
+}`},
+      {stars:3,q:"java.timeパッケージを使って今日の日付と曜日を「2026年4月14日（火）」の形式で表示するプログラムを書いてください。",a:`import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+
+public class DateDisplay {
+    public static void main(String[] args) {
+        LocalDate today = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter
+            .ofPattern("yyyy年M月d日（E）", Locale.JAPANESE);
+        System.out.println(today.format(formatter));
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch2",num:2,title:"型システムと変数",
+    goal:"Javaのプリミティブ型と参照型の違いを説明でき、型変換・文字列操作・Mathクラスを使ったプログラムを書ける。",
+    sections:[
+      {
+        title:"プリミティブ型と参照型",
+        body:`Javaの型は大きくプリミティブ型（primitive type）と参照型（reference type）の二種類に分かれます。プリミティブ型はスタック上に値が直接格納され、参照型はヒープ上のオブジェクトへの参照をスタックに持ちます。
+
+プリミティブ型は8種類：boolean（true/false）、byte（-128〜127）、short（-32768〜32767）、int（-2^31〜2^31-1）、long（-2^63〜2^63-1）、float（32bit浮動小数）、double（64bit浮動小数）、char（16bit Unicode文字）です。Pythonにはこの概念がなく、すべてオブジェクトです。
+
+参照型はString・配列・クラス・インターフェースなどすべてのオブジェクトです。プリミティブ型にはそれに対応するラッパークラス（Integer, Double, Boolean等）が存在し、ジェネリクスやコレクションで必要になります。Java 5以降のオートボクシング/アンボクシングにより、int ↔ Integer の変換は自動で行われます。`,
+        table:{headers:["プリミティブ","サイズ","ラッパークラス","デフォルト値"],rows:[
+          ["int","32bit","Integer","0"],
+          ["long","64bit","Long","0L"],
+          ["double","64bit","Double","0.0"],
+          ["boolean","1bit","Boolean","false"],
+          ["char","16bit","Character","'\\u0000'"],
+          ["byte","8bit","Byte","0"],
+        ]},
+        afterTable:"longリテラルはLサフィックスが必要（例: 100L）。floatはFサフィックス（例: 3.14F）。デフォルト値はフィールドにのみ適用され、ローカル変数は必ず初期化が必要です。",
+      },
+      {
+        title:"型変換と文字列操作",
+        body:`Javaでは型変換に暗黙的変換（widening conversion）と明示的変換（narrowing conversion, キャスト）があります。小さい型から大きい型への変換は自動（int→long→double）ですが、逆は精度を失う可能性があるためキャストが必要です。
+
+文字列（String）はJavaで最もよく使うクラスです。Javaの文字列はイミュータブル（変更不可）で、文字列連結の繰り返しには StringBuilder を使うのが効率的です。String はオブジェクトなので == ではなく equals() で内容比較します。Pythonの == はJavaの equals() に相当します。
+
+Java 15以降ではテキストブロック（"""..."""）がサポートされ、複数行文字列をPythonと同様に書けます。Java 21ではStringTemplates（プレビュー）も登場しています。`,
+        code:`public class TypesDemo {
+    public static void main(String[] args) {
+        // 暗黙的変換（widening）
+        int i = 42;
+        long l = i;       // int → long 自動変換
+        double d = i;     // int → double 自動変換
+
+        // 明示的キャスト（narrowing）
+        double pi = 3.14159;
+        int truncated = (int) pi;  // 小数点以下切り捨て → 3
+
+        // 文字列変換
+        String s1 = String.valueOf(42);    // int → String
+        String s2 = Integer.toString(42);  // 同上
+        int n = Integer.parseInt("123");   // String → int
+        double dd = Double.parseDouble("3.14");
+
+        // 文字列操作
+        String hello = "Hello, Java!";
+        System.out.println(hello.length());        // 12
+        System.out.println(hello.toUpperCase());   // HELLO, JAVA!
+        System.out.println(hello.contains("Java")); // true
+        System.out.println(hello.replace("Java", "World")); // Hello, World!
+        System.out.println(hello.substring(7, 11)); // Java
+        String[] parts = hello.split(", ");         // ["Hello", "Java!"]
+
+        // StringBuilder（効率的な文字列構築）
+        StringBuilder sb = new StringBuilder();
+        for (int k = 0; k < 5; k++) {
+            sb.append(k).append(", ");
+        }
+        System.out.println(sb.toString()); // 0, 1, 2, 3, 4,
+
+        // テキストブロック（Java 15+）
+        String json = """
+                {
+                    "name": "Java",
+                    "version": 21
+                }
+                """;
+    }
+}`,
+        afterCode:"文字列の == 比較はオブジェクト参照の比較であり、内容が同じでもfalseになる場合があります（文字列プールの例外を除く）。必ず equals() または equalsIgnoreCase() を使ってください。",
+      },
+      {
+        title:"配列と数値演算",
+        body:`Javaの配列は固定長で、宣言時に型と要素数を指定します。Python のリストのような動的なサイズ変更はできません（動的配列はArrayListを使う）。多次元配列も定義可能で、実際は配列の配列です。
+
+数値演算では整数同士の除算は整数になる点に注意（Python3 では // が整数除算）。また、Javaの % 演算子は負の数で異なる結果になります（Pythonの % は常に正）。数学関数は java.lang.Math クラスで提供されます。
+
+Java 21では配列操作に加え、Arrays クラスや java.util.stream を使ったモダンな操作が可能です。`,
+        code:`import java.util.Arrays;
+
+public class ArraysDemo {
+    public static void main(String[] args) {
+        // 配列宣言と初期化
+        int[] nums = {1, 2, 3, 4, 5};
+        String[] names = new String[3];  // nullで初期化
+        names[0] = "Alice";
+        names[1] = "Bob";
+        names[2] = "Charlie";
+
+        // 配列の基本操作
+        System.out.println(nums.length);           // 5
+        System.out.println(Arrays.toString(nums));  // [1, 2, 3, 4, 5]
+        Arrays.sort(nums);                          // ソート（in-place）
+
+        // 拡張for文
+        for (int n : nums) {
+            System.out.print(n + " ");
+        }
+
+        // 多次元配列
+        int[][] matrix = {
+            {1, 2, 3},
+            {4, 5, 6},
+            {7, 8, 9}
+        };
+        System.out.println(matrix[1][2]); // 6
+
+        // 数値演算
+        System.out.println(7 / 2);     // 3（整数除算）
+        System.out.println(7.0 / 2);   // 3.5
+        System.out.println(7 % 3);     // 1
+        System.out.println(Math.pow(2, 10));  // 1024.0
+        System.out.println(Math.abs(-42));    // 42
+        System.out.println(Math.max(10, 20)); // 20
+        System.out.println(Math.sqrt(16));    // 4.0
+    }
+}`,
+      },
+    ],
+    exercises:[
+      {stars:1,q:"int型の変数temperatureに気温（例：25）を代入し、それをdouble型のfahrenheitに摂氏→華氏変換（F = C × 9.0/5.0 + 32）して表示してください。",a:`public class TempConvert {
+    public static void main(String[] args) {
+        int temperature = 25;
+        double fahrenheit = temperature * 9.0 / 5.0 + 32;
+        System.out.printf("摂氏 %d°C = 華氏 %.1f°F%n", temperature, fahrenheit);
+    }
+}`},
+      {stars:2,q:"String配列に5つの果物名を格納し、Arrays.sort()でソートして表示した後、Arrays.binarySearch()でりんご（\"apple\"）を検索してインデックスを表示してください。",a:`import java.util.Arrays;
+
+public class FruitArray {
+    public static void main(String[] args) {
+        String[] fruits = {"banana", "apple", "cherry", "date", "elderberry"};
+        Arrays.sort(fruits);
+        System.out.println("ソート後: " + Arrays.toString(fruits));
+        int idx = Arrays.binarySearch(fruits, "apple");
+        System.out.println("apple のインデックス: " + idx);
+    }
+}`},
+      {stars:2,q:"StringBuilderを使って1から10までの数字をカンマ区切りで「1, 2, 3, ..., 10」と表示してください（末尾のカンマは不要）。",a:`public class NumberList {
+    public static void main(String[] args) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i <= 10; i++) {
+            sb.append(i);
+            if (i < 10) sb.append(", ");
+        }
+        System.out.println(sb.toString());
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch3",num:3,title:"制御構文とパターンマッチング",
+    goal:"if/switch expression/for/while/break/continueを使いこなし、Java 21のパターンマッチングでより表現力の高いコードを書ける。",
+    sections:[
+      {
+        title:"if文とswitch式",
+        body:`Javaのif文はPythonと似ていますが、条件式は必ず()で囲み、ブロックは{}で記述します。三項演算子も使えます。Java 14以降ではswitch式（switch expression）が導入され、従来のswitch文より簡潔で安全です。
+
+従来のswitch文はfall-through（意図しない次のcaseへの落下）が問題でしたが、switch式では -> 構文でfall-throughを防ぎ、値を返すことが可能です。Java 21ではパターンマッチングのswitch（JEP 441）が正式化され、型のパターンやguard条件（when）が使えます。
+
+Java 16以降のinstanceof パターンマッチングを使うと、型チェックとキャストを同時に行えます。Python の isinstance() に相当しますが、変数に直接バインドできる点が強力です。`,
+        code:`public class ControlDemo {
+    public static void main(String[] args) {
+        // 従来のif-else
+        int score = 75;
+        if (score >= 90) {
+            System.out.println("A");
+        } else if (score >= 70) {
+            System.out.println("B");
+        } else {
+            System.out.println("C");
+        }
+
+        // 三項演算子
+        String result = score >= 70 ? "合格" : "不合格";
+
+        // switch式（Java 14+）
+        int day = 3;
+        String dayName = switch (day) {
+            case 1 -> "Monday";
+            case 2 -> "Tuesday";
+            case 3 -> "Wednesday";
+            case 4, 5 -> "Thursday or Friday";
+            default -> "Weekend";
+        };
+
+        // switch式 with yield（複数行）
+        String grade = switch (score / 10) {
+            case 10, 9 -> "A";
+            case 8 -> "B";
+            case 7 -> "C";
+            default -> {
+                System.out.println("scoring: " + score);
+                yield "D";  // yieldで値を返す
+            }
+        };
+
+        // パターンマッチング instanceof（Java 16+）
+        Object obj = "Hello";
+        if (obj instanceof String s) {  // sにキャスト済みでバインド
+            System.out.println(s.toUpperCase());  // キャスト不要！
+        }
+
+        // switch でのパターンマッチング（Java 21）
+        Object shape = 42.0;
+        String desc = switch (shape) {
+            case Integer i -> "整数: " + i;
+            case Double d  -> "小数: " + d;
+            case String s when s.isEmpty() -> "空文字列";
+            case String s  -> "文字列: " + s;
+            default        -> "その他";
+        };
+    }
+}`,
+        afterCode:"switch式はJavaの switch文の問題点（break忘れによるfall-through）を解決したモダンな構文です。できるだけswitch式を使う習慣をつけましょう。",
+      },
+      {
+        title:"ループ構文",
+        body:`Javaのループはfor、while、do-whileの3種類と、コレクション向けの拡張for文（for-each）があります。Pythonのrangeに相当するのはforの初期化・条件・更新の3部構成です。
+
+ネストしたループではラベル付きbreak/continueが使えます。これはPythonにない機能で、外側のループを指定して抜けることができます。ただし、ネストを深くするより早期returnやメソッド分割が推奨されます。
+
+Java 8以降ではIteratorやfor-eachの代わりにStreamのforEachメソッドも広く使われます。ただしStreamのforEachは並列処理のための副作用処理には適さない場合があるため、可読性を考慮して選択します。`,
+        code:`public class LoopDemo {
+    public static void main(String[] args) {
+        // 基本for文
+        for (int i = 0; i < 5; i++) {
+            System.out.print(i + " ");  // 0 1 2 3 4
+        }
+
+        // while文
+        int count = 0;
+        while (count < 3) {
+            System.out.println("count=" + count++);
+        }
+
+        // do-while（最低1回実行）
+        int x = 10;
+        do {
+            System.out.println(x);
+            x--;
+        } while (x > 10);  // falseでも1回実行される
+
+        // 拡張for文（for-each）
+        int[] arr = {10, 20, 30, 40, 50};
+        for (int val : arr) {
+            System.out.print(val + " ");
+        }
+
+        // ラベル付きbreak
+        outer:
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                if (i == 1 && j == 1) {
+                    break outer;  // 外側のループを終了
+                }
+                System.out.printf("(%d,%d) ", i, j);
+            }
+        }
+        // 出力: (0,0) (0,1) (0,2) (1,0)
+    }
+}`,
+        afterCode:"Pythonのenumerate()相当は、Javaでは IntStream.range(0, arr.length) またはインデックス付きfor文で実現できます。Java 21では Sequenced Collections APIも追加されています。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"1から100までの整数のうち、FizzBuzzを実装してください。3の倍数はFizz、5の倍数はBuzz、両方の倍数はFizzBuzz、それ以外は数字を表示します。",a:`public class FizzBuzz {
+    public static void main(String[] args) {
+        for (int i = 1; i <= 100; i++) {
+            if (i % 15 == 0)      System.out.println("FizzBuzz");
+            else if (i % 3 == 0)  System.out.println("Fizz");
+            else if (i % 5 == 0)  System.out.println("Buzz");
+            else                   System.out.println(i);
+        }
+    }
+}`},
+      {stars:2,q:"switch式を使って、月（1〜12）を受け取りその季節（春/夏/秋/冬）を返すメソッドgetSeason(int month)を実装してください。",a:`public class Seasons {
+    public static String getSeason(int month) {
+        return switch (month) {
+            case 3, 4, 5   -> "春";
+            case 6, 7, 8   -> "夏";
+            case 9, 10, 11 -> "秋";
+            case 12, 1, 2  -> "冬";
+            default        -> throw new IllegalArgumentException("Invalid month: " + month);
+        };
+    }
+
+    public static void main(String[] args) {
+        for (int m = 1; m <= 12; m++) {
+            System.out.printf("%2d月: %s%n", m, getSeason(m));
+        }
+    }
+}`},
+      {stars:3,q:"2次元配列matrix（3×3の整数行列）を受け取り、対角和（左上から右下の対角線の合計）を求めるメソッドを書いてください。パターンマッチングinstanceofは不要です。",a:`public class MatrixDiag {
+    public static int diagonalSum(int[][] matrix) {
+        int sum = 0;
+        for (int i = 0; i < matrix.length; i++) {
+            sum += matrix[i][i];
+        }
+        return sum;
+    }
+
+    public static void main(String[] args) {
+        int[][] m = {{1,2,3},{4,5,6},{7,8,9}};
+        System.out.println("対角和: " + diagonalSum(m)); // 15
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch4",num:4,title:"クラスとオブジェクト指向",
+    goal:"クラス・コンストラクタ・カプセル化・staticメンバーを使ったクラス設計ができ、レコード（Record）クラスも活用できる。",
+    sections:[
+      {
+        title:"クラス設計の基本",
+        body:`Javaのオブジェクト指向はPythonより厳格で、すべてのコードはクラスの中に書く必要があります。クラスはフィールド（状態）とメソッド（振る舞い）を持ちます。コンストラクタはクラス名と同じ名前で戻り値なしです。
+
+カプセル化のベストプラクティスはフィールドをprivateにして、必要に応じてgetter/setterメソッドを提供することです。ただし現代Javaでは単純なデータクラスにはRecord（Java 16+）を使うのが推奨されます。this キーワードはインスタンス自身を参照し、フィールドとパラメータの名前衝突を解決します。
+
+staticメンバーはインスタンスに属さずクラス自体に属します。Pythonの @classmethod や @staticmethod に相当しますが、staticフィールドはすべてのインスタンスで共有されます。`,
+        code:`public class BankAccount {
+    // フィールド（private でカプセル化）
+    private String owner;
+    private double balance;
+    private static int totalAccounts = 0;  // クラス変数
+
+    // コンストラクタ（オーバーロード可能）
+    public BankAccount(String owner) {
+        this(owner, 0.0);  // 別コンストラクタ呼び出し
+    }
+
+    public BankAccount(String owner, double initialBalance) {
+        this.owner = owner;
+        this.balance = initialBalance;
+        totalAccounts++;
+    }
+
+    // getter
+    public String getOwner() { return owner; }
+    public double getBalance() { return balance; }
+
+    // ビジネスロジック
+    public void deposit(double amount) {
+        if (amount <= 0) throw new IllegalArgumentException("金額は正の値");
+        balance += amount;
+    }
+
+    public boolean withdraw(double amount) {
+        if (amount > balance) return false;
+        balance -= amount;
+        return true;
+    }
+
+    // staticメソッド（インスタンス不要）
+    public static int getTotalAccounts() { return totalAccounts; }
+
+    @Override
+    public String toString() {
+        return String.format("BankAccount{owner='%s', balance=%.2f}", owner, balance);
+    }
+}`,
+        afterCode:"@Override アノテーションはオーバーライドの意図を明示し、タイポがあればコンパイルエラーにしてくれます。必ず付ける習慣をつけましょう。",
+      },
+      {
+        title:"Recordクラス（Java 16+）",
+        body:`Recordはイミュータブルなデータクラスを簡潔に定義するためのJava 16の新機能です。equals・hashCode・toStringが自動生成され、コンポーネント（フィールド）のgetterも自動で作成されます（フィールド名がそのままメソッド名になる）。
+
+PythonのdataclassやNamedTupleに近い概念ですが、Javaのrecordはイミュータブル（フィールドはfinal）かつより型安全です。DDD（ドメイン駆動設計）の値オブジェクトやAPIのDTO（Data Transfer Object）として広く使われます。
+
+recordはextendsできませんが（暗黙的にjava.lang.Recordを継承）、インターフェースの実装は可能です。カスタムバリデーションはコンパクトコンストラクタで追加します。`,
+        code:`// Record定義（コンポーネント = フィールド）
+public record Point(double x, double y) {
+    // コンパクトコンストラクタ（バリデーション追加）
+    public Point {
+        if (Double.isNaN(x) || Double.isNaN(y)) {
+            throw new IllegalArgumentException("NaN不可");
+        }
+    }
+
+    // カスタムメソッド追加可能
+    public double distanceTo(Point other) {
+        double dx = this.x - other.x;
+        double dy = this.y - other.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    public Point translate(double dx, double dy) {
+        return new Point(x + dx, y + dy);  // 新しいインスタンスを返す
+    }
+}
+
+// 使用例
+public class RecordDemo {
+    public static void main(String[] args) {
+        var p1 = new Point(3.0, 4.0);
+        var p2 = new Point(0.0, 0.0);
+
+        System.out.println(p1.x());         // getter: 3.0
+        System.out.println(p1.y());         // getter: 4.0
+        System.out.println(p1);             // Point[x=3.0, y=4.0]
+        System.out.println(p1.distanceTo(p2)); // 5.0
+        System.out.println(p1.equals(new Point(3.0, 4.0))); // true
+    }
+}`,
+        afterCode:"sealed interface や record を組み合わせると、代数的データ型（ADT）をJavaで表現できます。これはScalaのcase classやHaskellのdata型に近い概念です。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"温度を表すTemperatureRecordクラスをrecordで定義してください。コンポーネントはvalue（double）とunit（String: \"C\" or \"F\"）です。toCelsius()メソッドを実装し、Fならば変換して返してください。",a:`public record Temperature(double value, String unit) {
+    public double toCelsius() {
+        return switch (unit) {
+            case "C" -> value;
+            case "F" -> (value - 32) * 5.0 / 9.0;
+            default  -> throw new IllegalArgumentException("Unknown unit: " + unit);
+        };
+    }
+
+    public static void main(String[] args) {
+        var t = new Temperature(98.6, "F");
+        System.out.printf("%.1f%s = %.1f°C%n", t.value(), t.unit(), t.toCelsius());
+    }
+}`},
+      {stars:2,q:"カウンターを表すCounterクラスを作成してください。フィールドはprivate int count（初期値0）、メソッドはincrement()・decrement()・reset()・getCount()です。static版totalIncrementsも追跡してください。",a:`public class Counter {
+    private int count = 0;
+    private static int totalIncrements = 0;
+
+    public void increment() { count++; totalIncrements++; }
+    public void decrement() { if (count > 0) count--; }
+    public void reset()     { count = 0; }
+    public int getCount()   { return count; }
+
+    public static int getTotalIncrements() { return totalIncrements; }
+
+    public static void main(String[] args) {
+        Counter c1 = new Counter();
+        Counter c2 = new Counter();
+        c1.increment(); c1.increment(); c1.increment();
+        c2.increment(); c2.increment();
+        System.out.println("c1: " + c1.getCount()); // 3
+        System.out.println("c2: " + c2.getCount()); // 2
+        System.out.println("total: " + Counter.getTotalIncrements()); // 5
+    }
+}`},
+      {stars:3,q:"不変（イミュータブル）なMoney recordを定義し、コンストラクタで金額が負ならIllegalArgumentExceptionを投げ、add(Money other)でMoneyを加算した新しいインスタンスを返すメソッドを実装してください。通貨（currency）が異なる場合はexceptionを投げること。",a:`public record Money(long amount, String currency) {
+    public Money {
+        if (amount < 0) throw new IllegalArgumentException("金額は0以上");
+        if (currency == null || currency.isBlank()) throw new IllegalArgumentException("通貨コード必須");
+    }
+
+    public Money add(Money other) {
+        if (!this.currency.equals(other.currency))
+            throw new IllegalArgumentException("通貨が異なります: " + currency + " vs " + other.currency);
+        return new Money(this.amount + other.amount, this.currency);
+    }
+
+    public static void main(String[] args) {
+        var m1 = new Money(1000, "JPY");
+        var m2 = new Money(2000, "JPY");
+        System.out.println(m1.add(m2)); // Money[amount=3000, currency=JPY]
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch5",num:5,title:"継承・抽象クラス・インターフェース",
+    goal:"extends・abstract・implementsを使ったクラス階層を設計でき、Java 8以降のdefaultメソッドやsealedクラス（Java 17+）を活用できる。",
+    sections:[
+      {
+        title:"継承と抽象クラス",
+        body:`Javaの継承はextendsキーワードを使い、単一継承のみサポートします（Pythonは多重継承可）。スーパークラスのコンストラクタはsuper()で呼び出す必要があり、必ず最初の文にする必要があります。
+
+抽象クラス（abstract class）は直接インスタンス化できず、サブクラスに実装を強制するabstractメソッドを持てます。共通の実装とインターフェースを両方提供したい場合に使います。Pythonの ABCMeta に相当しますが、Javaではコンパイル時に強制されます。
+
+finalキーワードをクラスに付けると継承禁止（String クラスはfinal）、メソッドに付けるとオーバーライド禁止になります。Javaはデフォルトでオーバーライド可能ですが（Pythonも同様）、フレームワーク設計では意図的にfinalを使います。`,
+        code:`// 抽象基底クラス
+public abstract class Shape {
+    protected String color;
+
+    public Shape(String color) {
+        this.color = color;
+    }
+
+    // 抽象メソッド（サブクラスで実装必須）
+    public abstract double area();
+    public abstract double perimeter();
+
+    // 具象メソッド（共通実装）
+    public void describe() {
+        System.out.printf("%s: 面積=%.2f, 周長=%.2f%n",
+            getClass().getSimpleName(), area(), perimeter());
+    }
+}
+
+public class Circle extends Shape {
+    private double radius;
+
+    public Circle(String color, double radius) {
+        super(color);  // 必須: 親コンストラクタ呼び出し
+        this.radius = radius;
+    }
+
+    @Override
+    public double area() { return Math.PI * radius * radius; }
+
+    @Override
+    public double perimeter() { return 2 * Math.PI * radius; }
+}
+
+public class Rectangle extends Shape {
+    private double width, height;
+
+    public Rectangle(String color, double width, double height) {
+        super(color);
+        this.width = width;
+        this.height = height;
+    }
+
+    @Override
+    public double area() { return width * height; }
+
+    @Override
+    public double perimeter() { return 2 * (width + height); }
+}`,
+        afterCode:"Javaはメソッドのオーバーロード（同名・異なるパラメータ）とオーバーライド（継承先で再定義）を区別します。@Overrideアノテーションでオーバーライドの意図を明示しましょう。",
+      },
+      {
+        title:"インターフェースとdefaultメソッド",
+        body:`インターフェースは「できること」を定義する契約です。Javaのクラスは複数のインターフェースをimplementsできます。Java 8以降ではdefaultメソッド（デフォルト実装を持つメソッド）とstaticメソッドが追加され、単なる仕様定義を超えたmixinのような使い方ができます。
+
+Python のダックタイピングとは異なり、Javaのインターフェースは明示的な宣言が必要です。ただしこれによりコンパイル時の型安全性が保証されます。Java 17のsealed interfaceを使うと、実装クラスを特定のセットに限定でき、switch式との組み合わせで網羅性チェックが可能です。
+
+ComparableインターフェースのcompareTo、Iterableのiterator、Callableのcallなど、JDK標準の関数型インターフェースを実装することでJavaのエコシステムと自然に統合できます。`,
+        code:`// インターフェース定義
+public interface Drawable {
+    void draw();  // 抽象メソッド
+
+    // defaultメソッド（Java 8+）
+    default void drawWithBorder() {
+        System.out.println("--- border ---");
+        draw();
+        System.out.println("--- border ---");
+    }
+
+    static Drawable of(String label) {
+        return () -> System.out.println("Drawing: " + label);
+    }
+}
+
+public interface Resizable {
+    void resize(double factor);
+    default void doubleSize() { resize(2.0); }
+}
+
+// 複数インターフェースの実装
+public class Canvas extends Shape implements Drawable, Resizable {
+    private double size;
+
+    public Canvas(double size) {
+        super("white");
+        this.size = size;
+    }
+
+    @Override public double area()      { return size * size; }
+    @Override public double perimeter() { return 4 * size; }
+    @Override public void draw()        { System.out.println("Canvas size=" + size); }
+    @Override public void resize(double f) { size *= f; }
+}
+
+// Sealed interface（Java 17+）
+public sealed interface Result<T> permits Success, Failure {
+    record Success<T>(T value) implements Result<T> {}
+    record Failure<T>(String message) implements Result<T> {}
+}`,
+        afterCode:"sealed classを使うと、switch式でdefaultを書かなくてもコンパイラが網羅性を保証してくれます。Optional.get()を避けてResult型パターンを使う関数型スタイルがモダンJavaでは推奨されています。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"Animalという抽象クラスを作り、speak()という抽象メソッドを定義してください。それをDogとCatで継承実装し、それぞれ「Woof!」「Meow!」と出力させてください。",a:`public abstract class Animal {
+    private String name;
+    public Animal(String name) { this.name = name; }
+    public String getName() { return name; }
+    public abstract void speak();
+}
+
+class Dog extends Animal {
+    public Dog(String name) { super(name); }
+    @Override public void speak() { System.out.println(getName() + ": Woof!"); }
+}
+
+class Cat extends Animal {
+    public Cat(String name) { super(name); }
+    @Override public void speak() { System.out.println(getName() + ": Meow!"); }
+}
+
+class Main {
+    public static void main(String[] args) {
+        Animal[] animals = {new Dog("Rex"), new Cat("Whiskers"), new Dog("Buddy")};
+        for (Animal a : animals) a.speak();
+    }
+}`},
+      {stars:2,q:"PrintableインターフェースにprintInfo()メソッドを定義し、defaultで「[クラス名] is printable」と出力するdefaultメソッドprintDefault()も追加してください。Bookクラスでimplementsして両方呼び出してください。",a:`interface Printable {
+    void printInfo();
+    default void printDefault() {
+        System.out.println(getClass().getSimpleName() + " is printable");
+    }
+}
+
+class Book implements Printable {
+    private String title;
+    private String author;
+
+    public Book(String title, String author) {
+        this.title = title;
+        this.author = author;
+    }
+
+    @Override
+    public void printInfo() {
+        System.out.printf("Book: '%s' by %s%n", title, author);
+    }
+
+    public static void main(String[] args) {
+        Book book = new Book("Java入門", "山田太郎");
+        book.printInfo();
+        book.printDefault();
+    }
+}`},
+      {stars:3,q:"sealed interface Expressionをpermsレコード: Num(double value)、Add(Expression left, Expression right)、Mul(Expression left, Expression right) で定義し、evaluate(Expression expr)メソッドでswitch式を使って計算してください。",a:`public class ExprEval {
+    sealed interface Expression permits Num, Add, Mul {}
+    record Num(double value) implements Expression {}
+    record Add(Expression left, Expression right) implements Expression {}
+    record Mul(Expression left, Expression right) implements Expression {}
+
+    public static double evaluate(Expression expr) {
+        return switch (expr) {
+            case Num(double v)           -> v;
+            case Add(var l, var r)       -> evaluate(l) + evaluate(r);
+            case Mul(var l, var r)       -> evaluate(l) * evaluate(r);
+        };
+    }
+
+    public static void main(String[] args) {
+        // (2 + 3) * 4 = 20
+        var expr = new Mul(new Add(new Num(2), new Num(3)), new Num(4));
+        System.out.println(evaluate(expr)); // 20.0
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch6",num:6,title:"例外処理",
+    goal:"checked例外とunchecked例外の違いを理解し、try-with-resources・カスタム例外・例外の連鎖を適切に使えるようになる。",
+    sections:[
+      {
+        title:"例外の種類と階層",
+        body:`Javaの例外はThrowableを頂点とした階層を持ちます。Errorは通常のプログラムでは処理しないシステムエラー（OutOfMemoryError等）です。Exceptionは2種類：checked例外（コンパイル時に処理が強制）とunchecked例外（RuntimeExceptionとそのサブクラス）です。
+
+Pythonとの最大の違いはchecked例外です。IOExceptionやSQLExceptionなどのchecked例外はメソッドシグネチャにthrows宣言するか、try-catchで処理しなければコンパイルエラーになります。一方RuntimeException（NullPointerException, ArrayIndexOutOfBoundsException等）はunchecked例外で宣言不要です。
+
+モダンJavaでは checked例外を嫌う傾向があり（Spring等のフレームワークも同様）、ライブラリ設計ではunchecked例外を選ぶことが多くなっています。checked例外を使う場合はcallerが回復できる意味のあるエラーに限定するのが良い設計です。`,
+        table:{headers:["種類","継承元","throws宣言","典型例"],rows:[
+          ["checked例外","Exception","必要","IOException, SQLException"],
+          ["unchecked例外","RuntimeException","不要","NPE, IllegalArgumentException"],
+          ["Error","Error","不要（使わない）","OutOfMemoryError"],
+        ]},
+        afterTable:"Java 14のNullPointerExceptionは「どの変数がnullか」を具体的に表示するHelpful NPEが追加されました（Java 17でデフォルト有効）。デバッグが大幅に楽になっています。",
+      },
+      {
+        title:"try-catch-finally と try-with-resources",
+        body:`try-catch-finally はPythonのtry-except-elseに相当します。finallyブロックは例外の有無にかかわらず必ず実行されるため、リソースの解放に使われていました。しかしJava 7からはtry-with-resources構文でより安全にリソース管理ができます。
+
+try-with-resources は AutoCloseable インターフェースを実装したオブジェクトを自動的にclose()します。複数リソースをセミコロンで並べると宣言の逆順でcloseされます。これによりclose()忘れやfinallyでの例外処理ミスを防げます。
+
+Java 9以降は既存変数をtry-with-resourcesに渡せるeffectively finalな変数も使えます。例外の連鎖（cause）を保持して例外を再スローすることで、スタックトレースが失われずに原因を追跡できます。`,
+        code:`import java.io.*;
+import java.nio.file.*;
+
+public class ExceptionDemo {
+    // checked例外をthrowsで宣言
+    public static String readFile(String path) throws IOException {
+        // try-with-resources: 自動close
+        try (var reader = new BufferedReader(new FileReader(path))) {
+            return reader.lines().reduce("", (a, b) -> a + b + "\\n");
+        }
+        // reader は自動で close() される
+    }
+
+    // 例外を変換して再スロー
+    public static String readFileSafe(String path) {
+        try {
+            return readFile(path);
+        } catch (FileNotFoundException e) {
+            throw new IllegalArgumentException("ファイルが見つかりません: " + path, e);
+        } catch (IOException e) {
+            throw new RuntimeException("ファイル読み込みエラー", e);  // 原因を保持
+        }
+    }
+
+    // multi-catch（Java 7+）
+    public static void parseInput(String s) {
+        try {
+            int n = Integer.parseInt(s);
+            int[] arr = new int[n];
+            System.out.println(arr[n + 1]);  // わざとエラー
+        } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+            System.out.println("入力エラー: " + e.getClass().getSimpleName());
+        } finally {
+            System.out.println("処理完了");
+        }
+    }
+}`,
+        afterCode:"リソース管理は必ずtry-with-resourcesを使ってください。finally { stream.close(); } パターンは例外が発生した場合にclose()も失敗する可能性があり、元の例外が隠れてしまいます。",
+      },
+      {
+        title:"カスタム例外の設計",
+        body:`アプリケーション固有のビジネスロジックエラーには独自例外クラスを作成します。unchecked例外として作る場合はRuntimeExceptionを継承します。エラーコードや追加情報を持たせることで、呼び出し元での処理が容易になります。
+
+例外クラスは通常Exceptionで終わる名前にします（ValidationException, InsufficientFundsException等）。コンストラクタは最低でも(String message)と(String message, Throwable cause)の2つを用意するのが慣例です。
+
+Javaのexceptionbestpracticeとして、例外メッセージは開発者向けに詳細に書く、ユーザー向けのメッセージは別途管理する、例外ログは適切なレベル（warn/error）で出力する、などがあります。`,
+        code:`// カスタム例外クラス
+public class InsufficientFundsException extends RuntimeException {
+    private final double amount;
+    private final double balance;
+
+    public InsufficientFundsException(double amount, double balance) {
+        super(String.format("残高不足: 要求額=%.2f, 残高=%.2f", amount, balance));
+        this.amount = amount;
+        this.balance = balance;
+    }
+
+    public InsufficientFundsException(String message, Throwable cause) {
+        super(message, cause);
+        this.amount = 0;
+        this.balance = 0;
+    }
+
+    public double getAmount()  { return amount; }
+    public double getBalance() { return balance; }
+}
+
+// 使用例
+public class AccountService {
+    public void transfer(BankAccount from, BankAccount to, double amount) {
+        if (from.getBalance() < amount) {
+            throw new InsufficientFundsException(amount, from.getBalance());
+        }
+        from.withdraw(amount);
+        to.deposit(amount);
+    }
+
+    public static void main(String[] args) {
+        try {
+            // 送金シミュレーション
+        } catch (InsufficientFundsException e) {
+            System.out.println("エラー: " + e.getMessage());
+            System.out.println("不足額: " + (e.getAmount() - e.getBalance()));
+        }
+    }
+}`,
+      },
+    ],
+    exercises:[
+      {stars:1,q:"正の整数を受け取り、負またはゼロの場合はIllegalArgumentExceptionを投げ、それ以外は平方根を返すsafeSquareRoot(int n)メソッドを書いてください。",a:`public class SafeMath {
+    public static double safeSquareRoot(int n) {
+        if (n <= 0) throw new IllegalArgumentException("正の整数が必要です: " + n);
+        return Math.sqrt(n);
+    }
+
+    public static void main(String[] args) {
+        try {
+            System.out.println(safeSquareRoot(16));  // 4.0
+            System.out.println(safeSquareRoot(-4));  // 例外
+        } catch (IllegalArgumentException e) {
+            System.out.println("エラー: " + e.getMessage());
+        }
+    }
+}`},
+      {stars:2,q:"try-with-resourcesを使って文字列をファイルに書き込み（java.io.FileWriter使用）、そのファイルを読み込んで出力するプログラムを書いてください。IOExceptionを適切に処理してください。",a:`import java.io.*;
+
+public class FileRW {
+    public static void main(String[] args) {
+        String path = "test.txt";
+        String content = "Hello, Java File I/O!\\nLine 2";
+
+        // 書き込み
+        try (var writer = new FileWriter(path)) {
+            writer.write(content);
+            System.out.println("書き込み完了");
+        } catch (IOException e) {
+            System.err.println("書き込みエラー: " + e.getMessage());
+            return;
+        }
+
+        // 読み込み
+        try (var reader = new BufferedReader(new FileReader(path))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+        } catch (FileNotFoundException e) {
+            System.err.println("ファイルなし: " + path);
+        } catch (IOException e) {
+            System.err.println("読み込みエラー: " + e.getMessage());
+        }
+    }
+}`},
+      {stars:3,q:"ValidationExceptionというカスタムunchecked例外を作り、フィールド名とメッセージを持たせてください。ユーザー入力（名前: 空白不可、年齢: 0〜120）をバリデートするUserValidatorクラスを実装し、エラーがあればValidationExceptionをスローしてください。",a:`public class ValidationException extends RuntimeException {
+    private final String field;
+
+    public ValidationException(String field, String message) {
+        super(field + ": " + message);
+        this.field = field;
+    }
+
+    public String getField() { return field; }
+}
+
+class UserValidator {
+    public static void validate(String name, int age) {
+        if (name == null || name.isBlank())
+            throw new ValidationException("name", "空白は不可");
+        if (age < 0 || age > 120)
+            throw new ValidationException("age", "0〜120の範囲で入力してください (given: " + age + ")");
+    }
+
+    public static void main(String[] args) {
+        try {
+            validate("", 25);
+        } catch (ValidationException e) {
+            System.out.println("バリデーションエラー [" + e.getField() + "]: " + e.getMessage());
+        }
+        try {
+            validate("Taro", 150);
+        } catch (ValidationException e) {
+            System.out.println("バリデーションエラー [" + e.getField() + "]: " + e.getMessage());
+        }
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch7",num:7,title:"ジェネリクスとコレクション",
+    goal:"ジェネリクスの型パラメータ・境界・ワイルドカードを理解し、List/Map/Set/Dequeを適切に使い分けられる。",
+    sections:[
+      {
+        title:"ジェネリクスの基礎",
+        body:`ジェネリクス（Generics）はJava 5で導入され、型安全なコレクションやアルゴリズムを実現します。<T> のように型パラメータを使うことで、キャストなしに任意の型を扱えます。Pythonのtypingモジュールのジェネリクスに似ていますが、Javaでは実行時にも（イレイジャを除いて）型情報が活用されます。
+
+型境界（bounds）はextends（上限: T extends Comparable<T>）でサブタイプを制限します。ワイルドカード（?）は型を未指定にする特殊な書き方で、? extends T（共変）と ? super T（反変）があります（PE CS原則: Producer Extends, Consumer Super）。
+
+型イレイジャ（Type Erasure）はJavaジェネリクスの重要な特性で、コンパイル後は型パラメータが消去されます。これによりList<String>とList<Integer>は実行時に同じList型になります。これがinstanceof List<String>が書けない理由です。`,
+        code:`import java.util.*;
+
+// ジェネリッククラス
+public class Box<T> {
+    private T value;
+
+    public Box(T value) { this.value = value; }
+    public T get() { return value; }
+    public <U> Box<U> map(java.util.function.Function<T,U> f) {
+        return new Box<>(f.apply(value));
+    }
+
+    @Override
+    public String toString() { return "Box[" + value + "]"; }
+}
+
+// 境界付き型パラメータ
+public class Statistics {
+    // T は Number のサブタイプかつ Comparable を実装
+    public static <T extends Number & Comparable<T>> T max(List<T> list) {
+        if (list.isEmpty()) throw new NoSuchElementException();
+        T max = list.get(0);
+        for (T val : list) {
+            if (val.compareTo(max) > 0) max = val;
+        }
+        return max;
+    }
+
+    // ワイルドカード（? extends Number: 共変）
+    public static double sum(List<? extends Number> list) {
+        return list.stream().mapToDouble(Number::doubleValue).sum();
+    }
+}
+
+// 使用例
+Box<String> strBox = new Box<>("hello");
+Box<Integer> intBox = strBox.map(String::length);  // Box[5]
+System.out.println(Statistics.max(List.of(3, 1, 4, 1, 5, 9)));  // 9
+System.out.println(Statistics.sum(List.of(1.5, 2.5, 3.0)));  // 7.0`,
+        afterCode:"型パラメータ名の慣例: T=Type, E=Element, K=Key, V=Value, R=Return type, N=Number。単文字の型パラメータを使うことでジェネリクスの文脈だと一目でわかります。",
+      },
+      {
+        title:"コレクションフレームワーク",
+        body:`Java Collections Frameworkは List・Set・Map・Queue等のインターフェースと多様な実装クラスを提供します。PythonのリストはArrayList、辞書はHashMap、集合はHashSetに相当します。
+
+実装クラスの選択基準はパフォーマンス特性によります。ランダムアクセスが多い場合はArrayList（O(1)）、挿入削除が多い場合はLinkedList（O(1)だが実際はキャッシュミスで遅い場合も）、ソート順を維持したい場合はTreeSet/TreeMap（O(log n)）、挿入順を維持したい場合はLinkedHashMap/LinkedHashSetです。
+
+Java 9以降の List.of()・Map.of()・Set.of() はイミュータブルなコレクションを作成します。これらは変更しようとするとUnsupportedOperationExceptionが発生します。Pythonのfrozensetに近いですが、Javaではより広く活用されています。`,
+        code:`import java.util.*;
+
+public class CollectionsDemo {
+    public static void main(String[] args) {
+        // List
+        List<String> list = new ArrayList<>();
+        list.add("banana"); list.add("apple"); list.add("cherry");
+        Collections.sort(list);
+        System.out.println(list);  // [apple, banana, cherry]
+        System.out.println(list.get(1));  // banana
+
+        // イミュータブルList（Java 9+）
+        List<String> immutable = List.of("x", "y", "z");
+
+        // Set（重複なし）
+        Set<String> set = new HashSet<>(list);
+        set.add("apple");  // 重複無視
+        Set<String> sorted = new TreeSet<>(set);  // ソート順
+
+        // Map
+        Map<String, Integer> scores = new HashMap<>();
+        scores.put("Alice", 90);
+        scores.put("Bob", 85);
+        scores.put("Charlie", 92);
+
+        // getOrDefault, putIfAbsent, computeIfAbsent
+        scores.getOrDefault("Dave", 0);
+        scores.computeIfAbsent("Eve", k -> k.length() * 10);
+
+        // entrySet でイテレーション
+        for (var entry : scores.entrySet()) {
+            System.out.printf("%s: %d%n", entry.getKey(), entry.getValue());
+        }
+
+        // Deque（スタック/キュー兼用）
+        Deque<Integer> deque = new ArrayDeque<>();
+        deque.push(1); deque.push(2); deque.push(3);  // スタック
+        System.out.println(deque.pop());  // 3（LIFO）
+
+        deque.offer(10); deque.offer(20);  // キュー
+        System.out.println(deque.poll());  // 10（FIFO）
+    }
+}`,
+        afterCode:"Map.entrySet()のイテレーションはmap.forEach((k,v) -> ...)とも書けます。Java 21ではSequenced CollectionsでgetFirst()/getLast()等のAPIが統一されました。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"List<Integer>を受け取り、その最小値・最大値・平均値を計算して返すStatsSummaryレコードを返すメソッドを書いてください。",a:`import java.util.*;
+
+public class StatsCalc {
+    record StatsSummary(int min, int max, double average) {}
+
+    public static StatsSummary compute(List<Integer> nums) {
+        if (nums.isEmpty()) throw new IllegalArgumentException("空リストは不可");
+        int min = Collections.min(nums);
+        int max = Collections.max(nums);
+        double avg = nums.stream().mapToInt(Integer::intValue).average().orElse(0);
+        return new StatsSummary(min, max, avg);
+    }
+
+    public static void main(String[] args) {
+        var s = compute(List.of(3, 1, 4, 1, 5, 9, 2, 6));
+        System.out.println(s); // StatsSummary[min=1, max=9, average=3.875]
+    }
+}`},
+      {stars:2,q:"文字列のリストを受け取り、各文字列の出現回数をMap<String,Integer>で返すメソッドwordCount(List<String> words)を書いてください。",a:`import java.util.*;
+
+public class WordCount {
+    public static Map<String, Integer> wordCount(List<String> words) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (String w : words) {
+            counts.merge(w, 1, Integer::sum);
+            // または: counts.put(w, counts.getOrDefault(w, 0) + 1);
+        }
+        return Collections.unmodifiableMap(counts);
+    }
+
+    public static void main(String[] args) {
+        var words = List.of("apple","banana","apple","cherry","banana","apple");
+        System.out.println(wordCount(words));
+        // {apple=3, banana=2, cherry=1}
+    }
+}`},
+      {stars:3,q:"ジェネリッククラスPair<A,B>を実装してください。swap()メソッドでPair<B,A>を返し、mapFirst(Function<A,C>)でPair<C,B>を返せるようにしてください。",a:`import java.util.function.Function;
+
+public class Pair<A, B> {
+    private final A first;
+    private final B second;
+
+    public Pair(A first, B second) {
+        this.first = first;
+        this.second = second;
+    }
+
+    public A getFirst()  { return first; }
+    public B getSecond() { return second; }
+
+    public Pair<B, A> swap() { return new Pair<>(second, first); }
+
+    public <C> Pair<C, B> mapFirst(Function<A, C> f) {
+        return new Pair<>(f.apply(first), second);
+    }
+
+    @Override
+    public String toString() { return "(" + first + ", " + second + ")"; }
+
+    public static void main(String[] args) {
+        var p = new Pair<>("hello", 5);
+        System.out.println(p);              // (hello, 5)
+        System.out.println(p.swap());       // (5, hello)
+        System.out.println(p.mapFirst(String::toUpperCase)); // (HELLO, 5)
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch8",num:8,title:"ラムダとStream API",
+    goal:"ラムダ式・メソッド参照・関数型インターフェースを使いこなし、Stream APIでコレクション操作をPythonのリスト内包表記より強力に書ける。",
+    sections:[
+      {
+        title:"ラムダ式と関数型インターフェース",
+        body:`Java 8で導入されたラムダ式は匿名関数を簡潔に書く構文です。Pythonのlambdaと似ていますが、Javaのラムダは「関数型インターフェース（@FunctionalInterfaceで抽象メソッドが1つのもの）」の実装として機能します。
+
+java.util.function パッケージには主要な関数型インターフェースが定義されています：Function<T,R>（T→R）、Consumer<T>（T→void）、Supplier<T>（()->T）、Predicate<T>（T→boolean）、BiFunction<T,U,R>（T,U→R）などです。
+
+メソッド参照（::）は既存メソッドをラムダとして参照する構文です。String::toUpperCase（インスタンスメソッド参照）、System.out::println（特定インスタンスのメソッド参照）、Integer::parseInt（静的メソッド参照）、ArrayList::new（コンストラクタ参照）の4種類があります。`,
+        code:`import java.util.function.*;
+import java.util.*;
+
+public class LambdaDemo {
+    public static void main(String[] args) {
+        // 関数型インターフェースの実装
+        Function<String, Integer> len = s -> s.length();
+        Function<String, Integer> len2 = String::length;  // メソッド参照
+        System.out.println(len.apply("hello"));  // 5
+
+        // compose/andThen で関数合成
+        Function<Integer, String> intToStr = i -> "num=" + i;
+        Function<String, String> pipeline = len.andThen(intToStr);
+        System.out.println(pipeline.apply("Java"));  // num=4
+
+        // Predicate: and, or, negate
+        Predicate<String> nonEmpty = s -> !s.isEmpty();
+        Predicate<String> longEnough = s -> s.length() >= 3;
+        Predicate<String> valid = nonEmpty.and(longEnough);
+        System.out.println(valid.test("hi"));    // false
+        System.out.println(valid.test("hello")); // true
+
+        // Consumer チェーン
+        Consumer<String> print = System.out::println;
+        Consumer<String> printUpper = s -> System.out.println(s.toUpperCase());
+        Consumer<String> both = print.andThen(printUpper);
+        both.accept("java");  // java, JAVA
+
+        // Supplier（遅延評価）
+        Supplier<List<String>> listFactory = ArrayList::new;
+        List<String> l1 = listFactory.get();
+        List<String> l2 = listFactory.get();  // 別インスタンス
+
+        // カスタム関数型インターフェース
+        @FunctionalInterface
+        interface TriFunction<A,B,C,R> {
+            R apply(A a, B b, C c);
+        }
+        TriFunction<Integer,Integer,Integer,Integer> sum3 = (a,b,c) -> a+b+c;
+        System.out.println(sum3.apply(1, 2, 3));  // 6
+    }
+}`,
+        afterCode:"ラムダ式は実質的にfinalなローカル変数しかキャプチャできません（effectively final）。これはPythonのクロージャとは異なり、ラムダ内でキャプチャした変数を変更するとコンパイルエラーになります。",
+      },
+      {
+        title:"Stream API",
+        body:`Stream APIはコレクション操作をパイプライン形式で記述する仕組みです。PythonのリストへのmapやfilterはJavaでは Stream.map()・Stream.filter()に対応します。Streamは遅延評価で、終端操作（collect, forEach, reduce等）が呼ばれるまで処理は始まりません。
+
+中間操作（lazy）: filter, map, flatMap, distinct, sorted, limit, skip, peek等。終端操作（eager）: collect, forEach, count, reduce, findFirst, anyMatch, allMatch, toList（Java 16+）等。
+
+Collectors クラスはcollect()で使う収集器を提供します。groupingBy でグルーピング、joining で文字列連結、toMap でMap変換、partitioningBy で分割など、Pythonのitertoolsより強力な操作が可能です。並列化も parallelStream() や parallel() で簡単に切り替えられます。`,
+        code:`import java.util.*;
+import java.util.stream.*;
+
+public class StreamDemo {
+    record Person(String name, int age, String city) {}
+
+    public static void main(String[] args) {
+        var people = List.of(
+            new Person("Alice",   30, "Tokyo"),
+            new Person("Bob",     25, "Osaka"),
+            new Person("Charlie", 35, "Tokyo"),
+            new Person("Dave",    28, "Osaka"),
+            new Person("Eve",     22, "Kyoto")
+        );
+
+        // filter + map + collect
+        List<String> tokyoPeople = people.stream()
+            .filter(p -> p.city().equals("Tokyo"))
+            .map(Person::name)
+            .sorted()
+            .collect(Collectors.toList());
+        // または .toList() (Java 16+)
+        System.out.println(tokyoPeople);  // [Alice, Charlie]
+
+        // 平均年齢
+        OptionalDouble avgAge = people.stream()
+            .mapToInt(Person::age)
+            .average();
+        avgAge.ifPresent(a -> System.out.printf("平均年齢: %.1f%n", a));
+
+        // groupingBy
+        Map<String, List<Person>> byCity = people.stream()
+            .collect(Collectors.groupingBy(Person::city));
+        byCity.forEach((city, ps) ->
+            System.out.println(city + ": " + ps.stream()
+                .map(Person::name).collect(Collectors.joining(", "))));
+
+        // 最年長者
+        people.stream()
+            .max(Comparator.comparingInt(Person::age))
+            .ifPresent(p -> System.out.println("最年長: " + p.name()));
+
+        // flatMap（リストのリストを平坦化）
+        var nested = List.of(List.of(1,2), List.of(3,4), List.of(5));
+        List<Integer> flat = nested.stream()
+            .flatMap(Collection::stream)
+            .collect(Collectors.toList());
+        System.out.println(flat);  // [1, 2, 3, 4, 5]
+
+        // Collectors.joining
+        String names = people.stream()
+            .map(Person::name)
+            .collect(Collectors.joining(", ", "[", "]"));
+        System.out.println(names);  // [Alice, Bob, Charlie, Dave, Eve]
+    }
+}`,
+        afterCode:"Streamは使い捨てです。一度終端操作を呼ぶと再利用できません。再利用したい場合はSupplier<Stream<T>> として毎回新しいStreamを生成してください。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"List<Integer>を受け取り、偶数だけをフィルタリングして2乗した値のリストをStream APIで返すメソッドを書いてください。",a:`import java.util.*;
+import java.util.stream.*;
+
+public class StreamExercise {
+    public static List<Integer> evenSquares(List<Integer> nums) {
+        return nums.stream()
+            .filter(n -> n % 2 == 0)
+            .map(n -> n * n)
+            .collect(Collectors.toList());
+    }
+
+    public static void main(String[] args) {
+        System.out.println(evenSquares(List.of(1,2,3,4,5,6,7,8)));
+        // [4, 16, 36, 64]
+    }
+}`},
+      {stars:2,q:"List<String>を受け取り、長さ3以上の単語を大文字にして重複を除き、アルファベット順に並べてカンマ区切りで返すメソッドをStream APIで実装してください。",a:`import java.util.*;
+import java.util.stream.*;
+
+public class WordProcessor {
+    public static String process(List<String> words) {
+        return words.stream()
+            .filter(w -> w.length() >= 3)
+            .map(String::toUpperCase)
+            .distinct()
+            .sorted()
+            .collect(Collectors.joining(", "));
+    }
+
+    public static void main(String[] args) {
+        var words = List.of("hi","hello","world","hi","java","go","java","hello");
+        System.out.println(process(words)); // HELLO, JAVA, WORLD
+    }
+}`},
+      {stars:3,q:"Person record（name: String, age: int, department: String）のリストを受け取り、部署別に平均年齢を計算してMap<String, Double>を返すメソッドをStream APIのgroupingByとaveragingtで実装してください。",a:`import java.util.*;
+import java.util.stream.*;
+
+public class DeptStats {
+    record Person(String name, int age, String department) {}
+
+    public static Map<String, Double> avgAgeByDept(List<Person> people) {
+        return people.stream()
+            .collect(Collectors.groupingBy(
+                Person::department,
+                Collectors.averagingInt(Person::age)
+            ));
+    }
+
+    public static void main(String[] args) {
+        var people = List.of(
+            new Person("Alice", 30, "Engineering"),
+            new Person("Bob",   25, "Marketing"),
+            new Person("Carol", 35, "Engineering"),
+            new Person("Dave",  28, "Marketing"),
+            new Person("Eve",   32, "Engineering")
+        );
+        avgAgeByDept(people).forEach((dept, avg) ->
+            System.out.printf("%s: %.1f歳%n", dept, avg));
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch9",num:9,title:"ファイルI/Oとjava.nio.file",
+    goal:"java.nio.file.Filesクラスを使ってファイルの読み書き・ディレクトリ操作・パス操作を行い、NIO.2の非同期ファイルI/Oの基礎を理解できる。",
+    sections:[
+      {
+        title:"Pathとjava.nio.file.Files",
+        body:`Java 7からjava.nio.file（NIO.2）が導入され、ファイル操作の標準APIとして推奨されています。旧来のjava.io.Fileよりも例外の詳細さ・機能の豊富さ・パフォーマンスで優れています。
+
+Path はファイルシステムのパスを表し、Paths.get() または Path.of()（Java 11+）で生成します。String操作ではなく型安全なパス操作が可能で、resolve（パス結合）・relativize（相対パス化）・normalize（正規化）などのメソッドを持ちます。
+
+Files ユーティリティクラスはほとんどのファイル操作をstaticメソッドで提供します。Files.readAllLines()・Files.readString()（Java 11+）・Files.writeString()・Files.copy()・Files.move()・Files.list()・Files.walk() などがあります。ファイル属性の取得や監視（WatchService）も可能です。`,
+        code:`import java.nio.file.*;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.util.List;
+
+public class NioDemo {
+    public static void main(String[] args) throws IOException {
+        Path dir  = Path.of("workspace");
+        Path file = dir.resolve("sample.txt");  // workspace/sample.txt
+
+        // ディレクトリ作成
+        Files.createDirectories(dir);
+
+        // ファイル書き込み（Java 11+）
+        String content = "Java NIO.2\\n2行目\\n3行目";
+        Files.writeString(file, content, StandardCharsets.UTF_8);
+
+        // ファイル読み込み
+        String text = Files.readString(file, StandardCharsets.UTF_8);
+        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+        System.out.println("行数: " + lines.size());
+
+        // ファイル属性
+        System.out.println("サイズ: " + Files.size(file) + " bytes");
+        System.out.println("最終更新: " + Files.getLastModifiedTime(file));
+
+        // ディレクトリ一覧
+        try (var stream = Files.list(dir)) {
+            stream.forEach(p -> System.out.println(p.getFileName()));
+        }
+
+        // ファイルコピー・移動
+        Path copy = dir.resolve("backup.txt");
+        Files.copy(file, copy, StandardCopyOption.REPLACE_EXISTING);
+
+        // ファイルツリーを歩く
+        try (var walk = Files.walk(dir)) {
+            walk.filter(Files::isRegularFile)
+                .forEach(p -> System.out.println(p));
+        }
+
+        // 後片付け
+        Files.delete(copy);
+        Files.delete(file);
+        Files.delete(dir);
+    }
+}`,
+        afterCode:"Files.lines()はStreamを返しファイルを遅延読み込みします。大きなファイルの処理にはreadAllLines()より効率的ですが、try-with-resourcesでStreamを閉じることを忘れないでください。",
+      },
+      {
+        title:"プロパティファイルと設定管理",
+        body:`Javaでよく使われる設定ファイル形式はプロパティファイル（.properties）とJSONまたはYAMLです。java.util.Propertiesクラスでキー=値形式のプロパティファイルを読み書きできます。
+
+プロパティファイルはJavaの歴史的な設定形式で、アプリケーション設定・国際化（i18n）・環境別設定によく使われます。ResourceBundleクラスを使うと多言語対応の文字列リソースを管理できます。
+
+モダンなアプリケーションではJackson（JSON）やSnakeYAML（YAML）ライブラリを使うことが多いですが、外部ライブラリなしで使えるPropertiesは軽量設定に便利です。`,
+        code:`import java.util.Properties;
+import java.io.*;
+import java.nio.file.*;
+
+public class PropertiesDemo {
+    public static void main(String[] args) throws IOException {
+        // プロパティファイルへの書き込み
+        Properties props = new Properties();
+        props.setProperty("app.name", "MyApp");
+        props.setProperty("app.version", "1.0.0");
+        props.setProperty("db.url", "jdbc:postgresql://localhost/mydb");
+        props.setProperty("db.pool.size", "10");
+
+        Path propsFile = Path.of("config.properties");
+        try (var out = Files.newOutputStream(propsFile)) {
+            props.store(out, "Application Configuration");
+        }
+
+        // プロパティファイルの読み込み
+        Properties loaded = new Properties();
+        try (var in = Files.newInputStream(propsFile)) {
+            loaded.load(in);
+        }
+
+        String appName = loaded.getProperty("app.name", "Unknown");
+        int poolSize = Integer.parseInt(loaded.getProperty("db.pool.size", "5"));
+        System.out.println("App: " + appName + ", Pool: " + poolSize);
+
+        // システムプロパティ・環境変数
+        String javaHome = System.getProperty("java.home");
+        String path = System.getenv("PATH");
+        System.out.println("JAVA_HOME: " + javaHome);
+
+        // クリーンアップ
+        Files.deleteIfExists(propsFile);
+    }
+}`,
+      },
+    ],
+    exercises:[
+      {stars:1,q:"コマンドライン引数でファイルパスを受け取り、そのファイルの行数・単語数・文字数を表示するプログラムをjava.nio.file.Filesを使って実装してください。",a:`import java.nio.file.*;
+import java.io.IOException;
+
+public class FileStats {
+    public static void main(String[] args) throws IOException {
+        if (args.length < 1) {
+            System.err.println("Usage: java FileStats <filepath>");
+            System.exit(1);
+        }
+        Path path = Path.of(args[0]);
+        var lines = Files.readAllLines(path);
+        long lineCount = lines.size();
+        long wordCount = lines.stream()
+            .flatMap(l -> java.util.Arrays.stream(l.split("\\\\s+")))
+            .filter(w -> !w.isEmpty())
+            .count();
+        long charCount = Files.readString(path).length();
+        System.out.printf("行数: %d, 単語数: %d, 文字数: %d%n", lineCount, wordCount, charCount);
+    }
+}`},
+      {stars:2,q:"指定ディレクトリ内の全.javaファイルをFiles.walk()で再帰的に探索し、ファイル名と行数をMapに格納して返すメソッドを実装してください。",a:`import java.nio.file.*;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.*;
+
+public class JavaFileFinder {
+    public static Map<String, Long> findJavaFiles(Path dir) throws IOException {
+        try (var walk = Files.walk(dir)) {
+            return walk
+                .filter(p -> p.toString().endsWith(".java"))
+                .filter(Files::isRegularFile)
+                .collect(Collectors.toMap(
+                    p -> p.getFileName().toString(),
+                    p -> {
+                        try { return (long) Files.readAllLines(p).size(); }
+                        catch (IOException e) { return -1L; }
+                    }
+                ));
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
+        findJavaFiles(Path.of(".")).forEach((name, lines) ->
+            System.out.printf("%s: %d行%n", name, lines));
+    }
+}`},
+      {stars:3,q:"CSVファイル（ヘッダーあり: name,age,city）を読み込み、年齢が指定値以上の行だけをフィルタリングして別のCSVファイルに書き出すプログラムをStream APIとFiles.readAllLines/writeStringで実装してください。",a:`import java.nio.file.*;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.*;
+
+public class CsvFilter {
+    public static void filter(Path input, Path output, int minAge) throws IOException {
+        var lines = Files.readAllLines(input);
+        if (lines.isEmpty()) return;
+
+        String header = lines.get(0);
+        String filtered = lines.stream()
+            .skip(1)
+            .filter(line -> {
+                String[] parts = line.split(",");
+                if (parts.length < 2) return false;
+                try { return Integer.parseInt(parts[1].trim()) >= minAge; }
+                catch (NumberFormatException e) { return false; }
+            })
+            .collect(Collectors.joining("\\n", header + "\\n", "\\n"));
+
+        Files.writeString(output, filtered);
+    }
+
+    public static void main(String[] args) throws IOException {
+        // テスト用CSV作成
+        Files.writeString(Path.of("people.csv"),
+            "name,age,city\\nAlice,30,Tokyo\\nBob,22,Osaka\\nCharlie,35,Tokyo\\n");
+        filter(Path.of("people.csv"), Path.of("filtered.csv"), 30);
+        System.out.println(Files.readString(Path.of("filtered.csv")));
+        Files.deleteIfExists(Path.of("people.csv"));
+        Files.deleteIfExists(Path.of("filtered.csv"));
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch10",num:10,title:"ビルドツールとモジュールシステム",
+    goal:"MavenまたはGradleでプロジェクトを作成し依存関係を管理でき、Java 9のモジュールシステムの基礎とJUnit 5でのテストを書ける。",
+    sections:[
+      {
+        title:"Maven と Gradle",
+        body:`JavaのビルドツールはかつてはすべてのプロジェクトでMavenが使われていましたが、現在はGradleも広く普及しています（特にAndroid開発ではGradle一択）。PythonのpipやpoetryはJavaではMaven/Gradleに相当します。
+
+MavenはXML（pom.xml）で設定を記述し、規約に従ったプロジェクト構造（src/main/java, src/test/javaなど）を使います。Central Repository（Maven Central）から依存関係を自動ダウンロードし、ライフサイクル（compile, test, package, install, deploy）で管理します。
+
+GradleはGroovyまたはKotlin DSLで設定を記述し、Mavenより柔軟で高速（インクリメンタルビルド・ビルドキャッシュ）です。大規模プロジェクトやAndroid開発ではGradleが標準です。どちらも成果物はJARファイルとして出力します。`,
+        table:{headers:["項目","Maven","Gradle"],rows:[
+          ["設定ファイル","pom.xml","build.gradle(.kts)"],
+          ["設定言語","XML","Groovy / Kotlin DSL"],
+          ["ビルド速度","中程度","高速（増分ビルド）"],
+          ["主な用途","Java EE, Spring","Android, 大規模プロジェクト"],
+          ["学習コスト","低（規約ベース）","やや高い"],
+        ]},
+        afterTable:`Maven プロジェクト作成: mvn archetype:generate -DgroupId=com.example -DartifactId=myapp -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+Gradle プロジェクト作成: gradle init --type java-application`,
+      },
+      {
+        title:"JUnit 5 でのテスト",
+        body:`JUnit 5（Jupiter）はJavaの標準テストフレームワークです。Pythonのpytestに相当し、アノテーションでテストを定義します。@Test・@BeforeEach・@AfterEach・@BeforeAll・@AfterAll・@Disabled・@ParameterizedTestなどがあります。
+
+アサーションはAssertions.assertEquals()・assertThrows()・assertAll()等を使います。assertAll()でまとめてアサーションでき、一部失敗しても全部実行されます。Mockito（モックライブラリ）と組み合わせることで、依存関係のない単体テストが書けます。
+
+現代のJava開発ではテスト駆動開発（TDD）やBDDスタイルも普及しており、AssertJ（流暢なアサーション）やTestcontainers（Dockerベースの統合テスト）も広く使われています。`,
+        code:`import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+class BankAccountTest {
+    private BankAccount account;
+
+    @BeforeEach
+    void setUp() {
+        account = new BankAccount("Alice", 1000.0);
+    }
+
+    @Test
+    @DisplayName("入金で残高が増える")
+    void deposit_increasesBalance() {
+        account.deposit(500.0);
+        assertEquals(1500.0, account.getBalance(), 0.001);
+    }
+
+    @Test
+    void withdraw_withSufficientBalance_succeeds() {
+        assertTrue(account.withdraw(500.0));
+        assertEquals(500.0, account.getBalance());
+    }
+
+    @Test
+    void withdraw_withInsufficientBalance_fails() {
+        assertFalse(account.withdraw(2000.0));
+        assertEquals(1000.0, account.getBalance()); // 変化なし
+    }
+
+    @Test
+    void deposit_negativeAmount_throwsException() {
+        assertThrows(IllegalArgumentException.class,
+            () -> account.deposit(-100.0));
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {100, 200, 500, 999})
+    void withdraw_validAmounts(double amount) {
+        assertTrue(account.withdraw(amount));
+    }
+
+    @Test
+    void multipleAssertions() {
+        account.deposit(200.0);
+        assertAll(
+            () -> assertEquals(1200.0, account.getBalance()),
+            () -> assertEquals("Alice", account.getOwner()),
+            () -> assertTrue(account.getBalance() > 0)
+        );
+    }
+}`,
+        afterCode:"pom.xmlにJUnit 5を追加するには: <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.10.0</version><scope>test</scope></dependency>。Maven Surefireプラグイン3.x以降が必要です。",
+      },
+      {
+        title:"Java 9 モジュールシステム（Jigsaw）",
+        body:`Java 9で導入されたモジュールシステム（Project Jigsaw）は、パッケージの可視性をより細かく制御する仕組みです。module-info.javaファイルにモジュールが何を提供し（exports）何を必要とするか（requires）を宣言します。
+
+モジュールシステムはカプセル化の強化、循環依存の排除、JREの軽量化（JEPで必要なモジュールだけをjlinkで固める）を目的としています。ただし既存のクラスパスベースのアプリケーションとの互換性も保たれており、無名モジュール（unnamed module）として従来通り動作します。
+
+実務では多くのアプリケーションがモジュールシステムを使わずクラスパスで動かしていますが、ライブラリ設計やJVM配布物の軽量化では重要な概念です。`,
+        code:`// module-info.java (src/main/java/ 直下)
+module com.example.app {
+    requires java.net.http;          // JDKモジュールの依存
+    requires java.logging;
+    requires com.google.gson;        // サードパーティモジュール
+
+    exports com.example.app.api;     // 公開するパッケージ
+    exports com.example.app.model;
+    // com.example.app.internal は外から見えない
+
+    opens com.example.app.model to com.google.gson;  // リフレクション許可
+}
+
+// モジュール情報の確認
+// $ java --list-modules
+// $ java --describe-module java.base
+
+// jlinkで最小JRE作成
+// $ jlink --module-path mods --add-modules com.example.app \\
+//         --output myapp-runtime --launcher myapp=com.example.app/com.example.app.Main`,
+      },
+    ],
+    exercises:[
+      {stars:1,q:"JUnit 5を使って、文字列を逆順にするreverseString(String s)メソッドをテストするクラスを書いてください。空文字列・1文字・通常文字列・回文の4ケースをテストしてください。",a:`import org.junit.jupiter.api.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+class StringUtilsTest {
+    static String reverseString(String s) {
+        return new StringBuilder(s).reverse().toString();
+    }
+
+    @Test void emptyString()  { assertEquals("", reverseString("")); }
+    @Test void singleChar()   { assertEquals("a", reverseString("a")); }
+    @Test void normal()       { assertEquals("olleh", reverseString("hello")); }
+    @Test void palindrome()   { assertEquals("racecar", reverseString("racecar")); }
+
+    @ParameterizedTest
+    @CsvSource({"hello,olleh", "Java,avaJ", "abc,cba"})
+    void parameterized(String input, String expected) {
+        assertEquals(expected, reverseString(input));
+    }
+}`},
+      {stars:2,q:"Maven の pom.xml の依存関係セクションに JUnit 5 と Jackson Databind を追加するXMLスニペットを書いてください（バージョンはJUnit 5.10.0, Jackson 2.16.0）。",a:`<!-- pom.xml の <dependencies> セクション -->
+<dependencies>
+    <!-- JUnit 5 -->
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>5.10.0</version>
+        <scope>test</scope>
+    </dependency>
+
+    <!-- Jackson Databind (JSON) -->
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>2.16.0</version>
+    </dependency>
+</dependencies>
+
+<!-- Maven Surefire Plugin (JUnit 5 実行に必要) -->
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.2.2</version>
+        </plugin>
+    </plugins>
+</build>`},
+      {stars:3,q:"Calculatorクラスにdivide(int a, int b)メソッドを実装し（bが0ならArithmeticException）、JUnit 5でassertThrowsを使って例外テスト・正常ケースのParameterizedTest・assertAllによる複数アサーションテストを含むテストクラスを書いてください。",a:`// Calculator.java
+public class Calculator {
+    public int add(int a, int b)      { return a + b; }
+    public int subtract(int a, int b) { return a - b; }
+    public int multiply(int a, int b) { return a * b; }
+    public double divide(int a, int b) {
+        if (b == 0) throw new ArithmeticException("ゼロ除算");
+        return (double) a / b;
+    }
+}
+
+// CalculatorTest.java
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.*;
+import org.junit.jupiter.params.provider.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+class CalculatorTest {
+    Calculator calc = new Calculator();
+
+    @Test
+    void divideByZero_throwsArithmeticException() {
+        var ex = assertThrows(ArithmeticException.class, () -> calc.divide(10, 0));
+        assertEquals("ゼロ除算", ex.getMessage());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"10,2,5.0", "9,3,3.0", "7,2,3.5"})
+    void divide_validInputs(int a, int b, double expected) {
+        assertEquals(expected, calc.divide(a, b), 0.001);
+    }
+
+    @Test
+    void multipleOperations() {
+        assertAll(
+            () -> assertEquals(5,  calc.add(2, 3)),
+            () -> assertEquals(1,  calc.subtract(3, 2)),
+            () -> assertEquals(6,  calc.multiply(2, 3)),
+            () -> assertEquals(2.5, calc.divide(5, 2), 0.001)
+        );
+    }
+}`},
+    ],
+  },
+];
+
+const EX = {};
+CHAPTERS.forEach(ch => {
+  EX[ch.id] = ch.exercises;
+});
+
+
+// Normalize data format
+const chapters = CHAPTERS.map(function(ch) {
+  var obj = {id:ch.id, num:ch.num, title:ch.title, est:ch.est||"45分", goal:ch.goal, sections:[]};
+  obj.sections = (ch.sections||[]).map(function(s) {
+    var ns = {title:s.title, body:s.body};
+    if(s.table) { ns.table = s.table.h ? s.table : {h:s.table.headers, r:s.table.rows, cap:s.table.cap}; }
+    if(s.afterTable) ns.afterTable = s.afterTable;
+    if(s.code) ns.code = s.code;
+    if(s.afterCode) ns.afterCode = s.afterCode;
+    return ns;
+  });
+  return obj;
+});
+const EX = {};
+CHAPTERS.forEach(function(ch) {
+  if(ch.exercises) {
+    EX[ch.id] = ch.exercises.map(function(e) {
+      return {diff: e.diff||e.stars||1, q: e.q||e.question||"", code: e.code||"// ここにコードを書いてください", answer: e.answer||e.a||""};
+    });
+  }
+});
+
+/* ─── UI Components ─── */
+
+// Normalize data format
+var chapters = CHAPTERS.map(function(ch) {
+  var obj = {id:ch.id, num:ch.num, title:ch.title, est:ch.est||"45分", goal:ch.goal, sections:[]};
+  obj.sections = (ch.sections||[]).map(function(s) {
+    var ns = {title:s.title, body:s.body};
+    if(s.table) { ns.table = s.table.h ? s.table : {h:s.table.headers, r:s.table.rows, cap:s.table.cap}; }
+    if(s.afterTable) ns.afterTable = s.afterTable;
+    if(s.code) ns.code = s.code;
+    if(s.afterCode) ns.afterCode = s.afterCode;
+    return ns;
+  });
+  return obj;
+});
+var EX = {};
+CHAPTERS.forEach(function(ch) {
+  if(ch.exercises) {
+    EX[ch.id] = ch.exercises.map(function(e) {
+      return {diff: e.diff||e.stars||1, q: e.q||e.question||"", code: e.code||"// ここにコードを書いてください", answer: e.answer||e.a||""};
+    });
+  }
+});
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, data.h.map((h, i) => /*#__PURE__*/React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, data.r.map((row, ri) => /*#__PURE__*/React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => /*#__PURE__*/React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return /*#__PURE__*/React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, /*#__PURE__*/React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "⭐ 基本" : d === 2 ? "⭐⭐ 応用" : "⭐⭐⭐ 発展";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, /*#__PURE__*/React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "🙈 解答を隠す" : "👀 解答例を見る"), showAnswer && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), /*#__PURE__*/React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && /*#__PURE__*/React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && /*#__PURE__*/React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+
+/* ─── Main App ─── */
+function JavaCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\u2615"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "Java \u5165\u9580\u30B3\u30FC\u30B9"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), /*#__PURE__*/React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "JVM・OOP・ジェネリクス・Stream API・ファイルI/O・ビルドツールの基礎を学び、Javaの設計思想とエコシステムを理解します。"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "▲" : "▼")), menuOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => /*#__PURE__*/React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : ""))), chapter.goal && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "🎯 この章のゴール"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => /*#__PURE__*/React.createElement(Section, {
+    key: ch + "-" + i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Exercise, {
+    key: ch + "-" + i,
+    ex: ex,
+    idx: i
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : /*#__PURE__*/React.createElement("a", {
+    href: "../index.html",
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "Java 21 (LTS) \u6E96\u62E0 \u00B7 2026\u5E744\u6708\u6642\u70B9")));
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(JavaCourse));
+  </script>
+</body>
+</html>

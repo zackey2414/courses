@@ -1,0 +1,2430 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java 初級コース</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const CHAPTERS = [
+  {
+    id:"ch1",num:1,title:"Mavenプロジェクト構成とHello CLI",
+    goal:"mavenでJavaプロジェクトを新規作成し、Mavenのディレクトリ構造・pom.xml・ビルドライフサイクルを理解して最初のCLI出力を実行できる。",
+    sections:[
+      {
+        title:"Mavenプロジェクトの作成",
+        body:`JavaTodoプロジェクトを通じて初級コースを進めます。まずMavenでプロジェクト雛形を生成します。Pythonではvenvやpoetryで仮想環境を作りますが、Javaではビルドツール（Maven/Gradle）がプロジェクト構造・依存管理・ビルドを一括で管理します。
+
+Mavenのディレクトリ規約：src/main/java（本番コード）、src/test/java（テストコード）、src/main/resources（設定ファイル等）。pom.xml（Project Object Model）がPythonのpyproject.tomlに相当し、groupId・artifactId・version（GAV座標）でプロジェクトを識別します。
+
+Mavenの主要コマンド：mvn compile（コンパイル）、mvn test（テスト実行）、mvn package（JARパッケージ）、mvn clean（ビルド成果物削除）、mvn dependency:tree（依存ツリー表示）。これらのコマンドを組み合わせてビルドパイプラインを構築します。`,
+        code:`# プロジェクト作成
+mvn archetype:generate \\
+  -DgroupId=com.example.todo \\
+  -DartifactId=javatodo \\
+  -DarchetypeArtifactId=maven-archetype-quickstart \\
+  -DarchetypeVersion=1.4 \\
+  -DinteractiveMode=false
+
+cd javatodo
+
+# ディレクトリ構造
+javatodo/
+├── pom.xml
+└── src/
+    ├── main/
+    │   └── java/com/example/todo/
+    │       └── App.java
+    └── test/
+        └── java/com/example/todo/
+            └── AppTest.java`,
+        afterCode:"IntelliJ IDEAを使っている場合はFile > New > Project > Maven からGUIで作成できます。pom.xmlを開くとIDEが自動で依存関係をダウンロードします。",
+      },
+      {
+        title:"pom.xmlの設定とmain-classの指定",
+        body:`pom.xmlにJava 21のコンパイルターゲット・JUnit 5・picocli・Jacksonを追加します。maven-shade-pluginを使うと依存関係をすべて含んだfat JAR（uber JAR）を作成でき、java -jar javatodo.jar で実行できます。
+
+maven-shade-pluginのManifest設定でMain-Classを指定することで、JARを直接実行可能にします。これはPythonの if __name__ == "__main__": エントリポイントに相当するJavaの慣例です。
+
+JVMのデフォルトエンコーディングをUTF-8に固定するには、JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF-8 環境変数を設定するか、pom.xmlでproject.build.sourceEncoding=UTF-8を指定します（特に日本語を扱う場合に重要）。`,
+        code:`<!-- pom.xml -->
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example.todo</groupId>
+  <artifactId>javatodo</artifactId>
+  <version>1.0-SNAPSHOT</version>
+
+  <properties>
+    <java.version>21</java.version>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>
+    <!-- picocli: CLIパーサー -->
+    <dependency>
+      <groupId>info.picocli</groupId>
+      <artifactId>picocli</artifactId>
+      <version>4.7.5</version>
+    </dependency>
+    <!-- Jackson: JSON処理 -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.16.1</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
+      <version>2.16.1</version>
+    </dependency>
+    <!-- JUnit 5 -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.10.1</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- fat JARビルド -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.5.1</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>com.example.todo.Main</mainClass>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.3</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>`,
+      },
+      {
+        title:"最初のCLIエントリポイント",
+        body:`プロジェクトのエントリポイントとなるMainクラスを作成します。この段階では単純なヘルプ表示とバージョン表示だけを実装し、章を追うごとに機能を追加していきます。
+
+picocliはアノテーションベースのCLIライブラリで、@Command・@Option・@Parametersアノテーションでコマンド構造を宣言的に定義できます。Pythonのargparseやclickに相当しますが、より型安全でサブコマンド構造が組みやすい設計です。
+
+最初はシンプルなバージョン表示とヘルプ表示から始め、次章以降でサブコマンド（add、list、done、delete）を追加します。`,
+        code:`// src/main/java/com/example/todo/Main.java
+package com.example.todo;
+
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+
+@Command(
+    name = "todo",
+    version = "JavaTodo 1.0",
+    description = "シンプルなCLIタスク管理ツール",
+    mixinStandardHelpOptions = true,  // --help / --version を自動追加
+    subcommands = {
+        CommandLine.HelpCommand.class
+    }
+)
+public class Main implements Runnable {
+
+    @Override
+    public void run() {
+        // サブコマンドなしで実行されたときはヘルプを表示
+        CommandLine.usage(this, System.out);
+    }
+
+    public static void main(String[] args) {
+        int exitCode = new CommandLine(new Main()).execute(args);
+        System.exit(exitCode);
+    }
+}`,
+        afterCode:"mvn compile && mvn exec:java -Dexec.mainClass=com.example.todo.Main でコンパイルと実行ができます。mvn package後はjava -jar target/javatodo-1.0-SNAPSHOT.jar --help で実行可能です。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"pom.xmlにSlf4j-simpleのロギング依存（org.slf4j:slf4j-simple:2.0.9）を追加し、MainクラスでLoggerFactory.getLogger(Main.class)を使ってINFOレベルのログ「Application started」を出力してください。",a:`<!-- pom.xmlに追加 -->
+<dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-simple</artifactId>
+    <version>2.0.9</version>
+</dependency>
+
+// Main.java
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class Main implements Runnable {
+    private static final Logger log = LoggerFactory.getLogger(Main.class);
+
+    @Override
+    public void run() {
+        log.info("Application started");
+        CommandLine.usage(this, System.out);
+    }
+}`},
+      {stars:2,q:"picocliの@Commandに name=\"todo\"、description・version・mixinStandardHelpOptions=trueを設定し、mvn packageでJARをビルドして java -jar target/javatodo-1.0-SNAPSHOT.jar --version を実行したときに「JavaTodo 1.0」と表示されるようにしてください。",a:`@Command(
+    name = "todo",
+    version = "JavaTodo 1.0",
+    description = "シンプルなCLIタスク管理ツール",
+    mixinStandardHelpOptions = true
+)
+public class Main implements Runnable {
+    @Override
+    public void run() {
+        CommandLine.usage(this, System.out);
+    }
+
+    public static void main(String[] args) {
+        int exitCode = new CommandLine(new Main()).execute(args);
+        System.exit(exitCode);
+    }
+}
+
+// ビルドと実行
+// $ mvn package -q
+// $ java -jar target/javatodo-1.0-SNAPSHOT.jar --version
+// JavaTodo 1.0`},
+      {stars:3,q:"@Option(names={\"--name\",\"-n\"}, description=\"Your name\")でString nameフィールドを追加し、todoコマンド実行時にnameが指定されていれば「こんにちは、{name}さん！」、なければ「こんにちは！」と表示するrun()を実装してください。",a:`@Command(name="todo", version="JavaTodo 1.0",
+    description="CLIタスク管理ツール", mixinStandardHelpOptions=true)
+public class Main implements Runnable {
+    @Option(names={"-n","--name"}, description="Your name")
+    private String name;
+
+    @Override
+    public void run() {
+        if (name != null && !name.isBlank()) {
+            System.out.println("こんにちは、" + name + "さん！");
+        } else {
+            System.out.println("こんにちは！");
+        }
+    }
+
+    public static void main(String[] args) {
+        System.exit(new CommandLine(new Main()).execute(args));
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch2",num:2,title:"タスクモデルの設計",
+    goal:"RecordとEnumを使ったイミュータブルなTaskモデルを設計し、Jacksonのシリアライズ/デシリアライズに対応させてJSONで保存・読み込みできる。",
+    sections:[
+      {
+        title:"TaskモデルとTaskStatus enum",
+        body:`タスク管理アプリの核心となるTaskモデルを設計します。Java 16のrecordはイミュータブルなデータクラスに最適で、equals/hashCode/toStringが自動生成されます。タスクのステータスはenumで型安全に管理します。
+
+PythonのdataclassやTypedDictよりも型が厳密で、コンパイル時に存在しないフィールドへのアクセスや型不一致を検出できます。JacksonはrecordのコンポーネントをJSON ↔ Javaオブジェクト変換できますが、Jackson 2.12以降はrecordをネイティブサポートしています。
+
+UUID（java.util.UUID）はタスクIDの一意識別子として使います。LocalDateTime（java.time）はJava 8以降の標準日時APIで、Jacksonのjackson-datatype-jsr310でシリアライズできます。`,
+        code:`package com.example.todo.model;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+public enum TaskStatus {
+    TODO, IN_PROGRESS, DONE
+}
+
+// Task record (Java 16+)
+public record Task(
+    @JsonProperty("id")          UUID id,
+    @JsonProperty("title")       String title,
+    @JsonProperty("description") String description,
+    @JsonProperty("status")      TaskStatus status,
+    @JsonProperty("createdAt")   LocalDateTime createdAt,
+    @JsonProperty("doneAt")      LocalDateTime doneAt
+) {
+    // ファクトリメソッド（新規タスク作成）
+    public static Task create(String title, String description) {
+        return new Task(
+            UUID.randomUUID(),
+            title,
+            description,
+            TaskStatus.TODO,
+            LocalDateTime.now(),
+            null
+        );
+    }
+
+    // 完了にした新しいTaskを返す（イミュータブル）
+    public Task complete() {
+        return new Task(id, title, description, TaskStatus.DONE, createdAt, LocalDateTime.now());
+    }
+
+    // ステータス変更
+    public Task withStatus(TaskStatus newStatus) {
+        return new Task(id, title, description, newStatus, createdAt,
+            newStatus == TaskStatus.DONE ? LocalDateTime.now() : doneAt);
+    }
+
+    // 表示用
+    public String display() {
+        String check = status == TaskStatus.DONE ? "[✓]" :
+                       status == TaskStatus.IN_PROGRESS ? "[~]" : "[ ]";
+        return String.format("%s %s - %s (id: %s)", check, title, description,
+            id.toString().substring(0, 8));
+    }
+}`,
+        afterCode:"recordはwithメソッドによるコピー生成パターンと相性が良いです。Java 14のrecordはPreviewでしたがJava 16で正式化されました。",
+      },
+      {
+        title:"JacksonによるJSON永続化",
+        body:`ObjectMapperはJacksonのコアクラスで、JavaオブジェクトをJSON文字列/ファイルに変換（シリアライズ）し、その逆（デシリアライズ）を行います。PythonのJson.dumps()/json.loads()やpickleに相当しますが、型安全かつ設定が豊富です。
+
+java.time（LocalDateTime等）のシリアライズにはJavaTimeModule（jackson-datatype-jsr310）の登録が必要です。デフォルトではLocalDateTimeを配列でシリアライズするため、WRITE_DATES_AS_TIMESTAMPS=falseでISO-8601文字列形式に変更します。
+
+タスクのリストをJSONファイルに保存・読み込みする TaskRepository クラスを設計します。これでアプリを再起動してもデータが保持されます。`,
+        code:`package com.example.todo.repository;
+
+import com.example.todo.model.Task;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.*;
+
+public class TaskRepository {
+    private static final ObjectMapper MAPPER = createMapper();
+    private final Path dataFile;
+
+    public TaskRepository() {
+        this(Path.of(System.getProperty("user.home"), ".javatodo", "tasks.json"));
+    }
+
+    public TaskRepository(Path dataFile) {
+        this.dataFile = dataFile;
+    }
+
+    private static ObjectMapper createMapper() {
+        return new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .enable(SerializationFeature.INDENT_OUTPUT);
+    }
+
+    public List<Task> loadAll() throws IOException {
+        if (!Files.exists(dataFile)) return new ArrayList<>();
+        try {
+            return MAPPER.readValue(dataFile.toFile(),
+                new TypeReference<List<Task>>() {});
+        } catch (Exception e) {
+            System.err.println("データ読み込みエラー: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    public void saveAll(List<Task> tasks) throws IOException {
+        Files.createDirectories(dataFile.getParent());
+        MAPPER.writeValue(dataFile.toFile(), tasks);
+    }
+
+    public Path getDataFile() { return dataFile; }
+}`,
+        afterCode:"ObjectMapperはスレッドセーフで再利用できます。毎回newするのはコストが高いため、staticなシングルトンかDIコンテナで管理するのが実務的です。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"Task recordのdisplay()メソッドを拡張し、createdAtをyyyy-MM-dd HH:mm形式でフォーマットして表示に含めてください。java.time.format.DateTimeFormatterを使ってください。",a:`import java.time.format.DateTimeFormatter;
+
+// Task record内のメソッド
+private static final DateTimeFormatter DISPLAY_FMT =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+public String display() {
+    String check = status == TaskStatus.DONE ? "[✓]" :
+                   status == TaskStatus.IN_PROGRESS ? "[~]" : "[ ]";
+    String created = createdAt != null ? createdAt.format(DISPLAY_FMT) : "-";
+    return String.format("%s %s - %s [%s] (id: %s)",
+        check, title, description, created, id.toString().substring(0, 8));
+}`},
+      {stars:2,q:"TaskRepositoryのテストクラスを書いてください。@TempDir（JUnit 5）を使って一時ディレクトリにデータを保存し、saveAll()→loadAll()でタスクが正しく永続化されるか検証してください。",a:`import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.*;
+import java.util.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+class TaskRepositoryTest {
+    @TempDir Path tempDir;
+    TaskRepository repo;
+
+    @BeforeEach
+    void setUp() {
+        repo = new TaskRepository(tempDir.resolve("tasks.json"));
+    }
+
+    @Test
+    void loadAll_whenFileNotExists_returnsEmpty() throws Exception {
+        assertTrue(repo.loadAll().isEmpty());
+    }
+
+    @Test
+    void saveAndLoad_roundtrip() throws Exception {
+        var task = Task.create("テスト", "説明");
+        repo.saveAll(List.of(task));
+
+        var loaded = repo.loadAll();
+        assertEquals(1, loaded.size());
+        assertEquals(task.id(), loaded.get(0).id());
+        assertEquals(task.title(), loaded.get(0).title());
+        assertEquals(TaskStatus.TODO, loaded.get(0).status());
+    }
+}`},
+      {stars:3,q:"TaskRepositoryに findById(UUID id) と findByStatus(TaskStatus status) メソッドを追加してください。両方ともloadAll()でファイルから読み込んだリストをStream APIでフィルタリングして返してください。",a:`public Optional<Task> findById(UUID id) throws IOException {
+    return loadAll().stream()
+        .filter(t -> t.id().equals(id))
+        .findFirst();
+}
+
+public List<Task> findByStatus(TaskStatus status) throws IOException {
+    return loadAll().stream()
+        .filter(t -> t.status() == status)
+        .collect(java.util.stream.Collectors.toList());
+}`},
+    ],
+  },
+  {
+    id:"ch3",num:3,title:"タスク追加サブコマンド（add）",
+    goal:"picocliのサブコマンドとして add コマンドを実装し、タイトル・説明をオプションで受け取ってJSONファイルに保存できる。",
+    sections:[
+      {
+        title:"picocliサブコマンドの構造",
+        body:`picocliでは@Commandをサブクラス（または別クラス）に付けることでサブコマンドを実現します。PythonのclickではグループとCommandで階層を作りますが、picocliではCommandLine.addSubcommand()またはparentCommand.subcommands属性で宣言します。
+
+各サブコマンドはRunnable（またはCallable<Integer>）を実装します。CommandLineクラスはexecute()時に適切なサブコマンドを選んでrun()/call()を呼びます。親コマンドとサブコマンドは@ParentCommand アノテーションで参照し合えます。
+
+@Specアノテーションとspec.commandLine().getParent()を使うと親コマンドに定義された共通オプション（例：データファイルパス）をサブコマンドから参照できます。`,
+        code:`package com.example.todo.command;
+
+import com.example.todo.model.Task;
+import com.example.todo.repository.TaskRepository;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
+import java.io.IOException;
+import java.util.*;
+
+@Command(
+    name = "add",
+    description = "新しいタスクを追加します"
+)
+public class AddCommand implements Runnable {
+
+    @Parameters(index = "0", description = "タスクのタイトル")
+    private String title;
+
+    @Option(names = {"-d", "--description"}, description = "タスクの説明",
+            defaultValue = "")
+    private String description;
+
+    private final TaskRepository repository;
+
+    // DIによるリポジトリ注入（テスト可能）
+    public AddCommand(TaskRepository repository) {
+        this.repository = repository;
+    }
+
+    @Override
+    public void run() {
+        try {
+            List<Task> tasks = new ArrayList<>(repository.loadAll());
+            Task newTask = Task.create(title, description);
+            tasks.add(newTask);
+            repository.saveAll(tasks);
+            System.out.printf("✓ タスクを追加しました: %s (id: %s)%n",
+                newTask.title(), newTask.id().toString().substring(0, 8));
+        } catch (IOException e) {
+            System.err.println("エラー: " + e.getMessage());
+        }
+    }
+}`,
+        afterCode:"Callableを使うと整数の終了コードを返せます。エラー時に0以外を返してSystem.exit()させるにはCallable<Integer>の実装が便利です。",
+      },
+      {
+        title:"Mainクラスへのサブコマンド登録",
+        body:`Mainクラスにサブコマンドを登録します。picocliのfactory機能（IFactory）を使うとサブコマンドのDI（依存注入）が容易になります。テスト時にはモックリポジトリを渡せます。
+
+@Commandのsubcommandsにクラスオブジェクトをリストアップするか、CommandLine#addSubcommand()を使って動的に登録できます。前者はアノテーション駆動で簡潔ですが、コンストラクタ引数を渡せないため、後者かFactory実装が必要です。
+
+CommandLine.IFactory を実装してカスタムインスタンス化を行います。これはシンプルなDIコンテナとして機能します。`,
+        code:`package com.example.todo;
+
+import com.example.todo.command.*;
+import com.example.todo.repository.TaskRepository;
+import picocli.CommandLine;
+import picocli.CommandLine.*;
+
+@Command(
+    name = "todo",
+    version = "JavaTodo 1.0",
+    description = "シンプルなCLIタスク管理ツール",
+    mixinStandardHelpOptions = true
+)
+public class Main implements Runnable {
+
+    @Override
+    public void run() {
+        CommandLine.usage(this, System.out);
+    }
+
+    public static void main(String[] args) {
+        var repo = new TaskRepository();
+
+        // カスタムFactoryでDI
+        CommandLine cmd = new CommandLine(new Main());
+        cmd.addSubcommand("add",    new AddCommand(repo));
+        // 後続章で list, done, delete を追加予定
+
+        int exitCode = cmd.execute(args);
+        System.exit(exitCode);
+    }
+}
+
+// 実行例
+// $ todo add "買い物" -d "牛乳・卵・野菜"
+// ✓ タスクを追加しました: 買い物 (id: a1b2c3d4)
+//
+// $ todo add "報告書作成" --description "月次レポートを作成する"
+// ✓ タスクを追加しました: 報告書作成 (id: e5f6a7b8)`,
+      },
+    ],
+    exercises:[
+      {stars:1,q:"AddCommandに --priority オプション（int型、1〜5、デフォルト3）を追加し、追加時に優先度も表示するよう修正してください。まず Task record に priority フィールドを追加してください。",a:`// Task record に priority を追加
+public record Task(
+    UUID id, String title, String description,
+    TaskStatus status, int priority,
+    LocalDateTime createdAt, LocalDateTime doneAt
+) {
+    public static Task create(String title, String description, int priority) {
+        return new Task(UUID.randomUUID(), title, description,
+            TaskStatus.TODO, priority, LocalDateTime.now(), null);
+    }
+    // ...
+}
+
+// AddCommand に追加
+@Option(names={"-p","--priority"}, description="優先度 1-5", defaultValue="3")
+private int priority;
+
+// run() 内
+Task newTask = Task.create(title, description, priority);
+System.out.printf("✓ タスクを追加しました: %s [優先度:%d] (id: %s)%n",
+    newTask.title(), newTask.priority(), newTask.id().toString().substring(0, 8));`},
+      {stars:2,q:"AddCommandのrun()メソッドのユニットテストを書いてください。@TempDirを使ったTaskRepositoryを渡し、コマンド実行後にtasks.jsonに1件保存されていることを確認してください。",a:`import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.*;
+import static org.junit.jupiter.api.Assertions.*;
+import picocli.CommandLine;
+
+class AddCommandTest {
+    @TempDir Path tempDir;
+
+    @Test
+    void add_createsTask() throws Exception {
+        var repo = new TaskRepository(tempDir.resolve("tasks.json"));
+        var cmd = new CommandLine(new AddCommand(repo));
+        int exit = cmd.execute("買い物", "-d", "牛乳・卵");
+
+        assertEquals(0, exit);
+        var tasks = repo.loadAll();
+        assertEquals(1, tasks.size());
+        assertEquals("買い物", tasks.get(0).title());
+        assertEquals("牛乳・卵", tasks.get(0).description());
+    }
+}`},
+      {stars:3,q:"タイトルが空文字または100文字超の場合にエラーメッセージを表示して終了コード1を返すバリデーションをAddCommandに追加してください。RunnabledからCallable<Integer>に変更してください。",a:`@Command(name="add", description="新しいタスクを追加します")
+public class AddCommand implements Callable<Integer> {
+    @Parameters(index="0") private String title;
+    @Option(names={"-d","--description"}, defaultValue="") private String description;
+
+    private final TaskRepository repository;
+    public AddCommand(TaskRepository repository) { this.repository = repository; }
+
+    @Override
+    public Integer call() {
+        if (title == null || title.isBlank()) {
+            System.err.println("エラー: タイトルは必須です");
+            return 1;
+        }
+        if (title.length() > 100) {
+            System.err.println("エラー: タイトルは100文字以内にしてください");
+            return 1;
+        }
+        try {
+            var tasks = new java.util.ArrayList<>(repository.loadAll());
+            var task = Task.create(title, description);
+            tasks.add(task);
+            repository.saveAll(tasks);
+            System.out.printf("✓ 追加: %s (id: %s)%n", task.title(),
+                task.id().toString().substring(0, 8));
+            return 0;
+        } catch (java.io.IOException e) {
+            System.err.println("エラー: " + e.getMessage());
+            return 1;
+        }
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch4",num:4,title:"タスク一覧表示（list）",
+    goal:"listサブコマンドを実装し、ステータスフィルター・ソート・テーブル形式での表示ができる。",
+    sections:[
+      {
+        title:"ListCommandの実装",
+        body:`listコマンドではすべてのタスクを表示します。--status オプションでフィルタリング、--sort オプションで並び替えが可能です。Pythonのrichlibrary相当の機能をJavaの標準出力で再現します。
+
+Stream APIのfilter・sorted・Comparatorを組み合わせて宣言的に操作します。Comparator.comparing()とComparator.thenComparing()でチェーンした複合ソートが可能です。Pythonのsortedにkeyとreverseがあるように、Javaでは.reversed()をチェーンできます。
+
+ANSI エスケープコードを使うことでターミナルに色付き出力ができます。ただし環境依存なので、System.getenv("TERM")でチェックするか、シンプルなテキスト表示を選択できるオプションを提供するのが良いプラクティスです。`,
+        code:`package com.example.todo.command;
+
+import com.example.todo.model.*;
+import com.example.todo.repository.TaskRepository;
+import picocli.CommandLine.*;
+import java.io.IOException;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.*;
+
+@Command(name="list", description="タスク一覧を表示します", aliases={"ls"})
+public class ListCommand implements Runnable {
+
+    @Option(names={"-s","--status"}, description="フィルター: TODO/IN_PROGRESS/DONE")
+    private TaskStatus statusFilter;
+
+    @Option(names={"--sort"}, description="ソート: created/priority/status",
+            defaultValue="created")
+    private String sortBy;
+
+    @Option(names={"--no-color"}, description="色なし出力")
+    private boolean noColor;
+
+    private final TaskRepository repository;
+
+    public ListCommand(TaskRepository repository) { this.repository = repository; }
+
+    @Override
+    public void run() {
+        try {
+            List<Task> tasks = repository.loadAll();
+            if (tasks.isEmpty()) {
+                System.out.println("タスクがありません。 'todo add <タイトル>' で追加してください。");
+                return;
+            }
+
+            Stream<Task> stream = tasks.stream();
+            if (statusFilter != null) {
+                stream = stream.filter(t -> t.status() == statusFilter);
+            }
+
+            Comparator<Task> cmp = switch (sortBy) {
+                case "priority" -> Comparator.comparingInt(Task::priority).reversed();
+                case "status"   -> Comparator.comparing(t -> t.status().name());
+                default         -> Comparator.comparing(Task::createdAt);
+            };
+            List<Task> sorted = stream.sorted(cmp).collect(Collectors.toList());
+
+            if (sorted.isEmpty()) {
+                System.out.println("該当するタスクがありません。");
+                return;
+            }
+
+            System.out.printf("%-10s %-3s %-30s %-15s %-12s%n",
+                "ID", "PRI", "タイトル", "ステータス", "作成日時");
+            System.out.println("-".repeat(75));
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MM/dd HH:mm");
+            for (Task t : sorted) {
+                String statusStr = switch (t.status()) {
+                    case TODO        -> noColor ? "TODO"        : "\u001B[33mTODO\u001B[0m";
+                    case IN_PROGRESS -> noColor ? "IN_PROGRESS" : "\u001B[34mIN_PROGRESS\u001B[0m";
+                    case DONE        -> noColor ? "DONE"        : "\u001B[32mDONE\u001B[0m";
+                };
+                System.out.printf("%-10s %-3d %-30s %-24s %-12s%n",
+                    t.id().toString().substring(0, 8),
+                    t.priority(),
+                    t.title().length() > 28 ? t.title().substring(0, 27) + "…" : t.title(),
+                    statusStr,
+                    t.createdAt().format(fmt));
+            }
+            System.out.printf("%nTotal: %d件%n", sorted.size());
+        } catch (IOException e) {
+            System.err.println("エラー: " + e.getMessage());
+        }
+    }
+}`,
+        afterCode:"本番のCLIではJansi（Windows ANSI対応）やJColorライブラリを使うと、Windowsでも色付き出力が確実に動きます。コンソール出力のテストにはSystem.setOut()でPrintStreamを差し替えるか、Picocliのテストユーティリティを使います。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"ListCommandに --limit オプション（int型、デフォルト50）を追加し、最大limit件だけ表示するよう修正してください。Streamのlimit()メソッドを使ってください。",a:`@Option(names={"--limit"}, description="最大表示件数", defaultValue="50")
+private int limit;
+
+// stream処理の最後に追加
+List<Task> sorted = stream.sorted(cmp).limit(limit).collect(Collectors.toList());`},
+      {stars:2,q:"listコマンドのテストを書いてください。3件のタスクを事前に保存し、ListCommandを実行したときのstdoutをキャプチャして「Total: 3件」が含まれることを確認してください。",a:`import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
+import picocli.CommandLine;
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+class ListCommandTest {
+    @TempDir Path tempDir;
+
+    @Test
+    void list_showsAllTasks() throws Exception {
+        var repo = new TaskRepository(tempDir.resolve("tasks.json"));
+        repo.saveAll(List.of(
+            Task.create("タスク1",""),
+            Task.create("タスク2",""),
+            Task.create("タスク3","")
+        ));
+
+        var out = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(out, true, "UTF-8"));
+        new CommandLine(new ListCommand(repo)).execute("--no-color");
+        System.setOut(System.out);
+
+        assertTrue(out.toString("UTF-8").contains("Total: 3件"));
+    }
+}`},
+      {stars:3,q:"ListCommandに --search オプション（String）を追加し、タイトルまたは説明に指定文字列を含むタスクだけを表示するよう実装してください。大文字小文字は区別しないようにしてください。",a:`@Option(names={"-q","--search"}, description="タイトル・説明の検索キーワード")
+private String search;
+
+// stream処理のフィルタ部分に追加
+if (search != null && !search.isBlank()) {
+    String keyword = search.toLowerCase();
+    stream = stream.filter(t ->
+        t.title().toLowerCase().contains(keyword) ||
+        (t.description() != null && t.description().toLowerCase().contains(keyword))
+    );
+}`},
+    ],
+  },
+  {
+    id:"ch5",num:5,title:"タスク完了と削除（done/delete）",
+    goal:"doneとdeleteサブコマンドを実装し、IDの部分一致でタスクを特定する曖昧検索とユーザー確認プロンプトを実装できる。",
+    sections:[
+      {
+        title:"DoneCommandとDeleteCommandの実装",
+        body:`doneコマンドはIDの先頭8文字を受け取り、対象タスクをDONEステータスに変更します。Taskはrecordでイミュータブルなので、complete()メソッドで新しいインスタンスを生成してリストを置き換えます。
+
+IDの部分一致はStream APIのfilterとstartsWith()で実装します。複数一致した場合はエラーを表示します。deleteコマンドでは誤操作を防ぐため、--forceオプションがない場合は確認プロンプトを表示します。
+
+ターミナルからのインタラクティブ入力は java.util.Scanner(System.in) または System.console().readLine() で読み取れます。System.console()はIDEから実行した場合にnullを返すことがあるため、nullチェックが必要です。`,
+        code:`// DoneCommand.java
+@Command(name="done", description="タスクを完了にします")
+public class DoneCommand implements Callable<Integer> {
+    @Parameters(index="0", description="タスクIDの先頭8文字以上")
+    private String idPrefix;
+
+    private final TaskRepository repository;
+    public DoneCommand(TaskRepository r) { this.repository = r; }
+
+    @Override
+    public Integer call() {
+        try {
+            var tasks = new ArrayList<>(repository.loadAll());
+            var matches = tasks.stream()
+                .filter(t -> t.id().toString().startsWith(idPrefix))
+                .collect(Collectors.toList());
+
+            if (matches.isEmpty()) {
+                System.err.println("エラー: ID「" + idPrefix + "」に一致するタスクが見つかりません");
+                return 1;
+            }
+            if (matches.size() > 1) {
+                System.err.println("エラー: 複数のタスクが一致します。IDをより長く指定してください");
+                matches.forEach(t -> System.err.println("  - " + t.id() + " " + t.title()));
+                return 1;
+            }
+
+            Task target = matches.get(0);
+            if (target.status() == TaskStatus.DONE) {
+                System.out.println("既に完了済みです: " + target.title());
+                return 0;
+            }
+
+            Task done = target.complete();
+            tasks.replaceAll(t -> t.id().equals(target.id()) ? done : t);
+            repository.saveAll(tasks);
+            System.out.println("✓ 完了: " + done.title());
+            return 0;
+        } catch (IOException e) {
+            System.err.println("エラー: " + e.getMessage());
+            return 1;
+        }
+    }
+}
+
+// DeleteCommand.java
+@Command(name="delete", description="タスクを削除します", aliases={"rm"})
+public class DeleteCommand implements Callable<Integer> {
+    @Parameters(index="0") private String idPrefix;
+    @Option(names={"-f","--force"}, description="確認なしで削除")
+    private boolean force;
+
+    private final TaskRepository repository;
+    public DeleteCommand(TaskRepository r) { this.repository = r; }
+
+    @Override
+    public Integer call() {
+        try {
+            var tasks = new ArrayList<>(repository.loadAll());
+            var match = tasks.stream()
+                .filter(t -> t.id().toString().startsWith(idPrefix))
+                .findFirst();
+
+            if (match.isEmpty()) {
+                System.err.println("エラー: 見つかりません: " + idPrefix);
+                return 1;
+            }
+            Task target = match.get();
+
+            if (!force) {
+                System.out.printf("本当に削除しますか？ '%s' [y/N]: ", target.title());
+                String input = new java.util.Scanner(System.in).nextLine().trim();
+                if (!input.equalsIgnoreCase("y")) {
+                    System.out.println("キャンセルしました。");
+                    return 0;
+                }
+            }
+
+            tasks.removeIf(t -> t.id().equals(target.id()));
+            repository.saveAll(tasks);
+            System.out.println("✓ 削除: " + target.title());
+            return 0;
+        } catch (IOException e) {
+            System.err.println("エラー: " + e.getMessage());
+            return 1;
+        }
+    }
+}`,
+        afterCode:"tasks.replaceAll()はList内のすべての要素に関数を適用してin-placeで置き換えます。recordのイミュータブルなコピーを生成してから置き換えることでデータの整合性を保ちます。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"DoneCommandのテストを書いてください。タスクを1件保存して done コマンドを実行し、ファイルに保存されたタスクのステータスがDONEになっていることを確認してください。",a:`@Test
+void done_changesStatusToDone() throws Exception {
+    var repo = new TaskRepository(tempDir.resolve("tasks.json"));
+    Task task = Task.create("テスト", "説明");
+    repo.saveAll(List.of(task));
+
+    String idPrefix = task.id().toString().substring(0, 8);
+    new CommandLine(new DoneCommand(repo)).execute(idPrefix);
+
+    var loaded = repo.loadAll();
+    assertEquals(1, loaded.size());
+    assertEquals(TaskStatus.DONE, loaded.get(0).status());
+    assertNotNull(loaded.get(0).doneAt());
+}`},
+      {stars:2,q:"DoneCommandに --undo オプションを追加してください。--undo が指定された場合、タスクをDONE→TODOに戻す（doneAtをnullに）処理を実装してください。",a:`@Option(names={"--undo"}, description="完了を取り消してTODOに戻す")
+private boolean undo;
+
+// call()内の処理を変更
+Task updated;
+if (undo) {
+    if (target.status() != TaskStatus.DONE) {
+        System.out.println("完了済みではありません: " + target.title());
+        return 0;
+    }
+    updated = new Task(target.id(), target.title(), target.description(),
+        TaskStatus.TODO, target.priority(), target.createdAt(), null);
+    System.out.println("↩ 取り消し: " + updated.title());
+} else {
+    if (target.status() == TaskStatus.DONE) {
+        System.out.println("既に完了済みです: " + target.title());
+        return 0;
+    }
+    updated = target.complete();
+    System.out.println("✓ 完了: " + updated.title());
+}
+tasks.replaceAll(t -> t.id().equals(target.id()) ? updated : t);
+repository.saveAll(tasks);`},
+      {stars:3,q:"deleteコマンドで --all オプションを追加し、すべての完了済みタスクをまとめて削除できるようにしてください。削除件数を「N件の完了タスクを削除しました」と表示してください。",a:`@Option(names={"--all-done"}, description="完了済みタスクをすべて削除")
+private boolean allDone;
+
+// call() 先頭に追加
+if (allDone) {
+    try {
+        var tasks = new ArrayList<>(repository.loadAll());
+        long before = tasks.size();
+        tasks.removeIf(t -> t.status() == TaskStatus.DONE);
+        long removed = before - tasks.size();
+        if (removed == 0) {
+            System.out.println("完了済みタスクはありません。");
+            return 0;
+        }
+        if (!force) {
+            System.out.printf("%d件の完了タスクを削除しますか？ [y/N]: ", removed);
+            String in = new java.util.Scanner(System.in).nextLine().trim();
+            if (!in.equalsIgnoreCase("y")) { System.out.println("キャンセル"); return 0; }
+        }
+        repository.saveAll(tasks);
+        System.out.printf("%d件の完了タスクを削除しました%n", removed);
+        return 0;
+    } catch (IOException e) {
+        System.err.println(e.getMessage()); return 1;
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch6",num:6,title:"タスク更新と統計表示",
+    goal:"updateサブコマンドでタスクを部分更新でき、statsコマンドでステータス別集計・完了率・平均完了時間をStream APIで計算して表示できる。",
+    sections:[
+      {
+        title:"UpdateCommandの実装",
+        body:`updateコマンドはIDでタスクを特定し、指定されたオプションのフィールドだけを変更します。全フィールドを変更する必要がある場合は全部指定、一部だけ変えたい場合は変えたいオプションだけ指定します。
+
+Javaではすべてのオプションフィールドにデフォルト値（nullや番兵値）を設定しておき、nullの場合は「変更なし」として扱います。これはHTTP PATCHメソッドの部分更新パターンと同じ考え方です。Pythonではkwargsと**演算子で同様のことができます。
+
+Taskはrecordでイミュータブルなため、フィールドの変更は「変更後の値を持つ新しいインスタンス」を生成することで表現します。この関数型スタイルは並行処理でも安全です。`,
+        code:`@Command(name="update", description="タスクを更新します")
+public class UpdateCommand implements Callable<Integer> {
+    @Parameters(index="0") private String idPrefix;
+    @Option(names={"-t","--title"}) private String newTitle;
+    @Option(names={"-d","--description"}) private String newDescription;
+    @Option(names={"-p","--priority"}) private Integer newPriority;
+    @Option(names={"-s","--status"}) private TaskStatus newStatus;
+
+    private final TaskRepository repository;
+    public UpdateCommand(TaskRepository r) { this.repository = r; }
+
+    @Override
+    public Integer call() {
+        try {
+            var tasks = new ArrayList<>(repository.loadAll());
+            var match = tasks.stream()
+                .filter(t -> t.id().toString().startsWith(idPrefix))
+                .findFirst();
+            if (match.isEmpty()) {
+                System.err.println("見つかりません: " + idPrefix); return 1;
+            }
+            Task old = match.get();
+            Task updated = new Task(
+                old.id(),
+                newTitle       != null ? newTitle       : old.title(),
+                newDescription != null ? newDescription : old.description(),
+                newStatus      != null ? newStatus      : old.status(),
+                newPriority    != null ? newPriority    : old.priority(),
+                old.createdAt(),
+                (newStatus == TaskStatus.DONE) ? java.time.LocalDateTime.now() : old.doneAt()
+            );
+            tasks.replaceAll(t -> t.id().equals(old.id()) ? updated : t);
+            repository.saveAll(tasks);
+            System.out.println("✓ 更新: " + updated.title());
+            return 0;
+        } catch (java.io.IOException e) {
+            System.err.println(e.getMessage()); return 1;
+        }
+    }
+}`,
+      },
+      {
+        title:"statsコマンド – Stream APIによる集計",
+        body:`統計コマンドでは保存された全タスクを集計して表示します。Stream APIのcollect(Collectors.groupingBy())とcollect(Collectors.counting())で効率的にカウントを集計できます。
+
+完了率は completed / total * 100.0、平均完了時間はDoneタスクのcreatedAt〜doneAt差をDuration.between()で計算します。OptionalDoubleのifPresentOrElse()を使うと値がない場合のフォールバックも簡潔に書けます。
+
+この章で実装するStatsCommandはPythonのcollections.Counterに相当する集計パターンをJavaのStream APIで実装する好例です。`,
+        code:`@Command(name="stats", description="タスク統計を表示します")
+public class StatsCommand implements Runnable {
+    private final TaskRepository repository;
+    public StatsCommand(TaskRepository r) { this.repository = r; }
+
+    @Override
+    public void run() {
+        try {
+            var tasks = repository.loadAll();
+            if (tasks.isEmpty()) { System.out.println("タスクがありません"); return; }
+
+            // ステータス別カウント
+            var byStat = tasks.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                    Task::status, java.util.stream.Collectors.counting()));
+
+            long total = tasks.size();
+            long done  = byStat.getOrDefault(TaskStatus.DONE, 0L);
+            long inPrg = byStat.getOrDefault(TaskStatus.IN_PROGRESS, 0L);
+            long todo  = byStat.getOrDefault(TaskStatus.TODO, 0L);
+
+            System.out.println("=== タスク統計 ===");
+            System.out.printf("合計: %d件%n", total);
+            System.out.printf("TODO:        %d件%n", todo);
+            System.out.printf("IN_PROGRESS: %d件%n", inPrg);
+            System.out.printf("DONE:        %d件%n", done);
+            System.out.printf("完了率: %.1f%%%n", (double) done / total * 100);
+
+            // 平均完了時間
+            tasks.stream()
+                .filter(t -> t.status() == TaskStatus.DONE && t.doneAt() != null)
+                .mapToLong(t -> java.time.Duration.between(t.createdAt(), t.doneAt()).toMinutes())
+                .average()
+                .ifPresent(avg -> System.out.printf("平均完了時間: %.0f分%n", avg));
+
+            // 優先度別統計
+            System.out.println("\n=== 優先度別 ===");
+            tasks.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                    Task::priority, java.util.TreeMap::new,
+                    java.util.stream.Collectors.counting()))
+                .forEach((p, c) -> System.out.printf("優先度%d: %d件%n", p, c));
+        } catch (java.io.IOException e) {
+            System.err.println(e.getMessage());
+        }
+    }
+}`,
+      },
+    ],
+    exercises:[
+      {stars:1,q:"UpdateCommandのテストを書いてください。タスクを作成し、updateコマンドで--titleと--priorityだけを変更し、descriptionは変わらずtitleとpriorityだけ更新されることを確認してください。",a:`@Test
+void update_onlySpecifiedFieldsChange() throws Exception {
+    var repo = new TaskRepository(tempDir.resolve("tasks.json"));
+    var task = Task.create("元のタイトル", "説明文");
+    repo.saveAll(List.of(task));
+
+    String id = task.id().toString().substring(0, 8);
+    new CommandLine(new UpdateCommand(repo))
+        .execute(id, "-t", "新タイトル", "-p", "5");
+
+    var loaded = repo.loadAll().get(0);
+    assertEquals("新タイトル", loaded.title());
+    assertEquals("説明文", loaded.description());  // 変わっていない
+    assertEquals(5, loaded.priority());
+}`},
+      {stars:2,q:"StatsCommandにおいて、最も古い未完了タスク（TODO/IN_PROGRESS）を表示する機能を追加してください。「最古の未完了タスク: {title} ({経過日数}日前)」という形式で出力してください。",a:`// stats run() に追加
+tasks.stream()
+    .filter(t -> t.status() != TaskStatus.DONE)
+    .min(java.util.Comparator.comparing(Task::createdAt))
+    .ifPresent(oldest -> {
+        long days = java.time.Duration.between(oldest.createdAt(),
+            java.time.LocalDateTime.now()).toDays();
+        System.out.printf("%n最古の未完了タスク: %s (%d日前)%n", oldest.title(), days);
+    });`},
+      {stars:3,q:"優先度ごとの完了率を計算してMap<Integer, Double>で返すメソッドcompletionRateByPriority(List<Task> tasks)を書いてください。Collectors.groupingByとCollectors.teeing（Java 12+）またはcollectingAndThenを使ってください。",a:`public static Map<Integer, Double> completionRateByPriority(List<Task> tasks) {
+    return tasks.stream()
+        .collect(java.util.stream.Collectors.groupingBy(
+            Task::priority,
+            java.util.stream.Collectors.collectingAndThen(
+                java.util.stream.Collectors.toList(),
+                list -> {
+                    long total = list.size();
+                    long done = list.stream()
+                        .filter(t -> t.status() == TaskStatus.DONE).count();
+                    return total == 0 ? 0.0 : (double) done / total * 100;
+                }
+            )
+        ));
+}`},
+    ],
+  },
+  {
+    id:"ch7",num:7,title:"設定ファイルとログ",
+    goal:"~/.javatodo/config.propertiesで設定を管理し、SLF4J+Logbackでログレベル別のロギングを実装できる。",
+    sections:[
+      {
+        title:"設定管理クラスの実装",
+        body:`アプリケーションの設定（データファイルパス・デフォルト優先度・カラー表示の有無）を~/.javatodo/config.propertiesで管理します。java.util.Propertiesを使ったシンプルな設定クラスを実装します。
+
+設定値には型変換が必要なので（Propertiesはすべての値をStringで扱う）、getInt/getBooleanなどのヘルパーメソッドを用意します。デフォルト値はハードコードするか、propertiesファイル内のデフォルトPropertiesインスタンスとして渡せます。
+
+環境変数でも設定を上書きできるようにすると12-factor app（クラウドネイティブアプリのベストプラクティス）に沿った設計になります。System.getenv()は環境変数を取得し、nullでない場合に設定値を上書きします。`,
+        code:`package com.example.todo.config;
+
+import java.io.*;
+import java.nio.file.*;
+import java.util.Properties;
+
+public class AppConfig {
+    private static final Path CONFIG_DIR  =
+        Path.of(System.getProperty("user.home"), ".javatodo");
+    private static final Path CONFIG_FILE = CONFIG_DIR.resolve("config.properties");
+
+    private final Properties props;
+
+    public AppConfig() throws IOException {
+        this.props = new Properties();
+        // デフォルト値
+        props.setProperty("data.file",       CONFIG_DIR.resolve("tasks.json").toString());
+        props.setProperty("default.priority","3");
+        props.setProperty("color.output",    "true");
+        props.setProperty("max.title.length","100");
+
+        if (Files.exists(CONFIG_FILE)) {
+            try (var in = Files.newInputStream(CONFIG_FILE)) {
+                props.load(in);
+            }
+        }
+
+        // 環境変数で上書き
+        String envData = System.getenv("JAVATODO_DATA");
+        if (envData != null) props.setProperty("data.file", envData);
+    }
+
+    public String get(String key)           { return props.getProperty(key); }
+    public int    getInt(String key)        { return Integer.parseInt(props.getProperty(key)); }
+    public boolean getBoolean(String key)   { return Boolean.parseBoolean(props.getProperty(key)); }
+    public Path   getDataFilePath()         { return Path.of(get("data.file")); }
+    public int    getDefaultPriority()      { return getInt("default.priority"); }
+    public boolean isColorOutput()          { return getBoolean("color.output"); }
+
+    public void set(String key, String value) throws IOException {
+        props.setProperty(key, value);
+        save();
+    }
+
+    private void save() throws IOException {
+        Files.createDirectories(CONFIG_DIR);
+        try (var out = Files.newOutputStream(CONFIG_FILE)) {
+            props.store(out, "JavaTodo Configuration");
+        }
+    }
+}`,
+        afterCode:"設定クラスのシングルトン化や読み込みのキャッシュを検討してください。テスト時は@TempDirで設定ディレクトリを差し替えられるようにコンストラクタでPATHを受け取れるようにすると良い設計です。",
+      },
+      {
+        title:"SLF4J+Logbackによるログ",
+        body:`Javaのロギングにはjava.util.logging（JUL）・Log4j2・Logbackなどがあります。実務ではSLF4J（ファサードAPI）+Logback（実装）の組み合わせが最も広く使われており、PythonのloggingモジュールをベースにしたStructured Loggingに相当します。
+
+SLF4Jを使うことで実装（Logback/Log4j2）を差し替えても呼び出し元のコードを変えなくて済みます。LoggerFactory.getLogger(ClassName.class)でロガーを取得し、log.debug/info/warn/error()でログを出力します。プレースホルダー{}を使うと文字列連結が不要で、DEBUG以下のログが無効なら計算自体がスキップされ効率的です。
+
+logback.xml（src/main/resources/に配置）でログ出力先（コンソール・ファイル）・フォーマット・ログレベルを設定します。`,
+        code:`<!-- pom.xmlに追加 -->
+<dependency>
+  <groupId>ch.qos.logback</groupId>
+  <artifactId>logback-classic</artifactId>
+  <version>1.4.14</version>
+</dependency>
+
+<!-- src/main/resources/logback.xml -->
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.err</target>
+    <encoder>
+      <pattern>%d{HH:mm:ss} [%level] %logger{20} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${user.home}/.javatodo/app.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <fileNamePattern>${user.home}/.javatodo/app.%d{yyyy-MM-dd}.log</fileNamePattern>
+      <maxHistory>7</maxHistory>
+    </rollingPolicy>
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss} [%level] %logger - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="FILE"/>
+  </root>
+</configuration>
+
+// Javaコード
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class TaskRepository {
+    private static final Logger log = LoggerFactory.getLogger(TaskRepository.class);
+
+    public void saveAll(List<Task> tasks) throws IOException {
+        log.debug("Saving {} tasks to {}", tasks.size(), dataFile);
+        Files.createDirectories(dataFile.getParent());
+        MAPPER.writeValue(dataFile.toFile(), tasks);
+        log.info("Saved {} tasks", tasks.size());
+    }
+}`,
+      },
+    ],
+    exercises:[
+      {stars:1,q:"AppConfigのテストを書いてください。デフォルト値が正しく返ること、set()で値を変更した後にget()で反映されることを確認してください。",a:`@Test
+void defaultValues() throws Exception {
+    var config = new AppConfig(tempDir);  // テスト用: ディレクトリを渡せる版
+    assertEquals("3", config.get("default.priority"));
+    assertEquals("true", config.get("color.output"));
+    assertEquals(3, config.getDefaultPriority());
+    assertTrue(config.isColorOutput());
+}
+
+@Test
+void set_persistsValue() throws Exception {
+    var config = new AppConfig(tempDir);
+    config.set("color.output", "false");
+    var config2 = new AppConfig(tempDir);
+    assertFalse(config2.isColorOutput());
+}`},
+      {stars:2,q:"configサブコマンドを実装してください。todo config set key value でキーに値をセットし、todo config get key で値を表示するようにしてください。",a:`@Command(name="config", description="設定を管理します")
+public class ConfigCommand implements Callable<Integer> {
+    @Command(name="set")
+    int set(@Parameters(index="0") String key,
+            @Parameters(index="1") String value) throws Exception {
+        var config = new AppConfig();
+        config.set(key, value);
+        System.out.printf("設定: %s = %s%n", key, value);
+        return 0;
+    }
+
+    @Command(name="get")
+    int get(@Parameters(index="0") String key) throws Exception {
+        var config = new AppConfig();
+        String val = config.get(key);
+        if (val == null) { System.err.println("キーが見つかりません: " + key); return 1; }
+        System.out.println(val);
+        return 0;
+    }
+
+    @Override public Integer call() {
+        System.out.println("Usage: todo config set <key> <value>");
+        System.out.println("       todo config get <key>");
+        return 0;
+    }
+}`},
+      {stars:3,q:"ログ出力レベルを設定から制御できるようにしてください。config.propertiesの log.level（DEBUG/INFO/WARN）を読み取り、MainクラスのSystemProperties経由でLogbackのルートレベルを動的に変更してください。",a:`// Main.main()の先頭に追加
+public static void main(String[] args) {
+    try {
+        var config = new AppConfig();
+        String logLevel = config.get("log.level");
+        if (logLevel != null) {
+            // Logback LoggerContextで動的レベル変更
+            ch.qos.logback.classic.Logger root =
+                (ch.qos.logback.classic.Logger)
+                LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+            root.setLevel(ch.qos.logback.classic.Level.valueOf(logLevel));
+        }
+    } catch (Exception e) {
+        // 設定ロードに失敗してもアプリは継続
+    }
+    // ... 残りのmain処理
+}`},
+    ],
+  },
+  {
+    id:"ch8",num:8,title:"CSV/Markdownエクスポート",
+    goal:"exportサブコマンドでCSV・Markdown形式にタスクをエクスポートでき、インターフェースとStrategyパターンを使った拡張可能な設計ができる。",
+    sections:[
+      {
+        title:"ExporterインターフェースとStrategyパターン",
+        body:`エクスポート機能を複数フォーマット（CSV・Markdown・JSON）に対応させるため、Strategyパターンを使います。ExporterインターフェースにexportTasks(List<Task>, Path)を定義し、CsvExporter・MarkdownExporterが実装します。
+
+Strategyパターンはアルゴリズムをカプセル化してランタイムに切り替えられるようにするデザインパターンです。PythonではCallableや辞書で関数を差し替えることで実現できますが、Javaでは型安全なインターフェースで明示的に設計します。
+
+CSV出力はRFC 4180に従い、フィールドにコンマ・ダブルクォート・改行が含まれる場合はダブルクォートで囲みエスケープします。Apache Commons CSVなどのライブラリを使うのが安全ですが、ここではStringBuilderで手実装します。`,
+        code:`// Exporterインターフェース
+package com.example.todo.export;
+
+import com.example.todo.model.Task;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+
+public interface Exporter {
+    String format();  // "csv", "markdown", etc.
+    void export(List<Task> tasks, Path output) throws IOException;
+}
+
+// CsvExporter
+public class CsvExporter implements Exporter {
+    @Override public String format() { return "csv"; }
+
+    @Override
+    public void export(List<Task> tasks, Path output) throws IOException {
+        var sb = new StringBuilder();
+        sb.append("id,title,description,status,priority,createdAt,doneAt\\n");
+        for (Task t : tasks) {
+            sb.append(escapeCsv(t.id().toString())).append(",");
+            sb.append(escapeCsv(t.title())).append(",");
+            sb.append(escapeCsv(t.description())).append(",");
+            sb.append(t.status()).append(",");
+            sb.append(t.priority()).append(",");
+            sb.append(t.createdAt()).append(",");
+            sb.append(t.doneAt() != null ? t.doneAt() : "").append("\\n");
+        }
+        java.nio.file.Files.writeString(output, sb.toString());
+    }
+
+    private String escapeCsv(String s) {
+        if (s == null) return "";
+        if (s.contains(",") || s.contains("\"") || s.contains("\\n")) {
+            return "\"" + s.replace("\"", "\"\"") + "\"";
+        }
+        return s;
+    }
+}
+
+// MarkdownExporter
+public class MarkdownExporter implements Exporter {
+    @Override public String format() { return "markdown"; }
+
+    @Override
+    public void export(List<Task> tasks, Path output) throws IOException {
+        var sb = new StringBuilder("# タスク一覧\\n\\n");
+        sb.append("| ID | タイトル | ステータス | 優先度 | 作成日 |\\n");
+        sb.append("|---|---|---|---|---|\\n");
+        var fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        for (Task t : tasks) {
+            sb.append(String.format("| %s | %s | %s | %d | %s |%n",
+                t.id().toString().substring(0, 8),
+                t.title().replace("|", "\\\\|"),
+                t.status(), t.priority(),
+                t.createdAt().format(fmt)));
+        }
+        java.nio.file.Files.writeString(output, sb.toString());
+    }
+}
+
+// ExportCommand
+@Command(name="export", description="タスクをエクスポートします")
+public class ExportCommand implements Callable<Integer> {
+    @Option(names={"-f","--format"}, defaultValue="csv",
+            description="フォーマット: csv/markdown")
+    private String format;
+
+    @Option(names={"-o","--output"}, required=true)
+    private Path output;
+
+    private final TaskRepository repository;
+    public ExportCommand(TaskRepository r) { this.repository = r; }
+
+    @Override
+    public Integer call() throws Exception {
+        var exporters = Map.of(
+            "csv",      (Exporter) new CsvExporter(),
+            "markdown", new MarkdownExporter()
+        );
+        Exporter exporter = exporters.get(format.toLowerCase());
+        if (exporter == null) {
+            System.err.println("未対応フォーマット: " + format); return 1;
+        }
+        var tasks = repository.loadAll();
+        exporter.export(tasks, output);
+        System.out.printf("✓ %d件を %s に出力: %s%n", tasks.size(), format, output);
+        return 0;
+    }
+}`,
+      },
+    ],
+    exercises:[
+      {stars:1,q:"CsvExporterのescapeCsv()メソッドのテストを書いてください。通常文字列・コンマ含む文字列・ダブルクォート含む文字列・nullの4ケースをテストしてください。",a:`@Test void normalString()   { assertEquals("hello", new CsvExporter().escapeCsv("hello")); }
+@Test void withComma()     { assertEquals("\"a,b\"", new CsvExporter().escapeCsv("a,b")); }
+@Test void withQuote()     { assertEquals("\"say \\\"hi\\\"\"", new CsvExporter().escapeCsv("say \\"hi\\"")); }
+@Test void nullInput()     { assertEquals("", new CsvExporter().escapeCsv(null)); }`},
+      {stars:2,q:"ExportCommandのテストを書いてください。5件のタスクをCSVでエクスポートし、出力ファイルにヘッダー行とデータが含まれることを確認してください。",a:`@Test
+void export_csv_createsFile() throws Exception {
+    var repo = new TaskRepository(tempDir.resolve("tasks.json"));
+    repo.saveAll(List.of(Task.create("T1",""), Task.create("T2",""), Task.create("T3","")));
+    Path outFile = tempDir.resolve("out.csv");
+
+    new CommandLine(new ExportCommand(repo))
+        .execute("-f","csv","-o", outFile.toString());
+
+    String content = Files.readString(outFile);
+    assertTrue(content.startsWith("id,title,"));
+    assertEquals(4, content.lines().count()); // header + 3 rows
+}`},
+      {stars:3,q:"JsonExporterクラスをExporterインターフェースで実装してください。TaskRepositoryのObjectMapperを再利用してもよいですし、新たに作成しても構いません。フォーマット名は\"json\"とし、インデント付きでエクスポートしてください。",a:`public class JsonExporter implements Exporter {
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+        .registerModule(new JavaTimeModule())
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .enable(SerializationFeature.INDENT_OUTPUT);
+
+    @Override public String format() { return "json"; }
+
+    @Override
+    public void export(List<Task> tasks, Path output) throws IOException {
+        MAPPER.writeValue(output.toFile(), tasks);
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch9",num:9,title:"並行処理とバッチインポート",
+    goal:"ExecutorServiceとCompletableFutureを使った並行処理を理解し、複数CSVファイルの並行インポートを実装できる。",
+    sections:[
+      {
+        title:"Javaの並行処理モデル",
+        body:`Javaの並行処理はThread、ExecutorService、CompletableFuture（Java 8+）、Virtual Thread（Java 21）という段階的な進化を遂げています。PythonのasyncioやThreadPoolExecutorに相当しますが、Javaは真のマルチスレッドで複数コアを並列利用できます（PythonはGILで制約）。
+
+ExecutorServiceはスレッドプールを管理し、タスクを非同期に実行します。Executors.newFixedThreadPool(n)でn個のスレッドプールを作成できます。CompletableFutureはPromise/Futureパターンを実装し、非同期処理のチェーンや結合を可能にします。
+
+Java 21の仮想スレッド（Virtual Thread）は軽量スレッドで、数百万のスレッドを作成できます。Executors.newVirtualThreadPerTaskExecutor()で仮想スレッドプールを作成でき、ブロッキングI/O操作でも効率的に並行処理ができます。`,
+        code:`import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class ConcurrencyDemo {
+    public static void main(String[] args) throws Exception {
+        // 固定スレッドプール
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+
+        // Callable<T> をsubmit→Future<T>で非同期結果を取得
+        Future<Integer> future = executor.submit(() -> {
+            Thread.sleep(100);
+            return 42;
+        });
+        System.out.println("結果: " + future.get());  // ブロッキング
+
+        // CompletableFuture（ノンブロッキングチェーン）
+        CompletableFuture<String> cf = CompletableFuture
+            .supplyAsync(() -> "Hello", executor)
+            .thenApply(s -> s + ", Java 21!")
+            .thenApply(String::toUpperCase);
+        System.out.println(cf.get());  // HELLO, JAVA 21!
+
+        // 複数の非同期タスクを並行実行して結合
+        var f1 = CompletableFuture.supplyAsync(() -> 10, executor);
+        var f2 = CompletableFuture.supplyAsync(() -> 20, executor);
+        var f3 = CompletableFuture.supplyAsync(() -> 30, executor);
+        int sum = CompletableFuture.allOf(f1, f2, f3)
+            .thenApply(v -> f1.join() + f2.join() + f3.join())
+            .get();
+        System.out.println("合計: " + sum);  // 60
+
+        // Java 21 仮想スレッド
+        try (var vte = Executors.newVirtualThreadPerTaskExecutor()) {
+            var tasks = java.util.stream.IntStream.range(0, 1000)
+                .mapToObj(i -> CompletableFuture.runAsync(
+                    () -> System.out.println("Virtual: " + i), vte))
+                .toArray(CompletableFuture[]::new);
+            CompletableFuture.allOf(tasks).get();
+        }
+
+        executor.shutdown();
+        executor.awaitTermination(5, TimeUnit.SECONDS);
+    }
+}`,
+        afterCode:"スレッドプールは必ずshutdown()してください。try-with-resourcesではExecutorServiceはAutoCloseableではないため、shutdownNow()をfinallyかtry-with-resources互換ラッパーで呼ぶ必要があります（Java 19以降はAutoCloseableを実装）。",
+      },
+      {
+        title:"並行CSVインポート",
+        body:`importサブコマンドでは複数のCSVファイルを並行して読み込み、タスクをマージします。CompletableFuture.supplyAsync()で各ファイルの読み込みを並行実行し、allOf()ですべて完了を待ちます。
+
+データ競合（Race Condition）を防ぐため、各スレッドは独立したリストを返し、メインスレッドでmergeします。AtomicIntegerは複数スレッドから安全にカウントを更新できる原子変数です。Pythonのthread-safe counterに相当しますが、Javaでは言語レベルでより細かい制御ができます。
+
+タスクの重複（同一UUID）を避けるため、インポート時にIDを再生成するか、既存タスクとIDの衝突をチェックしてスキップします。`,
+        code:`@Command(name="import", description="CSVファイルからタスクをインポートします")
+public class ImportCommand implements Callable<Integer> {
+    @Parameters(arity="1..*", description="インポートするCSVファイルパス")
+    private List<Path> csvFiles;
+
+    @Option(names={"--skip-duplicates"}, defaultValue="true")
+    private boolean skipDuplicates;
+
+    private final TaskRepository repository;
+    public ImportCommand(TaskRepository r) { this.repository = r; }
+
+    @Override
+    public Integer call() throws Exception {
+        var existing = new ArrayList<>(repository.loadAll());
+        var existingIds = existing.stream()
+            .map(Task::id).collect(java.util.stream.Collectors.toSet());
+
+        var executor = Executors.newVirtualThreadPerTaskExecutor();
+        var importedCount = new AtomicInteger(0);
+        var skippedCount  = new AtomicInteger(0);
+
+        // 各ファイルを並行読み込み
+        List<CompletableFuture<List<Task>>> futures = csvFiles.stream()
+            .map(file -> CompletableFuture.supplyAsync(
+                () -> parseCsv(file), executor))
+            .collect(java.util.stream.Collectors.toList());
+
+        List<Task> allImported = new ArrayList<>();
+        for (var f : futures) {
+            var tasks = f.get();
+            for (Task t : tasks) {
+                if (skipDuplicates && existingIds.contains(t.id())) {
+                    skippedCount.incrementAndGet(); continue;
+                }
+                allImported.add(t);
+                existingIds.add(t.id());
+                importedCount.incrementAndGet();
+            }
+        }
+
+        existing.addAll(allImported);
+        repository.saveAll(existing);
+        executor.shutdown();
+
+        System.out.printf("✓ インポート: %d件、スキップ: %d件%n",
+            importedCount.get(), skippedCount.get());
+        return 0;
+    }
+
+    private List<Task> parseCsv(Path file) {
+        // CSVパース実装（省略）
+        return List.of();
+    }
+}`,
+      },
+    ],
+    exercises:[
+      {stars:1,q:"CompletableFuture.supplyAsync()を使って2つのタスク（各100ms スリープ後に整数を返す）を並行実行し、両方の結果を足し合わせて表示するプログラムを書いてください。",a:`import java.util.concurrent.*;
+
+public class ParallelSum {
+    public static void main(String[] args) throws Exception {
+        var executor = Executors.newFixedThreadPool(2);
+        var f1 = CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(100); } catch (Exception e) {}
+            return 42;
+        }, executor);
+        var f2 = CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(100); } catch (Exception e) {}
+            return 58;
+        }, executor);
+
+        int result = f1.thenCombine(f2, Integer::sum).get();
+        System.out.println("合計: " + result); // 100
+
+        executor.shutdown();
+    }
+}`},
+      {stars:2,q:"AtomicIntegerを使って、10スレッドが各100回インクリメントするCounterをExecutorServiceで実装してください。最終値が1000になることをアサートしてください。",a:`import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class AtomicTest {
+    @Test
+    void atomicIncrement_noRaceCondition() throws Exception {
+        AtomicInteger counter = new AtomicInteger(0);
+        ExecutorService exec = Executors.newFixedThreadPool(10);
+        CountDownLatch latch = new CountDownLatch(10);
+
+        for (int i = 0; i < 10; i++) {
+            exec.submit(() -> {
+                for (int j = 0; j < 100; j++) counter.incrementAndGet();
+                latch.countDown();
+            });
+        }
+        latch.await(5, TimeUnit.SECONDS);
+        exec.shutdown();
+        assertEquals(1000, counter.get());
+    }
+}`},
+      {stars:3,q:"CompletableFuture.allOf()を使って5つのURLからコンテンツ長を並行フェッチ（実際にはThread.sleep(random)で模擬）し、完了順ではなく全部完了後にまとめて結果を表示するプログラムを書いてください。",a:`import java.util.concurrent.*;
+import java.util.*;
+import java.util.stream.*;
+
+public class ParallelFetch {
+    record FetchResult(String url, long contentLength, long elapsedMs) {}
+
+    public static void main(String[] args) throws Exception {
+        var urls = List.of("url1","url2","url3","url4","url5");
+        var rand = new Random();
+        var exec = Executors.newVirtualThreadPerTaskExecutor();
+
+        List<CompletableFuture<FetchResult>> futures = urls.stream()
+            .map(url -> CompletableFuture.supplyAsync(() -> {
+                long start = System.currentTimeMillis();
+                try { Thread.sleep(rand.nextInt(300) + 50); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                long elapsed = System.currentTimeMillis() - start;
+                return new FetchResult(url, rand.nextLong(1024, 10240), elapsed);
+            }, exec))
+            .collect(Collectors.toList());
+
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get();
+
+        futures.stream().map(CompletableFuture::join)
+            .sorted(Comparator.comparing(FetchResult::url))
+            .forEach(r -> System.out.printf("%s: %d bytes (%dms)%n",
+                r.url(), r.contentLength(), r.elapsedMs()));
+        exec.shutdown();
+    }
+}`},
+    ],
+  },
+  {
+    id:"ch10",num:10,title:"JARパッケージングとリリース",
+    goal:"maven-shade-pluginでfat JARを作成し、シェルスクリプトラッパー・Makefile・GitHub Actionsで自動リリースするパイプラインを構成できる。",
+    sections:[
+      {
+        title:"fat JARのビルドとCLIラッパー",
+        body:`maven-shade-pluginは依存するすべてのJARを1つのfat JARに結合します。これによりjava -jar todo.jar でサードパーティライブラリなしに配布できます。ただしfat JARはサイズが大きくなるため、jlinkで最小JREを含むカスタムランタイムを作る方法もあります。
+
+シェルスクリプトラッパーを作るとLinux/macOSで todo コマンドとして直接実行できます。Windowsでは.batファイルを用意します。PATHが通ったディレクトリ（/usr/local/bin等）に配置してchmod +xすれば完了です。
+
+GraalVM Native Imageを使うとJVMを含まないバイナリを生成でき、起動時間が数十ms以下になります。CLIツールではこの起動速度の改善が重要で、Spring Native・Micronaut・Quarkusがネイティブイメージに対応しています。`,
+        code:`# ビルド
+mvn package -DskipTests
+
+# 動作確認
+java -jar target/javatodo-1.0-SNAPSHOT.jar --help
+
+# シェルラッパー作成（Linux/macOS）
+cat > todo << 'EOF'
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+java -jar "$SCRIPT_DIR/javatodo.jar" "$@"
+EOF
+chmod +x todo
+cp todo /usr/local/bin/todo
+
+# Makefile
+# Makefile
+.PHONY: build test clean install
+
+JAR := target/javatodo-1.0-SNAPSHOT.jar
+
+build:
+	mvn package -DskipTests
+
+test:
+	mvn test
+
+clean:
+	mvn clean
+
+install: build
+	cp $(JAR) $(HOME)/.local/bin/javatodo.jar
+	cp scripts/todo $(HOME)/.local/bin/todo
+	chmod +x $(HOME)/.local/bin/todo
+
+release: clean build
+	@echo "Release JAR: $(JAR)"`,
+        afterCode:"GraalVM native-imageを使う場合はmvn -Pnative packageで対応するpom.xmlプロファイルを作成し、@NativeHintアノテーションやreflection-config.jsonでリフレクションを登録する必要があります。",
+      },
+      {
+        title:"GitHub Actions CI/CDパイプライン",
+        body:`GitHub ActionsはJavaプロジェクトの自動ビルド・テスト・リリースに広く使われます。.github/workflows/ci.ymlを作成し、プッシュやPRのたびにMavenビルドとテストを自動実行します。
+
+release.ymlでタグプッシュ時に自動的にGitHub Releasesにfat JARをアップロードします。Pythonのtwine publishに相当するワークフローです。Maven Central へのPublishにはnexus-staging-maven-pluginとGPGキー設定が必要です。
+
+actions/setup-javaアクションはJDKのセットアップを自動化し、Mavenのキャッシュも設定できます。actions/cache で~/.m2をキャッシュすると依存関係ダウンロードをスキップして大幅に高速化できます。`,
+        code:`# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build and Test
+        run: mvn -B package
+
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: javatodo-jar
+          path: target/javatodo-*.jar
+
+---
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - run: mvn -B package -DskipTests
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: target/javatodo-*.jar
+          generate_release_notes: true`,
+        afterCode:"Maven Wrapperを使うと、CI環境にMavenをインストールせずに./mvnw コマンドでビルドできます。mvn -N io.takari:maven:wrapper で生成してリポジトリにコミットしておきましょう。",
+      },
+    ],
+    exercises:[
+      {stars:1,q:"Makefileに lint ターゲットを追加してください。mvn checkstyle:check を実行し、コードスタイルをチェックします。また all ターゲットで clean → build → test → lint を順番に実行してください。",a:`# Makefile
+.PHONY: all build test clean install lint
+
+JAR := target/javatodo-1.0-SNAPSHOT.jar
+
+all: clean build test lint
+
+build:
+	mvn package -DskipTests
+
+test:
+	mvn test
+
+lint:
+	mvn checkstyle:check
+
+clean:
+	mvn clean
+
+install: build
+	cp $(JAR) $(HOME)/.local/bin/javatodo.jar`},
+      {stars:2,q:"GitHub Actionsのci.ymlに、テスト結果（Surefireレポート）をGitHub PR上にコメントとして投稿するステップを追加してください。actions/github-scriptを使ってください（疑似コードで可）。",a:`# ci.yml に追加
+- name: Test Report Comment
+  uses: actions/github-script@v7
+  if: github.event_name == 'pull_request'
+  with:
+    script: |
+      const fs = require('fs');
+      const path = 'target/surefire-reports';
+      let passed = 0, failed = 0;
+
+      if (fs.existsSync(path)) {
+        fs.readdirSync(path)
+          .filter(f => f.endsWith('.txt'))
+          .forEach(f => {
+            const content = fs.readFileSync(\`\${path}/\${f}\`, 'utf8');
+            const m = content.match(/Tests run: (\\d+).*, Failures: (\\d+)/);
+            if (m) { passed += parseInt(m[1]); failed += parseInt(m[2]); }
+          });
+      }
+
+      github.rest.issues.createComment({
+        owner: context.repo.owner, repo: context.repo.repo,
+        issue_number: context.issue.number,
+        body: \`## テスト結果\\n✅ 成功: \${passed - failed} / \${passed}\\n❌ 失敗: \${failed}\`
+      });`},
+      {stars:3,q:"pom.xmlにGraalVM native-imageビルド用プロファイル（id: native）を追加してください。native-maven-pluginを設定し、mvn -Pnative package でネイティブバイナリが生成されるように設定してください（pom.xmlのXMLスニペット）。",a:`<!-- pom.xml の <profiles> セクション -->
+<profiles>
+  <profile>
+    <id>native</id>
+    <build>
+      <plugins>
+        <plugin>
+          <groupId>org.graalvm.buildtools</groupId>
+          <artifactId>native-maven-plugin</artifactId>
+          <version>0.9.28</version>
+          <extensions>true</extensions>
+          <executions>
+            <execution>
+              <id>build-native</id>
+              <goals><goal>compile-no-fork</goal></goals>
+              <phase>package</phase>
+            </execution>
+          </executions>
+          <configuration>
+            <imageName>todo</imageName>
+            <mainClass>com.example.todo.Main</mainClass>
+            <buildArgs>
+              <buildArg>--no-fallback</buildArg>
+              <buildArg>--initialize-at-build-time=ch.qos.logback</buildArg>
+              <buildArg>-H:ReflectionConfigurationFiles=src/main/resources/reflect-config.json</buildArg>
+            </buildArgs>
+          </configuration>
+        </plugin>
+      </plugins>
+    </build>
+  </profile>
+</profiles>
+
+<!-- ビルド: mvn -Pnative package -->
+<!-- 実行: ./target/todo --help  (JVM不要) -->`},
+    ],
+  },
+];
+
+const EX = {};
+CHAPTERS.forEach(ch => { EX[ch.id] = ch.exercises; });
+
+
+// Normalize data format
+const chapters = CHAPTERS.map(function(ch) {
+  var obj = {id:ch.id, num:ch.num, title:ch.title, est:ch.est||"45分", goal:ch.goal, sections:[]};
+  obj.sections = (ch.sections||[]).map(function(s) {
+    var ns = {title:s.title, body:s.body};
+    if(s.table) { ns.table = s.table.h ? s.table : {h:s.table.headers, r:s.table.rows, cap:s.table.cap}; }
+    if(s.afterTable) ns.afterTable = s.afterTable;
+    if(s.code) ns.code = s.code;
+    if(s.afterCode) ns.afterCode = s.afterCode;
+    return ns;
+  });
+  return obj;
+});
+const EX = {};
+CHAPTERS.forEach(function(ch) {
+  if(ch.exercises) {
+    EX[ch.id] = ch.exercises.map(function(e) {
+      return {diff: e.diff||e.stars||1, q: e.q||e.question||"", code: e.code||"// ここにコードを書いてください", answer: e.answer||e.a||""};
+    });
+  }
+});
+
+/* ─── UI Components ─── */
+
+// Normalize data format
+var chapters = CHAPTERS.map(function(ch) {
+  var obj = {id:ch.id, num:ch.num, title:ch.title, est:ch.est||"45分", goal:ch.goal, sections:[]};
+  obj.sections = (ch.sections||[]).map(function(s) {
+    var ns = {title:s.title, body:s.body};
+    if(s.table) { ns.table = s.table.h ? s.table : {h:s.table.headers, r:s.table.rows, cap:s.table.cap}; }
+    if(s.afterTable) ns.afterTable = s.afterTable;
+    if(s.code) ns.code = s.code;
+    if(s.afterCode) ns.afterCode = s.afterCode;
+    return ns;
+  });
+  return obj;
+});
+var EX = {};
+CHAPTERS.forEach(function(ch) {
+  if(ch.exercises) {
+    EX[ch.id] = ch.exercises.map(function(e) {
+      return {diff: e.diff||e.stars||1, q: e.q||e.question||"", code: e.code||"// ここにコードを書いてください", answer: e.answer||e.a||""};
+    });
+  }
+});
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, data.h.map((h, i) => /*#__PURE__*/React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, data.r.map((row, ri) => /*#__PURE__*/React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => /*#__PURE__*/React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return /*#__PURE__*/React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, /*#__PURE__*/React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "⭐ 基本" : d === 2 ? "⭐⭐ 応用" : "⭐⭐⭐ 発展";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, /*#__PURE__*/React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "🙈 解答を隠す" : "👀 解答例を見る"), showAnswer && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), /*#__PURE__*/React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && /*#__PURE__*/React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && /*#__PURE__*/React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+
+/* ─── Main App ─── */
+function JavaBeginnerCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\u2615"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "Java \u521D\u7D1A\u30B3\u30FC\u30B9"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), /*#__PURE__*/React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "Maven・picocli・JacksonでCLIタスクマネージャを段階的に実装し、Javaの実践力を身につけます。"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "▲" : "▼")), menuOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => /*#__PURE__*/React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : ""))), chapter.goal && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "🎯 この章のゴール"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => /*#__PURE__*/React.createElement(Section, {
+    key: ch + "-" + i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Exercise, {
+    key: ch + "-" + i,
+    ex: ex,
+    idx: i
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : /*#__PURE__*/React.createElement("a", {
+    href: "../index.html",
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "Java 21 (LTS) \u6E96\u62E0 \u00B7 Maven 3.9 \u57FA\u6E96 \u00B7 2026\u5E744\u6708\u6642\u70B9")));
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(JavaBeginnerCourse));
+  </script>
+</body>
+</html>
