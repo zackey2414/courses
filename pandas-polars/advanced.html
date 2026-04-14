@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pandas/polars 上級コース</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const T = {
+  cowSummary: { h:["項目","pandas 1.x（旧）","pandas 2.0（CoW）"], r:[
+    ["代入の挙動","元dfが変わる場合がある","常に新しいオブジェクトを返す"],
+    ["SettingWithCopyWarning","頻繁に発生","原則発生しない"],
+    ["メモリ","変更時コピー不要な場合も","変更時に必要最小限コピー"],
+    ["推奨書き方","df = df.assign(...)","df = df.assign(...) ← 同じでOK"],
+    ["注意点","スライスの代入で予期しない挙動","スライスへの代入は常にコピーに対して行われる"],
+  ], cap:"pandas 2.0 Copy-on-Write の変更点" },
+  arrowDtypes: { h:["dtype","pandas 通常","ArrowBacked（pandas+PyArrow）","Polars"], r:[
+    ["整数","int64 (NumPy)","int64[pyarrow]","Int64 (Arrow)"],
+    ["文字列","object (Python str)","string[pyarrow]","Utf8 (Arrow)"],
+    ["Null許容","NaN (float混入)","pd.NA","null (ネイティブ)"],
+    ["メモリ","NumPy連続配列","Arrow Buffer","Arrow Buffer"],
+    ["相互変換","—","to_arrow() / from_arrow()","to_pandas() / from_pandas()"],
+  ], cap:"dtype バックエンドの比較" },
+  polarsOptim: { h:["最適化","説明","効果"], r:[
+    ["Predicate Pushdown","filterをスキャン段階に押し込む","不要行を読まずに済む"],
+    ["Projection Pushdown","必要な列だけ読む","I/Oとメモリを削減"],
+    ["Common Subplan","同じ部分計算を再利用","重複計算を排除"],
+    ["Join Reorder","小さいテーブルをビルド側に","Hash Joinが高速化"],
+    ["Streaming","バッチ単位で処理","大規模データをメモリ内に収める"],
+  ], cap:"Polars Lazy クエリ最適化" },
+  arrowCompute: { h:["関数","説明","例"], r:[
+    ["pc.add / subtract","要素ごとの加減算","pc.add(arr, 10)"],
+    ["pc.filter","ブールArrayでフィルタ","pc.filter(arr, mask)"],
+    ["pc.sort_indices","ソート済みインデックス取得","pc.sort_indices(arr)"],
+    ["pc.value_counts","ユニーク値と件数","pc.value_counts(arr)"],
+    ["pc.utf8_lower","文字列小文字化","pc.utf8_lower(str_arr)"],
+    ["pc.list_sum","ネストリストの合計","pc.list_sum(list_arr)"],
+  ], cap:"PyArrow Compute 主要関数" },
+  daskCompare: { h:["機能","pandas","Dask"], r:[
+    ["作成","pd.read_csv(file)","dd.read_csv('dir/*.csv')"],
+    ["計算実行","即時",".compute()で遅延実行"],
+    ["パーティション","なし","npartitions で分割"],
+    ["メモリ","全データをRAMに","チャンク単位で処理"],
+    ["groupby","df.groupby(...)","dd.groupby(...).agg(...).compute()"],
+    ["分散","不可","LocalCluster / Coiled 等"],
+  ], cap:"pandas vs Dask API 比較" },
+  pipelinePatterns: { h:["パターン","説明","向いている場面"], r:[
+    ["ETL","Extract→Transform→Load","DWH への一括取込"],
+    ["ELT","Extract→Load→Transform","クラウドDWH（BigQuery等）"],
+    ["増分処理","差分だけ処理","ログや IoT の継続取込"],
+    ["ストリーム","リアルタイム処理","Kafka + Faust/Spark Streaming"],
+    ["バッチ","定期バッチ","日次集計・月次レポート"],
+  ], cap:"データパイプラインの主要パターン" },
+  featureEngg: { h:["手法","説明","実装"], r:[
+    ["One-Hot Encoding","カテゴリを0/1列に","pd.get_dummies / sklearn OHE"],
+    ["Target Encoding","カテゴリ→ターゲット平均値","category_encoders.TargetEncoder"],
+    ["Binning","連続値をビン化","pd.cut / pd.qcut"],
+    ["Log変換","右歪み分布を正規化","np.log1p(x)"],
+    ["Scaling","スケールを揃える","StandardScaler / MinMaxScaler"],
+    ["Interaction","列の積・比率","df['a'] * df['b']"],
+  ], cap:"主な特徴量エンジニアリング手法" },
+  dqTools: { h:["ツール","役割","主なAPI"], r:[
+    ["Great Expectations","期待値ベースの品質検証","expect_column_values_to_not_be_null()"],
+    ["pandera","スキーマ定義と検証","pa.DataFrameSchema(...)"],
+    ["deequ (PySpark)","大規模DQチェック","Check().hasCompleteness(...)"],
+    ["Soda Core","SQL/Pandas DQ","soda scan run"],
+    ["whylogs","統計プロファイリング","why.log(df)"],
+  ], cap:"データ品質ツール一覧" },
+  lakeFormats: { h:["フォーマット","開発元","特徴","pandas/polars連携"], r:[
+    ["Apache Iceberg","Netflix/Apple","スナップショット、タイムトラベル","PyIceberg + Arrow"],
+    ["Delta Lake","Databricks","ACIDトランザクション、Z-Ordering","delta-rs + polars"],
+    ["Apache Hudi","Uber","Upsert/Delete対応","Spark中心、Arrow経由も可"],
+    ["Parquet","Apache","列指向圧縮、広く普及","pd.read_parquet / pl.read_parquet"],
+  ], cap:"次世代テーブルフォーマット比較" },
+};
+
+const EX = {
+ch1:[
+  {diff:2,q:"pandas 2.0のCopy-on-Writeを確認せよ。df.iloc[0, 0]への代入がコピーに対して行われることをid()で検証すること。",
+   code:`import pandas as pd
+import warnings
+warnings.filterwarnings('error')
+
+df = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
+subset = df[df['a'] > 1]
+
+# CoWではsubsetはコピー。subsetへの変更は df に影響しない
+# id() を使って別オブジェクトであることを確認
+print("df id:", id(df))
+print("subset id:", id(subset))
+print("同じオブジェクト?", id(df) == id(subset))`,
+   answer:`import pandas as pd
+
+df = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
+subset = df[df['a'] > 1]
+
+print("df id:", id(df))
+print("subset id:", id(subset))
+print("同じオブジェクト?", id(df) == id(subset))
+# → False。CoWによりsubsetは独立したコピー。
+# subsetを変更してもdfは不変。
+subset = subset.assign(a=0)
+print("df after modifying subset:", df['a'].tolist())  # [1, 2, 3] のまま`},
+  {diff:3,q:"polarsのlazy APIでCSVを読み込み、explain(optimized=True)でクエリプランを確認し、predicate pushdownが効いていることを示せ。",
+   code:`import polars as pl
+
+# ダミーデータを用意（実際はCSVファイルを使う）
+df = pl.DataFrame({
+    'id': range(1000),
+    'value': range(1000),
+    'category': ['A','B'] * 500
+})
+df.write_csv('/tmp/sample.csv')
+
+# lazy APIで読み込み
+lf = pl.scan_csv('/tmp/sample.csv')
+
+# filterとselectを組み合わせる
+query = (
+    lf
+    .filter(pl.col('value') > 500)
+    .select(['id', 'value'])
+)
+
+# クエリプランを確認
+print(query.explain(optimized=True))`,
+   answer:`import polars as pl
+
+df = pl.DataFrame({
+    'id': range(1000),
+    'value': range(1000),
+    'category': ['A','B'] * 500
+})
+df.write_csv('/tmp/sample.csv')
+
+lf = pl.scan_csv('/tmp/sample.csv')
+
+query = (
+    lf
+    .filter(pl.col('value') > 500)
+    .select(['id', 'value'])
+)
+
+# explain で最適化済みプランを出力
+# FILTER が CSV_SCAN の内部に押し込まれていることを確認
+print(query.explain(optimized=True))
+result = query.collect()
+print(result.shape)  # (499, 2)`},
+],
+ch2:[
+  {diff:2,q:"PyArrowでChunkedArrayを作成し、pc.sum()とpc.mean()で集計せよ。またto_pandas()でpandas Seriesに変換せよ。",
+   code:`import pyarrow as pa
+import pyarrow.compute as pc
+
+# 3つのチャンクに分けたChunkedArrayを作成
+chunks = [
+    pa.array([1, 2, 3]),
+    pa.array([4, 5, 6]),
+    pa.array([7, 8, 9])
+]
+ca = pa.chunked_array(chunks)
+
+# 集計
+total = # ここに書く
+avg   = # ここに書く
+print("合計:", total, "平均:", avg)
+
+# pandas変換
+s = # ここに書く
+print(type(s), s.tolist())`,
+   answer:`import pyarrow as pa
+import pyarrow.compute as pc
+
+chunks = [
+    pa.array([1, 2, 3]),
+    pa.array([4, 5, 6]),
+    pa.array([7, 8, 9])
+]
+ca = pa.chunked_array(chunks)
+
+total = pc.sum(ca)
+avg   = pc.mean(ca)
+print("合計:", total.as_py(), "平均:", avg.as_py())
+
+s = ca.to_pandas()
+print(type(s), s.tolist())`},
+  {diff:3,q:"PyArrow Datasetを使ってパーティション化されたParquetを書き出し、フィルタ付きで読み込め。",
+   code:`import pyarrow as pa
+import pyarrow.parquet as pq
+import pyarrow.dataset as ds
+import pandas as pd
+
+df = pd.DataFrame({
+    'year': [2022,2022,2023,2023,2023],
+    'sales': [100,200,150,300,250],
+    'region': ['A','B','A','B','A']
+})
+table = pa.Table.from_pandas(df)
+
+# year でパーティション化して書き出す
+pq.write_to_dataset(table, root_path='/tmp/sales_ds',
+                    partition_cols=['year'])
+
+# year==2023 のみ読み込む
+dataset = ds.dataset('/tmp/sales_ds', format='parquet', partitioning='hive')
+result = dataset.to_table(filter=ds.field('year') == 2023)
+print(result.to_pandas())`,
+   answer:`import pyarrow as pa
+import pyarrow.parquet as pq
+import pyarrow.dataset as ds
+import pandas as pd
+
+df = pd.DataFrame({
+    'year': [2022,2022,2023,2023,2023],
+    'sales': [100,200,150,300,250],
+    'region': ['A','B','A','B','A']
+})
+table = pa.Table.from_pandas(df)
+
+pq.write_to_dataset(table, root_path='/tmp/sales_ds',
+                    partition_cols=['year'])
+
+dataset = ds.dataset('/tmp/sales_ds', format='parquet', partitioning='hive')
+result = dataset.to_table(filter=ds.field('year') == 2023)
+print(result.to_pandas())
+# → 2023年の3行だけが返る`},
+],
+ch3:[
+  {diff:2,q:"DaskでCSVファイルを読み込み、特定列の平均をcompute()で求めよ。npartitionsも確認すること。",
+   code:`import dask.dataframe as dd
+import pandas as pd
+
+# ダミーCSVを作成
+pd.DataFrame({
+    'id': range(100),
+    'value': range(100),
+    'group': ['A','B'] * 50
+}).to_csv('/tmp/dask_sample.csv', index=False)
+
+# Dask で読み込み
+ddf = dd.read_csv('/tmp/dask_sample.csv')
+
+# npartitions 確認
+print("partitions:", ddf.npartitions)
+
+# value 列の平均を compute
+mean_val = # ここに書く
+print("平均:", mean_val)`,
+   answer:`import dask.dataframe as dd
+import pandas as pd
+
+pd.DataFrame({
+    'id': range(100),
+    'value': range(100),
+    'group': ['A','B'] * 50
+}).to_csv('/tmp/dask_sample.csv', index=False)
+
+ddf = dd.read_csv('/tmp/dask_sample.csv')
+print("partitions:", ddf.npartitions)
+
+mean_val = ddf['value'].mean().compute()
+print("平均:", mean_val)  # 49.5`},
+  {diff:3,q:"Daskでgroupby集計を行い、task graphを可視化（文字列表示）せよ。",
+   code:`import dask.dataframe as dd
+import pandas as pd
+
+pd.DataFrame({
+    'group': ['A','B','A','B','A'] * 20,
+    'value': range(100)
+}).to_csv('/tmp/dask_group.csv', index=False)
+
+ddf = dd.read_csv('/tmp/dask_group.csv')
+
+# groupby して group ごとの合計を計算
+result = ddf.groupby('group')['value'].sum()
+
+# task graph を文字列で確認（visualize は不要）
+print(result.__dask_graph__())
+
+# 実際に計算
+print(result.compute())`,
+   answer:`import dask.dataframe as dd
+import pandas as pd
+
+pd.DataFrame({
+    'group': ['A','B','A','B','A'] * 20,
+    'value': range(100)
+}).to_csv('/tmp/dask_group.csv', index=False)
+
+ddf = dd.read_csv('/tmp/dask_group.csv')
+result = ddf.groupby('group')['value'].sum()
+
+# task graph はキーの辞書（遅延グラフの中身）
+print(type(result.__dask_graph__()))
+# 実計算
+print(result.compute())`},
+],
+ch4:[
+  {diff:2,q:"polarsのmap_batches()を使って、文字列列を独自ロジックで変換せよ（例：各値をreverse）。",
+   code:`import polars as pl
+
+df = pl.DataFrame({'word': ['hello', 'world', 'polars', 'rust']})
+
+# map_batches を使って各文字列を逆順にする
+result = df.with_columns(
+    pl.col('word').map_batches(
+        lambda s: # ここに書く
+    ).alias('reversed')
+)
+print(result)`,
+   answer:`import polars as pl
+
+df = pl.DataFrame({'word': ['hello', 'world', 'polars', 'rust']})
+
+result = df.with_columns(
+    pl.col('word').map_batches(
+        lambda s: pl.Series([v[::-1] for v in s.to_list()])
+    ).alias('reversed')
+)
+print(result)`},
+  {diff:3,q:"polarsでカスタムExprを関数として定義し、再利用せよ。引数に列名を受け取り、z-score正規化を返すExprを作ること。",
+   code:`import polars as pl
+
+def zscore_expr(col_name: str) -> pl.Expr:
+    """指定列の z-score を返す Expr"""
+    col = pl.col(col_name)
+    # ここに書く: (x - mean) / std を返す Expr
+
+df = pl.DataFrame({'value': [10.0, 20.0, 30.0, 40.0, 50.0]})
+
+result = df.with_columns(
+    zscore_expr('value').alias('z_value')
+)
+print(result)`,
+   answer:`import polars as pl
+
+def zscore_expr(col_name: str) -> pl.Expr:
+    col = pl.col(col_name)
+    mean = col.mean()
+    std  = col.std()
+    return (col - mean) / std
+
+df = pl.DataFrame({'value': [10.0, 20.0, 30.0, 40.0, 50.0]})
+result = df.with_columns(zscore_expr('value').alias('z_value'))
+print(result)`},
+],
+ch5:[
+  {diff:2,q:"pandasで増分処理（新しい行だけ追加）を実装せよ。既存Parquetに差分を append して重複排除する。",
+   code:`import pandas as pd
+
+# 既存データ
+existing = pd.DataFrame({
+    'id': [1, 2, 3],
+    'value': [10, 20, 30]
+})
+existing.to_parquet('/tmp/existing.parquet', index=False)
+
+# 新しいデータ（idが3は重複、4は新規）
+new_data = pd.DataFrame({
+    'id': [3, 4],
+    'value': [30, 40]
+})
+
+# 増分処理: 既存を読んで新規分だけ追加し重複除去して保存
+# ここに書く`,
+   answer:`import pandas as pd
+
+existing = pd.DataFrame({'id': [1, 2, 3], 'value': [10, 20, 30]})
+existing.to_parquet('/tmp/existing.parquet', index=False)
+
+new_data = pd.DataFrame({'id': [3, 4], 'value': [30, 40]})
+
+df = pd.read_parquet('/tmp/existing.parquet')
+combined = pd.concat([df, new_data], ignore_index=True)
+result = combined.drop_duplicates(subset=['id'], keep='last')
+result.to_parquet('/tmp/existing.parquet', index=False)
+print(result)`},
+  {diff:3,q:"polarsで複数のParquetファイルをまとめてlazy読み込みし、フィルタ・集計してからcollect()せよ。",
+   code:`import polars as pl
+import os
+
+# ダミーParquetを複数作成
+for i, grp in enumerate(['A', 'B', 'C']):
+    pl.DataFrame({
+        'group': [grp] * 5,
+        'value': list(range(i*5, i*5+5))
+    }).write_parquet(f'/tmp/part_{grp}.parquet')
+
+# scan_parquet でまとめて lazy 読み込み
+lf = pl.scan_parquet('/tmp/part_*.parquet')
+
+# group ごとの合計を集計
+result = (
+    lf
+    # ここに書く
+)
+print(result)`,
+   answer:`import polars as pl
+
+for i, grp in enumerate(['A', 'B', 'C']):
+    pl.DataFrame({
+        'group': [grp] * 5,
+        'value': list(range(i*5, i*5+5))
+    }).write_parquet(f'/tmp/part_{grp}.parquet')
+
+lf = pl.scan_parquet('/tmp/part_*.parquet')
+
+result = (
+    lf
+    .group_by('group')
+    .agg(pl.col('value').sum().alias('total'))
+    .sort('group')
+    .collect()
+)
+print(result)`},
+],
+ch6:[
+  {diff:2,q:"pandasとscikit-learnのPipelineを組み合わせて、前処理（中央値補完+StandardScaler）→ロジスティック回帰を一本化せよ。",
+   code:`import pandas as pd
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+X = pd.DataFrame({
+    'age':    [25, None, 35, 28, None],
+    'salary': [50000, 60000, None, 45000, 70000]
+})
+y = [0, 1, 1, 0, 1]
+
+# Pipeline を組み立てて fit する
+pipe = Pipeline([
+    # ここに書く
+])
+pipe.fit(X, y)
+print(pipe.predict(X))`,
+   answer:`import pandas as pd
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+X = pd.DataFrame({
+    'age':    [25, None, 35, 28, None],
+    'salary': [50000, 60000, None, 45000, 70000]
+})
+y = [0, 1, 1, 0, 1]
+
+pipe = Pipeline([
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler',  StandardScaler()),
+    ('clf',     LogisticRegression())
+])
+pipe.fit(X, y)
+print(pipe.predict(X))`},
+  {diff:3,q:"polarsでTarget Encodingを手動実装せよ。カテゴリ列の各値をターゲット列の平均値に置換する。",
+   code:`import polars as pl
+
+df = pl.DataFrame({
+    'city':   ['Tokyo','Osaka','Tokyo','Kyoto','Osaka','Tokyo'],
+    'target': [1, 0, 1, 1, 0, 0]
+})
+
+# city ごとの target 平均を計算し、city 列を置換
+# ここに書く`,
+   answer:`import polars as pl
+
+df = pl.DataFrame({
+    'city':   ['Tokyo','Osaka','Tokyo','Kyoto','Osaka','Tokyo'],
+    'target': [1, 0, 1, 1, 0, 0]
+})
+
+encoding = (
+    df.group_by('city')
+      .agg(pl.col('target').mean().alias('city_enc'))
+)
+
+result = (
+    df.join(encoding, on='city', how='left')
+      .drop('city')
+      .rename({'city_enc': 'city'})
+)
+print(result)`},
+],
+ch7:[
+  {diff:2,q:"panderaでDataFrameスキーマを定義し、不正データで ValidationError が発生することを確認せよ。",
+   code:`import pandas as pd
+import pandera as pa
+
+schema = pa.DataFrameSchema({
+    'name':  pa.Column(str, pa.Check.str_length(min_value=1)),
+    'age':   pa.Column(int, pa.Check.ge(0)),
+    'score': pa.Column(float, pa.Check.between(0.0, 100.0))
+})
+
+# 正常データ
+good = pd.DataFrame({
+    'name':  ['Alice', 'Bob'],
+    'age':   [25, 30],
+    'score': [85.0, 92.0]
+})
+
+# 不正データ（ageが負）
+bad = pd.DataFrame({
+    'name':  ['Carol'],
+    'age':   [-1],
+    'score': [70.0]
+})
+
+# ここに書く: スキーマ検証を実行し、エラーを catch して表示`,
+   answer:`import pandas as pd
+import pandera as pa
+
+schema = pa.DataFrameSchema({
+    'name':  pa.Column(str, pa.Check.str_length(min_value=1)),
+    'age':   pa.Column(int, pa.Check.ge(0)),
+    'score': pa.Column(float, pa.Check.between(0.0, 100.0))
+})
+
+good = pd.DataFrame({'name':['Alice','Bob'], 'age':[25,30], 'score':[85.0,92.0]})
+bad  = pd.DataFrame({'name':['Carol'], 'age':[-1], 'score':[70.0]})
+
+schema.validate(good)
+print("good: OK")
+
+try:
+    schema.validate(bad)
+except pa.errors.SchemaError as e:
+    print("bad: ValidationError →", e.failure_cases)`},
+  {diff:3,q:"Great Expectationsのexpect_column_values_to_not_be_nullとexpect_column_values_to_be_betweenをpandasで実行せよ。",
+   code:`import pandas as pd
+import great_expectations as gx
+
+df = pd.DataFrame({
+    'age':   [25, None, 35, -5, 28],
+    'score': [80.0, 90.0, None, 70.0, 110.0]
+})
+
+context = gx.get_context(mode='ephemeral')
+ds = context.sources.add_pandas("demo")
+da = ds.add_dataframe_asset("df_asset")
+batch = da.build_batch_request(dataframe=df)
+
+validator = context.get_validator(batch_request=batch)
+
+# age が null でないことを期待
+r1 = validator.expect_column_values_to_not_be_null('age')
+# score が 0〜100 の間であることを期待
+r2 = validator.expect_column_values_to_be_between('score', min_value=0, max_value=100)
+
+print("age not null:", r1['success'])
+print("score 0-100:", r2['success'])`,
+   answer:`import pandas as pd
+import great_expectations as gx
+
+df = pd.DataFrame({
+    'age':   [25, None, 35, -5, 28],
+    'score': [80.0, 90.0, None, 70.0, 110.0]
+})
+
+context = gx.get_context(mode='ephemeral')
+ds = context.sources.add_pandas("demo")
+da = ds.add_dataframe_asset("df_asset")
+batch = da.build_batch_request(dataframe=df)
+
+validator = context.get_validator(batch_request=batch)
+
+r1 = validator.expect_column_values_to_not_be_null('age')
+r2 = validator.expect_column_values_to_be_between('score', min_value=0, max_value=100)
+
+# age に Null があるので r1 は success=False
+# score に 110 があるので r2 は success=False
+print("age not null:", r1['success'])   # False
+print("score 0-100:", r2['success'])    # False`},
+],
+ch8:[
+  {diff:2,q:"DuckDBでpandasのDataFrameを直接SQLで集計せよ（in-memoryクエリ）。",
+   code:`import duckdb
+import pandas as pd
+
+df = pd.DataFrame({
+    'category': ['A','B','A','C','B','A'],
+    'value':    [10, 20, 30, 15, 25, 5]
+})
+
+# DuckDB で df を直接クエリ
+result = duckdb.sql(
+    # ここに書く: category ごとの合計と件数
+).df()
+print(result)`,
+   answer:`import duckdb
+import pandas as pd
+
+df = pd.DataFrame({
+    'category': ['A','B','A','C','B','A'],
+    'value':    [10, 20, 30, 15, 25, 5]
+})
+
+result = duckdb.sql("""
+    SELECT category,
+           SUM(value) AS total,
+           COUNT(*)   AS cnt
+    FROM df
+    GROUP BY category
+    ORDER BY category
+""").df()
+print(result)`},
+  {diff:3,q:"IbisでDuckDBバックエンドに接続し、pandas互換APIでgroup_byと集計を実行せよ。",
+   code:`import ibis
+import pandas as pd
+
+ibis.options.interactive = True
+con = ibis.duckdb.connect()  # in-memory DuckDB
+
+# pandas DataFrameを登録
+df = pd.DataFrame({
+    'dept':   ['Eng','HR','Eng','Finance','HR'],
+    'salary': [80000, 60000, 90000, 70000, 65000]
+})
+t = con.create_table('employees', df, overwrite=True)
+
+# Ibis API で dept ごとの平均給与を集計
+result = (
+    t
+    # ここに書く
+)
+print(result)`,
+   answer:`import ibis
+import pandas as pd
+
+ibis.options.interactive = True
+con = ibis.duckdb.connect()
+
+df = pd.DataFrame({
+    'dept':   ['Eng','HR','Eng','Finance','HR'],
+    'salary': [80000, 60000, 90000, 70000, 65000]
+})
+t = con.create_table('employees', df, overwrite=True)
+
+result = (
+    t.group_by('dept')
+     .aggregate(avg_salary=t.salary.mean())
+     .order_by('dept')
+)
+print(result)`},
+],
+};
+
+const chapters = [
+{id:"ch1",num:1,title:"pandas/polars内部構造",est:"65分",
+goal:"pandas 2.0のCopy-on-Write(CoW)が従来との何が変わったかを説明できる。PyArrow backedのdtypeを使ってデータを扱える。Polarsのlazy APIとpredicate/projection pushdownを実際に動かして効果を確認できる。",
+sections:[
+{title:"pandas 2.0 Copy-on-Write",
+body:`pandas 1.x では、DataFrameをスライスして部分的に代入すると「元の DataFrame に反映されるかどうか」がケースによって変わり、SettingWithCopyWarning が頻繁に発生していました。これはライブラリの内部で「このオブジェクトはコピーか、ビューか」を追跡する仕組みが不完全だったためです。
+
+pandas 2.0 で導入されたCopy-on-Write（CoW）はこの問題を根本から解決します。CoWでは「変更が実際に発生するまではコピーを作らない」という戦略を採用しており、スライスや選択によって返されるオブジェクトは論理的に独立したコピーとして扱われます。実際のメモリコピーは変更が行われた瞬間に遅延して実行されるため、読み取りのみの場合はコストがかかりません。これにより、代入が元のDataFrameに影響するかどうかで悩む必要がなくなり、コードの予測可能性が格段に向上します。`,
+table:T.cowSummary,
+afterTable:`CoW の移行は pandas 2.0 でオプトイン、2.x 系で完全デフォルトになる予定です。既存コードでは pd.options.mode.copy_on_write = True を設定して動作を事前確認することが推奨されています。`},
+{title:"PyArrow backed dtypes と Polars クエリ最適化",
+body:`pandas 2.0 からは列のバックエンドとして PyArrow を選択できるようになりました。通常の pandas は NumPy 配列を内部に持ちますが、ArrowBacked dtype を使うと Apache Arrow のメモリレイアウトがそのまま利用されます。これにより、文字列列での null 値の扱いが改善し（NaN（float）の混入が不要になる）、polars や PyArrow と直接データを受け渡しする際のゼロコピー転送が可能になります。
+
+Polars は最初から Apache Arrow をネイティブに採用しており、さらにLazy APIと呼ばれる遅延評価機構を持っています。scan_csv()やscan_parquet()でファイルを"宣言的に"読み込み、filter()・select()・group_by()等の操作をチェーンしてから最後にcollect()を呼ぶと、Polarsの最適化エンジンがクエリプランを解析し、predicate pushdown（フィルタを読み込み段階に前倒し）やprojection pushdown（必要な列だけ読み込む）を自動で適用します。これにより、数十GBのParquetファイルでも必要な部分だけを読んで処理できます。`,
+table:T.polarsOptim,
+afterTable:`explain(optimized=True) を呼ぶとPolarsが適用した最適化の詳細を文字列で確認できます。SELECTION や FILTER が CSV_SCAN や PARQUET_SCAN の内部に埋め込まれていれば最適化が効いています。`},
+{title:"PyArrow Backed DTYPEの実践",
+body:`pandasで ArrowBacked dtype を使うには、dtype_backend='pyarrow' オプションをread_csv等に渡すか、既存のDataFrameをconvert_dtypes(dtype_backend='pyarrow')で変換します。各列の dtype が int64[pyarrow] や string[pyarrow] のように表示されれば成功です。
+
+ArrowBacked DataFrame は to_arrow() で PyArrow Table に、from_arrow() で逆方向に変換でき、polars との相互変換も arrow 経由でほぼゼロコピーで行えます。大量データをパイプラインで受け渡す際はこのゼロコピー転送が大きなメモリ節約につながります。`,
+table:T.arrowDtypes,
+code:`import pandas as pd
+import pyarrow as pa
+
+# ArrowBacked で CSV 読み込み
+df = pd.read_csv('/tmp/sample.csv', dtype_backend='pyarrow')
+print(df.dtypes)   # int64[pyarrow], string[pyarrow] など
+
+# Arrow Table への変換（ゼロコピーに近い）
+table = pa.Table.from_pandas(df)
+print(table.schema)
+
+# polars への変換
+import polars as pl
+pl_df = pl.from_arrow(table)
+print(pl_df.dtypes)`,
+afterCode:`dtype_backend='pyarrow' は pandas 1.5 以上で利用可能ですが、全機能をフルサポートするのは 2.0 以降です。ArrowBacked DataFrame は一部の pandas 拡張機能（例: pd.cut の一部パラメータ）と互換性がない場合があるため、移行時は単体テストを必ず実行してください。`},
+]},
+{id:"ch2",num:2,title:"PyArrow深化",est:"65分",
+goal:"ChunkedArray・RecordBatchを直接操作できる。PyArrow Compute Functionsで効率的に集計・変換ができる。Arrow Datasetを使ってパーティション化ファイルをフィルタ付きで読み込める。",
+sections:[
+{title:"ChunkedArray と Compute Functions",
+body:`PyArrowの基本単位は Array（単一のチャンク）ですが、複数のArrayをまとめたChunkedArrayを使うと、大きなデータを複数の連続メモリ領域に分けて格納できます。pandas の Series が内部的に一つの連続配列を持つのに対し、ChunkedArray はチャンクをリストとして管理するため、超大規模データでもメモリを効率よく使えます。
+
+PyArrow には pyarrow.compute モジュール（慣習的に pc と alias）に多数の演算関数が用意されており、C++の Arrow実装に直接ブリッジされているため非常に高速です。pandas の apply() や map() がPythonレベルのループを実行するのと比べ、pc.utf8_lower() や pc.add() 等は SIMD命令を活用したベクトル演算で動作します。`,
+table:T.arrowCompute,
+afterTable:`pc.list_flatten() や pc.list_sum() のように、リスト型の列（ネスト構造）を扱う関数も豊富です。JSON配列を列として持つデータを正規化する際に活躍します。`},
+{title:"RecordBatch と Arrow Dataset",
+body:`RecordBatch は Schema（列名と型の定義）+ 複数の Array で構成される「まとまったデータの塊」です。pandas の DataFrame に相当しますが、メタデータ（Schema）が厳密に型付けされています。RecordBatch はストリーミング処理で1バッチずつ処理する際によく使われ、IPC（Inter-Process Communication）形式でプロセス間通信やファイル保存にも使われます。
+
+Arrow Dataset は、ディレクトリ以下に分散した複数のParquetやCSVファイルをひとつの論理テーブルとして扱うAPIです。Hiveスタイルのパーティション（year=2023/month=01/part-0.parquet のようなディレクトリ構造）を自動認識し、filter= を指定するとパーティションキーに一致するフォルダだけを読むため、スキャンコストが劇的に下がります。`,
+table:T.arrowDtypes,
+code:`import pyarrow as pa
+import pyarrow.compute as pc
+
+# ChunkedArray 操作
+ca = pa.chunked_array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+print("chunks:", ca.num_chunks)
+print("sum:", pc.sum(ca).as_py())
+print("mean:", pc.mean(ca).as_py())
+
+# RecordBatch
+schema = pa.schema([('name', pa.string()), ('age', pa.int32())])
+batch = pa.RecordBatch.from_pydict(
+    {'name': ['Alice', 'Bob'], 'age': [25, 30]},
+    schema=schema
+)
+print(batch.schema)
+print(batch.to_pandas())`,
+afterCode:`RecordBatch は pyarrow.ipc.new_stream() / new_file() でバイナリに書き出し、別プロセスや別マシンに転送できます。pandas の pickle より高速で、型情報も厳密に保持されます。`},
+]},
+{id:"ch3",num:3,title:"分散データ処理（Dask）",est:"65分",
+goal:"Dask DataFrameを作成しcompute()で結果を取得できる。task graphの概念を理解し、persist()とcompute()の使い分けができる。ParquetのDask読み込みとS3連携のパターンを説明できる。",
+sections:[
+{title:"Dask DataFrameの基本",
+body:`Dask はpandasと互換のAPIを持ちながら、DataFrameを複数のパーティション（pandas DataFrameの配列）に分割して処理するライブラリです。各パーティションは独立して処理され、マルチコアやクラスタにまたがって並列実行されます。pandas でメモリに乗り切らないデータセットでも、Daskはチャンク単位で処理するため扱えます。
+
+Dask の最大の特徴は「遅延評価」です。dd.read_csv() や groupby() 等の操作は実際には計算グラフ（task graph）を構築するだけで、.compute() を呼んだときに初めて実行されます。これにより、複数の変換をチェーンしてからまとめて最適化・並列実行できます。メモリに余裕がある場合は .persist() でワーカーメモリにデータを保持し、その後の .compute() を高速化できます。`,
+table:T.daskCompare,
+afterTable:`Dask はローカルのマルチコアで動作する LocalCluster がデフォルトです。クラウドに移行したい場合は Coiled（SaaS）や Dask on Kubernetes を使うと pandas と同じコードのまま分散実行できます。`},
+{title:"Dask + Parquet と S3 連携",
+body:`Dask は dd.read_parquet('s3://bucket/path/') のように S3 パスをそのまま受け付けます。内部では fsspec というファイルシステム抽象化ライブラリを使い、ローカル・S3・GCS・Azure Blob を統一的に扱います。Parquetはパーティション化されていれば必要なファイルだけを読み、さらにfilters=引数でパーティションキーに基づくプルーニングが効きます。
+
+実務では「数十億行のログデータをS3に日付パーティションで保存し、Daskで特定日だけ読んで集計」というパターンがよく使われます。persist() でワーカーキャッシュに乗せてから複数の集計を実行すると、同じデータを何度もS3から読む無駄を省けます。`,
+code:`import dask.dataframe as dd
+
+# ローカルParquetの並列読み込み
+ddf = dd.read_parquet(
+    '/tmp/sales_ds/',
+    columns=['year', 'sales'],
+    filters=[('year', '==', 2023)]
+)
+
+# 遅延集計（まだ実行されない）
+agg = ddf.groupby('year')['sales'].sum()
+
+# 実行
+result = agg.compute()
+print(result)
+
+# S3 の場合（boto3とs3fsが必要）
+# ddf_s3 = dd.read_parquet(
+#     's3://my-bucket/sales/',
+#     storage_options={'anon': False}
+# )`,
+afterCode:`ddf.visualize() を呼ぶと graphviz で task graph を画像出力できます（graphviz のインストールが必要）。数百ノードのグラフを見ると Dask がどれだけ並列化しているかが視覚的に分かります。`},
+]},
+{id:"ch4",num:4,title:"Polarsプラグインとカスタム拡張",est:"60分",
+goal:"map_batches()でカスタム変換をPolarsのDataFrameに適用できる。カスタムExprを関数として定義して再利用できる。Polarsプラグイン（Rust拡張）の仕組みと活用場面を説明できる。",
+sections:[
+{title:"map_batches と カスタム Expr",
+body:`Polars はほとんどの処理を内蔵のArrow実装（Rust）で実行しますが、独自のロジックが必要な場合は map_batches() でPython関数を列単位で適用できます。map_batches() に渡す関数はpolarsSeries（1列分）を受け取り、変換後の Series を返します。pandasの apply() と異なり、map_batches() は列全体をまとめてSeriesとして受け取るため、Pythonレベルの行ループは起きません。
+
+さらに強力なのがカスタムExpr（式）です。pl.col('name').str.to_lowercase() のような組み込みExprと同じように使える関数を自分で定義できます。z-score 正規化・カスタムエンコーディング・複合条件フラグなど、繰り返し使う変換ロジックをExprとして定義しておくと、with_columns() の中でそのまま使え、lazy APIの最適化も受けられます。`,
+code:`import polars as pl
+
+# カスタム Expr: 偏差値計算
+def hensachi_expr(col_name: str) -> pl.Expr:
+    col = pl.col(col_name)
+    return (col - col.mean()) / col.std() * 10 + 50
+
+df = pl.DataFrame({'score': [60.0, 70.0, 80.0, 90.0, 55.0]})
+
+result = df.with_columns(
+    hensachi_expr('score').alias('hensachi'),
+    pl.col('score').map_batches(
+        lambda s: pl.Series([f"Lv{int(v//20)}" for v in s.to_list()])
+    ).alias('level')
+)
+print(result)`,
+afterCode:`map_batches() の return_dtype 引数で戻り値の型を明示すると、lazy API でのクエリプラン生成が正確になります。型が不明だとPolarsが推論できず実行時エラーになることがあります。`},
+{title:"Polarsプラグイン（Rust拡張）の概要",
+body:`Polarsはmaturin（RustのPythonバインディングビルドツール）を使ったプラグイン機構を提供しています。Rustで処理ロジックを書き、plugin_function() デコレータと組み合わせると、自作のExprを組み込みと同じ速度で動かせます。Pythonレベルのmap_batches()ではGILが解放されないため並列化に制限がありますが、Rustプラグインはこの制約を受けません。
+
+プラグインを書くには: Rustでpolars-core等に依存するcrateを作成し、maturin develop でビルドしてPythonパッケージとして登録します。その後import した関数をpl.col('x').register_plugin(...)で呼び出せます。ライブラリ・フレームワーク開発者向けの機能ですが、超高速なカスタム集計関数が必要な場合に有効です。大半の実務ユースケースではmap_batches()で十分です。`,
+code:`# Polars Plugin の最小構成（Rustコード例・概念説明）
+# Cargo.toml:
+#   [lib]
+#   name = "my_plugin"
+#   crate-type = ["cdylib"]
+#   [dependencies]
+#   polars = { version = "0.39", features = ["plugin"] }
+
+# src/lib.rs:
+# #[polars_expr(output_type=Float64)]
+# fn double(inputs: &[Series]) -> PolarsResult<Series> {
+#     let ca = inputs[0].f64()?;
+#     Ok((ca * 2.0).into_series())
+# }
+
+# Python 側（maturin develop 後）:
+import polars as pl
+
+# プラグイン関数を Expr に登録して使う（概念）
+# result = df.with_columns(
+#     pl.col('value').register_plugin(
+#         lib='my_plugin', symbol='double'
+#     ).alias('doubled')
+# )`,
+afterCode:`Polarsの公式GitHubには polars-plugins-tutorial というリポジトリがあり、最小構成からステップバイステップで学べます。実務でRustプラグインが必要な規模になったら、そのチュートリアルから始めるのが最短経路です。`},
+]},
+{id:"ch5",num:5,title:"データパイプライン設計",est:"65分",
+goal:"ETL/ELTパターンの違いを説明できる。増分処理（incremental load）をpandas/polarsで実装できる。Airflow/Prefect/Dagsterのタスク内でpandas/polarsを適切に使うパターンを理解している。",
+sections:[
+{title:"ETL/ELTパターンと増分処理",
+body:`データパイプラインには大きく ETL（Extract→Transform→Load）と ELT（Extract→Load→Transform）の2つのパターンがあります。ETLはデータを取り出して変換してからDWHに入れるため、入力データの変換がDWHの外で完結します。pandasやpolarsが活躍するのは主にこのETLフェーズです。ELTはデータを生のままDWH（BigQueryやSnowflake）に入れて、DWH内のSQLで変換します。クラウドDWHの高い処理能力を活かせるため近年主流になっています。
+
+増分処理（incremental load）は「前回実行時以降に追加・変更されたデータだけを処理する」パターンです。全量再処理（full refresh）は単純ですが、データ量が増えると非現実的です。増分処理では「最終処理タイムスタンプ」をどこかに保存しておき、次回は updated_at > last_run のデータだけを読んで処理します。pandas/polarsでは read_parquet のfilterや、SQL WHERE句でこれを実現します。`,
+table:T.pipelinePatterns,
+afterTable:`Upsert（新規は INSERT、既存は UPDATE）はDWHでは MERGE 文で行いますが、pandas では read→concat→drop_duplicates→write というパターンが基本です。大規模になったら Delta Lake の upsert API を使うのが効率的です。`},
+{title:"Airflow / Prefect / Dagster との統合",
+body:`Airflow・Prefect・Dagsterはどれも「タスクの依存グラフを定義して実行管理する」ワークフローオーケストレーターです。pandas/polarsのコードはそれぞれのタスク/フロー/オペレーションとして包むだけで動きます。重要なのはタスク間のデータ受け渡しで、大きなDataFrameをそのままワーカー間で渡すのは非効率なため、中間結果はParquetやS3に書き出してパスを受け渡すパターンが推奨されます。
+
+Prefect 2.x では @task デコレータを付けた関数をそのまま呼べばDAGが構築されます。Dagsterは Assets（データアセット）という概念でデータの系譜（lineage）を自動で管理してくれます。どのオーケストレーターを選ぶかはチームの規模・クラウド環境によりますが、pandas/polarsのコード自体は変わりません。`,
+code:`# Prefect 2.x の例（概念）
+from prefect import task, flow
+import polars as pl
+
+@task
+def extract() -> str:
+    df = pl.read_csv('s3://bucket/raw/sales.csv')
+    df.write_parquet('/tmp/raw.parquet')
+    return '/tmp/raw.parquet'
+
+@task
+def transform(path: str) -> str:
+    df = pl.read_parquet(path)
+    result = (
+        df.filter(pl.col('amount') > 0)
+          .group_by('region')
+          .agg(pl.col('amount').sum().alias('total'))
+    )
+    out = '/tmp/transformed.parquet'
+    result.write_parquet(out)
+    return out
+
+@flow
+def sales_pipeline():
+    raw_path = extract()
+    transform(raw_path)
+
+# sales_pipeline()`,
+afterCode:`タスク間でDataFrameを直接返すと Prefect がそれをシリアライズしてキャッシュしようとします。大きなDataFrameはファイルパスで受け渡す「ファイルベースの受け渡し」パターンにするとメモリ効率・再実行効率ともに向上します。`},
+]},
+{id:"ch6",num:6,title:"ML特徴量エンジニアリング",est:"60分",
+goal:"scikit-learn Pipelineにpandas/polarsの前処理を統合できる。Target Encodingをpolarsで実装できる。Feature Store（Feast等）の役割と基本的な使い方を説明できる。",
+sections:[
+{title:"scikit-learn Pipeline との統合",
+body:`scikit-learnのPipelineはデータ変換と学習器を一本のオブジェクトにまとめる仕組みです。fit()を呼ぶと各ステップが順に実行され、predict()も同じ変換を自動で適用します。これにより、学習時とテスト時で同じ前処理が確実に行われ、学習・テスト間のデータ漏洩（data leakage）を防ぎやすくなります。
+
+pandas は sklearn の estimator と直接連携できます。ColumnTransformer を使えば「数値列はScaler、カテゴリ列はOneHotEncoder」のように列ごとに異なる変換を定義でき、Pipeline に組み込めます。polarsでは前処理を先に行ってNumPy配列として sklearn に渡すのが現状もっとも安定したパターンです。将来的には sklearn-polars 等のブリッジライブラリが充実してきています。`,
+table:T.featureEngg,
+afterTable:`cross_val_score() に Pipeline を渡すと、各foldで fit/transform が leak なく実行されます。Pipeline を joblib.dump() で保存すれば、前処理+モデルをセットで本番に持ち込めます。`},
+{title:"Target Encoding と Feature Store",
+body:`Target Encoding はカテゴリ変数をそのカテゴリに対応するターゲット変数の平均値で置き換える手法です。One-Hot Encoding と比べてカーディナリティが高い列（都市名・商品IDなど）でも列数が増えず、ツリー系モデルとの相性が良いです。ただし、ターゲット変数の情報を使うため学習データでleakが起きやすく、cross-validation内でfoldごとにエンコーダをfitし直す必要があります。category_encoders ライブラリが sklearn 互換の TargetEncoder を提供しています。
+
+Feature Store（Feast・Tecton・Vertex AI Feature Store等）は「学習と推論で同じ特徴量計算を共有する」仕組みです。特徴量の定義をコードで管理し、学習時・オンライン推論時の両方から一貫して取得できます。pandasやpolarsで計算した特徴量をFeature Storeにmaterializeしておき、推論時にkey（ユーザーIDなど）でlookupするのが典型的なフローです。`,
+code:`import pandas as pd
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.impute import SimpleImputer
+
+X = pd.DataFrame({
+    'age':    [25, 30, None, 28, 35],
+    'salary': [50000, 60000, 45000, None, 80000],
+    'dept':   ['Eng', 'HR', 'Eng', 'Finance', 'HR']
+})
+y = [1, 0, 1, 0, 1]
+
+num_pipe = Pipeline([
+    ('imp', SimpleImputer(strategy='median')),
+    ('sc',  StandardScaler())
+])
+cat_pipe = Pipeline([
+    ('imp', SimpleImputer(strategy='most_frequent')),
+    ('ohe', OneHotEncoder(handle_unknown='ignore'))
+])
+ct = ColumnTransformer([
+    ('num', num_pipe, ['age', 'salary']),
+    ('cat', cat_pipe, ['dept'])
+])
+pipe = Pipeline([('prep', ct), ('clf', LogisticRegression())])
+pipe.fit(X, y)
+print(pipe.predict(X))`,
+afterCode:`Pipeline を ONNX 形式でエクスポートすると Python 以外の環境（C#・Java・Rust等）でも同じモデルを動かせます。sklearn-onnx ライブラリが変換を支援します。`},
+]},
+{id:"ch7",num:7,title:"データ品質・テスト",est:"60分",
+goal:"panderaでDataFrameのスキーマを定義・検証できる。Great Expectationsで基本的なExpectationを定義・実行できる。データ品質モニタリングの概念と実務での組み込み方を説明できる。",
+sections:[
+{title:"pandera によるスキーマ定義と検証",
+body:`pandera は pandas（および polars）の DataFrame に対して型・値・制約を宣言的に定義し、検証するライブラリです。DataFrameSchema オブジェクトでスキーマを定義し、.validate(df) を呼ぶと不正なデータがあった場合に SchemaError を発生させます。関数の引数・戻り値に @pa.check_input / @pa.check_output デコレータを付けると、関数呼び出し時に自動検証されます。
+
+pandera の強みは「スキーマをコードで管理できること」です。JSON や YAML でスキーマを別ファイルに書くアプローチと違い、pandera は Python クラス（pa.DataFrameModel を継承）でスキーマを定義でき、型ヒント・IDEの補完・バージョン管理が自然に機能します。ETLパイプラインの入口と出口にpanderaのバリデーションを挟むだけで、予期しないデータ変化に早く気づける仕組みが作れます。`,
+table:T.dqTools,
+afterTable:`pandera は polars にも対応しており、pa.DataFrameSchema を polars の DataFrame に対しても同様に使えます（pandera 0.18以降）。pandas と polars を混在させているプロジェクトでも統一的なスキーマ管理が可能です。`},
+{title:"Great Expectations によるデータ品質管理",
+body:`Great Expectations（GX）は「期待値（Expectation）」という単位でデータ品質のルールを定義するフレームワークです。expect_column_values_to_not_be_null() や expect_column_values_to_be_between() のように自然言語に近い形でルールを記述でき、その期待値を集めた Expectation Suite をCI/CDパイプラインで実行することでデータの品質を継続的に監視できます。
+
+GX はデータソース（pandas DataFrame・PostgreSQL・Spark等）に依存せず同じExpectation定義が使えます。実行結果はHTMLの「Data Docs」として可視化でき、ビジネスチームにも共有しやすいレポートが自動生成されます。本番データパイプラインでは「Airflow のタスクとしてGXを毎日実行し、品質が落ちたらアラートを送る」という構成が一般的です。`,
+code:`import pandas as pd
+import pandera as pa
+from pandera.typing import Series
+
+# DataFrameModel でスキーマ定義
+class SalesSchema(pa.DataFrameModel):
+    product_id: Series[int]   = pa.Field(ge=1)
+    price:      Series[float] = pa.Field(ge=0.0)
+    quantity:   Series[int]   = pa.Field(ge=0)
+    region:     Series[str]   = pa.Field(isin=['East','West','North','South'])
+
+# @pa.check_output(SalesSchema)
+def clean_sales(df: pd.DataFrame) -> pd.DataFrame:
+    return df.dropna()
+
+df_ok = pd.DataFrame({
+    'product_id': [1, 2],
+    'price': [100.0, 200.0],
+    'quantity': [5, 3],
+    'region': ['East', 'West']
+})
+SalesSchema.validate(df_ok)
+print("Validation passed")`,
+afterCode:`pandera の lazy=True オプションを validate() に渡すと、最初のエラーで止まらず全エラーをまとめて報告する SchemaErrors が発生します。大量のカラムを一度に検証する場合に便利です。`},
+]},
+{id:"ch8",num:8,title:"次世代データエコシステム",est:"60分",
+goal:"Apache Iceberg・Delta Lakeのテーブルフォーマットの特徴を説明できる。DuckDBでpandasとSQLを組み合わせてin-memory集計できる。Ibisを使って複数バックエンドで同じAPIを使えることを理解している。",
+sections:[
+{title:"Apache Iceberg・Delta Lake・DuckDB",
+body:`Apache Iceberg と Delta Lake はどちらも「Parquet ファイルの上にトランザクション管理層を追加したテーブルフォーマット」です。Parquet は高速な列指向ファイルですが、それ単体では ACID トランザクションやタイムトラベル（過去のスナップショットを参照する機能）が使えません。IcebergやDelta Lakeのメタデータ管理層がこれを実現します。
+
+DuckDB は「組み込みOLAPデータベース」で、Pythonプロセス内にSQLエンジンをembedして高速に分析クエリを実行できます。pandas DataFrameや Polars DataFrame、ParquetファイルをそのままSQL の FROM 句で参照でき、大きなDataFrameの集計は pandas のgroupby より DuckDB の SQL の方が速いことが多いです。インストールが pip install duckdb だけで完結し、設定不要ですぐ使えるのも魅力です。`,
+table:T.lakeFormats,
+afterTable:`DuckDB は Iceberg・Delta Lake のテーブルを直接読む拡張（iceberg extension、delta extension）も持っており、複雑なインフラを構築せずにデータレイクハウスのデータをローカルで試せます。`},
+{title:"Ibis：多バックエンド共通API",
+body:`Ibis は「pandasのようなAPIでDuckDB・BigQuery・Snowflake・Spark等のバックエンドを切り替えられる」データフレームライブラリです。ibis.duckdb.connect() でローカルDuckDBに、ibis.bigquery.connect(...) でBigQueryに接続し、以降の group_by・filter・select・join などのAPIは完全に同じです。同じコードをローカルでプロトタイプして本番のBigQueryに切り替えるといった使い方ができます。
+
+DataFusion は Rustで実装されたApacheの分散クエリエンジンで、Arrow IPC フォーマットをネイティブに扱い、PythonバインディングからDataFrameやSQLを実行できます。Polars と同様にArrowをベースにするため相互運用性が高く、将来的にPolarsのバックエンドとしても統合が検討されています。これらの次世代エコシステムはすべてApache ArrowをコアのデータフォーマットとしてIPC/飛行機プロトコルで通信する「Arrow native」なスタックを形成しています。`,
+code:`import ibis
+import pandas as pd
+
+ibis.options.interactive = True
+con = ibis.duckdb.connect()
+
+df = pd.DataFrame({
+    'dept':   ['Eng','HR','Eng','Finance','HR','Eng'],
+    'salary': [80000, 60000, 90000, 70000, 65000, 85000],
+    'yoe':    [3, 5, 7, 4, 2, 6]
+})
+t = con.create_table('employees', df, overwrite=True)
+
+# Ibis API（バックエンドに依存しない）
+result = (
+    t.filter(t.yoe >= 3)
+     .group_by('dept')
+     .aggregate(
+         avg_salary=t.salary.mean(),
+         headcount=t.dept.count()
+     )
+     .order_by('dept')
+)
+print(result)`,
+afterCode:`ibis.to_pandas(result) で Ibis テーブルを pandas DataFrame に変換できます。ibis.options.interactive = True にすると repr 時に自動でクエリが実行され、Jupyter での探索が快適になります。本番コードでは interactive を False にして明示的に execute() を呼ぶのが推奨です。`},
+]},
+];
+
+/* ─── UI Components ─── */
+function DataTable({ data }) {
+  return React.createElement("div", {
+    style: { overflowX:"auto", margin:"12px 0", borderRadius:10, border:"1px solid #d1d5db", background:"#fff" }
+  }, React.createElement("table", {
+    style: { width:"100%", borderCollapse:"separate", borderSpacing:0, fontSize:13 }
+  }, React.createElement("thead", null, React.createElement("tr", null,
+    data.h.map((h, i) => React.createElement("th", {
+      key: i,
+      style: {
+        background:"linear-gradient(180deg,#eef2ff,#e0e7ff)", color:"#312e81", fontWeight:800,
+        fontSize:12.5, padding:"10px 14px", textAlign:"left", borderBottom:"2px solid #a5b4fc",
+        borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+      }
+    }, h))
+  )), React.createElement("tbody", null,
+    data.r.map((row, ri) => React.createElement("tr", { key: ri },
+      row.map((cell, ci) => React.createElement("td", {
+        key: ci,
+        style: {
+          padding:"9px 14px",
+          borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+          borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+          color: ci === 0 ? "#1e1b4b" : "#374151",
+          fontWeight: ci === 0 ? 700 : 400,
+          fontSize:13, lineHeight:1.65, verticalAlign:"top", whiteSpace:"pre-line",
+          background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+        }
+      }, cell))
+    ))
+  ),
+  data.cap && React.createElement("div", {
+    style: { padding:"8px 14px", fontSize:12, color:"#6b7280", borderTop:"1px solid #e5e7eb", background:"#f9fafb" }
+  }, data.cap));
+}
+
+function Code({ code, hl }) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color:"#d0d0f0", padding:"14px 16px", borderRadius:10,
+      fontSize:12, lineHeight:1.65, overflowX:"auto", margin:"8px 0 0",
+      fontFamily:"'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace:"pre-wrap", wordBreak:"break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+
+const diffLabel = d => d === 1 ? "⭐ 基本" : d === 2 ? "⭐⭐ 応用" : "⭐⭐⭐ 発展";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+
+function Exercise({ ex, idx }) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: { borderRadius:12, border:"2px solid #f59e0b", overflow:"hidden", background:"#fff", marginBottom:8 }
+  },
+    React.createElement("div", { style: { padding:"12px 16px", background:"linear-gradient(135deg,#fffbeb,#fef3c7)" } },
+      React.createElement("div", { style: { display:"flex", alignItems:"center", gap:8, marginBottom:6 } },
+        React.createElement("span", {
+          style: { background:"#f59e0b", color:"#fff", fontSize:11, fontWeight:800, padding:"3px 10px", borderRadius:6 }
+        }, "問", idx + 1),
+        React.createElement("span", { style: { fontSize:12, fontWeight:700, color:diffColor(ex.diff) } }, diffLabel(ex.diff))
+      ),
+      React.createElement("p", { style: { margin:0, fontSize:13.5, lineHeight:1.8, color:"#92400e", whiteSpace:"pre-line" } }, ex.q)
+    ),
+    React.createElement("div", { style: { padding:"0 16px 12px" } },
+      React.createElement(Code, { code: ex.code, hl: true })
+    ),
+    React.createElement("div", { style: { borderTop:"1px dashed #fcd34d", padding:"10px 16px" } },
+      React.createElement("button", {
+        onClick: () => setShowAnswer(!showAnswer),
+        style: {
+          background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+          color:"#fff", border:"none", borderRadius:8, padding:"8px 20px",
+          fontSize:13, fontWeight:700, cursor:"pointer", width:"100%"
+        }
+      }, showAnswer ? "🙈 解答を隠す" : "👀 解答例を見る"),
+      showAnswer && React.createElement("div", { style: { marginTop:10 } },
+        React.createElement("div", {
+          style: { fontSize:11, fontWeight:700, color:"#166534", textTransform:"uppercase", letterSpacing:1, marginBottom:4 }
+        }, "✅ 解答例"),
+        React.createElement(Code, { code: ex.answer })
+      )
+    )
+  );
+}
+
+function Section({ section, idx, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: { borderRadius:12, border:"1px solid #e5e7eb", overflow:"hidden", background:"#fff" }
+  },
+    React.createElement("button", {
+      onClick: () => setOpen(!open),
+      style: {
+        width:"100%", display:"flex", alignItems:"center", gap:10, padding:"12px 16px",
+        border:"none", background:"#fafafa", cursor:"pointer", textAlign:"left",
+        fontSize:14, fontWeight:700, color:"#1e1b4b"
+      }
+    },
+      React.createElement("span", {
+        style: {
+          flexShrink:0, width:24, height:24, borderRadius:6, background:"#6366f1",
+          color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800
+        }
+      }, idx + 1),
+      React.createElement("span", { style: { flex:1 } }, section.title),
+      React.createElement("span", { style: { fontSize:18, color:"#9ca3af", transition:"transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0)" } }, "›")
+    ),
+    open && React.createElement("div", { style: { padding:"12px 16px 16px" } },
+      section.body && React.createElement("p", {
+        style: { margin:"0 0 8px", fontSize:13.5, lineHeight:1.85, color:"#374151", whiteSpace:"pre-line" }
+      }, section.body),
+      section.table && React.createElement(DataTable, { data: section.table }),
+      section.afterTable && React.createElement("p", {
+        style: { margin:"8px 0", fontSize:13.5, lineHeight:1.85, color:"#374151", whiteSpace:"pre-line" }
+      }, section.afterTable),
+      section.code && React.createElement(Code, { code: section.code }),
+      section.afterCode && React.createElement("p", {
+        style: {
+          margin:"10px 0 0", fontSize:13, lineHeight:1.8, color:"#555", whiteSpace:"pre-line",
+          background:"#f9fafb", padding:"10px 14px", borderRadius:8, border:"1px solid #e5e7eb"
+        }
+      }, section.afterCode)
+    )
+  );
+}
+
+/* ─── Main App ─── */
+function PandasPolarsAdvancedCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+
+  return React.createElement("div", {
+    style: { minHeight:"100vh", background:"#f8f7f4", fontFamily:"'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif" }
+  },
+    React.createElement("div", { style: { maxWidth:1100, margin:"0 auto", padding:"20px 14px" } },
+
+      /* ─ Hero ─ */
+      React.createElement("div", {
+        style: {
+          background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+          borderRadius:16, padding:"24px 20px", marginBottom:16, position:"relative", overflow:"hidden"
+        }
+      },
+        React.createElement("div", { style: { position:"absolute", top:-30, right:-10, fontSize:140, opacity:0.05 } }, "🐼"),
+        React.createElement("div", {
+          style: { fontSize:11, fontWeight:700, color:"#a5b4fc", textTransform:"uppercase", letterSpacing:2, marginBottom:4 }
+        }, "Pythonで学ぶデータ分析"),
+        React.createElement("h1", { style: { margin:0, fontSize:22, fontWeight:900, color:"#fff" } }, "pandas/polars 上級コース"),
+        React.createElement("p", { style: { margin:"6px 0 0", fontSize:12.5, color:"#c4b5fd" } },
+          "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問 ・ 難易度⭐⭐〜⭐⭐⭐"),
+        React.createElement("p", { style: { margin:"10px 0 0", fontSize:12, color:"#ddd6fe", lineHeight:1.8 } },
+          "pandas 2.0のCopy-on-Write・PyArrow統合・Polarsのクエリ最適化から、Dask分散処理・データパイプライン設計・ML特徴量エンジニアリング・データ品質テスト・次世代エコシステム（Iceberg・DuckDB・Ibis）まで、実務で差をつける上級トピックを体系的に習得します。"),
+        React.createElement("div", { style: { marginTop:14, display:"flex", gap:3 } },
+          chapters.map((_, i) => React.createElement("div", {
+            key: i,
+            onClick: () => { setCh(i); setMenuOpen(false); },
+            style: { flex:1, height:5, borderRadius:3, background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)", cursor:"pointer" }
+          }))
+        )
+      ),
+
+      /* ─ Chapter Menu ─ */
+      React.createElement("div", { style: { marginBottom:14 } },
+        React.createElement("button", {
+          onClick: () => setMenuOpen(!menuOpen),
+          style: {
+            width:"100%", padding:"10px 16px", border:"1px solid #d1d5db", borderRadius:10,
+            background:"#fff", fontSize:14, fontWeight:700, color:"#1e1b4b", cursor:"pointer",
+            display:"flex", justifyContent:"space-between"
+          }
+        },
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", { style: { fontSize:12, color:"#9ca3af" } }, menuOpen ? "▲" : "▼")
+        ),
+        menuOpen && React.createElement("div", {
+          style: { marginTop:4, border:"1px solid #e5e7eb", borderRadius:10, overflow:"hidden", background:"#fff", boxShadow:"0 4px 20px rgba(0,0,0,0.08)" }
+        }, chapters.map((c, i) => React.createElement("button", {
+          key: c.id,
+          onClick: () => { setCh(i); setMenuOpen(false); },
+          style: {
+            width:"100%", padding:"10px 16px", border:"none",
+            borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+            background: i === ch ? "#eef2ff" : "#fff",
+            fontSize:13, fontWeight: i === ch ? 700 : 500,
+            color: i === ch ? "#4338ca" : "#374151",
+            cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:10
+          }
+        },
+          React.createElement("span", {
+            style: {
+              width:22, height:22, borderRadius:"50%",
+              background: i === ch ? "#6366f1" : "#e5e7eb",
+              color: i === ch ? "#fff" : "#6b7280",
+              fontWeight:800, fontSize:11, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0
+            }
+          }, c.num),
+          React.createElement("span", { style: { flex:1 } }, c.title),
+          EX[c.id] && React.createElement("span", { style: { fontSize:11, color:"#f59e0b", fontWeight:700 } }, EX[c.id].length, "問")
+        )))
+      ),
+
+      /* ─ Chapter Header ─ */
+      React.createElement("div", { style: { display:"flex", alignItems:"center", gap:10, marginBottom:12 } },
+        React.createElement("span", {
+          style: {
+            width:36, height:36, borderRadius:"50%",
+            background:"linear-gradient(135deg,#6366f1,#8b5cf6)",
+            color:"#fff", fontWeight:900, fontSize:16, display:"flex", alignItems:"center", justifyContent:"center"
+          }
+        }, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontWeight:800, fontSize:18, color:"#1e1b4b" } }, chapter.title),
+          React.createElement("div", { style: { fontSize:12, color:"#6b7280" } },
+            "目安: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : "")
+        )
+      ),
+
+      /* ─ Goal ─ */
+      chapter.goal && React.createElement("div", {
+        style: {
+          background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",
+          border:"1px solid #c7d2fe", borderLeft:"4px solid #6366f1",
+          borderRadius:10, padding:"12px 16px", marginBottom:14
+        }
+      },
+        React.createElement("div", { style: { fontSize:11, fontWeight:800, color:"#4338ca", letterSpacing:1, marginBottom:6 } }, "🎯 この章のゴール"),
+        React.createElement("div", { style: { fontSize:13.5, color:"#1e1b4b", lineHeight:1.8, whiteSpace:"pre-line" } }, chapter.goal)
+      ),
+
+      /* ─ Sections ─ */
+      React.createElement("div", { style: { display:"flex", flexDirection:"column", gap:8 } },
+        chapter.sections.map((sec, i) => React.createElement(Section, {
+          key: ch + "-" + i, section: sec, idx: i, defaultOpen: false
+        }))
+      ),
+
+      /* ─ Exercises ─ */
+      exercises.length > 0 && React.createElement("div", { style: { marginTop:20 } },
+        React.createElement("div", { style: { display:"flex", alignItems:"center", gap:8, marginBottom:12 } },
+          React.createElement("span", {
+            style: { background:"#f59e0b", color:"#fff", fontWeight:800, fontSize:13, padding:"4px 14px", borderRadius:8 }
+          }, "🏋️ 演習問題"),
+          React.createElement("span", { style: { fontSize:13, color:"#92400e" } }, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex, i) => React.createElement(Exercise, { key: ch + "-" + i, ex: ex, idx: i }))
+      ),
+
+      /* ─ Navigation ─ */
+      React.createElement("div", { style: { display:"flex", justifyContent:"space-between", marginTop:20, gap:10 } },
+        ch > 0 ? React.createElement("button", {
+          onClick: () => { setCh(ch - 1); window.scrollTo(0, 0); },
+          style: {
+            flex:1, padding:"12px 16px", border:"1px solid #d1d5db", borderRadius:10,
+            background:"#fff", cursor:"pointer", fontWeight:600, fontSize:13, color:"#6b7280"
+          }
+        }, "← Ch.", chapters[ch - 1].num) : React.createElement("div", { style: { flex:1 } }),
+
+        ch < chapters.length - 1 ? React.createElement("button", {
+          onClick: () => { setCh(ch + 1); window.scrollTo(0, 0); },
+          style: {
+            flex:1, padding:"12px 16px", border:"none", borderRadius:10,
+            background:"linear-gradient(135deg,#6366f1,#8b5cf6)",
+            cursor:"pointer", fontWeight:700, fontSize:13, color:"#fff"
+          }
+        }, "Ch.", chapters[ch + 1].num, " →") : React.createElement("a", {
+          href: "../index.html",
+          style: {
+            flex:1, padding:"12px 16px", borderRadius:10,
+            background:"linear-gradient(135deg,#22c55e,#16a34a)",
+            color:"#fff", fontWeight:700, fontSize:13, textAlign:"center", textDecoration:"none"
+          }
+        }, "🎉 コース完了！")
+      ),
+
+      /* ─ Footer ─ */
+      React.createElement("p", {
+        style: { textAlign:"center", fontSize:11, color:"#9ca3af", marginTop:20 }
+      }, "pandas.pydata.org ・ pola.rs ・ pandas 2.x / Polars 0.20 時点")
+    )
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(PandasPolarsAdvancedCourse));
+  </script>
+</body>
+</html>
