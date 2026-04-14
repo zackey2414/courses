@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pandas/polars 初級コース</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const T = {
+  dfConcepts: { h:["概念","pandas","polars"], r:[
+    ["作成（dict）","pd.DataFrame({'a':[1,2]})","pl.DataFrame({'a':[1,2]})"],
+    ["行数・列数","df.shape","df.shape"],
+    ["列名","df.columns","df.columns"],
+    ["型一覧","df.dtypes","df.dtypes"],
+    ["先頭N行","df.head(5)","df.head(5)"],
+    ["統計要約","df.describe()","df.describe()"],
+  ], cap:"DataFrame基本操作の対応表" },
+  ioFormats: { h:["形式","pandas","polars","特徴"], r:[
+    ["CSV","pd.read_csv()","pl.read_csv()","最も一般的"],
+    ["JSON","pd.read_json()","pl.read_json()","ネスト構造に注意"],
+    ["Parquet","pd.read_parquet()","pl.read_parquet()","高速・圧縮"],
+    ["Excel","pd.read_excel()","pl.read_excel()","openpyxl/calamine必要"],
+    ["書き込み","df.to_csv()","df.write_csv()","APIが微妙に異なる"],
+  ], cap:"主なI/Oフォーマット" },
+  filterOps: { h:["操作","pandas","polars"], r:[
+    ["行選択（条件）","df[df['age']>20]","df.filter(pl.col('age')>20)"],
+    ["列選択","df[['a','b']] / df.loc[:,['a','b']]","df.select(['a','b'])"],
+    ["AND条件","(c1) & (c2)","(c1) & (c2)"],
+    ["OR条件","(c1) | (c2)","(c1) | (c2)"],
+    ["isin","df[df['x'].isin([1,2])]","df.filter(pl.col('x').is_in([1,2]))"],
+    ["行番号","df.iloc[0:5]","df[0:5]"],
+  ], cap:"選択・フィルタ操作の比較" },
+  colOps: { h:["操作","pandas","polars"], r:[
+    ["列追加","df['new']=val / df.assign(new=val)","df.with_columns(pl.lit(val).alias('new'))"],
+    ["列削除","df.drop('col',axis=1)","df.drop('col')"],
+    ["列名変更","df.rename(columns={'old':'new'})","df.rename({'old':'new'})"],
+    ["型変換","df['col'].astype(int)","df.with_columns(pl.col('col').cast(pl.Int64))"],
+    ["文字列操作","df['col'].str.lower()","df.with_columns(pl.col('col').str.to_lowercase())"],
+  ], cap:"列操作の対応表" },
+  missingOps: { h:["操作","pandas","polars"], r:[
+    ["欠損検出","df.isnull() / df.isna()","df.is_null()"],
+    ["欠損数","df.isnull().sum()","df.null_count()"],
+    ["行削除","df.dropna()","df.drop_nulls()"],
+    ["定数補完","df.fillna(0)","df.fill_null(0)"],
+    ["前方補完","df.fillna(method='ffill')","df.fill_null(strategy='forward')"],
+    ["後方補完","df.fillna(method='bfill')","df.fill_null(strategy='backward')"],
+  ], cap:"欠損値処理の対応表" },
+  groupOps: { h:["操作","pandas","polars"], r:[
+    ["グループ集計","df.groupby('col').agg(...)","df.group_by('col').agg(...)"],
+    ["合計","groupby(...).sum()","group_by(...).agg(pl.col('x').sum())"],
+    ["平均","groupby(...).mean()","group_by(...).agg(pl.col('x').mean())"],
+    ["件数","groupby(...).size()","group_by(...).agg(pl.len())"],
+    ["複数集計","groupby(...).agg({'a':'sum','b':'mean'})","group_by(...).agg([pl.col('a').sum(), pl.col('b').mean()])"],
+    ["ピボット","pd.pivot_table(df,...)","df.pivot(...)"],
+  ], cap:"グループ集計の対応表" },
+  joinTypes: { h:["結合種別","説明","両側に一致する行"], r:[
+    ["inner","両方に存在する行のみ","✓"],
+    ["left","左を全て保持、右はNaN","左側は全て"],
+    ["right","右を全て保持、左はNaN","右側は全て"],
+    ["outer / full","どちらかに存在する全行","どちらか一方でも"],
+    ["cross","全行の組合せ","全行×全行"],
+  ], cap:"JOIN種別の概要" },
+  plotTypes: { h:["グラフ","pandas shortcut","matplotlib/seaborn"], r:[
+    ["折れ線","df.plot.line()","plt.plot(x,y)"],
+    ["棒グラフ","df.plot.bar()","plt.bar(x,y) / sns.barplot"],
+    ["散布図","df.plot.scatter(x,y)","plt.scatter(x,y) / sns.scatterplot"],
+    ["ヒストグラム","df['col'].plot.hist()","plt.hist(x) / sns.histplot"],
+    ["箱ひげ図","df.plot.box()","sns.boxplot"],
+  ], cap:"可視化の手法一覧" },
+};
+
+const EX = {
+ch1:[
+  {diff:1,q:"dictからpandasとpolarsそれぞれでDataFrameを作成し、shape・columnsを出力せよ。",
+   code:`import pandas as pd
+import polars as pl
+
+data = {'name': ['Alice','Bob','Carol'], 'age': [25,30,22], 'score': [88.5,91.0,76.3]}
+
+# pandas
+df_pd = # ここに書く
+
+# polars
+df_pl = # ここに書く
+
+print(df_pd.shape, df_pd.columns)
+print(df_pl.shape, df_pl.columns)`,
+   answer:`import pandas as pd
+import polars as pl
+
+data = {'name': ['Alice','Bob','Carol'], 'age': [25,30,22], 'score': [88.5,91.0,76.3]}
+
+df_pd = pd.DataFrame(data)
+df_pl = pl.DataFrame(data)
+
+print(df_pd.shape, df_pd.columns.tolist())
+print(df_pl.shape, df_pl.columns)`},
+  {diff:2,q:"pandasのDataFrameに対してdescribe()を実行し、数値列の平均・標準偏差・最大値を確認せよ。また、dtypesで各列の型を確認せよ。",
+   code:`import pandas as pd
+
+df = pd.DataFrame({
+    'age': [25, 30, 22, 35, 28],
+    'salary': [300000, 450000, 280000, 520000, 390000],
+    'name': ['Alice','Bob','Carol','Dave','Eve']
+})
+
+# describe と dtypes を出力
+`,
+   answer:`import pandas as pd
+
+df = pd.DataFrame({
+    'age': [25, 30, 22, 35, 28],
+    'salary': [300000, 450000, 280000, 520000, 390000],
+    'name': ['Alice','Bob','Carol','Dave','Eve']
+})
+
+print(df.describe())
+print()
+print(df.dtypes)`},
+],
+ch2:[
+  {diff:1,q:"pandasでtitanic.csvを読み込み、先頭5行・列名・行列数を確認せよ。",
+   code:`import pandas as pd
+
+# CSVを読み込んで基本情報を表示
+df = pd.read_csv('titanic.csv')
+
+# 先頭5行
+# 列名
+# 行列数
+`,
+   answer:`import pandas as pd
+
+df = pd.read_csv('titanic.csv')
+
+print(df.head())
+print(df.columns.tolist())
+print(df.shape)`},
+  {diff:2,q:"polarsでCSVを読み込み、DataFrameをParquet形式で書き出した後、再度読み込んで元と同じ内容か確認せよ。",
+   code:`import polars as pl
+
+df = pl.read_csv('titanic.csv')
+
+# parquetに書き出す
+# 再度読み込む
+# shape を比較
+`,
+   answer:`import polars as pl
+
+df = pl.read_csv('titanic.csv')
+df.write_parquet('titanic.parquet')
+
+df2 = pl.read_parquet('titanic.parquet')
+print(df.shape, df2.shape)
+print(df.dtypes == df2.dtypes)`},
+],
+ch3:[
+  {diff:1,q:"pandasでタイタニックデータを読み込み、生存者（Survived==1）のみを抽出して件数を表示せよ。",
+   code:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+# 生存者を抽出
+survivors = # ここに書く
+print(len(survivors))`,
+   answer:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+survivors = df[df['Survived'] == 1]
+print(len(survivors))`},
+  {diff:2,q:"polarsで「年齢が30歳以上かつ1等客室（Pclass==1）」の乗客を抽出し、名前と年齢だけ表示せよ。",
+   code:`import polars as pl
+df = pl.read_csv('titanic.csv')
+
+# filter と select を組み合わせる
+`,
+   answer:`import polars as pl
+df = pl.read_csv('titanic.csv')
+
+result = (
+    df.filter((pl.col('Age') >= 30) & (pl.col('Pclass') == 1))
+      .select(['Name', 'Age'])
+)
+print(result)`},
+],
+ch4:[
+  {diff:1,q:"pandasで 'Fare' 列を整数に型変換し、'FareLevel' 列（Fareが30以上なら'high'、未満なら'low'）を追加せよ。",
+   code:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+# Fare を int に変換
+df['Fare'] = # ここに書く
+
+# FareLevel 列を追加
+df['FareLevel'] = # ここに書く
+print(df[['Fare','FareLevel']].head())`,
+   answer:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+df['Fare'] = df['Fare'].astype(int)
+df['FareLevel'] = df['Fare'].apply(lambda x: 'high' if x >= 30 else 'low')
+print(df[['Fare','FareLevel']].head())`},
+  {diff:2,q:"pandasで 'Name' 列から敬称（Mr./Mrs./Miss.等）を抽出し、'Title' 列として追加せよ。strアクセサとextractを使うこと。",
+   code:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+# Name列の例: 'Braund, Mr. Owen Harris'
+df['Title'] = df['Name'].str.extract(r', (\\w+)\.')
+print(df['Title'].value_counts())`,
+   answer:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+df['Title'] = df['Name'].str.extract(r', (\\w+)\\.')
+print(df['Title'].value_counts())`},
+],
+ch5:[
+  {diff:1,q:"pandasでタイタニックデータの欠損値を列ごとに集計し、欠損が多い列TOP3を表示せよ。",
+   code:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+# 列ごとの欠損数を集計して降順表示
+`,
+   answer:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+missing = df.isnull().sum().sort_values(ascending=False)
+print(missing[missing > 0].head(3))`},
+  {diff:2,q:"pandasで 'Age' 列の欠損を中央値で補完し、'Cabin' 列を削除して、補完後の欠損数が0であることを確認せよ。",
+   code:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+# Age の中央値で補完
+df['Age'] = # ここに書く
+
+# Cabin 列を削除
+df = # ここに書く
+
+print(df.isnull().sum().sum())  # 0 に近くなるはず`,
+   answer:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+df['Age'] = df['Age'].fillna(df['Age'].median())
+df = df.drop('Cabin', axis=1)
+print(df.isnull().sum().sum())`},
+],
+ch6:[
+  {diff:1,q:"pandasでタイタニックデータを客室クラス（Pclass）でグループ化し、生存率（Survivedの平均）と人数を集計せよ。",
+   code:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+result = df.groupby('Pclass').agg(
+    # 生存率と人数
+)
+print(result)`,
+   answer:`import pandas as pd
+df = pd.read_csv('titanic.csv')
+
+result = df.groupby('Pclass').agg(
+    survival_rate=('Survived', 'mean'),
+    count=('Survived', 'count')
+).round(3)
+print(result)`},
+  {diff:2,q:"polarsでタイタニックデータをPclassと性別（Sex）でグループ化し、平均年齢と平均運賃を集計せよ。",
+   code:`import polars as pl
+df = pl.read_csv('titanic.csv')
+
+result = (
+    df.group_by(['Pclass', 'Sex'])
+      .agg([
+          # 平均年齢と平均運賃
+      ])
+      .sort(['Pclass', 'Sex'])
+)
+print(result)`,
+   answer:`import polars as pl
+df = pl.read_csv('titanic.csv')
+
+result = (
+    df.group_by(['Pclass', 'Sex'])
+      .agg([
+          pl.col('Age').mean().alias('avg_age'),
+          pl.col('Fare').mean().alias('avg_fare'),
+      ])
+      .sort(['Pclass', 'Sex'])
+)
+print(result)`},
+],
+ch7:[
+  {diff:1,q:"pandasで2つのDataFrameをinner joinせよ。乗客IDが共通のキー。",
+   code:`import pandas as pd
+
+passengers = pd.DataFrame({
+    'PassengerId': [1,2,3,4],
+    'Name': ['Alice','Bob','Carol','Dave']
+})
+tickets = pd.DataFrame({
+    'PassengerId': [1,2,5],
+    'Fare': [50.0, 30.0, 80.0]
+})
+
+# inner join
+result = # ここに書く
+print(result)`,
+   answer:`import pandas as pd
+
+passengers = pd.DataFrame({
+    'PassengerId': [1,2,3,4],
+    'Name': ['Alice','Bob','Carol','Dave']
+})
+tickets = pd.DataFrame({
+    'PassengerId': [1,2,5],
+    'Fare': [50.0, 30.0, 80.0]
+})
+
+result = pd.merge(passengers, tickets, on='PassengerId', how='inner')
+print(result)`},
+  {diff:2,q:"pandasで2つのDataFrameを縦（rows）に結合し、重複行を除去せよ。",
+   code:`import pandas as pd
+
+df1 = pd.DataFrame({'id':[1,2,3],'val':['a','b','c']})
+df2 = pd.DataFrame({'id':[3,4,5],'val':['c','d','e']})
+
+# 縦に結合して重複除去
+`,
+   answer:`import pandas as pd
+
+df1 = pd.DataFrame({'id':[1,2,3],'val':['a','b','c']})
+df2 = pd.DataFrame({'id':[3,4,5],'val':['c','d','e']})
+
+combined = pd.concat([df1, df2], ignore_index=True)
+result = combined.drop_duplicates()
+print(result)`},
+],
+ch8:[
+  {diff:1,q:"matplotlibでタイタニックのPclassごとの人数を棒グラフで表示せよ。",
+   code:`import pandas as pd
+import matplotlib.pyplot as plt
+
+df = pd.read_csv('titanic.csv')
+
+# Pclass ごとの件数を棒グラフに
+counts = df['Pclass'].value_counts().sort_index()
+# plt.bar を使う
+`,
+   answer:`import pandas as pd
+import matplotlib.pyplot as plt
+
+df = pd.read_csv('titanic.csv')
+counts = df['Pclass'].value_counts().sort_index()
+
+plt.bar(counts.index, counts.values, color=['#6366f1','#8b5cf6','#a78bfa'])
+plt.xlabel('Pclass')
+plt.ylabel('Count')
+plt.title('Passengers per Class')
+plt.tight_layout()
+plt.show()`},
+  {diff:2,q:"seabornで年齢と運賃の散布図を描き、生存者/非生存者を色で区別せよ。",
+   code:`import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = pd.read_csv('titanic.csv').dropna(subset=['Age','Fare'])
+
+# sns.scatterplot を使って Survived で色分け
+`,
+   answer:`import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = pd.read_csv('titanic.csv').dropna(subset=['Age','Fare'])
+
+sns.scatterplot(data=df, x='Age', y='Fare', hue='Survived',
+                palette={0:'#ef4444', 1:'#22c55e'}, alpha=0.7)
+plt.title('Age vs Fare (colored by Survival)')
+plt.tight_layout()
+plt.show()`},
+],
+};
+
+const chapters = [
+{id:"ch1",num:1,title:"DataFrameの基本",est:"45分",
+goal:"DataFrameの概念を理解し、pandasとpolarsの両方でDataFrameを作成できる。shape・dtypes・head・describeで基本的なデータ把握ができる。",
+sections:[
+{title:"DataFrameとは何か",
+body:`DataFrameは「表形式のデータ」を扱うための中心的なデータ構造です。Excelのシートと同じように行と列があり、各列は同じ型のデータを持ちます。Pythonのリストや辞書と違って、DataFrameはNumPyを基盤として数値演算を高速に処理できます。
+
+pandasはPythonデータ分析の事実上の標準ライブラリで、2008年にリリースされて以来広く使われてきました。polarsはRust製の新しいライブラリで、並列処理を活かした高速な処理が特徴です。APIは似ていますが細部が異なります。このコースではタイタニックのデータセットを使い、両者の違いを実践的に学びます。`,
+table:T.dfConcepts,
+afterTable:`NumPyのndarrayは同一型の多次元配列ですが、DataFrameは列ごとに異なる型（int/float/str）を持てます。pandasの内部はNumPy配列でできており、polarsはArrow配列を使います。`},
+{title:"DataFrameの作成と基本操作",
+body:`DataFrameは辞書・リスト・CSVなど様々なソースから作成できます。最も簡単なのは辞書から作る方法で、キーが列名・値がリストになります。pandasとpolarsで基本的な書き方はほぼ同じですが、メソッド名に微妙な違いがあります。
+
+describeメソッドは数値列の統計量（count・mean・std・min・25%・50%・75%・max）を一気に確認できる強力なツールです。データを受け取ったらまずdescribe()を実行して異常値や欠損の傾向を把握することがデータ分析の第一歩です。`,
+code:`import pandas as pd
+import polars as pl
+
+# dictから作成
+data = {
+    'name': ['Alice', 'Bob', 'Carol'],
+    'age': [25, 30, 22],
+    'score': [88.5, 91.0, 76.3]
+}
+
+df_pd = pd.DataFrame(data)
+df_pl = pl.DataFrame(data)
+
+# 基本情報
+print("shape:", df_pd.shape)         # (3, 3)
+print("columns:", df_pd.columns.tolist())
+print("dtypes:\\n", df_pd.dtypes)
+print("\\nhead:\\n", df_pd.head(2))
+print("\\ndescribe:\\n", df_pd.describe())`,
+afterCode:`pandasのcolumnsはIndex型を返すので.tolist()で普通のリストにできます。polarsはPythonのリストをそのまま返します。この違いは実務でしばしば混乱を招くので覚えておきましょう。`},
+]},
+{id:"ch2",num:2,title:"データ読み書き",est:"50分",
+goal:"CSVやParquet等のファイルを読み書きできる。エンコーディングやsep等のオプションを使いこなせる。",
+sections:[
+{title:"CSVの読み込みとオプション",
+body:`データ分析の現場では大半のデータがCSVやExcel形式で渡されます。pd.read_csv()はデフォルトでも動くことが多いですが、日本語データではencoding='utf-8'や'shift-jis'の指定が必要です。また、区切り文字がタブの場合はsep='\\t'、ヘッダが無い場合はheader=Noneを指定します。
+
+polarsのpl.read_csv()は同様のオプションを持ちますが、デフォルトのエンコーディング推定がpandasと異なる場合があります。大容量CSVではpolarsの並列読み込みが数倍高速になることがあります。`,
+table:T.ioFormats,
+afterTable:`Parquetは列指向の圧縮フォーマットで、CSVより読み書きが高速で容量も小さくなります。データを長期保存する場合はParquetを使うのが実務では一般的です。`},
+{title:"読み込み時のよくあるオプション",
+body:`実務でよく遭遇するのが文字化け（エンコーディング問題）です。Windowsで作成されたCSVはShift-JISのことが多く、read_csv('file.csv', encoding='shift-jis')と指定します。それでも読めない場合はerrors='replace'や'ignore'を追加します。
+
+dtype引数で列の型を明示的に指定すると、読み込み時の自動型推定によるミスを防げます。例えば郵便番号は数値として読まれると先頭のゼロが消えてしまうため、dtype={'zip_code': str}のように文字列で読む必要があります。`,
+code:`import pandas as pd
+
+# 基本的な読み込み
+df = pd.read_csv('titanic.csv')
+
+# オプション付き
+df2 = pd.read_csv(
+    'data.csv',
+    encoding='utf-8',    # 文字コード指定
+    sep=',',             # 区切り文字
+    header=0,            # ヘッダ行番号
+    na_values=['N/A', '-'],  # 欠損値として扱う文字列
+    dtype={'PassengerId': int, 'Name': str},
+    usecols=['Name', 'Age', 'Survived']  # 必要な列だけ読む
+)
+
+# 書き出し
+df.to_csv('output.csv', index=False, encoding='utf-8')
+
+# Parquet（高速・圧縮）
+df.to_parquet('output.parquet')
+df3 = pd.read_parquet('output.parquet')`,
+afterCode:`usecols で必要な列だけ読み込むとメモリ使用量を大幅に削減できます。数百列あるデータでは10列だけ読む指定をするだけで速度が劇的に改善することがあります。`},
+]},
+{id:"ch3",num:3,title:"選択とフィルタリング",est:"55分",
+goal:"pandas の loc/iloc/boolean indexing と polars の filter()/select() を使い、必要なデータを柔軟に抽出できる。",
+sections:[
+{title:"pandasの選択方法",
+body:`pandasには行・列を選択する方法が複数あります。[]演算子は列名で列を選べ、df['age']で単列、df[['age','name']]で複数列を取得します。locはラベルベースのアクセスでdf.loc[0:2, 'age':'name']のように範囲指定ができます。ilocは整数インデックスベースで、df.iloc[0:3, 1:3]のようにスライスで指定します。
+
+boolean indexingは「条件を満たす行だけ抽出する」最も頻繁に使うパターンです。df[df['age'] > 25]で25歳超の行だけ抽出できます。複数条件はdf[(df['age'] > 25) & (df['score'] > 80)]のように&（AND）や|（OR）で組み合わせますが、各条件を必ず括弧で囲む必要があります。`,
+table:T.filterOps,
+afterTable:`locとilocの違いで混乱しやすいのがスライスの扱いです。loc[0:3]はインデックス3を含む（4行）のに対し、iloc[0:3]はPythonのリストと同様に3を含まない（3行）です。`},
+{title:"polarsのfilterとselect",
+body:`polarsではfilter()で行を絞り込み、select()で列を選択します。条件式にはpl.col('列名')を使い、これはpandasのdf['列名']に相当します。polarsはメソッドチェーンが基本設計なので、filter→select→sort→limit等を自然に繋げて書けます。
+
+polarsでは条件演算子が直感的で、is_in()・is_null()・is_between()等の便利なメソッドが用意されています。pandasのboolean indexingに比べてエラーメッセージが明確なのも特徴です。`,
+code:`import pandas as pd
+import polars as pl
+
+df_pd = pd.read_csv('titanic.csv')
+df_pl = pl.read_csv('titanic.csv')
+
+# pandas: 女性の生存者を Name と Age だけ取得
+result_pd = df_pd.loc[
+    (df_pd['Sex'] == 'female') & (df_pd['Survived'] == 1),
+    ['Name', 'Age']
+]
+
+# polars: 同じ操作
+result_pl = (
+    df_pl
+    .filter((pl.col('Sex') == 'female') & (pl.col('Survived') == 1))
+    .select(['Name', 'Age'])
+)
+
+print(result_pd.head(3))
+print(result_pl.head(3))`,
+afterCode:`polarsはlazy APIも提供しており、scan_csv()で読み込み・filter/selectをチェーンしてcollect()で実行すると、必要な列・行だけをメモリに載せる最適化が自動で行われます。大規模データでは特に有効です。`},
+]},
+{id:"ch4",num:4,title:"列操作",est:"50分",
+goal:"列の追加・削除・名前変更・型変換・文字列操作を pandas と polars 両方で実行できる。",
+sections:[
+{title:"列の追加・削除・名前変更",
+body:`データ分析では元の列から新しい特徴量を作る「特徴量エンジニアリング」が重要です。pandasでは直接代入（df['new']=...）またはassign()メソッドで列を追加します。assign()はメソッドチェーンで使えるため、複数列を一度に追加したい場合に便利です。
+
+polarsではwith_columns()が対応メソッドで、pl.col()を使った式で新列を定義します。polarsのwith_columns()はイミュータブル（元のDataFrameを変更しない）で、常に新しいDataFrameを返します。pandasのassign()も同様ですが、直接代入（df['new']=...）は元のDataFrameを変更します。`,
+table:T.colOps,
+afterTable:`列名のリネームはpandasではrename(columns={'old':'new'})、polarsではrename({'old':'new'})です。複数列を一度にリネームする場合も辞書に複数の対応を書けばOKです。`},
+{title:"型変換と文字列操作",
+body:`データ読み込み時に型が意図通りにならないことがよくあります。例えば数値のはずの列が文字列として読まれた場合、astype(int)やastype(float)で変換します。変換できない値（欠損値や'N/A'等の文字列）があるとエラーになるので、事前に欠損処理が必要です。
+
+pandasの文字列操作はstrアクセサ経由で行います。df['name'].str.upper()・df['name'].str.split()・df['name'].str.contains('pattern')等が使えます。polarsではpl.col('name').str.to_uppercase()のようにstr名前空間のメソッドを呼びます。`,
+code:`import pandas as pd
+
+df = pd.read_csv('titanic.csv')
+
+# 列追加: Fare をカテゴリ化
+df = df.assign(
+    FareCategory=pd.cut(df['Fare'], bins=[0,10,50,600],
+                        labels=['cheap','mid','expensive']),
+    NameLength=df['Name'].str.len()
+)
+
+# 型変換
+df['Age'] = df['Age'].fillna(0).astype(int)
+
+# 文字列操作: 敬称抽出
+df['Title'] = df['Name'].str.extract(r', (\\w+)\\.')
+
+# 列削除
+df = df.drop(['Ticket','Cabin'], axis=1)
+
+# 列名変更
+df = df.rename(columns={'Pclass': 'PassengerClass'})
+
+print(df[['Name','Title','NameLength','FareCategory']].head(3))`,
+afterCode:`pd.cut()は連続値をビン（区間）に分類するときに便利です。labelsに名前を付けると結果がわかりやすくなります。同様にpd.qcut()は分位数で均等に区切ります。`},
+]},
+{id:"ch5",num:5,title:"欠損値の処理",est:"45分",
+goal:"欠損値を検出・集計し、削除・定数補完・前後方補完など状況に応じた欠損処理ができる。",
+sections:[
+{title:"欠損値の検出と集計",
+body:`実世界のデータには必ずといっていいほど欠損値があります。pandasでは欠損値をNaN（Not a Number）として管理し、polarsではnullとして管理します。両者とも「値が存在しない」という概念ですが、内部表現が異なります。
+
+欠損値を無視したまま集計すると誤った結果になります。例えばdf['age'].mean()はNaNを除いて計算するので問題ありませんが、df['age'] + df['salary']のような演算でどちらかがNaNなら結果もNaNになります。まずisnull().sum()で欠損状況を把握してから処理方針を決めることが重要です。`,
+table:T.missingOps,
+afterTable:`欠損値の処理方針は「削除」「固定値補完」「統計値補完（平均・中央値）」「前後値補完」の4つが基本です。どれを使うかはデータの性質と分析目的によって変わります。`},
+{title:"欠損値の補完テクニック",
+body:`補完方法の選択はデータの性質に依存します。年齢のような連続変数には中央値補完が外れ値の影響を受けにくくて適しています。性別のようなカテゴリ変数には最頻値（mode()）補完が一般的です。時系列データでは前方補完（ffill）が自然な選択です。
+
+polarsのfill_null(strategy='forward')はpandasのfillna(method='ffill')に対応します。ただし先頭行が欠損している場合は前方補完できないため、後続処理で確認が必要です。欠損の多い列（例：Cabinで70%以上が欠損）は思い切って列ごと削除するのも現実的な戦略です。`,
+code:`import pandas as pd
+
+df = pd.read_csv('titanic.csv')
+
+# 欠損状況の確認
+print("欠損数:")
+print(df.isnull().sum()[df.isnull().sum() > 0])
+print(f"\\n全体の欠損率: {df.isnull().sum().sum() / df.size:.2%}")
+
+# Age: 中央値で補完
+median_age = df['Age'].median()
+df['Age'] = df['Age'].fillna(median_age)
+
+# Embarked: 最頻値で補完
+df['Embarked'] = df['Embarked'].fillna(df['Embarked'].mode()[0])
+
+# Cabin: 欠損が多すぎるので列ごと削除
+df = df.drop('Cabin', axis=1)
+
+# 確認
+print("\\n補完後の欠損:")
+print(df.isnull().sum()[df.isnull().sum() > 0])`,
+afterCode:`補完した値が分析に影響するかを検証するために、補完前後のdescribeを比較するのが良い習慣です。中央値で補完すると中央値付近にデータが集中して分布が変わることがあります。`},
+]},
+{id:"ch6",num:6,title:"グループ集計",est:"55分",
+goal:"groupby/group_by で複数集計関数を適用できる。pivot_table で二次元集計ができる。重複排除もできる。",
+sections:[
+{title:"groupbyによる集計",
+body:`groupby（グループ化と集計）はデータ分析の中核です。SQLのGROUP BY句と同じ考え方で、「客室クラスごとの生存率」や「出発港ごとの平均運賃」のような集計を実現します。pandasではgroupby()にagg()を繋げて複数の集計関数を同時に適用できます。
+
+polarsではgroup_by().agg([...])の形で、複数の集計式をリストで渡します。polarsのagg内ではpl.col('x').sum()・pl.col('x').mean()・pl.len()（件数）等の式を使います。pandasのNamed Aggregation（agg(name=('col','func'))）はpolarsのalias()に相当します。`,
+table:T.groupOps,
+afterTable:`groupby後にreset_index()を呼ぶとグループキーが通常の列に戻ります。as_index=Falseを指定しても同じ効果が得られ、こちらの方が簡潔です。`},
+{title:"pivot_tableと重複排除",
+body:`pivot_tableはgroupbyのクロス集計版で、行と列の2次元で集計できます。例えば「客室クラス（行）×性別（列）の生存率テーブル」をpd.pivot_table(df, values='Survived', index='Pclass', columns='Sex', aggfunc='mean')一行で作れます。Excelのピボットテーブルと同じ操作性で、プレゼン用の集計表に適しています。
+
+重複排除はdrop_duplicates()で行います。subset=['col1','col2']で特定列の組合せで重複判定ができます。keep='first'（デフォルト）で最初の行を残し、keep='last'で最後の行を残します。データクレンジングで頻繁に使う操作です。`,
+code:`import pandas as pd
+
+df = pd.read_csv('titanic.csv')
+df['Age'] = df['Age'].fillna(df['Age'].median())
+
+# groupby + 複数集計
+summary = df.groupby('Pclass').agg(
+    count=('Survived', 'count'),
+    survival_rate=('Survived', 'mean'),
+    avg_age=('Age', 'mean'),
+    avg_fare=('Fare', 'mean')
+).round(2)
+print(summary)
+
+# pivot_table: クラス×性別の生存率
+pivot = pd.pivot_table(
+    df, values='Survived',
+    index='Pclass', columns='Sex',
+    aggfunc='mean'
+).round(3)
+print("\\n", pivot)
+
+# 重複排除
+df_unique = df.drop_duplicates(subset=['Name'])
+print(f"\\n重複除去後: {len(df_unique)} 行")`,
+afterCode:`pivot_tableのfill_value=0を指定すると、集計結果がNaNになった箇所を0で埋められます。margins=Trueにすると合計行・合計列も追加されます。`},
+]},
+{id:"ch7",num:7,title:"結合とマージ",est:"50分",
+goal:"pd.merge と polars.join で left/right/inner/outer の結合ができる。pd.concat で縦・横の結合もできる。",
+sections:[
+{title:"DataFrameの結合（JOIN）",
+body:`複数のDataFrameを結合することはデータ分析でよくある操作です。SQLのJOINと同じ概念で、pandasではpd.merge()、polarsではdf.join()を使います。how引数でinner/left/right/outerを指定します。on引数で結合キー（共通の列名）を指定し、列名が異なる場合はleft_on・right_onで個別に指定します。
+
+inner joinは両方のDataFrameに存在する行だけを残します。left joinは左のDataFrameの全行を残し、右に対応する値がなければNaNを入れます。データが必ず揃っていない実務データではleft joinが最も使われます。`,
+table:T.joinTypes,
+afterTable:`polarsのjoin()はhow='left'/'inner'/'outer'/'cross'等に対応します。outer joinはpandasでhow='outer'ですが、polarsではhow='full'と指定することに注意してください。`},
+{title:"concatによる縦横結合",
+body:`pd.concat()は複数のDataFrameを縦（axis=0）または横（axis=1）に結合します。縦結合は同じ列構造を持つデータを積み重ねる場合（例：月ごとのデータをまとめる）に使います。ignore_index=Trueでインデックスをリセットするのが一般的です。
+
+横結合（axis=1）は同じ行数のDataFrameを列方向に並べます。pandasのmergeとは異なりキーを使わないため、インデックスが揃っていることが前提です。インデックスを揃えるためにset_index()を使ってからconcatするパターンがよく使われます。`,
+code:`import pandas as pd
+
+df_main = pd.read_csv('titanic.csv')
+
+# 補助テーブルを作成（仮）
+df_extra = pd.DataFrame({
+    'PassengerId': [1, 2, 3],
+    'HomeCountry': ['UK', 'USA', 'France']
+})
+
+# LEFT JOIN: 全乗客に国情報を付与（ない場合はNaN）
+df_merged = pd.merge(df_main, df_extra, on='PassengerId', how='left')
+print(df_merged[['Name','HomeCountry']].head(5))
+
+# 縦方向concat: 2つのサブセットを結合
+df_first = df_main[df_main['Pclass'] == 1]
+df_third = df_main[df_main['Pclass'] == 3]
+df_concat = pd.concat([df_first, df_third], ignore_index=True)
+print(f"\\n結合後: {len(df_concat)} 行")`,
+afterCode:`mergeでsuffixes=('_left','_right')を指定すると、両方のDataFrameに同名の列がある場合に列名の衝突を解決できます。デフォルトは_x・_yが付きます。`},
+]},
+{id:"ch8",num:8,title:"可視化入門",est:"50分",
+goal:"matplotlib と seaborn で棒グラフ・散布図・ヒストグラムを描ける。DataFrame.plot() ショートカットで素早く確認グラフを作れる。",
+sections:[
+{title:"matplotlib基礎とDataFrame.plot()",
+body:`matplotlibはPythonの基本的な可視化ライブラリです。plt.figure()でキャンバスを作成し、plt.plot()・plt.bar()・plt.scatter()等でグラフを描き、plt.show()で表示します。pandasのDataFrameには.plot()メソッドが組み込まれていて、df.plot.bar()・df.plot.hist()等のショートカットでmatplotlibのグラフをすぐに作れます。
+
+EDA（探索的データ分析）では速度が重要なので、まずdf.plot()でざっくり確認し、発表資料にはmatplotlib/seabornで丁寧に整形するという使い分けが実務的です。`,
+table:T.plotTypes,
+afterTable:`plt.tight_layout()はラベルやタイトルが切れないように余白を自動調整します。グラフを保存する場合はplt.savefig('output.png', dpi=150, bbox_inches='tight')が便利です。`},
+{title:"seabornによる統計可視化",
+body:`seabornはmatplotlibの上に構築された統計可視化ライブラリで、DataFrameをそのまま渡してグラフを作れるのが特徴です。sns.barplot()・sns.scatterplot()・sns.histplot()・sns.boxplot()等が揃っており、hue引数でカテゴリ列を色分けできます。
+
+sns.heatmap()はcorr()（相関行列）と組み合わせて使うと、各列の相関関係を一覧できます。数値列が多いデータセットでどの特徴量が強く関連しているかを視覚的に把握するのに最適です。`,
+code:`import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv('titanic.csv')
+df['Age'] = df['Age'].fillna(df['Age'].median())
+
+fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+
+# 1. 棒グラフ: Pclass ごとの生存率
+survival = df.groupby('Pclass')['Survived'].mean()
+axes[0].bar(survival.index, survival.values,
+            color=['#6366f1','#8b5cf6','#a78bfa'])
+axes[0].set_title('Survival Rate by Class')
+axes[0].set_ylabel('Rate')
+
+# 2. ヒストグラム: 年齢分布
+sns.histplot(df['Age'], bins=20, ax=axes[1],
+             color='#6366f1', kde=True)
+axes[1].set_title('Age Distribution')
+
+# 3. 散布図: 年齢 vs 運賃（生存で色分け）
+sns.scatterplot(data=df, x='Age', y='Fare',
+                hue='Survived', ax=axes[2],
+                palette={0:'#ef4444', 1:'#22c55e'}, alpha=0.6)
+axes[2].set_title('Age vs Fare')
+
+plt.tight_layout()
+plt.show()`,
+afterCode:`複数のサブプロットはplt.subplots(rows, cols)で作り、axes[i]に描画します。figsize=(幅, 高さ)の単位はインチです。Jupyter Notebookではplt.show()が無くても表示されますが、スクリプトでは必要です。`},
+]},
+];
+
+/* ─── UI Components ─── */
+function DataTable({ data }) {
+  return React.createElement("div", {
+    style: { overflowX:"auto", margin:"12px 0", borderRadius:10, border:"1px solid #d1d5db", background:"#fff" }
+  }, React.createElement("table", {
+    style: { width:"100%", borderCollapse:"separate", borderSpacing:0, fontSize:13 }
+  }, React.createElement("thead", null, React.createElement("tr", null,
+    data.h.map((h, i) => React.createElement("th", {
+      key: i,
+      style: {
+        background:"linear-gradient(180deg,#eef2ff,#e0e7ff)", color:"#312e81", fontWeight:800,
+        fontSize:12.5, padding:"10px 14px", textAlign:"left", borderBottom:"2px solid #a5b4fc",
+        borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+      }
+    }, h))
+  )), React.createElement("tbody", null,
+    data.r.map((row, ri) => React.createElement("tr", { key: ri },
+      row.map((cell, ci) => React.createElement("td", {
+        key: ci,
+        style: {
+          padding:"9px 14px",
+          borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+          borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+          color: ci === 0 ? "#1e1b4b" : "#374151",
+          fontWeight: ci === 0 ? 700 : 400,
+          fontSize:13, lineHeight:1.65, verticalAlign:"top", whiteSpace:"pre-line",
+          background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+        }
+      }, cell))
+    ))
+  )),
+  data.cap && React.createElement("div", {
+    style: { padding:"8px 14px", fontSize:12, color:"#6b7280", borderTop:"1px solid #e5e7eb", background:"#f9fafb" }
+  }, data.cap));
+}
+
+function Code({ code, hl }) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color:"#d0d0f0", padding:"14px 16px", borderRadius:10,
+      fontSize:12, lineHeight:1.65, overflowX:"auto", margin:"8px 0 0",
+      fontFamily:"'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace:"pre-wrap", wordBreak:"break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+
+const diffLabel = d => d === 1 ? "⭐ 基本" : d === 2 ? "⭐⭐ 応用" : "⭐⭐⭐ 発展";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+
+function Exercise({ ex, idx }) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: { borderRadius:12, border:"2px solid #f59e0b", overflow:"hidden", background:"#fff", marginBottom:8 }
+  },
+    React.createElement("div", { style: { padding:"12px 16px", background:"linear-gradient(135deg,#fffbeb,#fef3c7)" } },
+      React.createElement("div", { style: { display:"flex", alignItems:"center", gap:8, marginBottom:6 } },
+        React.createElement("span", {
+          style: { background:"#f59e0b", color:"#fff", fontSize:11, fontWeight:800, padding:"3px 10px", borderRadius:6 }
+        }, "問", idx + 1),
+        React.createElement("span", { style: { fontSize:12, fontWeight:700, color:diffColor(ex.diff) } }, diffLabel(ex.diff))
+      ),
+      React.createElement("p", { style: { margin:0, fontSize:13.5, lineHeight:1.8, color:"#92400e", whiteSpace:"pre-line" } }, ex.q)
+    ),
+    React.createElement("div", { style: { padding:"0 16px 12px" } },
+      React.createElement(Code, { code: ex.code, hl: true })
+    ),
+    React.createElement("div", { style: { borderTop:"1px dashed #fcd34d", padding:"10px 16px" } },
+      React.createElement("button", {
+        onClick: () => setShowAnswer(!showAnswer),
+        style: {
+          background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+          color:"#fff", border:"none", borderRadius:8, padding:"8px 20px",
+          fontSize:13, fontWeight:700, cursor:"pointer", width:"100%"
+        }
+      }, showAnswer ? "🙈 解答を隠す" : "👀 解答例を見る"),
+      showAnswer && React.createElement("div", { style: { marginTop:10 } },
+        React.createElement("div", {
+          style: { fontSize:11, fontWeight:700, color:"#166534", textTransform:"uppercase", letterSpacing:1, marginBottom:4 }
+        }, "✅ 解答例"),
+        React.createElement(Code, { code: ex.answer })
+      )
+    )
+  );
+}
+
+function Section({ section, idx, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: { borderRadius:12, border:"1px solid #e5e7eb", overflow:"hidden", background:"#fff" }
+  },
+    React.createElement("button", {
+      onClick: () => setOpen(!open),
+      style: {
+        width:"100%", display:"flex", alignItems:"center", gap:10, padding:"12px 16px",
+        border:"none", background:"#fafafa", cursor:"pointer", textAlign:"left",
+        fontSize:14, fontWeight:700, color:"#1e1b4b"
+      }
+    },
+      React.createElement("span", {
+        style: {
+          flexShrink:0, width:24, height:24, borderRadius:6, background:"#6366f1",
+          color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800
+        }
+      }, idx + 1),
+      React.createElement("span", { style: { flex:1 } }, section.title),
+      React.createElement("span", { style: { fontSize:18, color:"#9ca3af", transition:"transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0)" } }, "›")
+    ),
+    open && React.createElement("div", { style: { padding:"12px 16px 16px" } },
+      section.body && React.createElement("p", {
+        style: { margin:"0 0 8px", fontSize:13.5, lineHeight:1.85, color:"#374151", whiteSpace:"pre-line" }
+      }, section.body),
+      section.table && React.createElement(DataTable, { data: section.table }),
+      section.afterTable && React.createElement("p", {
+        style: { margin:"8px 0", fontSize:13.5, lineHeight:1.85, color:"#374151", whiteSpace:"pre-line" }
+      }, section.afterTable),
+      section.code && React.createElement(Code, { code: section.code }),
+      section.afterCode && React.createElement("p", {
+        style: {
+          margin:"10px 0 0", fontSize:13, lineHeight:1.8, color:"#555", whiteSpace:"pre-line",
+          background:"#f9fafb", padding:"10px 14px", borderRadius:8, border:"1px solid #e5e7eb"
+        }
+      }, section.afterCode)
+    )
+  );
+}
+
+/* ─── Main App ─── */
+function PandasPolarsBeginnerCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+
+  return React.createElement("div", {
+    style: { minHeight:"100vh", background:"#f8f7f4", fontFamily:"'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif" }
+  },
+    React.createElement("div", { style: { maxWidth:1100, margin:"0 auto", padding:"20px 14px" } },
+
+      /* ─ Hero ─ */
+      React.createElement("div", {
+        style: {
+          background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+          borderRadius:16, padding:"24px 20px", marginBottom:16, position:"relative", overflow:"hidden"
+        }
+      },
+        React.createElement("div", { style: { position:"absolute", top:-30, right:-10, fontSize:140, opacity:0.05 } }, "🐼"),
+        React.createElement("div", {
+          style: { fontSize:11, fontWeight:700, color:"#a5b4fc", textTransform:"uppercase", letterSpacing:2, marginBottom:4 }
+        }, "Pythonで学ぶデータ分析"),
+        React.createElement("h1", { style: { margin:0, fontSize:22, fontWeight:900, color:"#fff" } }, "pandas/polars 初級コース"),
+        React.createElement("p", { style: { margin:"6px 0 0", fontSize:12.5, color:"#c4b5fd" } },
+          "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問 ・ 難易度⭐〜⭐⭐"),
+        React.createElement("p", { style: { margin:"10px 0 0", fontSize:12, color:"#ddd6fe", lineHeight:1.8 } },
+          "タイタニックなどの公開データセットを題材に、DataFrameの基本操作・欠損処理・グループ集計・結合・可視化を両ライブラリで実践的に習得します。"),
+        React.createElement("div", { style: { marginTop:14, display:"flex", gap:3 } },
+          chapters.map((_, i) => React.createElement("div", {
+            key: i,
+            onClick: () => { setCh(i); setMenuOpen(false); },
+            style: { flex:1, height:5, borderRadius:3, background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)", cursor:"pointer" }
+          }))
+        )
+      ),
+
+      /* ─ Chapter Menu ─ */
+      React.createElement("div", { style: { marginBottom:14 } },
+        React.createElement("button", {
+          onClick: () => setMenuOpen(!menuOpen),
+          style: {
+            width:"100%", padding:"10px 16px", border:"1px solid #d1d5db", borderRadius:10,
+            background:"#fff", fontSize:14, fontWeight:700, color:"#1e1b4b", cursor:"pointer",
+            display:"flex", justifyContent:"space-between"
+          }
+        },
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", { style: { fontSize:12, color:"#9ca3af" } }, menuOpen ? "▲" : "▼")
+        ),
+        menuOpen && React.createElement("div", {
+          style: { marginTop:4, border:"1px solid #e5e7eb", borderRadius:10, overflow:"hidden", background:"#fff", boxShadow:"0 4px 20px rgba(0,0,0,0.08)" }
+        }, chapters.map((c, i) => React.createElement("button", {
+          key: c.id,
+          onClick: () => { setCh(i); setMenuOpen(false); },
+          style: {
+            width:"100%", padding:"10px 16px", border:"none",
+            borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+            background: i === ch ? "#eef2ff" : "#fff",
+            fontSize:13, fontWeight: i === ch ? 700 : 500,
+            color: i === ch ? "#4338ca" : "#374151",
+            cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:10
+          }
+        },
+          React.createElement("span", {
+            style: {
+              width:22, height:22, borderRadius:"50%",
+              background: i === ch ? "#6366f1" : "#e5e7eb",
+              color: i === ch ? "#fff" : "#6b7280",
+              fontWeight:800, fontSize:11, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0
+            }
+          }, c.num),
+          React.createElement("span", { style: { flex:1 } }, c.title),
+          EX[c.id] && React.createElement("span", { style: { fontSize:11, color:"#f59e0b", fontWeight:700 } }, EX[c.id].length, "問")
+        )))
+      ),
+
+      /* ─ Chapter Header ─ */
+      React.createElement("div", { style: { display:"flex", alignItems:"center", gap:10, marginBottom:12 } },
+        React.createElement("span", {
+          style: {
+            width:36, height:36, borderRadius:"50%",
+            background:"linear-gradient(135deg,#6366f1,#8b5cf6)",
+            color:"#fff", fontWeight:900, fontSize:16, display:"flex", alignItems:"center", justifyContent:"center"
+          }
+        }, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontWeight:800, fontSize:18, color:"#1e1b4b" } }, chapter.title),
+          React.createElement("div", { style: { fontSize:12, color:"#6b7280" } },
+            "目安: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : "")
+        )
+      ),
+
+      /* ─ Goal ─ */
+      chapter.goal && React.createElement("div", {
+        style: {
+          background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",
+          border:"1px solid #c7d2fe", borderLeft:"4px solid #6366f1",
+          borderRadius:10, padding:"12px 16px", marginBottom:14
+        }
+      },
+        React.createElement("div", { style: { fontSize:11, fontWeight:800, color:"#4338ca", letterSpacing:1, marginBottom:6 } }, "🎯 この章のゴール"),
+        React.createElement("div", { style: { fontSize:13.5, color:"#1e1b4b", lineHeight:1.8, whiteSpace:"pre-line" } }, chapter.goal)
+      ),
+
+      /* ─ Sections ─ */
+      React.createElement("div", { style: { display:"flex", flexDirection:"column", gap:8 } },
+        chapter.sections.map((sec, i) => React.createElement(Section, {
+          key: ch + "-" + i, section: sec, idx: i, defaultOpen: false
+        }))
+      ),
+
+      /* ─ Exercises ─ */
+      exercises.length > 0 && React.createElement("div", { style: { marginTop:20 } },
+        React.createElement("div", { style: { display:"flex", alignItems:"center", gap:8, marginBottom:12 } },
+          React.createElement("span", {
+            style: { background:"#f59e0b", color:"#fff", fontWeight:800, fontSize:13, padding:"4px 14px", borderRadius:8 }
+          }, "🏋️ 演習問題"),
+          React.createElement("span", { style: { fontSize:13, color:"#92400e" } }, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex, i) => React.createElement(Exercise, { key: ch + "-" + i, ex: ex, idx: i }))
+      ),
+
+      /* ─ Navigation ─ */
+      React.createElement("div", { style: { display:"flex", justifyContent:"space-between", marginTop:20, gap:10 } },
+        ch > 0 ? React.createElement("button", {
+          onClick: () => { setCh(ch - 1); window.scrollTo(0, 0); },
+          style: {
+            flex:1, padding:"12px 16px", border:"1px solid #d1d5db", borderRadius:10,
+            background:"#fff", cursor:"pointer", fontWeight:600, fontSize:13, color:"#6b7280"
+          }
+        }, "← Ch.", chapters[ch - 1].num) : React.createElement("div", { style: { flex:1 } }),
+
+        ch < chapters.length - 1 ? React.createElement("button", {
+          onClick: () => { setCh(ch + 1); window.scrollTo(0, 0); },
+          style: {
+            flex:1, padding:"12px 16px", border:"none", borderRadius:10,
+            background:"linear-gradient(135deg,#6366f1,#8b5cf6)",
+            cursor:"pointer", fontWeight:700, fontSize:13, color:"#fff"
+          }
+        }, "Ch.", chapters[ch + 1].num, " →") : React.createElement("a", {
+          href: "../index.html",
+          style: {
+            flex:1, padding:"12px 16px", borderRadius:10,
+            background:"linear-gradient(135deg,#22c55e,#16a34a)",
+            color:"#fff", fontWeight:700, fontSize:13, textAlign:"center", textDecoration:"none"
+          }
+        }, "🎉 コース完了！")
+      ),
+
+      /* ─ Footer ─ */
+      React.createElement("p", {
+        style: { textAlign:"center", fontSize:11, color:"#9ca3af", marginTop:20 }
+      }, "pandas.pydata.org ・ pola.rs ・ pandas 2.x / Polars 0.20 時点")
+    )
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(PandasPolarsBeginnerCourse));
+  </script>
+</body>
+</html>
