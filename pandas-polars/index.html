@@ -1,0 +1,2220 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pandas / Polars 入門コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのpandas/Polars入門コース。全10章・30問の演習付き。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  pdVsPl: {
+    h: ["項目", "pandas", "Polars"],
+    r: [["開発元", "Wes McKinney (2008〜)", "Ritchie Vink (2020〜)"], ["実装言語", "Python + C / Cython", "Rust + Python バインディング"], ["実行モデル", "即時評価 (Eager)", "遅延評価 (Lazy) + 即時評価"], ["メモリモデル", "NumPy ベース (行指向も可)", "Apache Arrow ベース (列指向)"], ["GIL", "影響を受ける", "GIL フリー (Rust 側で並列)"], ["インデックス", "あり (重要な概念)", "なし (行番号のみ)"], ["エコシステム", "非常に広い (scikit-learn等と統合)", "急成長中 (Arrow互換で連携)"], ["得意領域", "対話的な探索・小〜中規模データ", "大規模データ・バッチ処理"]]
+  },
+  dtypes: {
+    h: ["概念", "pandas", "Polars"],
+    r: [["整数", "int64 (numpy)", "Int64, Int32, Int16, Int8"], ["浮動小数点", "float64 (numpy)", "Float64, Float32"], ["文字列", "object / StringDtype", "Utf8 (String)"], ["真偽値", "bool / BooleanDtype", "Boolean"], ["日時", "datetime64[ns]", "Datetime, Date, Time"], ["カテゴリ", "CategoricalDtype", "Categorical, Enum"], ["欠損値", "NaN / pd.NA", "null (Arrow ネイティブ)"]]
+  },
+  fileFormats: {
+    h: ["フォーマット", "pandas", "Polars", "特徴"],
+    r: [["CSV", "pd.read_csv()", "pl.read_csv() / scan_csv()", "テキスト形式。互換性最高だが遅い"], ["JSON", "pd.read_json()", "pl.read_json() / read_ndjson()", "ネスト構造対応。NDJSON は行指向"], ["Parquet", "pd.read_parquet()", "pl.read_parquet() / scan_parquet()", "列指向バイナリ。高速・高圧縮"], ["Excel", "pd.read_excel()", "pl.read_excel()", "openpyxl / xlsxwriter 経由"], ["Feather/IPC", "pd.read_feather()", "pl.read_ipc() / scan_ipc()", "Arrow IPC。ゼロコピー可能"]]
+  },
+  selectCompare: {
+    h: ["操作", "pandas", "Polars"],
+    r: [["列選択", "df['col'] / df[['a','b']]", "df.select('col') / df.select(['a','b'])"], ["行スライス", "df.iloc[0:5]", "df.head(5) / df.slice(0, 5)"], ["ラベル指定", "df.loc[idx, 'col']", "なし（インデックス概念なし）"], ["条件フィルタ", "df[df['age'] > 20]", "df.filter(pl.col('age') > 20)"], ["ソート", "df.sort_values('col')", "df.sort('col')"], ["複合条件", "df[(c1) & (c2)]", "df.filter((c1) & (c2))"]]
+  },
+  missingCompare: {
+    h: ["操作", "pandas", "Polars"],
+    r: [["欠損値表現", "NaN / pd.NA / None", "null (全型共通)"], ["欠損値検出", "df.isna() / df.isnull()", "df.is_null() / df.null_count()"], ["欠損値除去", "df.dropna()", "df.drop_nulls()"], ["欠損値穴埋め", "df.fillna(value)", "df.fill_null(value)"], ["前方穴埋め", "df.ffill()", "df.fill_null(strategy='forward')"], ["型変換", "df.astype(int)", "df.cast(pl.Int64)"]]
+  },
+  aggCompare: {
+    h: ["操作", "pandas", "Polars"],
+    r: [["グループ化", "df.groupby('col')", "df.group_by('col')"], ["集約", ".agg({'col': 'sum'})", ".agg(pl.col('col').sum())"], ["複数集約", ".agg({'c': ['mean','std']})", ".agg([pl.col('c').mean(), pl.col('c').std()])"], ["ピボット", "pd.pivot_table(df, ...)", "df.pivot(on=..., index=..., values=...)"], ["ウィンドウ関数", "df['col'].rolling(3).mean()", "pl.col('col').rolling_mean(3)"], ["ランク", "df['col'].rank()", "pl.col('col').rank()"]]
+  },
+  joinCompare: {
+    h: ["操作", "pandas", "Polars"],
+    r: [["内部結合", "pd.merge(a, b, on='key')", "a.join(b, on='key', how='inner')"], ["左結合", "pd.merge(a, b, how='left')", "a.join(b, on='key', how='left')"], ["外部結合", "pd.merge(a, b, how='outer')", "a.join(b, on='key', how='full')"], ["縦結合", "pd.concat([a, b])", "pl.concat([a, b])"], ["キー名違い", "pd.merge(a, b, left_on=, right_on=)", "a.join(b, left_on=, right_on=)"], ["クロス結合", "a.merge(b, how='cross')", "a.join(b, how='cross')"]]
+  },
+  strCompare: {
+    h: ["操作", "pandas", "Polars"],
+    r: [["小文字化", "s.str.lower()", "s.str.to_lowercase()"], ["分割", "s.str.split(',')", "s.str.split(',')"], ["正規表現抽出", "s.str.extract(r'(\\d+)')", "s.str.extract(r'(\\d+)')"], ["含有チェック", "s.str.contains('abc')", "s.str.contains('abc')"], ["置換", "s.str.replace('a','b')", "s.str.replace('a','b')"], ["長さ", "s.str.len()", "s.str.len_chars()"]]
+  },
+  dtCompare: {
+    h: ["操作", "pandas", "Polars"],
+    r: [["年抽出", "s.dt.year", "s.dt.year()"], ["月抽出", "s.dt.month", "s.dt.month()"], ["曜日", "s.dt.dayofweek", "s.dt.weekday()"], ["日付差分", "s.diff()", "s.diff()"], ["フォーマット", "s.dt.strftime('%Y-%m')", "s.dt.strftime('%Y-%m')"], ["パース", "pd.to_datetime(s)", "s.str.to_datetime()"]]
+  },
+  perfCompare: {
+    h: ["項目", "pandas", "Polars", "備考"],
+    r: [["CSV読み込み (1GB)", "約15秒", "約3秒", "Polars はマルチスレッド"], ["groupby集約 (10M行)", "約2秒", "約0.3秒", "Rust + 並列実行"], ["join (5M x 5M)", "約4秒", "約0.8秒", "Arrow フォーマットの恩恵"], ["メモリ使用量", "データの2〜5倍", "データの1〜2倍", "Arrow の効率的なレイアウト"], ["遅延評価", "非対応", "対応 (LazyFrame)", "クエリ最適化が効く"]]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "pandas と Polars をインポートし、それぞれのバージョンを表示してください。",
+    code: `# 期待する出力例:
+# pandas: 2.2.x
+# polars: 0.20.x`,
+    answer: `import pandas as pd
+import polars as pl
+
+print("pandas:", pd.__version__)
+print("polars:", pl.__version__)`
+  }, {
+    diff: 1,
+    q: "pandas と Polars それぞれで、名前・年齢・都市の3列を持つ簡単な DataFrame を辞書から作成し、表示してください。",
+    code: `# データ: {"名前": ["田中","佐藤","鈴木"], "年齢": [25, 30, 28], "都市": ["東京","大阪","名古屋"]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["田中","佐藤","鈴木"], "年齢": [25, 30, 28], "都市": ["東京","大阪","名古屋"]}
+
+pdf = pd.DataFrame(data)
+print("=== pandas ===")
+print(pdf)
+
+plf = pl.DataFrame(data)
+print("\\n=== Polars ===")
+print(plf)`
+  }, {
+    diff: 2,
+    q: "pandas の DataFrame と Polars の DataFrame それぞれについて、shape、columns、dtypes を表示して、出力フォーマットの違いを確認してください。",
+    code: `# data = {"商品": ["りんご","みかん","ぶどう"], "価格": [150, 80, 300], "在庫": [True, False, True]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"商品": ["りんご","みかん","ぶどう"], "価格": [150, 80, 300], "在庫": [True, False, True]}
+
+pdf = pd.DataFrame(data)
+print("--- pandas ---")
+print("shape:", pdf.shape)
+print("columns:", pdf.columns.tolist())
+print("dtypes:\\n", pdf.dtypes)
+
+plf = pl.DataFrame(data)
+print("\\n--- Polars ---")
+print("shape:", plf.shape)
+print("columns:", plf.columns)
+print("dtypes:", plf.dtypes)`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "pandas と Polars それぞれで、1〜5 の整数を持つ Series を作成し、合計と平均を表示してください。",
+    code: `# Series: [10, 20, 30, 40, 50]
+# 合計: 150, 平均: 30.0`,
+    answer: `import pandas as pd
+import polars as pl
+
+# pandas
+ps = pd.Series([10, 20, 30, 40, 50])
+print("pandas - 合計:", ps.sum(), "平均:", ps.mean())
+
+# Polars
+pls = pl.Series([10, 20, 30, 40, 50])
+print("Polars - 合計:", pls.sum(), "平均:", pls.mean())`
+  }, {
+    diff: 2,
+    q: "pandas と Polars でそれぞれ DataFrame を作成し、特定の列の型を確認してから、整数列を浮動小数点に変換してください。",
+    code: `# data = {"名前": ["A","B","C"], "点数": [85, 92, 78]}
+# 点数列を float に変換して確認`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["A","B","C"], "点数": [85, 92, 78]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print("変換前:", pdf["点数"].dtype)
+pdf["点数"] = pdf["点数"].astype(float)
+print("変換後:", pdf["点数"].dtype)
+print(pdf)
+
+# Polars
+plf = pl.DataFrame(data)
+print("\\n変換前:", plf["点数"].dtype)
+plf2 = plf.with_columns(pl.col("点数").cast(pl.Float64))
+print("変換後:", plf2["点数"].dtype)
+print(plf2)`
+  }, {
+    diff: 2,
+    q: "pandas と Polars で DataFrame の先頭3行、末尾2行、統計サマリ (describe) をそれぞれ表示してください。",
+    code: `# 10行程度のDataFrameを作成して確認
+# data = {"x": list(range(10)), "y": [i**2 for i in range(10)]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"x": list(range(10)), "y": [i**2 for i in range(10)]}
+
+pdf = pd.DataFrame(data)
+print("=== pandas ===")
+print(pdf.head(3))
+print(pdf.tail(2))
+print(pdf.describe())
+
+plf = pl.DataFrame(data)
+print("\\n=== Polars ===")
+print(plf.head(3))
+print(plf.tail(2))
+print(plf.describe())`
+  }],
+  ch3: [{
+    diff: 1,
+    q: "以下のデータを CSV ファイルに書き出し、再度読み込んで表示してください。pandas と Polars の両方で行ってください。",
+    code: `# data = {"都市": ["東京","大阪","福岡"], "人口万": [1400, 880, 160]}
+# ファイル名: cities_pd.csv, cities_pl.csv`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"都市": ["東京","大阪","福岡"], "人口万": [1400, 880, 160]}
+
+# pandas
+pdf = pd.DataFrame(data)
+pdf.to_csv("cities_pd.csv", index=False)
+pdf2 = pd.read_csv("cities_pd.csv")
+print("pandas:\\n", pdf2)
+
+# Polars
+plf = pl.DataFrame(data)
+plf.write_csv("cities_pl.csv")
+plf2 = pl.read_csv("cities_pl.csv")
+print("\\nPolars:\\n", plf2)`
+  }, {
+    diff: 2,
+    q: "pandas と Polars で Parquet 形式でファイルを書き出し・読み込みしてください。CSV と比べてファイルサイズがどう変わるか確認してください。",
+    code: `# 1000行程度のデータを作成し、CSV と Parquet のサイズを比較
+import os`,
+    answer: `import pandas as pd
+import polars as pl
+import os
+
+data = {"id": list(range(1000)),
+        "value": [i * 3.14 for i in range(1000)],
+        "label": ["cat" if i % 3 == 0 else "dog" for i in range(1000)]}
+
+# pandas
+pdf = pd.DataFrame(data)
+pdf.to_csv("test_pd.csv", index=False)
+pdf.to_parquet("test_pd.parquet")
+print("pandas CSV:", os.path.getsize("test_pd.csv"), "bytes")
+print("pandas Parquet:", os.path.getsize("test_pd.parquet"), "bytes")
+
+# Polars
+plf = pl.DataFrame(data)
+plf.write_csv("test_pl.csv")
+plf.write_parquet("test_pl.parquet")
+print("Polars CSV:", os.path.getsize("test_pl.csv"), "bytes")
+print("Polars Parquet:", os.path.getsize("test_pl.parquet"), "bytes")
+
+# 読み込み確認
+pdf2 = pd.read_parquet("test_pd.parquet")
+plf2 = pl.read_parquet("test_pl.parquet")
+print("\\npandas shape:", pdf2.shape)
+print("Polars shape:", plf2.shape)`
+  }, {
+    diff: 3,
+    q: "Polars の scan_csv を使い、LazyFrame として CSV を読み込んでから collect() で実体化してください。scan_csv と read_csv の違いを確認しましょう。",
+    code: `# まず CSV を書き出してから scan_csv で読み込む
+# LazyFrame の型を確認し、collect() で DataFrame に変換`,
+    answer: `import polars as pl
+
+data = {"name": ["Alice","Bob","Charlie","Diana"],
+        "score": [85, 92, 78, 95],
+        "grade": ["B","A","C","A"]}
+pl.DataFrame(data).write_csv("students.csv")
+
+# read_csv: 即時読み込み (DataFrame)
+df_eager = pl.read_csv("students.csv")
+print("read_csv の型:", type(df_eager))
+print(df_eager)
+
+# scan_csv: 遅延読み込み (LazyFrame)
+lf = pl.scan_csv("students.csv")
+print("\\nscan_csv の型:", type(lf))
+
+# LazyFrame にフィルタを追加してから実体化
+result = lf.filter(pl.col("score") >= 85).collect()
+print("\\nフィルタ後に collect():")
+print(result)
+print("\\n※ scan_csv はファイル全体を読まず、必要な行だけ処理できる")`
+  }],
+  ch4: [{
+    diff: 1,
+    q: "pandas と Polars でそれぞれ DataFrame を作成し、年齢が 25 以上の行だけをフィルタして表示してください。",
+    code: `# data = {"名前": ["田中","佐藤","鈴木","高橋","伊藤"],
+#          "年齢": [22, 30, 25, 19, 35],
+#          "部署": ["営業","開発","開発","人事","営業"]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["田中","佐藤","鈴木","高橋","伊藤"],
+        "年齢": [22, 30, 25, 19, 35],
+        "部署": ["営業","開発","開発","人事","営業"]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print("=== pandas ===")
+print(pdf[pdf["年齢"] >= 25])
+
+# Polars
+plf = pl.DataFrame(data)
+print("\\n=== Polars ===")
+print(plf.filter(pl.col("年齢") >= 25))`
+  }, {
+    diff: 2,
+    q: "pandas の loc/iloc と Polars の select/slice を使って、特定の行と列を選択してください。\n\n1. 先頭3行の「名前」列と「年齢」列のみ抽出\n2. 2行目から4行目（0始まり）を抽出",
+    code: `# 上記と同じデータを使用`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["田中","佐藤","鈴木","高橋","伊藤"],
+        "年齢": [22, 30, 25, 19, 35],
+        "部署": ["営業","開発","開発","人事","営業"]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print("--- pandas: 先頭3行の名前・年齢 ---")
+print(pdf.loc[0:2, ["名前", "年齢"]])
+print("\\n--- pandas: 2〜4行目 ---")
+print(pdf.iloc[2:5])
+
+# Polars
+plf = pl.DataFrame(data)
+print("\\n--- Polars: 先頭3行の名前・年齢 ---")
+print(plf.head(3).select(["名前", "年齢"]))
+print("\\n--- Polars: 2〜4行目 ---")
+print(plf.slice(2, 3))`
+  }, {
+    diff: 2,
+    q: "pandas と Polars で、複数条件でのフィルタとソートを組み合わせてください。\n・条件: 年齢が 20 以上 かつ 部署が「開発」\n・結果を年齢の降順でソート",
+    code: `# 上記と同じデータを使用`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["田中","佐藤","鈴木","高橋","伊藤","山田"],
+        "年齢": [22, 30, 25, 19, 35, 28],
+        "部署": ["営業","開発","開発","人事","営業","開発"]}
+
+# pandas
+pdf = pd.DataFrame(data)
+result_pd = pdf[(pdf["年齢"] >= 20) & (pdf["部署"] == "開発")].sort_values("年齢", ascending=False)
+print("=== pandas ===")
+print(result_pd)
+
+# Polars
+plf = pl.DataFrame(data)
+result_pl = plf.filter(
+    (pl.col("年齢") >= 20) & (pl.col("部署") == "開発")
+).sort("年齢", descending=True)
+print("\\n=== Polars ===")
+print(result_pl)`
+  }],
+  ch5: [{
+    diff: 1,
+    q: "欠損値を含む DataFrame を pandas と Polars で作成し、欠損値の個数を列ごとに確認してください。",
+    code: `# data = {"名前": ["A","B","C","D","E"],
+#          "点数": [80, None, 92, None, 75],
+#          "評価": ["良","優",None,"可",None]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+# pandas
+pdf = pd.DataFrame({"名前": ["A","B","C","D","E"],
+                     "点数": [80, None, 92, None, 75],
+                     "評価": ["良","優",None,"可",None]})
+print("=== pandas 欠損値数 ===")
+print(pdf.isnull().sum())
+
+# Polars
+plf = pl.DataFrame({"名前": ["A","B","C","D","E"],
+                     "点数": [80, None, 92, None, 75],
+                     "評価": ["良","優",None,"可",None]})
+print("\\n=== Polars 欠損値数 ===")
+print(plf.null_count())`
+  }, {
+    diff: 2,
+    q: "欠損値を含む DataFrame に対して、以下の処理を pandas と Polars の両方で行ってください。\n1. 欠損値のある行を削除した結果\n2. 欠損値を特定の値（点数:0, 評価:\"不明\"）で穴埋めした結果",
+    code: `# 上記と同じデータを使用`,
+    answer: `import pandas as pd
+import polars as pl
+
+# pandas
+pdf = pd.DataFrame({"名前": ["A","B","C","D","E"],
+                     "点数": [80, None, 92, None, 75],
+                     "評価": ["良","優",None,"可",None]})
+print("--- pandas: dropna ---")
+print(pdf.dropna())
+print("\\n--- pandas: fillna ---")
+print(pdf.fillna({"点数": 0, "評価": "不明"}))
+
+# Polars
+plf = pl.DataFrame({"名前": ["A","B","C","D","E"],
+                     "点数": [80, None, 92, None, 75],
+                     "評価": ["良","優",None,"可",None]})
+print("\\n--- Polars: drop_nulls ---")
+print(plf.drop_nulls())
+print("\\n--- Polars: fill_null ---")
+print(plf.with_columns([
+    pl.col("点数").fill_null(0),
+    pl.col("評価").fill_null("不明")
+]))`
+  }, {
+    diff: 3,
+    q: "時系列データで欠損値がある場合に、前方穴埋め (forward fill) と線形補間 (interpolate) を pandas と Polars で行ってください。",
+    code: `# data = {"日付": ["2024-01-01","2024-01-02","2024-01-03","2024-01-04","2024-01-05"],
+#          "気温": [15.0, None, None, 18.0, None]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+# pandas
+pdf = pd.DataFrame({"日付": pd.to_datetime(["2024-01-01","2024-01-02","2024-01-03","2024-01-04","2024-01-05"]),
+                     "気温": [15.0, None, None, 18.0, None]})
+print("--- pandas: forward fill ---")
+print(pdf.ffill())
+print("\\n--- pandas: interpolate ---")
+print(pdf.interpolate())
+
+# Polars
+plf = pl.DataFrame({"日付": ["2024-01-01","2024-01-02","2024-01-03","2024-01-04","2024-01-05"],
+                     "気温": [15.0, None, None, 18.0, None]})
+plf = plf.with_columns(pl.col("日付").str.to_datetime())
+print("\\n--- Polars: forward fill ---")
+print(plf.with_columns(pl.col("気温").fill_null(strategy="forward")))
+print("\\n--- Polars: interpolate ---")
+print(plf.with_columns(pl.col("気温").interpolate()))`
+  }],
+  ch6: [{
+    diff: 1,
+    q: "売上データをカテゴリ別にグループ化し、合計と平均を pandas と Polars で計算してください。",
+    code: `# data = {"カテゴリ": ["食品","文具","食品","家電","文具","家電","食品"],
+#          "売上": [1200, 300, 800, 5000, 150, 3000, 950]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"カテゴリ": ["食品","文具","食品","家電","文具","家電","食品"],
+        "売上": [1200, 300, 800, 5000, 150, 3000, 950]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print("=== pandas groupby ===")
+print(pdf.groupby("カテゴリ")["売上"].agg(["sum", "mean"]))
+
+# Polars
+plf = pl.DataFrame(data)
+print("\\n=== Polars group_by ===")
+print(plf.group_by("カテゴリ").agg([
+    pl.col("売上").sum().alias("合計"),
+    pl.col("売上").mean().alias("平均")
+]))`
+  }, {
+    diff: 2,
+    q: "pandas の pivot_table と Polars の pivot を使って、月別・カテゴリ別の売上合計をピボットテーブルで表示してください。",
+    code: `# data = {"月": ["1月","1月","2月","2月","1月","2月"],
+#          "カテゴリ": ["食品","文具","食品","文具","食品","文具"],
+#          "売上": [1000, 200, 1200, 350, 800, 180]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"月": ["1月","1月","2月","2月","1月","2月"],
+        "カテゴリ": ["食品","文具","食品","文具","食品","文具"],
+        "売上": [1000, 200, 1200, 350, 800, 180]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print("=== pandas pivot_table ===")
+print(pd.pivot_table(pdf, values="売上", index="月", columns="カテゴリ", aggfunc="sum"))
+
+# Polars
+plf = pl.DataFrame(data)
+print("\\n=== Polars pivot ===")
+print(plf.pivot(on="カテゴリ", index="月", values="売上", aggregate_function="sum"))`
+  }, {
+    diff: 3,
+    q: "ウィンドウ関数を使って、各行に「カテゴリごとの累計売上」と「カテゴリごとのランク」を追加してください。pandas と Polars の両方で実装してください。",
+    code: `# data = {"カテゴリ": ["A","A","A","B","B","B"],
+#          "日付": ["01","02","03","01","02","03"],
+#          "売上": [100, 150, 120, 200, 180, 250]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"カテゴリ": ["A","A","A","B","B","B"],
+        "日付": ["01","02","03","01","02","03"],
+        "売上": [100, 150, 120, 200, 180, 250]}
+
+# pandas
+pdf = pd.DataFrame(data)
+pdf["累計"] = pdf.groupby("カテゴリ")["売上"].cumsum()
+pdf["ランク"] = pdf.groupby("カテゴリ")["売上"].rank(ascending=False).astype(int)
+print("=== pandas ===")
+print(pdf)
+
+# Polars
+plf = pl.DataFrame(data)
+result = plf.with_columns([
+    pl.col("売上").cum_sum().over("カテゴリ").alias("累計"),
+    pl.col("売上").rank(descending=True).over("カテゴリ").alias("ランク")
+])
+print("\\n=== Polars ===")
+print(result)`
+  }],
+  ch7: [{
+    diff: 1,
+    q: "2 つの DataFrame を共通キーで内部結合 (inner join) してください。pandas と Polars の両方で実装してください。",
+    code: `# 社員テーブル: {"社員ID": [1,2,3,4], "名前": ["田中","佐藤","鈴木","高橋"]}
+# 部署テーブル: {"社員ID": [1,2,3,5], "部署": ["営業","開発","人事","経理"]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+emp = {"社員ID": [1,2,3,4], "名前": ["田中","佐藤","鈴木","高橋"]}
+dept = {"社員ID": [1,2,3,5], "部署": ["営業","開発","人事","経理"]}
+
+# pandas
+pdf_e = pd.DataFrame(emp)
+pdf_d = pd.DataFrame(dept)
+print("=== pandas inner join ===")
+print(pd.merge(pdf_e, pdf_d, on="社員ID"))
+
+# Polars
+plf_e = pl.DataFrame(emp)
+plf_d = pl.DataFrame(dept)
+print("\\n=== Polars inner join ===")
+print(plf_e.join(plf_d, on="社員ID", how="inner"))`
+  }, {
+    diff: 2,
+    q: "左結合 (left join) と外部結合 (outer/full join) の両方を pandas と Polars で実行し、結果の違いを確認してください。結合後の欠損値にも注目してください。",
+    code: `# 上記と同じ社員・部署テーブルを使用`,
+    answer: `import pandas as pd
+import polars as pl
+
+emp = {"社員ID": [1,2,3,4], "名前": ["田中","佐藤","鈴木","高橋"]}
+dept = {"社員ID": [1,2,3,5], "部署": ["営業","開発","人事","経理"]}
+
+# pandas
+pdf_e, pdf_d = pd.DataFrame(emp), pd.DataFrame(dept)
+print("--- pandas LEFT ---")
+print(pd.merge(pdf_e, pdf_d, on="社員ID", how="left"))
+print("\\n--- pandas OUTER ---")
+print(pd.merge(pdf_e, pdf_d, on="社員ID", how="outer"))
+
+# Polars
+plf_e, plf_d = pl.DataFrame(emp), pl.DataFrame(dept)
+print("\\n--- Polars LEFT ---")
+print(plf_e.join(plf_d, on="社員ID", how="left"))
+print("\\n--- Polars FULL ---")
+print(plf_e.join(plf_d, on="社員ID", how="full"))`
+  }, {
+    diff: 3,
+    q: "3つ以上の DataFrame を段階的に結合してください。さらに concat を使って縦方向の結合も行ってください。\n\n社員 → 部署 → 給与 の順で結合し、最後に2つの月のデータを縦結合します。",
+    code: `# 社員: {社員ID, 名前}
+# 部署: {社員ID, 部署名}
+# 給与: {社員ID, 月給}
+# 1月売上と2月売上を縦結合`,
+    answer: `import pandas as pd
+import polars as pl
+
+emp = {"社員ID": [1,2,3], "名前": ["田中","佐藤","鈴木"]}
+dept = {"社員ID": [1,2,3], "部署名": ["営業","開発","人事"]}
+salary = {"社員ID": [1,2,3], "月給": [300000, 450000, 350000]}
+jan = {"社員ID": [1,2], "売上": [100, 200]}
+feb = {"社員ID": [1,2], "売上": [120, 180]}
+
+# pandas
+pe, pd2, ps = pd.DataFrame(emp), pd.DataFrame(dept), pd.DataFrame(salary)
+merged = pe.merge(pd2, on="社員ID").merge(ps, on="社員ID")
+print("=== pandas 3テーブル結合 ===")
+print(merged)
+concat_pd = pd.concat([pd.DataFrame(jan).assign(月="1月"),
+                        pd.DataFrame(feb).assign(月="2月")])
+print("\\n=== pandas 縦結合 ===")
+print(concat_pd)
+
+# Polars
+pe2, pd3, ps2 = pl.DataFrame(emp), pl.DataFrame(dept), pl.DataFrame(salary)
+merged2 = pe2.join(pd3, on="社員ID").join(ps2, on="社員ID")
+print("\\n=== Polars 3テーブル結合 ===")
+print(merged2)
+concat_pl = pl.concat([
+    pl.DataFrame(jan).with_columns(pl.lit("1月").alias("月")),
+    pl.DataFrame(feb).with_columns(pl.lit("2月").alias("月"))
+])
+print("\\n=== Polars 縦結合 ===")
+print(concat_pl)`
+  }],
+  ch8: [{
+    diff: 1,
+    q: "文字列カラムに対して、pandas と Polars の str アクセサを使い、小文字化・大文字化・文字数カウントを行ってください。",
+    code: `# data = {"名前": ["Alice","Bob","Charlie"]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+# pandas
+pdf = pd.DataFrame({"名前": ["Alice","Bob","Charlie"]})
+print("=== pandas str ===")
+print("lower:", pdf["名前"].str.lower().tolist())
+print("upper:", pdf["名前"].str.upper().tolist())
+print("len:", pdf["名前"].str.len().tolist())
+
+# Polars
+plf = pl.DataFrame({"名前": ["Alice","Bob","Charlie"]})
+print("\\n=== Polars str ===")
+print(plf.with_columns([
+    pl.col("名前").str.to_lowercase().alias("lower"),
+    pl.col("名前").str.to_uppercase().alias("upper"),
+    pl.col("名前").str.len_chars().alias("len")
+]))`
+  }, {
+    diff: 2,
+    q: "日付文字列を日時型にパースし、年・月・曜日を抽出してください。pandas と Polars の両方で行ってください。",
+    code: `# data = {"日付": ["2024-03-15","2024-06-20","2024-12-25"]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+# pandas
+pdf = pd.DataFrame({"日付": ["2024-03-15","2024-06-20","2024-12-25"]})
+pdf["日付"] = pd.to_datetime(pdf["日付"])
+pdf["年"] = pdf["日付"].dt.year
+pdf["月"] = pdf["日付"].dt.month
+pdf["曜日"] = pdf["日付"].dt.day_name()
+print("=== pandas ===")
+print(pdf)
+
+# Polars
+plf = pl.DataFrame({"日付": ["2024-03-15","2024-06-20","2024-12-25"]})
+result = plf.with_columns(pl.col("日付").str.to_datetime()).with_columns([
+    pl.col("日付").dt.year().alias("年"),
+    pl.col("日付").dt.month().alias("月"),
+    pl.col("日付").dt.weekday().alias("曜日番号")
+])
+print("\\n=== Polars ===")
+print(result)`
+  }, {
+    diff: 3,
+    q: "文字列データに正規表現を適用して情報を抽出してください。\n・メールアドレスからドメイン部分を抽出\n・電話番号からハイフンを除去\npandas と Polars の両方で実装してください。",
+    code: `# data = {"email": ["user@example.com","admin@test.co.jp","info@site.org"],
+#          "電話": ["03-1234-5678","090-1111-2222","06-9999-8888"]}`,
+    answer: `import pandas as pd
+import polars as pl
+
+data = {"email": ["user@example.com","admin@test.co.jp","info@site.org"],
+        "電話": ["03-1234-5678","090-1111-2222","06-9999-8888"]}
+
+# pandas
+pdf = pd.DataFrame(data)
+pdf["ドメイン"] = pdf["email"].str.extract(r"@(.+)$")
+pdf["電話_整形"] = pdf["電話"].str.replace("-", "", regex=False)
+print("=== pandas ===")
+print(pdf)
+
+# Polars
+plf = pl.DataFrame(data)
+result = plf.with_columns([
+    pl.col("email").str.extract(r"@(.+)$", 1).alias("ドメイン"),
+    pl.col("電話").str.replace_all("-", "").alias("電話_整形")
+])
+print("\\n=== Polars ===")
+print(result)`
+  }],
+  ch9: [{
+    diff: 1,
+    q: "pandas の DataFrame.plot() を使って、簡単な折れ線グラフと棒グラフを作成するコードを書いてください。",
+    code: `# data = {"月": ["1月","2月","3月","4月","5月"],
+#          "売上": [120, 150, 180, 160, 200]}
+# 折れ線グラフと棒グラフをそれぞれ表示`,
+    answer: `import pandas as pd
+import matplotlib.pyplot as plt
+
+data = {"月": ["1月","2月","3月","4月","5月"],
+        "売上": [120, 150, 180, 160, 200]}
+
+pdf = pd.DataFrame(data)
+
+# 折れ線グラフ
+pdf.plot(x="月", y="売上", kind="line", title="月別売上（折れ線）", marker="o")
+plt.ylabel("売上（万円）")
+plt.tight_layout()
+plt.savefig("line_chart.png")
+plt.show()
+
+# 棒グラフ
+pdf.plot(x="月", y="売上", kind="bar", title="月別売上（棒）", color="steelblue")
+plt.ylabel("売上（万円）")
+plt.tight_layout()
+plt.savefig("bar_chart.png")
+plt.show()
+
+print("グラフを保存しました")`
+  }, {
+    diff: 2,
+    q: "seaborn を使って、カテゴリ別の分布を箱ひげ図で、2変数の関係を散布図で可視化してください。",
+    code: `# サンプルデータを作成し、boxplot と scatterplot を描画`,
+    answer: `import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+
+np.random.seed(42)
+pdf = pd.DataFrame({
+    "カテゴリ": np.random.choice(["A","B","C"], 100),
+    "値": np.random.randn(100) * 10 + 50,
+    "x": np.random.randn(100),
+    "y": np.random.randn(100) * 2
+})
+
+# 箱ひげ図
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+sns.boxplot(data=pdf, x="カテゴリ", y="値", ax=axes[0])
+axes[0].set_title("カテゴリ別の値の分布")
+
+# 散布図
+sns.scatterplot(data=pdf, x="x", y="y", hue="カテゴリ", ax=axes[1])
+axes[1].set_title("x vs y の散布図")
+
+plt.tight_layout()
+plt.savefig("seaborn_charts.png")
+plt.show()
+print("seaborn グラフを保存しました")`
+  }, {
+    diff: 3,
+    q: "Polars の DataFrame を matplotlib で可視化してください。Polars には直接の plot 機能がないため、必要に応じて変換してください。複数のサブプロットを含むダッシュボード風のグラフを作成しましょう。",
+    code: `# Polars DataFrame → matplotlib で4つのサブプロット`,
+    answer: `import polars as pl
+import matplotlib.pyplot as plt
+import numpy as np
+
+np.random.seed(42)
+plf = pl.DataFrame({
+    "月": list(range(1, 13)),
+    "売上A": np.random.randint(100, 300, 12).tolist(),
+    "売上B": np.random.randint(80, 250, 12).tolist(),
+    "利益率": (np.random.rand(12) * 30 + 10).tolist()
+})
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+# 1. 折れ線: 月別売上
+axes[0,0].plot(plf["月"].to_list(), plf["売上A"].to_list(), "o-", label="A")
+axes[0,0].plot(plf["月"].to_list(), plf["売上B"].to_list(), "s-", label="B")
+axes[0,0].set_title("月別売上推移"); axes[0,0].legend()
+
+# 2. 棒グラフ: 売上比較
+x = np.arange(12); w = 0.35
+axes[0,1].bar(x - w/2, plf["売上A"].to_list(), w, label="A")
+axes[0,1].bar(x + w/2, plf["売上B"].to_list(), w, label="B")
+axes[0,1].set_title("売上比較"); axes[0,1].legend()
+
+# 3. 散布図
+axes[1,0].scatter(plf["売上A"].to_list(), plf["利益率"].to_list())
+axes[1,0].set_xlabel("売上A"); axes[1,0].set_ylabel("利益率")
+axes[1,0].set_title("売上 vs 利益率")
+
+# 4. ヒストグラム
+axes[1,1].hist(plf["利益率"].to_list(), bins=8, color="purple", alpha=0.7)
+axes[1,1].set_title("利益率の分布")
+
+plt.suptitle("Polars DataFrame ダッシュボード", fontsize=14, fontweight="bold")
+plt.tight_layout()
+plt.savefig("polars_dashboard.png")
+plt.show()
+print("ダッシュボードを保存しました")`
+  }],
+  ch10: [{
+    diff: 2,
+    q: "pandas と Polars で同じ集約クエリを実行し、処理時間を time モジュールで計測して比較してください。100万行のデータを使用してください。",
+    code: `# 100万行のランダムデータで groupby + 複数集約の速度比較`,
+    answer: `import pandas as pd
+import polars as pl
+import numpy as np
+import time
+
+n = 1_000_000
+np.random.seed(42)
+data = {
+    "category": np.random.choice(["A","B","C","D","E"], n),
+    "value1": np.random.randn(n),
+    "value2": np.random.rand(n) * 100
+}
+
+# pandas
+pdf = pd.DataFrame(data)
+t0 = time.time()
+result_pd = pdf.groupby("category").agg({"value1": ["mean","std"], "value2": ["sum","max"]})
+t1 = time.time()
+print(f"pandas: {t1-t0:.4f}秒")
+print(result_pd.head())
+
+# Polars
+plf = pl.DataFrame(data)
+t0 = time.time()
+result_pl = plf.group_by("category").agg([
+    pl.col("value1").mean().alias("v1_mean"),
+    pl.col("value1").std().alias("v1_std"),
+    pl.col("value2").sum().alias("v2_sum"),
+    pl.col("value2").max().alias("v2_max")
+])
+t1 = time.time()
+print(f"\\nPolars: {t1-t0:.4f}秒")
+print(result_pl)`
+  }, {
+    diff: 2,
+    q: "Polars の LazyFrame を使って、遅延評価の最適化効果を確認してください。\n複数のフィルタ・変換を連鎖させた場合、Eager と Lazy でどう違うか比較してください。",
+    code: `# 大きめのDataFrameに対して filter → with_columns → group_by を
+# Eager (DataFrame) と Lazy (LazyFrame) で比較`,
+    answer: `import polars as pl
+import numpy as np
+import time
+
+n = 2_000_000
+np.random.seed(42)
+data = {
+    "id": np.arange(n),
+    "group": np.random.choice(["X","Y","Z"], n),
+    "score": np.random.randn(n) * 100,
+    "flag": np.random.choice([True, False], n)
+}
+
+plf = pl.DataFrame(data)
+
+# Eager
+t0 = time.time()
+r1 = plf.filter(pl.col("flag") == True)
+r2 = r1.with_columns((pl.col("score") * 2).alias("doubled"))
+r3 = r2.group_by("group").agg(pl.col("doubled").mean())
+t1 = time.time()
+print(f"Eager: {t1-t0:.4f}秒")
+print(r3)
+
+# Lazy
+t0 = time.time()
+result_lazy = (
+    plf.lazy()
+    .filter(pl.col("flag") == True)
+    .with_columns((pl.col("score") * 2).alias("doubled"))
+    .group_by("group")
+    .agg(pl.col("doubled").mean())
+    .collect()
+)
+t1 = time.time()
+print(f"\\nLazy: {t1-t0:.4f}秒")
+print(result_lazy)
+
+print("\\n※ Lazy は内部でクエリプランを最適化し、不要な列の読み込みを省略できる")`
+  }, {
+    diff: 3,
+    q: "総合問題: 売上データを CSVから読み込み → クリーニング → 集約 → 結合 → 可視化 までの一連のパイプラインを pandas と Polars の両方で実装してください。\n\nまず CSV を作成してから、完全な分析パイプラインを構築します。",
+    code: `# 1. ダミーCSVを作成
+# 2. 読み込み
+# 3. 欠損値処理
+# 4. groupby集約
+# 5. 別テーブルと結合
+# 6. 結果表示`,
+    answer: `import pandas as pd
+import polars as pl
+import numpy as np
+
+# --- ダミーデータ作成 ---
+np.random.seed(42)
+n = 500
+sales_data = {
+    "日付": pd.date_range("2024-01-01", periods=n).strftime("%Y-%m-%d").tolist(),
+    "店舗ID": np.random.choice([1,2,3,4,5], n).tolist(),
+    "カテゴリ": np.random.choice(["食品","文具","家電","衣類"], n).tolist(),
+    "売上": np.where(np.random.rand(n) > 0.1,
+                     np.random.randint(100, 5000, n), None).tolist()
+}
+pd.DataFrame(sales_data).to_csv("sales.csv", index=False)
+
+stores = {"店舗ID": [1,2,3,4,5], "店舗名": ["東京本店","大阪支店","名古屋支店","福岡支店","札幌支店"]}
+pd.DataFrame(stores).to_csv("stores.csv", index=False)
+
+# === pandas パイプライン ===
+print("========== pandas ==========")
+pdf = pd.read_csv("sales.csv", parse_dates=["日付"])
+pdf["売上"] = pdf["売上"].fillna(0).astype(float)
+pdf["月"] = pdf["日付"].dt.to_period("M").astype(str)
+agg_pd = pdf.groupby(["店舗ID","月"]).agg(
+    売上合計=("売上","sum"), 件数=("売上","count")
+).reset_index()
+stores_pd = pd.read_csv("stores.csv")
+result_pd = agg_pd.merge(stores_pd, on="店舗ID")
+print(result_pd.head(10))
+
+# === Polars パイプライン ===
+print("\\n========== Polars ==========")
+plf = pl.read_csv("sales.csv")
+plf = plf.with_columns([
+    pl.col("日付").str.to_datetime(),
+    pl.col("売上").fill_null(0).cast(pl.Float64)
+])
+plf = plf.with_columns(pl.col("日付").dt.strftime("%Y-%m").alias("月"))
+agg_pl = plf.group_by(["店舗ID","月"]).agg([
+    pl.col("売上").sum().alias("売上合計"),
+    pl.col("売上").count().alias("件数")
+])
+stores_pl = pl.read_csv("stores.csv")
+result_pl = agg_pl.join(stores_pl, on="店舗ID")
+print(result_pl.head(10))`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "データフレームの概念と環境構築",
+  est: "30分",
+  goal: "データフレームとは何かを理解し、pandas と Polars の設計思想の違い（即時評価 vs 遅延評価、NumPy ベース vs Arrow ベース）を自分の言葉で説明できるようになる。両ライブラリをインストールし、最初の DataFrame を作成・表示できる状態がゴール。",
+  sections: [{
+    title: "データフレームとは何か",
+    body: "データフレームは「行と列を持つ二次元の表形式データ構造」です。Excel のスプレッドシートや SQL のテーブルと同じ発想で、各列は特定の型（整数・文字列・日時など）を持ち、各行は1件のレコードを表します。Python の標準ライブラリにはこの構造が存在しないため、データ分析では pandas や Polars といった外部ライブラリを使うのが事実上の標準になっています。\n\nデータフレームを使う最大のメリットは、SQL ライクな操作（フィルタ・集約・結合・ソート）を Python コードとして書けることです。for ループで1行ずつ処理する代わりに、列単位のベクトル演算で高速に処理できます。数十万行〜数百万行のデータを扱う場面では、この差が如実に効いてきます。\n\nこのコースでは pandas と Polars の2つを並行して学びます。pandas はデータ分析の事実上の標準で情報量が圧倒的に多く、Polars は後発の高速ライブラリで大規模データに強みがあります。両方を知っておくことで、データの規模や用途に応じて最適な選択ができるようになります。",
+    afterCode: "ポイント: pandas だけ覚えれば十分だった時代は終わりつつあります。Polars の登場により「大規模データは Polars、既存コードベースは pandas」という使い分けが実務で増えています。"
+  }, {
+    title: "pandas vs Polars — 設計思想の違い",
+    body: "pandas は 2008 年に金融データ分析のために生まれました。NumPy 配列の上にインデックス（行ラベル）やカラム名を載せた構造で、対話的な探索分析に最適化されています。一方 Polars は 2020 年に Rust で書かれた新しいライブラリで、Apache Arrow というメモリフォーマットをベースにしています。\n\n最も大きな違いは実行モデルです。pandas は「書いた操作をその場で即実行する」即時評価 (Eager) ですが、Polars は「操作を溜めておいて最後にまとめて最適化・実行する」遅延評価 (Lazy) もサポートしています。これにより Polars は不要な列の読み込みを省略したり、フィルタの順序を入れ替えたりといった最適化を自動で行えます。\n\nもう一つの大きな違いはインデックスの有無です。pandas ではインデックスが重要な役割を果たし、loc / iloc での行選択やアラインメント（異なる DataFrame 同士の自動位置合わせ）に使われます。Polars にはインデックスという概念がなく、すべて列として扱います。これにより API がシンプルになる反面、pandas のインデックス機能に慣れた人には戸惑いもあるでしょう。",
+    table: T.pdVsPl,
+    afterTable: "どちらが「上位互換」というわけではありません。pandas はエコシステムの広さ（scikit-learn, matplotlib などとのシームレスな統合）が強みで、Polars は速度とメモリ効率が強みです。両方の特性を理解して使い分けるのが、現代のデータエンジニアリングのベストプラクティスです。"
+  }, {
+    title: "環境構築",
+    body: "pandas と Polars は pip で簡単にインストールできます。このコースでは pandas 2.2 系と Polars 0.20 系を前提にしています。バージョンによって API が異なる場合があるため、まずバージョンを確認する習慣を付けましょう。\n\nPolars はオプションの依存関係が多く、用途に応じて追加パッケージを入れる設計になっています。たとえば Excel を読み書きする場合は polars[xlsx2csv] や polars[calamine] が必要です。Parquet の読み書きは標準で対応しています。\n\n開発環境としては Jupyter Notebook / JupyterLab が最も一般的です。DataFrame を表形式で見やすく表示できるため、対話的なデータ探索に向いています。VS Code + Python 拡張でも十分に開発できます。",
+    code: `# インストール
+pip install pandas polars pyarrow
+
+# バージョン確認
+python -c "import pandas as pd; print('pandas:', pd.__version__)"
+python -c "import polars as pl; print('polars:', pl.__version__)"
+
+# Jupyter を使う場合
+pip install jupyterlab
+jupyter lab`,
+    afterCode: "ポイント: pyarrow は Parquet の読み書きや pandas と Polars 間のデータ変換に使います。明示的に import しなくても裏側で使われることが多いので、一緒にインストールしておくと安心です。"
+  }, {
+    title: "最初の DataFrame を作る",
+    body: "両ライブラリとも、Python の辞書やリストから DataFrame を作成できます。構文はほぼ同じですが、インポート名の慣例が異なります。pandas は import pandas as pd、Polars は import polars as pl が定番です。\n\nDataFrame を作成したら、まず shape（行数・列数）、columns（カラム名一覧）、dtypes（各カラムの型）を確認するのが基本の流れです。pandas は NumPy の型名（int64, object など）を、Polars は独自の型名（Int64, Utf8 など）を返します。この違いは内部のメモリ表現の違いに由来しています。\n\nprint() で DataFrame を表示すると、pandas は表形式のテキスト、Polars も同様に表形式ですが罫線付きで表示されます。Jupyter Notebook ではどちらも HTML テーブルとしてリッチに表示されます。",
+    code: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["田中", "佐藤", "鈴木"],
+        "年齢": [25, 30, 28],
+        "都市": ["東京", "大阪", "名古屋"]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print(pdf)
+print("shape:", pdf.shape)       # (3, 3)
+print("dtypes:", pdf.dtypes)
+
+# Polars
+plf = pl.DataFrame(data)
+print(plf)
+print("shape:", plf.shape)       # (3, 3)
+print("dtypes:", plf.dtypes)`,
+    afterCode: "ミニ演習: 上のコードを実行して、pandas と Polars の型名の違い（int64 vs Int64、object vs Utf8）を確認してみましょう。同じデータなのに型の表記が違うのは、基盤となるメモリフォーマットの違いが理由です。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "Series と DataFrame 基礎",
+  est: "40分",
+  goal: "Series（1次元データ）と DataFrame（2次元データ）の関係を理解し、作成・型確認・インデクシング・基本統計量の取得を両ライブラリで自在に行えるようになる。pandas のインデックス概念と Polars にインデックスがない設計の違いを実感できる状態がゴール。",
+  sections: [{
+    title: "Series — 1次元のデータ構造",
+    body: "Series は「型の揃った1次元配列 + ラベル（インデックス）」です。pandas では DataFrame の各列が Series であり、df['列名'] で取り出すと Series が返ります。Polars でも同様に Series が存在しますが、インデックス（行ラベル）はありません。\n\npandas の Series には name 属性があり、DataFrame の列名と対応します。sum(), mean(), std() といった集約メソッドも Series に直接呼べるため、「列単位の計算」が非常に簡潔に書けます。Polars の Series も同様のメソッドを持ちますが、Polars では式 (Expression) ベースの API が推奨されており、Series を直接操作するよりも pl.col('列名').sum() のように書くことが多いです。\n\nSeries の型は作成時に自動推論されますが、明示的に指定することも可能です。特に整数と浮動小数点が混在している場合や、None を含むデータでは型推論の結果が意図と異なることがあるため、型を明示する習慣を付けると安全です。",
+    code: `import pandas as pd
+import polars as pl
+
+# pandas Series
+ps = pd.Series([10, 20, 30, 40, 50], name="売上")
+print(ps)
+print("合計:", ps.sum(), "平均:", ps.mean())
+
+# Polars Series
+pls = pl.Series("売上", [10, 20, 30, 40, 50])
+print(pls)
+print("合計:", pls.sum(), "平均:", pls.mean())`,
+    afterCode: "ポイント: pandas の Series はインデックス付き（0, 1, 2, ...がデフォルト）ですが、Polars の Series にはインデックスがなく、位置（行番号）でしかアクセスできません。この違いが後のデータ操作で効いてきます。"
+  }, {
+    title: "DataFrame の作成方法",
+    body: "DataFrame は辞書・リスト・NumPy 配列・CSV ファイルなど、さまざまなソースから作成できます。最も一般的なのは辞書からの作成で、キーが列名、値がその列のデータになります。\n\npandas では辞書の他に、records（辞書のリスト）や columns 引数付きのリストのリストからも作成できます。Polars も同様の方法をサポートしていますが、schema 引数で型を明示的に指定できる点が特徴です。型を指定しておくと、大規模データでの型推論コストを省けます。\n\nDataFrame を作成したら describe() で基本統計量（件数・平均・標準偏差・最小・最大・四分位数）を確認するのが定石です。これだけでデータの概要をすばやく掴めます。",
+    code: `import pandas as pd
+import polars as pl
+
+# 辞書から
+data = {"商品": ["A","B","C"], "価格": [100, 200, 150]}
+
+# pandas
+pdf = pd.DataFrame(data)
+# records（辞書のリスト）から
+pdf2 = pd.DataFrame([{"商品": "A", "価格": 100}, {"商品": "B", "価格": 200}])
+
+# Polars（型を明示）
+plf = pl.DataFrame(data, schema={"商品": pl.Utf8, "価格": pl.Int64})
+
+print(pdf.describe())
+print(plf.describe())`,
+    afterCode: "ポイント: Polars の describe() は pandas と出力フォーマットが異なります。pandas は数値列のみ対象ですが、Polars は全列を対象にし、null の数なども表示します。"
+  }, {
+    title: "型システムの違い",
+    body: "pandas は歴史的に NumPy の型を使っており、文字列は object 型（Python オブジェクトの配列）として格納されます。これはメモリ効率が悪く、pandas 2.0 以降では Arrow ベースの StringDtype や ArrowDtype が導入されましたが、デフォルトではまだ object が使われる場面があります。\n\nPolars は最初から Apache Arrow のメモリフォーマットを採用しており、文字列は Utf8 型として効率的に格納されます。整数・浮動小数点も Arrow の型（Int64, Float64 など）をそのまま使います。この違いは特に文字列を大量に含むデータで顕著にメモリ使用量の差として表れます。\n\n型変換は pandas では astype()、Polars では cast() を使います。どちらも変換できない値がある場合はエラーになりますが、Polars には strict=False オプションがあり、変換できない値を null にする柔軟な変換も可能です。",
+    table: T.dtypes,
+    afterTable: "pandas 2.0 以降は pd.ArrowDtype を使うことで Arrow ベースの型を利用できますが、まだエコシステム全体の対応が追いついていない場面もあります。当面は NumPy ベースの型がデフォルトと考えてください。"
+  }, {
+    title: "基本的なアクセス方法",
+    body: "DataFrame から特定の列や行にアクセスする方法は、pandas と Polars で大きく異なります。pandas は df['列名'] で列を取得し、df.loc[行ラベル, 列名] でラベルベース、df.iloc[行番号, 列番号] で位置ベースのアクセスが可能です。Polars では df['列名'] または df.select('列名') で列を取得し、df.row(n) で特定の行を取得します。\n\npandas のインデックスは「行のラベル」として機能し、文字列やDatetimeIndex なども使えます。これにより df.loc['2024-01-01'] のような直感的なアクセスが可能です。一方 Polars にはこの概念がなく、フィルタ操作で同等のことを実現します。\n\nスライスによる複数行の取得も両ライブラリで異なります。pandas の df.iloc[0:3] は0〜2行目（3行）を返し、Polars の df.head(3) や df.slice(0, 3) が同等です。pandas の loc は終端を含み、iloc は含まないという罠もあります。",
+    code: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["田中","佐藤","鈴木"], "年齢": [25,30,28], "都市": ["東京","大阪","名古屋"]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print(pdf["名前"])           # 列選択 → Series
+print(pdf.iloc[0:2])        # 先頭2行
+print(pdf.loc[0, "年齢"])    # 0行目の年齢
+
+# Polars
+plf = pl.DataFrame(data)
+print(plf["名前"])           # 列選択 → Series
+print(plf.head(2))           # 先頭2行
+print(plf.row(0))            # 0行目 (タプルで返る)`,
+    afterCode: "ミニ演習: pandas で pdf.loc[0:2] と pdf.iloc[0:2] の結果を比較してください。loc はラベル 0〜2（3行）を返し、iloc は位置 0〜1（2行）を返すという違いに気付くはずです。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "データ読み込み・書き出し",
+  est: "45分",
+  goal: "CSV / JSON / Parquet / Excel の4大フォーマットを pandas と Polars の両方で読み書きできるようになる。Polars の scan_csv / scan_parquet による遅延読み込みの概念を理解し、大規模ファイルをメモリに載せずに部分的に処理する方法を知ることがゴール。",
+  sections: [{
+    title: "ファイルフォーマットの使い分け",
+    body: "データの保存・交換に使うフォーマットは用途によって最適なものが異なります。CSV はテキスト形式で人間が読め、ほぼすべてのツールで扱えるため互換性が最高ですが、型情報が失われ、読み込みが遅いという欠点があります。JSON はネスト構造を表現でき、Web API とのやり取りに向いています。\n\nParquet は列指向のバイナリフォーマットで、分析用途に最適化されています。型情報が保持され、圧縮効率が高く、必要な列だけを読み込めるため、大規模データでは CSV の数倍〜数十倍高速です。実務では「保存は Parquet、人に渡すときは CSV」という使い分けが定番になっています。\n\nExcel は非エンジニアとのデータ共有に便利ですが、読み書きが遅く、大規模データには向きません。Feather / IPC は Arrow のネイティブフォーマットで、pandas-Polars 間のデータ交換に最適です。",
+    table: T.fileFormats,
+    afterTable: "実務でのおすすめ: 分析の中間ファイルは Parquet、外部共有は CSV、Web API は JSON。Excel は「クライアントに渡すとき」に限定して使いましょう。"
+  }, {
+    title: "CSV の読み書き",
+    body: "CSV の読み書きは両ライブラリとも最も基本的な操作です。pandas は pd.read_csv()、Polars は pl.read_csv() で読み込みます。書き出しは pandas が df.to_csv()、Polars が df.write_csv() です。\n\npandas の read_csv は非常に多くのオプションを持ち、エンコーディング（encoding='utf-8'）、区切り文字（sep=','）、ヘッダー行の指定（header=0）、型指定（dtype={'列': int}）、日付解析（parse_dates=['日付列']）など細かい制御が可能です。Polars も同様のオプションを持ちますが、引数名が異なる場合があります。\n\n大きな違いは Polars の scan_csv() です。これは CSV を遅延読み込みする LazyFrame を返し、実際のデータ読み込みは collect() を呼ぶまで行われません。フィルタや列選択を先に指定しておくと、必要な部分だけ読み込めるため、メモリに載りきらない大規模ファイルの処理に威力を発揮します。",
+    code: `import pandas as pd
+import polars as pl
+
+# --- pandas ---
+# 読み込み
+pdf = pd.read_csv("data.csv", encoding="utf-8", parse_dates=["日付"])
+# 書き出し
+pdf.to_csv("output.csv", index=False)
+
+# --- Polars ---
+# 即時読み込み
+plf = pl.read_csv("data.csv")
+# 遅延読み込み（LazyFrame）
+lf = pl.scan_csv("data.csv")
+result = lf.filter(pl.col("年齢") > 20).select(["名前", "年齢"]).collect()
+
+# 書き出し
+plf.write_csv("output.csv")`,
+    afterCode: "ポイント: pandas の to_csv() はデフォルトでインデックスも書き出します。index=False を忘れると、読み込み時に Unnamed: 0 という謎の列ができる事故が起きがちです。"
+  }, {
+    title: "Parquet の読み書き",
+    body: "Parquet はビッグデータ時代の標準フォーマットで、Spark / BigQuery / Athena / dbt など主要なデータ基盤ツールがネイティブ対応しています。列指向で圧縮されるため、CSV と比べてファイルサイズが 1/5〜1/10 になることも珍しくありません。\n\npandas では pd.read_parquet() で読み込み、df.to_parquet() で書き出します。内部的には pyarrow または fastparquet エンジンを使います。Polars は pl.read_parquet() と df.write_parquet() で、Arrow フォーマットとの親和性が高いため変換オーバーヘッドがほぼゼロです。\n\nPolars の scan_parquet() は特に強力で、Parquet のメタデータ（列名・行数・統計情報）を先に読み、必要な列だけを実際にデコードします。数百列あるテーブルから3列だけ使いたい場合、残りの列はディスクから読まれすらしません。",
+    code: `import pandas as pd
+import polars as pl
+
+# pandas
+pdf = pd.read_parquet("data.parquet")
+pdf.to_parquet("output.parquet", engine="pyarrow")
+
+# Polars（即時）
+plf = pl.read_parquet("data.parquet")
+plf.write_parquet("output.parquet")
+
+# Polars（遅延 — 必要な列だけ読む）
+result = (
+    pl.scan_parquet("data.parquet")
+    .select(["名前", "売上"])
+    .filter(pl.col("売上") > 1000)
+    .collect()
+)`,
+    afterCode: "ポイント: CSV で保存していたデータを Parquet に変換するだけで、読み込み速度が5〜10倍、ファイルサイズが1/5〜1/10になることがあります。一度変換すれば以後の分析がすべて速くなるので、初手でやる価値があります。"
+  }, {
+    title: "JSON と Excel",
+    body: "JSON は Web API から取得したデータの読み込みに頻繁に使います。pandas は pd.read_json() でフラットな JSON 配列を、pd.json_normalize() でネストした JSON をフラットな DataFrame に変換できます。Polars は pl.read_json() と pl.read_ndjson()（改行区切り JSON）を使います。\n\nExcel の読み書きは pandas の得意分野で、pd.read_excel() / df.to_excel() が充実しています。シート名の指定、ヘッダー行の指定、セル範囲の指定など細かい制御が可能です。Polars も pl.read_excel() をサポートしていますが、openpyxl や calamine といった外部ライブラリが必要です。\n\n実務では「クライアントから Excel で受け取り → pandas で読み込み → Parquet で保存 → 以後は Polars で高速処理」というパイプラインがよく見られます。フォーマット間の変換を自在に行えることが、データエンジニアの基本スキルです。",
+    code: `import pandas as pd
+import polars as pl
+
+# JSON 読み込み
+pdf = pd.read_json("data.json")
+plf = pl.read_json("data.json")
+
+# NDJSON（1行1オブジェクトの JSON）
+plf_nd = pl.read_ndjson("data.ndjson")
+
+# Excel 読み込み
+pdf_excel = pd.read_excel("report.xlsx", sheet_name="Sheet1")
+plf_excel = pl.read_excel("report.xlsx", sheet_name="Sheet1")
+
+# Excel 書き出し
+pdf.to_excel("output.xlsx", index=False)`,
+    afterCode: "ミニ演習: 適当な辞書から DataFrame を作り、CSV → Parquet → Excel の3形式で保存して、ファイルサイズを比較してみましょう。Parquet が圧倒的に小さいことがわかるはずです。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "選択・フィルタ・ソート",
+  est: "50分",
+  goal: "pandas の loc / iloc と Polars の select / filter / sort を使い分けて、自在にデータを抽出・並べ替えできるようになる。Polars の式 (Expression) ベースの API が pandas のブラケット記法とどう違うのかを理解し、複合条件のフィルタを書けるようになることがゴール。",
+  sections: [{
+    title: "列の選択",
+    body: "列の選択は最も頻繁に行う操作です。pandas では df['列名'] で1列、df[['列A', '列B']] でリストを渡して複数列を選択します。Polars では df.select('列名') または df.select(['列A', '列B']) を使います。\n\n大きな違いは、pandas の df['列名'] は Series を返しますが、df[['列名']] は1列の DataFrame を返すという点です。Polars の df.select() は常に DataFrame を返します。また Polars では pl.col('列名') という式オブジェクトを使って列を参照することが多く、これが式ベース API の基本になります。\n\n列を除外する場合、pandas では df.drop(columns=['列名']) を使います。Polars では df.drop('列名') または df.select(pl.exclude('列名')) が使えます。列名のパターンマッチ（正規表現）で選択する機能は Polars の方が充実しています。",
+    code: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["田中","佐藤","鈴木"], "年齢": [25,30,28], "都市": ["東京","大阪","名古屋"]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print(pdf["名前"])                  # Series
+print(pdf[["名前", "年齢"]])        # DataFrame
+
+# Polars
+plf = pl.DataFrame(data)
+print(plf.select("名前"))           # DataFrame (1列)
+print(plf.select(["名前", "年齢"])) # DataFrame (2列)
+print(plf.select(pl.col("名前")))   # 式ベース`,
+    afterCode: "ポイント: Polars の pl.col() は「この列に対する操作」を表すオブジェクトで、select / filter / with_columns などのメソッドに渡して使います。最初は冗長に感じますが、複雑な変換を連鎖させるときに威力を発揮します。"
+  }, {
+    title: "行のフィルタリング",
+    body: "条件に合う行だけを抽出するフィルタリングは、データ分析の基本操作です。pandas では df[df['列名'] > 値] のようにブラケット記法でブール配列を渡します。Polars では df.filter(pl.col('列名') > 値) を使います。\n\n複数条件の組み合わせには & (AND) と | (OR) を使いますが、両ライブラリとも各条件を括弧で囲む必要があります。これは Python の演算子優先順位の制約で、括弧を忘れると予期しない結果やエラーになります。\n\nPythonの in 演算子に相当するフィルタは、pandas では df[df['列'].isin([値1, 値2])]、Polars では df.filter(pl.col('列').is_in([値1, 値2])) です。否定条件には ~ (NOT) を使います。",
+    table: T.selectCompare,
+    code: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["田中","佐藤","鈴木","高橋"], "年齢": [22,30,25,19], "部署": ["営業","開発","開発","人事"]}
+
+# pandas — ブラケット記法
+pdf = pd.DataFrame(data)
+print(pdf[(pdf["年齢"] >= 25) & (pdf["部署"] == "開発")])
+
+# Polars — 式ベース
+plf = pl.DataFrame(data)
+print(plf.filter((pl.col("年齢") >= 25) & (pl.col("部署") == "開発")))`,
+    afterCode: "ポイント: pandas の query() メソッドを使うと df.query('年齢 >= 25 and 部署 == \"開発\"') のように SQL 風に書けます。条件が複雑になるときは query() の方が読みやすくなることがあります。"
+  }, {
+    title: "ソート",
+    body: "行の並べ替えは pandas では df.sort_values('列名')、Polars では df.sort('列名') です。降順にする場合、pandas は ascending=False、Polars は descending=True を指定します。引数名が逆なので注意が必要です。\n\n複数列でのソート（第1キーが同じなら第2キーで並べる）は、リストで列名を渡します。pandas は sort_values(['列A', '列B'], ascending=[True, False]) のように列ごとに昇順・降順を指定できます。Polars も sort(['列A', '列B'], descending=[False, True]) で同様に指定可能です。\n\nソート後のインデックスの扱いも違いがあります。pandas ではソートしてもインデックスは元の値のままなので、reset_index(drop=True) で振り直す必要があります。Polars にはインデックスがないため、この問題は起きません。",
+    code: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["田中","佐藤","鈴木","高橋"], "年齢": [22,30,25,19], "点数": [85,92,78,95]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print(pdf.sort_values("年齢", ascending=False))
+print(pdf.sort_values(["点数","年齢"], ascending=[False, True]))
+
+# Polars
+plf = pl.DataFrame(data)
+print(plf.sort("年齢", descending=True))
+print(plf.sort(["点数","年齢"], descending=[True, False]))`,
+    afterCode: "ポイント: Polars は null 値のソート位置を nulls_last=True/False で制御できます。pandas は na_position='last' / 'first' で指定します。"
+  }, {
+    title: "列の追加・変換",
+    body: "既存の列から新しい列を計算して追加する操作は非常に頻繁に行います。pandas では df['新列'] = 式 で直接代入します。Polars では df.with_columns(式.alias('新列名')) を使い、元の DataFrame は変更されません（イミュータブル）。\n\nこの「ミュータブル vs イミュータブル」の違いは重要です。pandas は元の DataFrame を直接書き換えるため、意図しない副作用が起きやすいです。copy() を使わないと元データが壊れるという事故は pandas のあるあるです。Polars は新しい DataFrame を返すため、安全ですが、変数を再代入する必要があります。\n\n複数列を同時に追加・変更する場合、Polars の with_columns() にリストで式を渡せるので、1回のメソッド呼び出しで完結します。pandas では各列ごとに代入文を書くか、assign() メソッドを使います。",
+    code: `import pandas as pd
+import polars as pl
+
+data = {"商品": ["A","B","C"], "価格": [100, 200, 150], "個数": [5, 3, 8]}
+
+# pandas（ミュータブル: 元を書き換え）
+pdf = pd.DataFrame(data)
+pdf["合計"] = pdf["価格"] * pdf["個数"]
+pdf["税込"] = pdf["合計"] * 1.1
+
+# Polars（イミュータブル: 新しいDFを返す）
+plf = pl.DataFrame(data)
+plf = plf.with_columns([
+    (pl.col("価格") * pl.col("個数")).alias("合計"),
+    (pl.col("価格") * pl.col("個数") * 1.1).alias("税込")
+])`,
+    afterCode: "ポイント: pandas の assign() メソッドも Polars と同様にイミュータブルな操作が可能です。df.assign(合計=lambda x: x['価格']*x['個数']) のように使います。メソッドチェーンしたいときに便利です。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "欠損値処理とデータクリーニング",
+  est: "45分",
+  goal: "欠損値の検出・削除・穴埋めを pandas と Polars の両方で自在に行えるようになる。NaN / None / null の違いを理解し、前方穴埋め・補間・型変換まで含めたデータクリーニングの一連のフローを組み立てられることがゴール。",
+  sections: [{
+    title: "欠損値の表現 — NaN vs null",
+    body: "欠損値（データが存在しない状態）の扱いは pandas と Polars で根本的に異なります。pandas は歴史的に浮動小数点の NaN (Not a Number) を欠損値として使ってきました。これは NumPy 由来の設計ですが、整数列に NaN を入れると自動的に float64 に変換されるという副作用があります。pandas 1.0 以降では pd.NA という新しい欠損値マーカーが導入されましたが、完全な移行には至っていません。\n\nPolars は Apache Arrow の null をそのまま使います。null はどの型でも使え、整数列に null を入れても型が変わりません。この設計の方が直感的で、型の安定性が保たれます。Arrow の null はビットマスクで管理されるため、メモリ効率も良いです。\n\nPython の None は pandas では NaN に変換されることが多いですが、文字列列では None のまま残ることがあります。Polars では None は一貫して null になります。この挙動の違いはデータクリーニングで頻繁に遭遇するので、しっかり押さえておきましょう。",
+    code: `import pandas as pd
+import polars as pl
+import numpy as np
+
+# pandas — NaN と型変換の問題
+ps = pd.Series([1, 2, None, 4])
+print(ps)        # 0    1.0  ← int が float に変わる!
+print(ps.dtype)  # float64
+
+# Polars — null でも型が保たれる
+pls = pl.Series([1, 2, None, 4])
+print(pls)       # [1, 2, null, 4]
+print(pls.dtype) # Int64  ← 型が変わらない`,
+    afterTable: "pandas 2.0 以降では pd.array([1, 2, pd.NA, 4], dtype='Int64')（大文字の I）で Nullable 整数型を使えますが、デフォルトではまだ NaN ベースです。"
+  }, {
+    title: "欠損値の検出と確認",
+    body: "データを読み込んだらまず欠損値の状況を確認します。pandas では df.isnull()（= df.isna()）で各セルが欠損かどうかの真偽値 DataFrame が返り、df.isnull().sum() で列ごとの欠損数、df.isnull().sum().sum() で全体の欠損数がわかります。\n\nPolars では df.null_count() で列ごとの null 数を一発で取得できます。また df.is_null() でセルごとの真偽値 DataFrame、df.select(pl.all().is_null().sum()) で列ごとの null 数も取得できます。\n\n欠損値の割合を確認するのも重要です。列の欠損率が 50% を超えていたらその列自体を削除する、5% 以下なら穴埋めする、といった判断基準を持っておくと、クリーニングの方針を素早く決められます。",
+    table: T.missingCompare,
+    afterTable: "ポイント: pandas の isnull() と isna() は完全に同じ関数です。どちらを使っても構いませんが、チーム内で統一しておくとコードの一貫性が保たれます。"
+  }, {
+    title: "欠損値の削除と穴埋め",
+    body: "欠損値の処理方法は大きく2つ — 削除（行ごと or 列ごと）と穴埋め（固定値・前方・後方・補間）です。\n\n削除は pandas の dropna()、Polars の drop_nulls() で行います。pandas は how='any'（1つでも欠損があれば削除）と how='all'（全列が欠損の場合のみ削除）を選べます。subset 引数で特定の列だけを対象にすることも可能です。\n\n穴埋めは pandas の fillna()、Polars の fill_null() です。固定値（0, '不明' など）で穴埋めする他、前方穴埋め（forward fill: 直前の有効値で埋める）や線形補間（interpolate）も使えます。時系列データでは前方穴埋めが定番で、「最後に観測された値が続いている」という仮定で欠損を埋めます。",
+    code: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["A","B","C","D"], "点数": [80, None, 92, None], "評価": ["良",None,"優","可"]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print(pdf.dropna())                          # 欠損行を削除
+print(pdf.fillna({"点数": 0, "評価": "不明"})) # 穴埋め
+print(pdf["点数"].ffill())                    # 前方穴埋め
+
+# Polars
+plf = pl.DataFrame(data)
+print(plf.drop_nulls())                      # 欠損行を削除
+print(plf.with_columns([                     # 穴埋め
+    pl.col("点数").fill_null(0),
+    pl.col("評価").fill_null("不明")
+]))
+print(plf.with_columns(                      # 前方穴埋め
+    pl.col("点数").fill_null(strategy="forward")
+))`,
+    afterCode: "ポイント: 穴埋めの値は分析結果に大きく影響します。0 で埋めると平均が下がり、平均値で埋めると分散が小さくなります。「なぜその値で埋めるのか」を意識することが重要です。"
+  }, {
+    title: "型変換とデータクリーニング",
+    body: "実データでは「数値のはずの列が文字列型になっている」「日付がただの文字列」といった型の不整合が頻繁に起きます。CSV から読み込むと全列が文字列になってしまうケースもあり、適切な型に変換するのがクリーニングの基本です。\n\npandas では astype() で型変換し、errors='coerce' を付けると変換できない値を NaN にできます。pd.to_numeric() / pd.to_datetime() という専用関数もあります。Polars では cast() で変換し、strict=False で変換失敗を null にできます。\n\n重複行の処理も重要なクリーニング操作です。pandas は df.duplicated() で重複を検出し、df.drop_duplicates() で削除します。Polars では df.is_duplicated() と df.unique() を使います。",
+    code: `import pandas as pd
+import polars as pl
+
+# pandas — 型変換
+pdf = pd.DataFrame({"値": ["100","200","abc","400"]})
+pdf["値_num"] = pd.to_numeric(pdf["値"], errors="coerce")
+print(pdf)  # abc → NaN
+
+# Polars — 型変換
+plf = pl.DataFrame({"値": ["100","200","abc","400"]})
+plf2 = plf.with_columns(
+    pl.col("値").cast(pl.Int64, strict=False).alias("値_num")
+)
+print(plf2)  # abc → null
+
+# 重複除去
+pdf2 = pd.DataFrame({"x": [1,1,2,2,3], "y": ["a","a","b","b","c"]})
+print(pdf2.drop_duplicates())
+plf3 = pl.DataFrame({"x": [1,1,2,2,3], "y": ["a","a","b","b","c"]})
+print(plf3.unique())`,
+    afterCode: "ミニ演習: 文字列 '2024-01-15' を pandas と Polars でそれぞれ日時型に変換してください。pandas は pd.to_datetime()、Polars は str.to_datetime() を使います。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "集約とグループ化",
+  est: "55分",
+  goal: "groupby / group_by による集約操作を自在に使いこなせるようになる。単純な合計・平均だけでなく、複数集約関数の同時適用、ピボットテーブル、ウィンドウ関数（over / rolling / cumsum）まで含め、SQL の GROUP BY + WINDOW に相当する操作を DataFrame で書けるようになることがゴール。",
+  sections: [{
+    title: "基本的な集約関数",
+    body: "DataFrame 全体に対する集約は、pandas では df['列'].sum() / mean() / std() / min() / max() / count() などで行います。Polars も同様のメソッドを持ちますが、式ベースの書き方 df.select(pl.col('列').sum()) が推奨されます。\n\n複数列・複数集約を一度に行う場合、pandas では df.agg({'列A': 'sum', '列B': 'mean'}) のように辞書形式で指定します。Polars では df.select([pl.col('列A').sum(), pl.col('列B').mean()]) のようにリストで式を渡します。Polars の式ベースの方が、同じ列に複数の集約（平均と標準偏差）を適用するときに自然に書けます。\n\nカウント系の集約も重要です。pandas の value_counts() は各値の出現回数を返し、Polars では df['列'].value_counts() で同等の結果が得られます。nunique()（ユニークな値の数）も頻繁に使います。",
+    code: `import pandas as pd
+import polars as pl
+
+data = {"カテゴリ": ["A","B","A","B","A"], "売上": [100, 200, 150, 300, 120]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print("合計:", pdf["売上"].sum())
+print("平均:", pdf["売上"].mean())
+print("件数別:\\n", pdf["カテゴリ"].value_counts())
+
+# Polars
+plf = pl.DataFrame(data)
+print(plf.select([
+    pl.col("売上").sum().alias("合計"),
+    pl.col("売上").mean().alias("平均")
+]))
+print(plf["カテゴリ"].value_counts())`,
+    afterCode: "ポイント: pandas の describe() は count / mean / std / min / 25% / 50% / 75% / max を一括表示します。探索的データ分析の最初の一手として非常に便利です。"
+  }, {
+    title: "グループ化 — groupby / group_by",
+    body: "特定の列の値でデータをグループに分け、グループごとに集約するのが groupby です。SQL の GROUP BY と同じ概念で、データ分析の最も基本的な操作の一つです。\n\npandas では df.groupby('列名') でグループ化オブジェクトを作り、そこに集約メソッドを呼びます。Polars では df.group_by('列名').agg(...) で集約を行います。pandas の groupby はデフォルトでグループ列をインデックスにしますが、as_index=False を付けると通常の列として残せます。\n\n複数列でグループ化する場合はリストで渡します。pandas は groupby(['列A', '列B'])、Polars は group_by(['列A', '列B']) です。集約関数も複数指定でき、グループごとの合計・平均・件数を一度に計算できます。",
+    table: T.aggCompare,
+    code: `import pandas as pd
+import polars as pl
+
+data = {"店舗": ["東京","東京","大阪","大阪","東京"],
+        "商品": ["A","B","A","B","A"],
+        "売上": [100, 200, 150, 300, 120]}
+
+# pandas
+pdf = pd.DataFrame(data)
+print(pdf.groupby("店舗", as_index=False)["売上"].agg(["sum","mean"]))
+
+# Polars
+plf = pl.DataFrame(data)
+print(plf.group_by("店舗").agg([
+    pl.col("売上").sum().alias("合計"),
+    pl.col("売上").mean().alias("平均"),
+    pl.col("売上").count().alias("件数")
+]))`,
+    afterCode: "ポイント: Polars の group_by は結果の順序が保証されません（ハッシュベースなので）。順序が必要な場合は結果を sort() してください。pandas は sort=True がデフォルトです。"
+  }, {
+    title: "ピボットテーブル",
+    body: "ピボットテーブルは「行と列の2軸でデータをクロス集計する」操作です。Excel のピボットテーブル機能と同じ概念で、例えば「月別 x カテゴリ別の売上合計」のような集計に使います。\n\npandas では pd.pivot_table(df, values='売上', index='月', columns='カテゴリ', aggfunc='sum') で作成します。aggfunc にはリストを渡して複数の集約を同時に行うこともできます。Polars では df.pivot(on='カテゴリ', index='月', values='売上', aggregate_function='sum') です。\n\n逆操作のメルト（ピボットの逆）も重要です。横持ちのデータを縦持ちに変換する操作で、pandas は pd.melt()、Polars は df.unpivot()（旧 melt）を使います。可視化ライブラリは縦持ちデータを好むため、ピボット ↔ メルトの変換は頻繁に行います。",
+    code: `import pandas as pd
+import polars as pl
+
+data = {"月": ["1月","1月","2月","2月"],
+        "カテゴリ": ["食品","文具","食品","文具"],
+        "売上": [1000, 200, 1200, 350]}
+
+# pandas
+pdf = pd.DataFrame(data)
+pivot_pd = pd.pivot_table(pdf, values="売上", index="月", columns="カテゴリ", aggfunc="sum")
+print(pivot_pd)
+
+# Polars
+plf = pl.DataFrame(data)
+pivot_pl = plf.pivot(on="カテゴリ", index="月", values="売上", aggregate_function="sum")
+print(pivot_pl)`,
+    afterCode: "ポイント: ピボットテーブルで aggfunc を省略すると pandas はデフォルトで mean（平均）を使います。sum のつもりで集計したら平均になっていた、という事故が起きがちなので、必ず明示しましょう。"
+  }, {
+    title: "ウィンドウ関数",
+    body: "ウィンドウ関数は、グループ化と似ていますが「行数を減らさずに、各行にグループ単位の計算結果を付与する」操作です。SQL の OVER 句に相当し、累計・移動平均・ランキングなどに使います。\n\npandas では groupby().transform() や rolling().mean() でウィンドウ関数を実現します。Polars では式に .over('列名') を付けることでウィンドウ関数になります。この .over() は SQL の PARTITION BY に相当し、指定した列の値ごとに独立して計算が行われます。\n\n移動平均（ローリング）は時系列データの平滑化に頻繁に使います。pandas は df['列'].rolling(window=3).mean()、Polars は pl.col('列').rolling_mean(window_size=3) です。",
+    code: `import pandas as pd
+import polars as pl
+
+data = {"グループ": ["A","A","A","B","B","B"],
+        "値": [10, 20, 30, 100, 200, 300]}
+
+# pandas — transform でウィンドウ関数
+pdf = pd.DataFrame(data)
+pdf["グループ平均"] = pdf.groupby("グループ")["値"].transform("mean")
+pdf["累計"] = pdf.groupby("グループ")["値"].cumsum()
+print(pdf)
+
+# Polars — over() でウィンドウ関数
+plf = pl.DataFrame(data)
+result = plf.with_columns([
+    pl.col("値").mean().over("グループ").alias("グループ平均"),
+    pl.col("値").cum_sum().over("グループ").alias("累計")
+])
+print(result)`,
+    afterCode: "ポイント: Polars の over() は複数列でパーティションを切ることもできます。pl.col('値').sum().over(['年', '月']) のように書くと、年×月の組み合わせごとに合計が計算されます。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "結合とマージ",
+  est: "45分",
+  goal: "内部結合・左結合・外部結合・クロス結合の違いを理解し、pandas の merge と Polars の join を使って複数の DataFrame を正しく結合できるようになる。concat による縦結合との使い分けも含め、SQL の JOIN / UNION に相当する操作を DataFrame で自在に書けることがゴール。",
+  sections: [{
+    title: "結合の種類",
+    body: "データベースの世界では、複数のテーブルを共通キーで結びつける操作を JOIN と呼びます。DataFrame でもまったく同じ概念を使い、pandas は pd.merge()、Polars は df.join() で結合します。\n\n結合方法は4種類あります。内部結合 (inner) は両方のテーブルにキーが存在する行だけを残します。左結合 (left) は左テーブルの全行を残し、右に一致がなければ欠損値になります。外部結合 (outer / full) は両方の全行を残します。クロス結合 (cross) はすべての組み合わせを作ります。\n\n実務で最も使うのは left join です。「マスターテーブルの全行を残しつつ、別テーブルの情報を付け足す」というパターンが非常に多いためです。inner join はデータの欠損を見逃しやすいため、意図的に「両方に存在するもの」だけを抽出したい場合に限って使います。",
+    table: T.joinCompare,
+    afterTable: "pandas では merge の how 引数に 'outer' を使いますが、Polars では 'full' と書きます。この命名の違いはよくある混乱ポイントなので注意してください。"
+  }, {
+    title: "基本的な結合操作",
+    body: "結合の基本形は「共通のキー列を指定して2つの DataFrame を結合する」です。pandas は pd.merge(left, right, on='キー列', how='inner')、Polars は left.join(right, on='キー列', how='inner') です。\n\n左右の DataFrame でキー列の名前が異なる場合は、pandas では left_on / right_on を指定します。Polars でも同様に left_on / right_on が使えます。結合後に不要な重複列が残ることがあるので、select や drop で整理する習慣を付けましょう。\n\n結合結果の行数にも注意が必要です。キーが一意でない場合（1対多の結合）、行数が増えます。意図せず行が増殖していないか、結合後に shape を確認するのが安全です。",
+    code: `import pandas as pd
+import polars as pl
+
+users = {"user_id": [1,2,3], "名前": ["田中","佐藤","鈴木"]}
+orders = {"user_id": [1,1,2,4], "商品": ["A","B","C","D"], "金額": [100,200,300,400]}
+
+# pandas
+pu, po = pd.DataFrame(users), pd.DataFrame(orders)
+print("--- inner ---")
+print(pd.merge(pu, po, on="user_id"))
+print("--- left ---")
+print(pd.merge(pu, po, on="user_id", how="left"))
+
+# Polars
+plu, plo = pl.DataFrame(users), pl.DataFrame(orders)
+print("--- inner ---")
+print(plu.join(plo, on="user_id", how="inner"))
+print("--- left ---")
+print(plu.join(plo, on="user_id", how="left"))`,
+    afterCode: "ポイント: user_id=4 の注文は users テーブルに存在しないため、inner join では消えます。left join では users 側の全行（1,2,3）が残り、user_id=3 の注文は null になります。この違いを確認してください。"
+  }, {
+    title: "縦結合 — concat",
+    body: "結合 (join) が「横に結びつける」操作であるのに対し、concat は「縦に積み重ねる」操作です。SQL の UNION ALL に相当します。同じ構造（カラム名と型が一致）の DataFrame を上下に繋げるのが典型的な使い方です。\n\npandas は pd.concat([df1, df2])、Polars は pl.concat([df1, df2]) で縦結合します。pandas はデフォルトでインデックスが重複しますが、ignore_index=True で振り直せます。Polars にはインデックスがないため、この問題は起きません。\n\nカラム名が完全に一致していない場合の挙動も異なります。pandas は自動的に全カラムを含め、欠損部分を NaN で埋めます。Polars はデフォルトでエラーになりますが、how='diagonal' を指定すると pandas と同様の挙動になります。",
+    code: `import pandas as pd
+import polars as pl
+
+jan = {"商品": ["A","B"], "売上": [100, 200]}
+feb = {"商品": ["A","B"], "売上": [120, 180]}
+
+# pandas
+pj, pf = pd.DataFrame(jan), pd.DataFrame(feb)
+pj["月"] = "1月"; pf["月"] = "2月"
+print(pd.concat([pj, pf], ignore_index=True))
+
+# Polars
+plj = pl.DataFrame(jan).with_columns(pl.lit("1月").alias("月"))
+plf = pl.DataFrame(feb).with_columns(pl.lit("2月").alias("月"))
+print(pl.concat([plj, plf]))`,
+    afterCode: "ポイント: concat は「構造が同じデータを追加する」操作なので、月次データを積み上げる・複数ソースのデータを統合する、といった場面で使います。横に項目を増やしたい場合は join を使いましょう。"
+  }, {
+    title: "pandas ↔ Polars の相互変換",
+    body: "実務では pandas と Polars を混在して使うことがあります。scikit-learn の入力に pandas が必要、大規模集計は Polars でやりたい、といったケースです。両ライブラリ間の変換は Apache Arrow を介して非常に効率的に行えます。\n\nPolars → pandas は df.to_pandas() で変換できます。pandas → Polars は pl.from_pandas(df) です。Arrow 経由で変換されるため、大きなデータでもコピーコストが比較的小さく済みます。\n\nただし型の対応が完全ではない場合があります。pandas の object 型（Python オブジェクトの混在列）は Polars に変換するとエラーになることがあります。変換前に dtypes を確認し、必要なら型を統一しておくのが安全です。",
+    code: `import pandas as pd
+import polars as pl
+
+# pandas → Polars
+pdf = pd.DataFrame({"x": [1,2,3], "y": ["a","b","c"]})
+plf = pl.from_pandas(pdf)
+print(type(plf))  # <class 'polars.DataFrame'>
+
+# Polars → pandas
+plf2 = pl.DataFrame({"a": [10,20], "b": [1.5, 2.5]})
+pdf2 = plf2.to_pandas()
+print(type(pdf2))  # <class 'pandas.core.frame.DataFrame'>`,
+    afterCode: "ポイント: 変換は便利ですが、頻繁に行き来するとオーバーヘッドが蓄積します。処理パイプラインの中でどちらを使うかを決め、変換は入口と出口で1回ずつに留めるのが理想です。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "文字列・日時操作",
+  est: "45分",
+  goal: "文字列カラムに対する操作（分割・結合・正規表現・置換）を pandas の str アクセサと Polars の str 名前空間の両方で書けるようになる。日時型の扱い（パース・年月日抽出・差分計算・リサンプル）まで含め、テキストデータと時系列データを自在に加工できることがゴール。",
+  sections: [{
+    title: "文字列操作 — str アクセサ",
+    body: "DataFrame の文字列カラムに対して一括操作を行うには、pandas では .str アクセサ、Polars では .str 名前空間を使います。どちらも似た API を提供していますが、メソッド名が微妙に異なる場合があります。\n\n基本的な操作として、大文字・小文字変換、文字列長の取得、部分文字列の抽出、分割、結合、前後の空白除去（strip）などがあります。これらは for ループで1行ずつ処理するよりも圧倒的に高速です。pandas の str 操作は内部で NumPy のベクトル化を使い、Polars は Rust の文字列処理エンジンを使うため、さらに速いです。\n\ncontains や startswith / endswith は文字列のパターンマッチに使い、フィルタ条件として頻繁に登場します。「名前が『田』で始まる人」「メールアドレスに 'gmail' を含む人」といった条件を書くのに使います。",
+    table: T.strCompare,
+    code: `import pandas as pd
+import polars as pl
+
+data = {"名前": ["  田中太郎  ", "佐藤花子", "SUZUKI"], "email": ["tanaka@gmail.com","sato@yahoo.co.jp","suzuki@gmail.com"]}
+
+# pandas
+pdf = pd.DataFrame(data)
+pdf["名前_整形"] = pdf["名前"].str.strip()
+pdf["gmail"] = pdf["email"].str.contains("gmail")
+print(pdf)
+
+# Polars
+plf = pl.DataFrame(data)
+result = plf.with_columns([
+    pl.col("名前").str.strip_chars().alias("名前_整形"),
+    pl.col("email").str.contains("gmail").alias("gmail")
+])
+print(result)`,
+    afterCode: "ポイント: pandas の str.strip() は前後の空白を除去しますが、Polars では str.strip_chars() です。このようにメソッド名が異なるケースがあるため、公式ドキュメントで確認する習慣を付けましょう。"
+  }, {
+    title: "正規表現によるテキスト処理",
+    body: "正規表現 (regex) を使った高度なテキスト処理は、データクリーニングの強力な武器です。電話番号からハイフンを除去する、メールアドレスからドメインを抽出する、数値部分だけを取り出す、といった操作に使います。\n\npandas では str.extract() で正規表現の捕捉グループに一致する部分を抽出し、str.replace() で置換を行います。Polars でも str.extract() と str.replace() / str.replace_all() が使えます。正規表現のパターン自体は Python の re モジュールと同じ構文です。\n\n実務で頻繁に使う正規表現パターンとしては、r'\\d+' (数字列)、r'[A-Za-z]+' (英字列)、r'@(.+)$' (メールのドメイン) などがあります。正規表現に自信がなければ、regex101.com のようなオンラインツールでパターンを試してから DataFrame に適用するのがおすすめです。",
+    code: `import pandas as pd
+import polars as pl
+
+data = {"テキスト": ["商品A: 1500円", "商品B: 2800円", "商品C: 980円"]}
+
+# pandas
+pdf = pd.DataFrame(data)
+pdf["価格"] = pdf["テキスト"].str.extract(r"(\\d+)円").astype(int)
+print(pdf)
+
+# Polars
+plf = pl.DataFrame(data)
+result = plf.with_columns(
+    pl.col("テキスト").str.extract(r"(\\d+)円", 1).cast(pl.Int64).alias("価格")
+)
+print(result)`,
+    afterCode: "ポイント: Polars の str.extract() は捕捉グループのインデックス（1始まり）を第2引数で指定します。pandas は自動的にグループ1を返しますが、Polars は明示的です。"
+  }, {
+    title: "日時型の基本操作",
+    body: "日付・時刻データの扱いは、データ分析で避けて通れないテーマです。pandas は datetime64[ns] 型を中心とした強力な日時サポートを持ち、Polars も Datetime / Date / Time / Duration 型で同等の機能を提供しています。\n\n文字列から日時型への変換（パース）は、pandas では pd.to_datetime()、Polars では str.to_datetime() を使います。フォーマット文字列 (%Y-%m-%d など) で入力形式を指定できます。パース後は .dt アクセサ（pandas）または .dt 名前空間（Polars）で年・月・日・曜日などの成分を抽出できます。\n\n日時の差分計算も重要です。pandas では日時列同士の引き算で timedelta が得られ、.dt.days で日数に変換できます。Polars では同様に差分を取ると Duration 型が返ります。",
+    table: T.dtCompare,
+    code: `import pandas as pd
+import polars as pl
+
+dates = ["2024-01-15", "2024-06-20", "2024-12-25"]
+
+# pandas
+pdf = pd.DataFrame({"日付": pd.to_datetime(dates)})
+pdf["年"] = pdf["日付"].dt.year
+pdf["月"] = pdf["日付"].dt.month
+pdf["曜日"] = pdf["日付"].dt.day_name()
+print(pdf)
+
+# Polars
+plf = pl.DataFrame({"日付": dates})
+result = plf.with_columns(pl.col("日付").str.to_datetime()).with_columns([
+    pl.col("日付").dt.year().alias("年"),
+    pl.col("日付").dt.month().alias("月"),
+    pl.col("日付").dt.weekday().alias("曜日番号")
+])
+print(result)`,
+    afterCode: "ポイント: pandas の dt.dayofweek は月曜=0〜日曜=6、Polars の dt.weekday() も同様に月曜=1〜日曜=7 です（微妙にオフセットが異なる場合があるのでドキュメントで確認してください）。"
+  }, {
+    title: "時系列のリサンプルと集約",
+    body: "時系列データを特定の時間間隔で集約する操作をリサンプル (resample) と呼びます。日次データを月次に集約する、分足データを時間足にする、といった操作です。\n\npandas では df.resample('M', on='日付列') で月次リサンプルし、.sum() / .mean() などで集約します。resample は DatetimeIndex を前提とした API で、set_index() で日時列をインデックスにする必要がある場合もあります。\n\nPolars ではリサンプルに相当する操作として group_by_dynamic() があります。every='1mo' で月次、every='1w' で週次といった指定が可能です。Polars の方が直感的な引数で指定でき、インデックスの設定も不要です。",
+    code: `import pandas as pd
+import polars as pl
+
+# pandas — resample
+dates = pd.date_range("2024-01-01", periods=90, freq="D")
+pdf = pd.DataFrame({"日付": dates, "売上": range(90)})
+monthly = pdf.resample("M", on="日付")["売上"].sum()
+print(monthly)
+
+# Polars — group_by_dynamic
+plf = pl.DataFrame({
+    "日付": [d.isoformat() for d in dates],
+    "売上": list(range(90))
+}).with_columns(pl.col("日付").str.to_datetime())
+
+monthly_pl = plf.group_by_dynamic("日付", every="1mo").agg(
+    pl.col("売上").sum()
+)
+print(monthly_pl)`,
+    afterCode: "ポイント: pandas の resample は非常に柔軟で、'W-MON'（月曜始まりの週次）、'Q'（四半期）、'H'（時間）なども使えます。Polars の group_by_dynamic も '1w' / '1q' / '1h' で同等の指定が可能です。"
+  }]
+}, {
+  id: "ch9",
+  num: 9,
+  title: "可視化基礎",
+  est: "40分",
+  goal: "pandas の DataFrame.plot() による手軽な可視化と、matplotlib / seaborn を使ったより詳細なグラフ作成ができるようになる。Polars のデータを可視化する方法（変換またはリスト抽出）を理解し、分析結果を視覚的に伝えるスキルを身に付けることがゴール。",
+  sections: [{
+    title: "pandas.plot() — 最速の可視化",
+    body: "pandas の DataFrame と Series には .plot() メソッドが組み込まれており、matplotlib をバックエンドとしてグラフを描画します。df.plot(kind='line') で折れ線、kind='bar' で棒グラフ、kind='hist' でヒストグラム、kind='scatter' で散布図が描けます。\n\n.plot() の最大の利点は手軽さです。1行で基本的なグラフが描け、探索的データ分析 (EDA) で「とりあえずデータの傾向を見たい」ときに最適です。列名が自動的にラベルに使われ、凡例も自動で追加されるため、設定なしでそれなりに見やすいグラフができます。\n\nカスタマイズしたい場合は、.plot() の戻り値（matplotlib の Axes オブジェクト）に対してタイトル・ラベル・色・サイズなどを設定します。figsize 引数でサイズを変え、title でタイトルを付け、color で色を指定するのが基本です。",
+    code: `import pandas as pd
+import matplotlib.pyplot as plt
+
+data = {"月": ["1月","2月","3月","4月","5月"],
+        "売上A": [120, 150, 180, 160, 200],
+        "売上B": [100, 130, 140, 170, 190]}
+pdf = pd.DataFrame(data)
+
+# 折れ線グラフ
+pdf.plot(x="月", y=["売上A","売上B"], kind="line", marker="o", figsize=(8,4))
+plt.title("月別売上推移")
+plt.ylabel("万円")
+plt.tight_layout()
+plt.show()
+
+# 棒グラフ
+pdf.plot(x="月", kind="bar", figsize=(8,4))
+plt.title("月別売上比較")
+plt.tight_layout()
+plt.show()`,
+    afterCode: "ポイント: Jupyter Notebook では %matplotlib inline を冒頭に書くと、plt.show() なしでグラフが表示されます。"
+  }, {
+    title: "matplotlib で詳細なグラフを作る",
+    body: "pandas.plot() は手軽ですが、複雑なレイアウト（サブプロット・注釈・カスタム軸）が必要な場合は matplotlib を直接使う方が柔軟です。fig, ax = plt.subplots() でフィギュアと軸を作り、ax.plot() / ax.bar() などでデータを描画します。\n\nmatplotlib の基本概念は Figure（紙全体）と Axes（個々のグラフ領域）の2層構造です。plt.subplots(nrows=2, ncols=2) で2x2のサブプロットを作り、各 axes にデータを描画すれば、ダッシュボード風のグラフが作れます。\n\nPolars のデータを matplotlib で可視化するには、.to_list() で Python リストに変換するか、.to_pandas() で pandas に変換してから .plot() を使います。Polars 自体にはプロット機能がないため、この変換が必要です。",
+    code: `import matplotlib.pyplot as plt
+import polars as pl
+
+plf = pl.DataFrame({
+    "x": list(range(10)),
+    "y": [x**2 for x in range(10)]
+})
+
+# Polars → matplotlib
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(plf["x"].to_list(), plf["y"].to_list(), "o-", color="purple")
+ax.set_xlabel("x")
+ax.set_ylabel("y = x^2")
+ax.set_title("Polars データの可視化")
+ax.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()`,
+    afterCode: "ポイント: matplotlib で日本語を表示するには、japanize-matplotlib パッケージをインストールして import japanize_matplotlib するのが最も手軽です。"
+  }, {
+    title: "seaborn — 統計的可視化",
+    body: "seaborn は matplotlib の上に構築された統計的可視化ライブラリです。pandas の DataFrame を直接渡すだけで、美しい統計グラフを描けます。箱ひげ図、バイオリンプロット、ヒートマップ、ペアプロットなど、EDA に必要なグラフが充実しています。\n\nseaborn の最大の強みは、hue 引数によるカテゴリ別の色分けです。sns.scatterplot(data=df, x='身長', y='体重', hue='性別') と書くだけで、性別ごとに色分けされた散布図が得られます。この手軽さは matplotlib 単体では実現しにくいものです。\n\nseaborn は pandas DataFrame を前提としているため、Polars のデータを使う場合は .to_pandas() で変換してから渡す必要があります。変換のオーバーヘッドはあるものの、可視化の頻度（多くても数十回/分析セッション）では無視できるレベルです。",
+    code: `import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+
+np.random.seed(42)
+pdf = pd.DataFrame({
+    "カテゴリ": np.random.choice(["A","B","C"], 200),
+    "値": np.random.randn(200) * 10 + 50
+})
+
+# 箱ひげ図
+sns.boxplot(data=pdf, x="カテゴリ", y="値")
+plt.title("カテゴリ別の値の分布")
+plt.show()
+
+# ヒートマップ（相関行列）
+corr_data = pd.DataFrame(np.random.randn(100, 4), columns=["A","B","C","D"])
+sns.heatmap(corr_data.corr(), annot=True, cmap="coolwarm", vmin=-1, vmax=1)
+plt.title("相関行列")
+plt.show()`,
+    afterCode: "ポイント: seaborn のテーマは sns.set_theme(style='whitegrid') などで変更できます。プレゼン用には 'darkgrid'、論文用には 'white' がよく使われます。"
+  }]
+}, {
+  id: "ch10",
+  num: 10,
+  title: "パフォーマンス比較と実践",
+  est: "45分",
+  goal: "pandas と Polars の性能差がどの操作でどの程度生じるかを実測で把握する。Polars の遅延評価 (LazyFrame) による最適化の仕組みを理解し、実際の分析パイプラインを両ライブラリで組み立てて比較できるようになることがゴール。コース全体の知識を統合し、用途に応じた使い分けの指針を持てる状態がゴール。",
+  sections: [{
+    title: "ベンチマーク — 速度とメモリ",
+    body: "pandas と Polars のパフォーマンス差は、操作の種類とデータの規模によって大きく変わります。一般的な傾向として、CSV 読み込みは Polars が 3〜5 倍速、groupby 集約は 5〜10 倍速、join は 3〜5 倍速です。これは Polars が Rust で書かれておりマルチスレッドを活用するためです。\n\nメモリ使用量でも Polars が有利です。Apache Arrow のメモリフォーマットは列指向で圧縮効率が高く、同じデータでも pandas の 1/2〜1/5 のメモリで保持できます。pandas が int64 を使う場面で Polars は Int32 や Int16 を自動選択することもあります。\n\nただし小規模データ（数千行以下）では両者の差はほとんどなく、pandas の方が若干速い場合もあります。また pandas は NumPy との統合が深いため、NumPy の関数を大量に使う場面では pandas の方が効率的なこともあります。性能差は「中〜大規模データでの集約・結合・フィルタ」で顕著になります。",
+    table: T.perfCompare,
+    afterTable: "上記の数値は代表的なハードウェア（8コア CPU / 32GB RAM）での目安です。実際の差はデータの内容・操作の複雑さ・ハードウェアに依存するため、自分の環境で計測するのが最も確実です。"
+  }, {
+    title: "遅延評価 (Lazy Evaluation)",
+    body: "Polars の最大の強みの一つが遅延評価（LazyFrame）です。df.lazy() で LazyFrame に変換すると、その後の操作（filter, select, group_by など）は即座に実行されず、クエリプランとして記録されます。最後に .collect() を呼んだ時点で、Polars はクエリプラン全体を見て最適化してから実行します。\n\nこの最適化には「述語プッシュダウン」（フィルタ条件をデータソースに近い位置で適用し、不要な行の読み込みを省く）、「投影プッシュダウン」（必要な列だけを読み込む）、「共通部分式の除去」（同じ計算の重複を排除する）などが含まれます。\n\nscan_csv() や scan_parquet() は最初から LazyFrame を返すため、ファイルを全部メモリに載せずに必要な部分だけ処理できます。メモリに載りきらない大規模ファイルの処理に威力を発揮し、pandas にはない Polars 固有の強みです。",
+    code: `import polars as pl
+
+# LazyFrame でクエリを構築（この時点ではまだ実行されない）
+query = (
+    pl.scan_csv("large_data.csv")
+    .filter(pl.col("年齢") > 20)
+    .select(["名前", "年齢", "売上"])
+    .group_by("名前")
+    .agg(pl.col("売上").sum())
+    .sort("売上", descending=True)
+    .head(10)
+)
+
+# クエリプランを確認
+print(query.explain())   # 最適化後のプランが表示される
+
+# 実行
+result = query.collect()  # ここで初めてファイルを読み込み・処理する
+print(result)`,
+    afterCode: "ポイント: explain() でクエリプランを確認すると、Polars がどのような最適化を行っているかがわかります。FILTER PUSHDOWN や PROJECTION PUSHDOWN が表示されていれば、最適化が効いています。"
+  }, {
+    title: "使い分けの指針",
+    body: "pandas と Polars の使い分けは、データの規模・チームの状況・エコシステムの要件で判断します。pandas を選ぶのは「数万行以下の探索的分析」「scikit-learn / statsmodels との連携が必要」「チームが pandas に慣れている」「Jupyter での対話的作業」といった場面です。\n\nPolars を選ぶのは「数百万行以上のデータ処理」「バッチパイプラインでの定常処理」「メモリ効率が重要」「処理速度がボトルネック」といった場面です。また Polars は API がモダンで一貫しているため、新規プロジェクトで最初から採用するケースも増えています。\n\n両方を組み合わせるのも有効なアプローチです。大規模データの前処理を Polars で行い、分析・可視化を pandas + matplotlib / seaborn で行う、というパイプラインは実務で非常によく見られます。to_pandas() / from_pandas() による変換が軽量なので、切り替えコストは最小限に抑えられます。",
+    afterCode: "コース完了後の次のステップ: このコースでは入門レベルの操作を一通りカバーしました。次は実際のデータセット（Kaggle のデータなど）を使って、読み込み → クリーニング → 分析 → 可視化の一連のパイプラインを自力で組み立ててみてください。「知識」を「スキル」に変えるには手を動かすのが一番です。"
+  }, {
+    title: "総合演習の進め方",
+    body: "この章の演習では、ここまで学んだすべての知識を使って、pandas と Polars による完全なデータ分析パイプラインを構築します。CSV からの読み込み、欠損値処理、型変換、グループ化集約、結合、そしてパフォーマンス比較まで、一気通貫で実装します。\n\nまずは pandas で書き、次に Polars に書き換えて比較するのがおすすめです。「同じことを両方で書ける」状態になれば、用途に応じて最適なライブラリを選択できる実力が付いたと言えます。\n\n解答を見る前に自分で実装してみてください。うまくいかない箇所があれば、該当する章に戻って復習しましょう。エラーメッセージを読む力も実務では重要なスキルです。",
+    afterCode: "コースを最後まで完了した方へ: pandas と Polars の両方を操れるようになったことで、Python のデータ分析エコシステムの中核的なスキルが身に付きました。実務では「とりあえず pandas で試し、遅ければ Polars に移行する」というアプローチが現実的です。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, React.createElement("thead", null, React.createElement("tr", null, data.h.map((h, i) => React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), React.createElement("tbody", null, data.r.map((row, ri) => React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function PandasPolarsCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, React.createElement("div", {
+    style: {
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\uD83D\uDC3C"), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "pandas / Polars \u5165\u9580\u30B3\u30FC\u30B9"), React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "pandas \u3068 Polars \u306E\u4E21\u65B9\u3092\u4E26\u884C\u3057\u3066\u5B66\u3073\u3001\u30C7\u30FC\u30BF\u306E\u8AAD\u307F\u8FBC\u307F\u30FB\u52A0\u5DE5\u30FB\u96C6\u7D04\u30FB\u53EF\u8996\u5316\u306E\u4E00\u9023\u306E\u30D5\u30ED\u30FC\u3092\u8EAB\u306B\u4ED8\u3051\u307E\u3059\u3002\u300C\u30C7\u30FC\u30BF\u306E\u898F\u6A21\u3084\u7528\u9014\u306B\u5FDC\u3058\u3066\u6700\u9069\u306A\u30E9\u30A4\u30D6\u30E9\u30EA\u3092\u9078\u629E\u3067\u304D\u308B\u300D\u72B6\u614B\u306B\u306A\u308B\u3053\u3068\u304C\u30B3\u30FC\u30B9\u5168\u4F53\u306E\u30B4\u30FC\u30EB\u3067\u3059\u3002"), React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "\u25B2" : "\u25BC")), menuOpen && React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F"))))), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` \u30FB \u6F14\u7FD2${exercises.length}\u554F` : ""))), chapter.goal && React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"), React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => React.createElement(Section, {
+    key: ch + "-" + i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => React.createElement(Exercise, {
+    key: ch + "-" + i,
+    ex: ex,
+    idx: i
+  }))), React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : React.createElement("a", {
+    href: "../index.html",
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "pandas 2.2 \u30FB Polars 0.20 \u30FB Python 3.12 \u6E96\u62E0 \u30FB 2026\u5E744\u6708\u6642\u70B9")));
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(PandasPolarsCourse));
+  </script>
+</body>
+</html>

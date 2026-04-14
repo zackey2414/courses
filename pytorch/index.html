@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PyTorch 入門コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのPyTorch入門コース。全10章・30問の演習付き。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  frameworks: {
+    h: ["項目", "PyTorch", "TensorFlow / Keras"],
+    r: [["計算グラフ", "Define-by-Run（動的）", "Define-and-Run → Eager（2.x で動的も可）"], ["デバッグ", "Python の pdb / print がそのまま使える", "tf.function 内では制約あり"], ["研究利用", "論文実装のデファクト（arXiv の 80%+）", "産業向けデプロイに強い"], ["学習曲線", "NumPy に近い感覚で書ける", "高レベル API は簡潔だが低レベルは複雑"], ["分散学習", "DDP / FSDP", "tf.distribute.Strategy"], ["デプロイ", "TorchServe / ONNX / TorchScript", "TF Serving / TF Lite / TF.js"]],
+    cap: "2024年以降、研究・産業の両面で PyTorch のシェアが拡大し続けています。"
+  },
+  tensorCreate: {
+    h: ["関数", "説明", "NumPy 対応"],
+    r: [["torch.tensor([1,2,3])", "リストから作成", "np.array([1,2,3])"], ["torch.zeros(3, 4)", "全てゼロ", "np.zeros((3,4))"], ["torch.ones(2, 3)", "全て1", "np.ones((2,3))"], ["torch.rand(2, 3)", "一様乱数 [0,1)", "np.random.rand(2,3)"], ["torch.randn(2, 3)", "標準正規分布", "np.random.randn(2,3)"], ["torch.arange(0, 10, 2)", "等差数列", "np.arange(0,10,2)"], ["torch.linspace(0, 1, 5)", "等間隔分割", "np.linspace(0,1,5)"], ["torch.eye(3)", "単位行列", "np.eye(3)"], ["torch.empty(2, 3)", "未初期化（高速）", "np.empty((2,3))"]]
+  },
+  dtypes: {
+    h: ["PyTorch 型", "Python / NumPy 対応", "用途"],
+    r: [["torch.float32 (デフォルト)", "np.float32", "ニューラルネットの標準精度"], ["torch.float64", "np.float64", "高精度計算"], ["torch.float16", "np.float16", "混合精度学習（AMP）"], ["torch.bfloat16", "なし", "TPU / A100 以降の混合精度"], ["torch.int32", "np.int32", "インデックス・カウンタ"], ["torch.int64 (デフォルト整数)", "np.int64", "ラベル・ID"], ["torch.bool", "np.bool_", "マスク・条件"]]
+  },
+  shapeOps: {
+    h: ["操作", "メソッド", "説明"],
+    r: [["形状変更", "view / reshape", "要素数が同じなら自由に変形"], ["転置", "t() / permute", "2次元転置 / 任意次元入れ替え"], ["次元追加", "unsqueeze(dim)", "指定位置にサイズ1の次元を挿入"], ["次元削除", "squeeze(dim)", "サイズ1の次元を削除"], ["結合", "torch.cat / torch.stack", "既存次元で結合 / 新次元で積み重ね"], ["分割", "torch.chunk / torch.split", "均等分割 / サイズ指定分割"], ["展開", "flatten()", "多次元を1次元に展開"]]
+  },
+  autogradOps: {
+    h: ["操作", "コード", "説明"],
+    r: [["勾配有効化", "requires_grad=True", "この Tensor の勾配を追跡開始"], ["逆伝播", "loss.backward()", "計算グラフを遡って勾配計算"], ["勾配取得", "x.grad", "backward() 後に格納された勾配値"], ["勾配停止", "with torch.no_grad():", "推論時に勾配計算を止めてメモリ節約"], ["グラフ切断", "detach()", "計算グラフから切り離した新 Tensor を返す"], ["勾配リセット", "optimizer.zero_grad()", "前回の勾配を消去（累積防止）"]]
+  },
+  nnModules: {
+    h: ["レイヤー", "クラス", "説明"],
+    r: [["全結合層", "nn.Linear(in, out)", "y = xW^T + b"], ["活性化", "nn.ReLU / nn.Sigmoid / nn.Tanh", "非線形変換"], ["ドロップアウト", "nn.Dropout(p)", "訓練時にランダムにユニットを無効化"], ["バッチ正規化", "nn.BatchNorm1d(features)", "ミニバッチ内で正規化"], ["コンテナ", "nn.Sequential(...)", "レイヤーを順番に並べる"]]
+  },
+  losses: {
+    h: ["損失関数", "クラス", "用途"],
+    r: [["平均二乗誤差", "nn.MSELoss()", "回帰問題"], ["平均絶対誤差", "nn.L1Loss()", "外れ値に頑健な回帰"], ["交差エントロピー", "nn.CrossEntropyLoss()", "多クラス分類（softmax 内蔵）"], ["二値交差エントロピー", "nn.BCEWithLogitsLoss()", "二値分類（sigmoid 内蔵）"], ["負の対数尤度", "nn.NLLLoss()", "log_softmax との組み合わせ"], ["Huber 損失", "nn.HuberLoss()", "MSE と L1 のハイブリッド"]]
+  },
+  optimizers: {
+    h: ["最適化手法", "クラス", "特徴"],
+    r: [["SGD", "optim.SGD", "基本。momentum 併用が定番"], ["Adam", "optim.Adam", "適応学習率。多くのタスクで安定"], ["AdamW", "optim.AdamW", "重み減衰を正しく分離した Adam"], ["RMSprop", "optim.RMSprop", "RNN 系で使われることが多い"], ["Adagrad", "optim.Adagrad", "疎な特徴に強い"]]
+  },
+  transforms: {
+    h: ["変換", "クラス / 関数", "説明"],
+    r: [["Tensor化", "transforms.ToTensor()", "PIL/ndarray → [0,1] の FloatTensor"], ["正規化", "transforms.Normalize(mean, std)", "チャネルごとに平均・標準偏差で正規化"], ["リサイズ", "transforms.Resize(size)", "画像サイズ変更"], ["ランダム反転", "transforms.RandomHorizontalFlip()", "水平反転（データ拡張）"], ["ランダム切り出し", "transforms.RandomCrop(size)", "ランダムな位置で切り出し"], ["合成", "transforms.Compose([...])", "複数の変換をパイプライン化"]]
+  },
+  convOps: {
+    h: ["レイヤー", "クラス", "パラメータ"],
+    r: [["2D畳み込み", "nn.Conv2d(in_ch, out_ch, kernel)", "in_channels, out_channels, kernel_size, stride, padding"], ["最大プーリング", "nn.MaxPool2d(kernel)", "kernel_size, stride（デフォルト=kernel_size）"], ["平均プーリング", "nn.AvgPool2d(kernel)", "kernel_size, stride"], ["適応平均プーリング", "nn.AdaptiveAvgPool2d(output_size)", "出力サイズを指定（入力サイズ不問）"], ["バッチ正規化2D", "nn.BatchNorm2d(num_features)", "チャネル数を指定"]]
+  },
+  nlpLayers: {
+    h: ["レイヤー", "クラス", "説明"],
+    r: [["埋め込み層", "nn.Embedding(vocab, dim)", "整数ID → 密ベクトルに変換"], ["RNN", "nn.RNN(input, hidden)", "単純な再帰構造"], ["LSTM", "nn.LSTM(input, hidden)", "長期依存を学習可能なゲート付きRNN"], ["GRU", "nn.GRU(input, hidden)", "LSTMの簡略版（パラメータ少）"], ["パディング", "nn.utils.rnn.pad_sequence", "可変長系列を揃える"], ["パッキング", "nn.utils.rnn.pack_padded_sequence", "パディングを無視した効率的計算"]]
+  },
+  saveLoad: {
+    h: ["操作", "コード", "説明"],
+    r: [["パラメータ保存", "torch.save(model.state_dict(), path)", "推奨。モデル構造と分離して保存"], ["パラメータ読込", "model.load_state_dict(torch.load(path))", "同じモデル定義に重みを復元"], ["モデル全体保存", "torch.save(model, path)", "pickle 依存。バージョン互換性に注意"], ["ONNX出力", "torch.onnx.export(model, dummy, path)", "他フレームワークで推論可能な形式"], ["TorchScript", "torch.jit.script(model)", "Python 非依存の中間表現に変換"]]
+  },
+  debugTools: {
+    h: ["ツール / 手法", "用途", "コード例"],
+    r: [["TensorBoard", "損失・精度のグラフ化", "SummaryWriter('runs/exp')"], ["tqdm", "プログレスバー表示", "tqdm(dataloader)"], ["勾配ノルム確認", "勾配消失・爆発の検出", "p.grad.norm() for p in model.parameters()"], ["学習率スケジューラ", "学習率の可視化", "scheduler.get_last_lr()"], ["torch.autograd.set_detect_anomaly", "NaN発生箇所の特定", "set_detect_anomaly(True)"]]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "PyTorch がインストールされていることを確認し、バージョンとCUDAの利用可否を表示してください。",
+    code: `import torch\n# バージョンと CUDA 利用可否を表示`,
+    answer: `import torch\n\nprint("PyTorch version:", torch.__version__)\nprint("CUDA available:", torch.cuda.is_available())\nif torch.cuda.is_available():\n    print("CUDA device:", torch.cuda.get_device_name(0))`
+  }, {
+    diff: 1,
+    q: "Define-by-Run の動作を確認するため、テンソルの演算結果を途中で print しながら計算してください。\nif文で条件分岐しても計算グラフが動的に構築されることを示すコードを書きましょう。",
+    code: `import torch\n# x = torch.tensor(3.0) から始めて、\n# x > 0 なら y = x * 2、そうでなければ y = x * -1\n# 結果を print`,
+    answer: `import torch\n\nx = torch.tensor(3.0, requires_grad=True)\nprint("x =", x)\n\nif x > 0:\n    y = x * 2\n    print("正の値なので2倍:", y)\nelse:\n    y = x * -1\n    print("負の値なので符号反転:", y)\n\ny.backward()\nprint("dy/dx =", x.grad)  # 条件分岐に応じた勾配`
+  }, {
+    diff: 2,
+    q: "PyTorch と NumPy の速度を比較するコードを書いてください。\n大きな行列（1000x1000）の行列積を NumPy と PyTorch それぞれで実行し、\ntime モジュールで計測して結果を表示しましょう。",
+    code: `import torch\nimport numpy as np\nimport time\n\n# 1000x1000 の行列積を NumPy と PyTorch で比較`,
+    answer: `import torch\nimport numpy as np\nimport time\n\nsize = 1000\n\n# NumPy\na_np = np.random.randn(size, size).astype(np.float32)\nb_np = np.random.randn(size, size).astype(np.float32)\nstart = time.time()\nfor _ in range(10):\n    c_np = a_np @ b_np\nt_np = time.time() - start\nprint(f"NumPy: {t_np:.4f}s")\n\n# PyTorch (CPU)\na_pt = torch.randn(size, size)\nb_pt = torch.randn(size, size)\nstart = time.time()\nfor _ in range(10):\n    c_pt = a_pt @ b_pt\nt_pt = time.time() - start\nprint(f"PyTorch CPU: {t_pt:.4f}s")\n\nif torch.cuda.is_available():\n    a_gpu = a_pt.cuda()\n    b_gpu = b_pt.cuda()\n    torch.cuda.synchronize()\n    start = time.time()\n    for _ in range(10):\n        c_gpu = a_gpu @ b_gpu\n    torch.cuda.synchronize()\n    t_gpu = time.time() - start\n    print(f"PyTorch GPU: {t_gpu:.4f}s")`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "以下の条件でテンソルを作成し、それぞれの shape, dtype, device を表示してください。\n1. リスト [1, 2, 3, 4, 5] から整数テンソル\n2. 3x4 のゼロテンソル（float32）\n3. 2x3 の標準正規乱数テンソル",
+    code: `import torch\n# 3つのテンソルを作成して情報表示`,
+    answer: `import torch\n\n# 1. リストから\na = torch.tensor([1, 2, 3, 4, 5])\nprint("a:", a, "| shape:", a.shape, "| dtype:", a.dtype)\n\n# 2. ゼロテンソル\nb = torch.zeros(3, 4)\nprint("b shape:", b.shape, "| dtype:", b.dtype)\n\n# 3. 正規乱数\nc = torch.randn(2, 3)\nprint("c:", c, "| shape:", c.shape, "| dtype:", c.dtype)`
+  }, {
+    diff: 2,
+    q: "2x3x4 のテンソルを作成し、以下の形状操作を順番に行って各結果の shape を表示してください。\n1. view で (6, 4) に変形\n2. permute で軸を入れ替え (2, 0, 1)\n3. unsqueeze(0) で先頭にバッチ次元を追加\n4. flatten() で1次元に展開",
+    code: `import torch\nx = torch.randn(2, 3, 4)\n# 形状操作を実行`,
+    answer: `import torch\n\nx = torch.randn(2, 3, 4)\nprint("元:", x.shape)  # [2, 3, 4]\n\n# 1. view\na = x.view(6, 4)\nprint("view(6,4):", a.shape)\n\n# 2. permute\nb = x.permute(2, 0, 1)\nprint("permute(2,0,1):", b.shape)  # [4, 2, 3]\n\n# 3. unsqueeze\nc = x.unsqueeze(0)\nprint("unsqueeze(0):", c.shape)  # [1, 2, 3, 4]\n\n# 4. flatten\nd = x.flatten()\nprint("flatten:", d.shape)  # [24]`
+  }, {
+    diff: 2,
+    q: "NumPy 配列と PyTorch テンソルの相互変換を行い、メモリ共有の挙動を確認してください。\nNumPy → Tensor（from_numpy）で変換後、元の NumPy 配列を変更したとき Tensor も変わることを示しましょう。",
+    code: `import torch\nimport numpy as np\n# メモリ共有を確認`,
+    answer: `import torch\nimport numpy as np\n\n# NumPy → Tensor（メモリ共有）\nnp_arr = np.array([1.0, 2.0, 3.0])\ntensor = torch.from_numpy(np_arr)\nprint("変換前 tensor:", tensor)\n\nnp_arr[0] = 99.0  # NumPy側を変更\nprint("NumPy変更後 tensor:", tensor)  # Tensorも変わる！\n\n# Tensor → NumPy（メモリ共有）\nt = torch.tensor([10.0, 20.0, 30.0])\nn = t.numpy()\nprint("\\n変換前 numpy:", n)\nt[0] = 999.0\nprint("Tensor変更後 numpy:", n)  # NumPyも変わる！\n\n# コピーして共有を切る\nt2 = torch.tensor(np.array([1, 2, 3]), dtype=torch.float32)\nprint("\\n独立コピー:", t2)`
+  }, {
+    diff: 3,
+    q: "GPU が利用可能な場合に、テンソルを CPU と GPU の間で転送するコードを書いてください。\nGPU がない環境でもエラーにならないよう条件分岐を入れること。\ndevice の設定パターンとして torch.device の使い方も示してください。",
+    code: `import torch\n# device の設定と GPU 転送`,
+    answer: `import torch\n\n# デバイス設定の定番パターン\ndevice = torch.device("cuda" if torch.cuda.is_available() else "cpu")\nprint("Using device:", device)\n\n# テンソル作成＆転送\nx = torch.randn(3, 3)\nprint("元の device:", x.device)\n\nx = x.to(device)\nprint("転送後 device:", x.device)\n\n# GPU上で演算\ny = torch.randn(3, 3, device=device)  # 直接GPU上に作成\nz = x + y\nprint("結果 device:", z.device)\n\n# CPUに戻す（NumPy変換にはCPU必須）\nz_cpu = z.cpu()\nprint("CPU tensor:", z_cpu)\nprint("NumPy:", z_cpu.numpy())`
+  }],
+  ch3: [{
+    diff: 1,
+    q: "y = 3x^2 + 2x + 1 の x=2.0 における微分値を自動微分で求めてください。\n解析解 dy/dx = 6x + 2 = 14 と一致することを確認しましょう。",
+    code: `import torch\n# x = 2.0 で y = 3x^2 + 2x + 1 の勾配を計算`,
+    answer: `import torch\n\nx = torch.tensor(2.0, requires_grad=True)\ny = 3 * x**2 + 2 * x + 1\nprint("y =", y.item())\n\ny.backward()\nprint("dy/dx =", x.grad.item())  # 14.0\nprint("解析解: 6*2+2 =", 6*2+2)`
+  }, {
+    diff: 2,
+    q: "2変数関数 z = x^2 * y + y^3 の (x=1, y=2) における偏微分を求めてください。\n解析解: dz/dx = 2xy = 4, dz/dy = x^2 + 3y^2 = 13",
+    code: `import torch\n# 2変数の偏微分`,
+    answer: `import torch\n\nx = torch.tensor(1.0, requires_grad=True)\ny = torch.tensor(2.0, requires_grad=True)\n\nz = x**2 * y + y**3\nprint("z =", z.item())\n\nz.backward()\nprint("dz/dx =", x.grad.item())  # 4.0\nprint("dz/dy =", y.grad.item())  # 13.0\nprint("解析解: dz/dx=2*1*2=4, dz/dy=1+3*4=13")`
+  }, {
+    diff: 2,
+    q: "勾配の累積問題を実演してください。\n同じテンソルで backward() を2回呼ぶと勾配が累積されることを示し、\nzero_() で解消する方法も書きましょう。",
+    code: `import torch\n# 勾配の累積と解消`,
+    answer: `import torch\n\nx = torch.tensor(3.0, requires_grad=True)\n\n# 1回目\ny1 = x * 2\ny1.backward()\nprint("1回目 grad:", x.grad.item())  # 2.0\n\n# 2回目（累積される！）\ny2 = x * 2\ny2.backward()\nprint("2回目 grad (累積):", x.grad.item())  # 4.0\n\n# 勾配リセット\nx.grad.zero_()\nprint("リセット後:", x.grad.item())  # 0.0\n\n# 改めて計算\ny3 = x * 2\ny3.backward()\nprint("リセット後の grad:", x.grad.item())  # 2.0`
+  }],
+  ch4: [{
+    diff: 1,
+    q: "nn.Linear を使って、入力5次元→出力3次元の全結合層を作成し、\nランダムな入力を通して出力の shape を確認してください。\nまた、パラメータ（重みとバイアス）の shape も表示しましょう。",
+    code: `import torch\nimport torch.nn as nn\n# Linear層を作成して動作確認`,
+    answer: `import torch\nimport torch.nn as nn\n\nlayer = nn.Linear(5, 3)\nprint("weight shape:", layer.weight.shape)  # [3, 5]\nprint("bias shape:", layer.bias.shape)  # [3]\n\nx = torch.randn(1, 5)  # バッチサイズ1\noutput = layer(x)\nprint("入力 shape:", x.shape)\nprint("出力 shape:", output.shape)  # [1, 3]\nprint("出力:", output)`
+  }, {
+    diff: 2,
+    q: "nn.Module を継承した SimpleNet クラスを定義してください。\n構造: 入力10 → 隠れ層32(ReLU) → 隠れ層16(ReLU) → 出力3\nパラメータ数の合計も計算して表示しましょう。",
+    code: `import torch\nimport torch.nn as nn\n# SimpleNet を定義`,
+    answer: `import torch\nimport torch.nn as nn\n\nclass SimpleNet(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc1 = nn.Linear(10, 32)\n        self.fc2 = nn.Linear(32, 16)\n        self.fc3 = nn.Linear(16, 3)\n        self.relu = nn.ReLU()\n\n    def forward(self, x):\n        x = self.relu(self.fc1(x))\n        x = self.relu(self.fc2(x))\n        x = self.fc3(x)\n        return x\n\nmodel = SimpleNet()\nprint(model)\n\n# パラメータ数\ntotal = sum(p.numel() for p in model.parameters())\nprint(f"\\n総パラメータ数: {total}")\nfor name, param in model.named_parameters():\n    print(f"  {name}: {param.shape} ({param.numel()})")\n\n# 動作確認\nx = torch.randn(4, 10)  # バッチサイズ4\nout = model(x)\nprint(f"\\n入力: {x.shape} → 出力: {out.shape}")`
+  }, {
+    diff: 3,
+    q: "nn.Sequential を使って同じ構造のネットワークを定義し、\nnn.Module 版と同じ出力 shape になることを確認してください。\n活性化関数として nn.GELU も試してみましょう。",
+    code: `import torch\nimport torch.nn as nn\n# Sequential で同じ構造を定義`,
+    answer: `import torch\nimport torch.nn as nn\n\n# Sequential版\nmodel_seq = nn.Sequential(\n    nn.Linear(10, 32),\n    nn.ReLU(),\n    nn.Linear(32, 16),\n    nn.ReLU(),\n    nn.Linear(16, 3)\n)\nprint("Sequential版:")\nprint(model_seq)\n\nx = torch.randn(4, 10)\nout = model_seq(x)\nprint(f"出力 shape: {out.shape}")  # [4, 3]\n\n# GELU版\nmodel_gelu = nn.Sequential(\n    nn.Linear(10, 32),\n    nn.GELU(),\n    nn.Linear(32, 16),\n    nn.GELU(),\n    nn.Linear(16, 3)\n)\nout_gelu = model_gelu(x)\nprint(f"\\nGELU版出力 shape: {out_gelu.shape}")\nprint(f"ReLU版出力: {out.data[0]}")\nprint(f"GELU版出力: {out_gelu.data[0]}")`
+  }],
+  ch5: [{
+    diff: 1,
+    q: "MSELoss と CrossEntropyLoss をそれぞれ使って損失を計算してください。\n・回帰: 予測 [2.5, 0.5, 2.0] に対して正解 [3.0, 0.0, 1.5]\n・分類: 3クラスの logit に対してラベル [0, 2, 1]",
+    code: `import torch\nimport torch.nn as nn\n# MSELoss と CrossEntropyLoss`,
+    answer: `import torch\nimport torch.nn as nn\n\n# 回帰: MSELoss\npred_reg = torch.tensor([2.5, 0.5, 2.0])\ntarget_reg = torch.tensor([3.0, 0.0, 1.5])\nmse = nn.MSELoss()\nloss_mse = mse(pred_reg, target_reg)\nprint(f"MSE Loss: {loss_mse.item():.4f}")\n\n# 分類: CrossEntropyLoss\npred_cls = torch.randn(3, 3)  # バッチ3, クラス3\ntarget_cls = torch.tensor([0, 2, 1])  # 正解ラベル\nce = nn.CrossEntropyLoss()\nloss_ce = ce(pred_cls, target_cls)\nprint(f"CrossEntropy Loss: {loss_ce.item():.4f}")`
+  }, {
+    diff: 2,
+    q: "簡単な回帰問題（y = 2x + 1）を SGD で学習してください。\n100個のデータ点を生成し、1000エポック学習して、\n最終的な重みとバイアスが理想値（w=2, b=1）に近づくことを確認しましょう。",
+    code: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\n# y = 2x + 1 を学習`,
+    answer: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\n\n# データ生成\ntorch.manual_seed(42)\nx = torch.randn(100, 1)\ny = 2 * x + 1 + 0.1 * torch.randn(100, 1)\n\n# モデル\nmodel = nn.Linear(1, 1)\noptimizer = optim.SGD(model.parameters(), lr=0.1)\ncriterion = nn.MSELoss()\n\n# 学習\nfor epoch in range(1000):\n    pred = model(x)\n    loss = criterion(pred, y)\n    optimizer.zero_grad()\n    loss.backward()\n    optimizer.step()\n    if (epoch + 1) % 200 == 0:\n        print(f"Epoch {epoch+1}: loss={loss.item():.4f}")\n\nw = model.weight.item()\nb = model.bias.item()\nprint(f"\\n学習結果: y = {w:.4f}x + {b:.4f}")\nprint(f"理想値:   y = 2.0000x + 1.0000")`
+  }, {
+    diff: 3,
+    q: "Adam と SGD(momentum=0.9) で同じ問題を学習し、収束速度を比較してください。\n各エポックの loss を記録して最終結果を比べましょう。",
+    code: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\n# Adam vs SGD の比較`,
+    answer: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\n\ntorch.manual_seed(42)\nx = torch.randn(100, 1)\ny = 2 * x + 1 + 0.1 * torch.randn(100, 1)\n\ndef train(opt_class, opt_kwargs, epochs=500):\n    model = nn.Linear(1, 1)\n    optimizer = opt_class(model.parameters(), **opt_kwargs)\n    criterion = nn.MSELoss()\n    losses = []\n    for epoch in range(epochs):\n        pred = model(x)\n        loss = criterion(pred, y)\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n        losses.append(loss.item())\n    return model, losses\n\n# SGD with momentum\nmodel_sgd, losses_sgd = train(optim.SGD, {"lr": 0.01, "momentum": 0.9})\n# Adam\nmodel_adam, losses_adam = train(optim.Adam, {"lr": 0.01})\n\nprint("SGD(momentum=0.9):")\nprint(f"  最終loss: {losses_sgd[-1]:.6f}")\nprint(f"  w={model_sgd.weight.item():.4f}, b={model_sgd.bias.item():.4f}")\nprint(f"\\nAdam:")\nprint(f"  最終loss: {losses_adam[-1]:.6f}")\nprint(f"  w={model_adam.weight.item():.4f}, b={model_adam.bias.item():.4f}")\nprint(f"\\n100エポック時点: SGD={losses_sgd[99]:.6f}, Adam={losses_adam[99]:.6f}")`
+  }],
+  ch6: [{
+    diff: 1,
+    q: "torch.utils.data.TensorDataset と DataLoader を使って、\n簡単なデータセット（x, y の組）をバッチサイズ4で取り出してください。",
+    code: `import torch\nfrom torch.utils.data import TensorDataset, DataLoader\n# TensorDataset + DataLoader の基本`,
+    answer: `import torch\nfrom torch.utils.data import TensorDataset, DataLoader\n\n# データ作成\nx = torch.randn(20, 3)  # 20サンプル, 特徴量3\ny = torch.randint(0, 2, (20,))  # 二値ラベル\n\n# Dataset & DataLoader\ndataset = TensorDataset(x, y)\nloader = DataLoader(dataset, batch_size=4, shuffle=True)\n\nprint(f"データ数: {len(dataset)}")\nprint(f"バッチ数: {len(loader)}")\n\nfor i, (batch_x, batch_y) in enumerate(loader):\n    print(f"バッチ{i}: x={batch_x.shape}, y={batch_y}")\n    if i >= 2:\n        print("...")  \n        break`
+  }, {
+    diff: 2,
+    q: "torch.utils.data.Dataset を継承したカスタム Dataset クラスを作成してください。\n・__len__ と __getitem__ を実装\n・sin関数のデータを生成: x → sin(x) + ノイズ\n・DataLoader でバッチ処理されることを確認",
+    code: `import torch\nfrom torch.utils.data import Dataset, DataLoader\n# カスタム Dataset`,
+    answer: `import torch\nfrom torch.utils.data import Dataset, DataLoader\nimport math\n\nclass SinDataset(Dataset):\n    def __init__(self, n_samples=200):\n        self.x = torch.linspace(0, 4 * math.pi, n_samples).unsqueeze(1)\n        self.y = torch.sin(self.x) + 0.1 * torch.randn_like(self.x)\n\n    def __len__(self):\n        return len(self.x)\n\n    def __getitem__(self, idx):\n        return self.x[idx], self.y[idx]\n\n# 使い方\ndataset = SinDataset(200)\nloader = DataLoader(dataset, batch_size=32, shuffle=True)\n\nprint(f"データ数: {len(dataset)}")\nprint(f"バッチ数: {len(loader)}")\n\n# 1バッチ取得\nx_batch, y_batch = next(iter(loader))\nprint(f"バッチ x shape: {x_batch.shape}")\nprint(f"バッチ y shape: {y_batch.shape}")`
+  }, {
+    diff: 3,
+    q: "torchvision.datasets から MNIST を読み込み、transforms で前処理を適用してください。\n・ToTensor + Normalize(0.5, 0.5) の Compose\n・DataLoader でバッチサイズ64, shuffle=True\n・最初のバッチの shape とラベルを表示",
+    code: `import torch\nfrom torchvision import datasets, transforms\nfrom torch.utils.data import DataLoader\n# MNIST の読み込み`,
+    answer: `import torch\nfrom torchvision import datasets, transforms\nfrom torch.utils.data import DataLoader\n\n# 前処理パイプライン\ntransform = transforms.Compose([\n    transforms.ToTensor(),\n    transforms.Normalize((0.5,), (0.5,))\n])\n\n# データセット読み込み\ntrain_dataset = datasets.MNIST(\n    root="./data", train=True,\n    download=True, transform=transform\n)\ntest_dataset = datasets.MNIST(\n    root="./data", train=False,\n    download=True, transform=transform\n)\n\n# DataLoader\ntrain_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)\ntest_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)\n\nprint(f"訓練データ数: {len(train_dataset)}")\nprint(f"テストデータ数: {len(test_dataset)}")\n\n# 最初のバッチ\nimages, labels = next(iter(train_loader))\nprint(f"画像 shape: {images.shape}")  # [64, 1, 28, 28]\nprint(f"ラベル: {labels[:10]}")\nprint(f"画素値範囲: [{images.min():.2f}, {images.max():.2f}]")`
+  }],
+  ch7: [{
+    diff: 1,
+    q: "nn.Conv2d の基本動作を確認してください。\n入力チャネル1, 出力チャネル8, カーネルサイズ3 の畳み込み層を作成し、\n28x28 の入力画像（バッチ1）を通して出力の shape を確認しましょう。",
+    code: `import torch\nimport torch.nn as nn\n# Conv2d の基本動作`,
+    answer: `import torch\nimport torch.nn as nn\n\n# Conv2d 層\nconv = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1)\nprint("weight shape:", conv.weight.shape)  # [8, 1, 3, 3]\nprint("bias shape:", conv.bias.shape)  # [8]\n\n# 入力: バッチ1, チャネル1, 28x28\nx = torch.randn(1, 1, 28, 28)\nout = conv(x)\nprint(f"\\n入力: {x.shape}")\nprint(f"出力: {out.shape}")  # [1, 8, 28, 28] (padding=1)\n\n# padding なしの場合\nconv_nopad = nn.Conv2d(1, 8, 3)\nout2 = conv_nopad(x)\nprint(f"padding無し出力: {out2.shape}")  # [1, 8, 26, 26]`
+  }, {
+    diff: 2,
+    q: "MNIST 用の CNN を定義してください。\n構造: Conv(1→16, k=3, p=1) → ReLU → MaxPool(2)\n     → Conv(16→32, k=3, p=1) → ReLU → MaxPool(2)\n     → Flatten → Linear(32*7*7→128) → ReLU → Linear(128→10)\nダミー入力で出力 shape を確認しましょう。",
+    code: `import torch\nimport torch.nn as nn\n# MNIST用CNN`,
+    answer: `import torch\nimport torch.nn as nn\n\nclass MNISTNet(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 16, 3, padding=1),\n            nn.ReLU(),\n            nn.MaxPool2d(2),  # 28→14\n            nn.Conv2d(16, 32, 3, padding=1),\n            nn.ReLU(),\n            nn.MaxPool2d(2),  # 14→7\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Linear(32 * 7 * 7, 128),\n            nn.ReLU(),\n            nn.Linear(128, 10)\n        )\n\n    def forward(self, x):\n        x = self.features(x)\n        x = self.classifier(x)\n        return x\n\nmodel = MNISTNet()\nprint(model)\n\nx = torch.randn(4, 1, 28, 28)\nout = model(x)\nprint(f"\\n入力: {x.shape} → 出力: {out.shape}")  # [4, 10]\n\ntotal = sum(p.numel() for p in model.parameters())\nprint(f"パラメータ数: {total:,}")`
+  }, {
+    diff: 3,
+    q: "MNIST の CNN を実際に訓練し、テスト精度を計測してください。\n5エポック学習してテスト精度 95% 以上を目指しましょう。\n各エポックの loss と精度を表示すること。",
+    code: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torchvision import datasets, transforms\nfrom torch.utils.data import DataLoader\n# MNIST CNN の訓練と評価`,
+    answer: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torchvision import datasets, transforms\nfrom torch.utils.data import DataLoader\n\n# データ\ntransform = transforms.Compose([\n    transforms.ToTensor(),\n    transforms.Normalize((0.1307,), (0.3081,))\n])\ntrain_data = datasets.MNIST("./data", train=True, download=True, transform=transform)\ntest_data = datasets.MNIST("./data", train=False, download=True, transform=transform)\ntrain_loader = DataLoader(train_data, batch_size=64, shuffle=True)\ntest_loader = DataLoader(test_data, batch_size=256)\n\n# モデル\nclass CNN(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Conv2d(1,16,3,padding=1), nn.ReLU(), nn.MaxPool2d(2),\n            nn.Conv2d(16,32,3,padding=1), nn.ReLU(), nn.MaxPool2d(2),\n            nn.Flatten(),\n            nn.Linear(32*7*7,128), nn.ReLU(),\n            nn.Linear(128,10)\n        )\n    def forward(self, x): return self.net(x)\n\ndevice = torch.device("cuda" if torch.cuda.is_available() else "cpu")\nmodel = CNN().to(device)\noptimizer = optim.Adam(model.parameters(), lr=1e-3)\ncriterion = nn.CrossEntropyLoss()\n\nfor epoch in range(5):\n    model.train()\n    total_loss = 0\n    for images, labels in train_loader:\n        images, labels = images.to(device), labels.to(device)\n        out = model(images)\n        loss = criterion(out, labels)\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n        total_loss += loss.item()\n    # テスト\n    model.eval()\n    correct = 0\n    with torch.no_grad():\n        for images, labels in test_loader:\n            images, labels = images.to(device), labels.to(device)\n            pred = model(images).argmax(1)\n            correct += (pred == labels).sum().item()\n    acc = correct / len(test_data) * 100\n    print(f"Epoch {epoch+1}: loss={total_loss/len(train_loader):.4f}, acc={acc:.2f}%")`
+  }],
+  ch8: [{
+    diff: 1,
+    q: "nn.Embedding を使って、5つの単語ID（0〜4）を8次元のベクトルに変換してください。\n同じIDが同じベクトルになることを確認しましょう。",
+    code: `import torch\nimport torch.nn as nn\n# Embedding の基本`,
+    answer: `import torch\nimport torch.nn as nn\n\n# 語彙数10, 埋め込み次元8\nembed = nn.Embedding(num_embeddings=10, embedding_dim=8)\n\n# 単語ID列\nids = torch.tensor([0, 1, 2, 3, 4])\nvectors = embed(ids)\nprint("入力:", ids)\nprint("出力 shape:", vectors.shape)  # [5, 8]\nprint("ID=0のベクトル:", vectors[0])\n\n# 同じIDは同じベクトル\nids2 = torch.tensor([0, 0, 3])\nvectors2 = embed(ids2)\nprint("\\nID=0 (1回目):", vectors2[0])\nprint("ID=0 (2回目):", vectors2[1])\nprint("一致:", torch.equal(vectors2[0], vectors2[1]))`
+  }, {
+    diff: 2,
+    q: "nn.LSTM を使って、バッチサイズ2、系列長10、入力次元16 のデータを処理してください。\n隠れ層32次元で、出力と最終隠れ状態の shape を確認しましょう。\nbidirectional=True の場合の変化も示してください。",
+    code: `import torch\nimport torch.nn as nn\n# LSTM の基本`,
+    answer: `import torch\nimport torch.nn as nn\n\n# 単方向LSTM\nlstm = nn.LSTM(input_size=16, hidden_size=32, batch_first=True)\nx = torch.randn(2, 10, 16)  # バッチ2, 系列長10, 入力16\n\noutput, (h_n, c_n) = lstm(x)\nprint("=== 単方向 LSTM ===")\nprint(f"出力: {output.shape}")     # [2, 10, 32]\nprint(f"h_n: {h_n.shape}")        # [1, 2, 32]\nprint(f"c_n: {c_n.shape}")        # [1, 2, 32]\n\n# 双方向LSTM\nlstm_bi = nn.LSTM(16, 32, batch_first=True, bidirectional=True)\noutput_bi, (h_n_bi, c_n_bi) = lstm_bi(x)\nprint("\\n=== 双方向 LSTM ===")\nprint(f"出力: {output_bi.shape}")   # [2, 10, 64]\nprint(f"h_n: {h_n_bi.shape}")      # [2, 2, 32]\nprint(f"c_n: {c_n_bi.shape}")      # [2, 2, 32]`
+  }, {
+    diff: 3,
+    q: "簡単なテキスト分類モデル（Embedding → LSTM → Linear）を定義し、\nダミーデータで動作確認してください。\n語彙数100、埋め込み次元32、LSTM隠れ層64、2クラス分類。",
+    code: `import torch\nimport torch.nn as nn\n# テキスト分類モデル`,
+    answer: `import torch\nimport torch.nn as nn\n\nclass TextClassifier(nn.Module):\n    def __init__(self, vocab_size=100, embed_dim=32,\n                 hidden_dim=64, num_classes=2):\n        super().__init__()\n        self.embedding = nn.Embedding(vocab_size, embed_dim)\n        self.lstm = nn.LSTM(embed_dim, hidden_dim, batch_first=True)\n        self.fc = nn.Linear(hidden_dim, num_classes)\n\n    def forward(self, x):\n        # x: [batch, seq_len] の整数テンソル\n        embedded = self.embedding(x)      # [batch, seq, embed]\n        output, (h_n, _) = self.lstm(embedded)\n        # 最終隠れ状態を使う\n        last_hidden = h_n.squeeze(0)      # [batch, hidden]\n        logits = self.fc(last_hidden)     # [batch, classes]\n        return logits\n\nmodel = TextClassifier()\nprint(model)\n\n# ダミーデータ: バッチ4, 系列長20\nx = torch.randint(0, 100, (4, 20))\nout = model(x)\nprint(f"\\n入力: {x.shape} → 出力: {out.shape}")  # [4, 2]\nprint(f"出力 (logits): {out}")\n\n# 予測クラス\npred = out.argmax(dim=1)\nprint(f"予測: {pred}")\n\ntotal = sum(p.numel() for p in model.parameters())\nprint(f"パラメータ数: {total:,}")`
+  }],
+  ch9: [{
+    diff: 1,
+    q: "モデルの state_dict を保存し、新しいモデルに読み込んでください。\n読み込み前後で同じ入力に対する出力が一致することを確認しましょう。",
+    code: `import torch\nimport torch.nn as nn\n# state_dict の保存と読み込み`,
+    answer: `import torch\nimport torch.nn as nn\nimport os\n\n# モデル定義\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc = nn.Linear(5, 3)\n    def forward(self, x):\n        return self.fc(x)\n\n# 保存\nmodel = Net()\ntorch.save(model.state_dict(), "model_weights.pth")\nprint("保存完了")\n\n# テスト入力\nx = torch.randn(1, 5)\nout_before = model(x)\n\n# 新しいモデルに読み込み\nmodel2 = Net()\nmodel2.load_state_dict(torch.load("model_weights.pth"))\nmodel2.eval()\n\nout_after = model2(x)\nprint(f"保存前出力: {out_before.data}")\nprint(f"読込後出力: {out_after.data}")\nprint(f"一致: {torch.allclose(out_before, out_after)}")\n\nos.remove("model_weights.pth")`
+  }, {
+    diff: 2,
+    q: "チェックポイント（モデル + オプティマイザ + エポック数）を保存・復元してください。\n学習を途中から再開できるようにしましょう。",
+    code: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\n# チェックポイントの保存と復元`,
+    answer: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\nimport os\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc = nn.Linear(5, 3)\n    def forward(self, x): return self.fc(x)\n\n# 学習してチェックポイント保存\nmodel = Net()\noptimizer = optim.Adam(model.parameters(), lr=0.001)\n\n# 3エポック学習したと仮定\ncheckpoint = {\n    "epoch": 3,\n    "model_state_dict": model.state_dict(),\n    "optimizer_state_dict": optimizer.state_dict(),\n    "loss": 0.42,\n}\ntorch.save(checkpoint, "checkpoint.pth")\nprint("チェックポイント保存完了")\n\n# 復元\nmodel2 = Net()\noptimizer2 = optim.Adam(model2.parameters(), lr=0.001)\n\ncp = torch.load("checkpoint.pth")\nmodel2.load_state_dict(cp["model_state_dict"])\noptimizer2.load_state_dict(cp["optimizer_state_dict"])\nstart_epoch = cp["epoch"]\nlast_loss = cp["loss"]\n\nprint(f"再開エポック: {start_epoch}")\nprint(f"前回のloss: {last_loss}")\nprint("ここから学習を再開できます")\n\nos.remove("checkpoint.pth")`
+  }, {
+    diff: 3,
+    q: "TorchScript（torch.jit.script）を使ってモデルを変換し、\n保存・読み込み・推論を行ってください。\nPython 非依存で推論可能であることを説明するコメントも入れましょう。",
+    code: `import torch\nimport torch.nn as nn\n# TorchScript 変換と保存`,
+    answer: `import torch\nimport torch.nn as nn\nimport os\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc1 = nn.Linear(5, 16)\n        self.relu = nn.ReLU()\n        self.fc2 = nn.Linear(16, 3)\n\n    def forward(self, x):\n        x = self.relu(self.fc1(x))\n        return self.fc2(x)\n\nmodel = Net()\nmodel.eval()\n\n# TorchScript に変換\n# script: コードを解析して中間表現に変換\n# Python インタプリタなしで実行可能になる\nscripted = torch.jit.script(model)\nprint("TorchScript変換完了")\nprint(scripted.code)  # 生成された中間表現\n\n# 保存\nscripted.save("model_scripted.pt")\nprint("\\n保存完了")\n\n# 読み込み（モデル定義クラスが不要！）\nloaded = torch.jit.load("model_scripted.pt")\n\n# 推論\nx = torch.randn(2, 5)\nout_original = model(x)\nout_scripted = loaded(x)\n\nprint(f"元モデル出力: {out_original.data}")\nprint(f"Script出力:   {out_scripted.data}")\nprint(f"一致: {torch.allclose(out_original, out_scripted)}")\n\n# C++ / Rust / モバイルなどからも\n# このファイルを読み込んで推論できる\nprint("\\n※ model_scripted.pt は C++/モバイルからも利用可能")\n\nos.remove("model_scripted.pt")`
+  }],
+  ch10: [{
+    diff: 1,
+    q: "TensorBoard の SummaryWriter を使って、\n100ステップ分の訓練 loss（ダミー値）をログに書き込んでください。\n実際に tensorboard --logdir=runs で確認できることをコメントで説明しましょう。",
+    code: `import torch\nfrom torch.utils.tensorboard import SummaryWriter\n# TensorBoard ログ`,
+    answer: `import torch\nfrom torch.utils.tensorboard import SummaryWriter\nimport math\n\n# ログディレクトリ指定\nwriter = SummaryWriter("runs/demo")\n\n# ダミーの学習ループ\nfor step in range(100):\n    # 擬似的な loss（減衰する値 + ノイズ）\n    loss = 2.0 * math.exp(-step / 30) + 0.1 * torch.rand(1).item()\n    acc = 1.0 - math.exp(-step / 40) + 0.05 * torch.rand(1).item()\n\n    writer.add_scalar("Loss/train", loss, step)\n    writer.add_scalar("Accuracy/train", acc, step)\n\nwriter.close()\nprint("ログ書き込み完了")\nprint("確認: tensorboard --logdir=runs")\nprint("ブラウザで http://localhost:6006 を開く")`
+  }, {
+    diff: 2,
+    q: "学習ループに tqdm のプログレスバーを統合してください。\nエポック進捗と各バッチの loss をリアルタイムに表示するようにしましょう。\nTensorDataset を使った簡単な回帰問題で実装してください。",
+    code: `import torch\nimport torch.nn as nn\nfrom torch.utils.data import TensorDataset, DataLoader\nfrom tqdm import tqdm\n# tqdm 付き学習ループ`,
+    answer: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torch.utils.data import TensorDataset, DataLoader\nfrom tqdm import tqdm\n\n# データ\ntorch.manual_seed(42)\nx = torch.randn(500, 5)\ny = x.sum(dim=1, keepdim=True) + 0.1 * torch.randn(500, 1)\ndataset = TensorDataset(x, y)\nloader = DataLoader(dataset, batch_size=32, shuffle=True)\n\n# モデル\nmodel = nn.Sequential(nn.Linear(5, 16), nn.ReLU(), nn.Linear(16, 1))\noptimizer = optim.Adam(model.parameters(), lr=0.01)\ncriterion = nn.MSELoss()\n\n# tqdm付き学習ループ\nfor epoch in range(10):\n    epoch_loss = 0.0\n    pbar = tqdm(loader, desc=f"Epoch {epoch+1}/10")\n    for batch_x, batch_y in pbar:\n        pred = model(batch_x)\n        loss = criterion(pred, batch_y)\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n        epoch_loss += loss.item()\n        pbar.set_postfix(loss=f"{loss.item():.4f}")\n    avg_loss = epoch_loss / len(loader)\n    print(f"  → 平均loss: {avg_loss:.4f}")`
+  }, {
+    diff: 2,
+    q: "モデルの各層の勾配ノルムを計算して表示する関数を書いてください。\n勾配消失や勾配爆発が起きていないか確認するために使います。\n1回の forward/backward 後に呼び出して確認しましょう。",
+    code: `import torch\nimport torch.nn as nn\n# 勾配ノルムの確認`,
+    answer: `import torch\nimport torch.nn as nn\n\ndef check_gradients(model):\n    """各層の勾配ノルムを表示"""\n    print("--- 勾配ノルム ---")\n    for name, param in model.named_parameters():\n        if param.grad is not None:\n            grad_norm = param.grad.norm().item()\n            status = ""\n            if grad_norm < 1e-7:\n                status = " ⚠ 勾配消失の可能性"\n            elif grad_norm > 100:\n                status = " ⚠ 勾配爆発の可能性"\n            print(f"  {name}: {grad_norm:.6f}{status}")\n        else:\n            print(f"  {name}: None (勾配なし)")\n\n# テスト\nmodel = nn.Sequential(\n    nn.Linear(10, 64), nn.ReLU(),\n    nn.Linear(64, 32), nn.ReLU(),\n    nn.Linear(32, 2)\n)\n\nx = torch.randn(4, 10)\ny = torch.tensor([0, 1, 0, 1])\n\nout = model(x)\nloss = nn.CrossEntropyLoss()(out, y)\nloss.backward()\n\ncheck_gradients(model)`
+  }, {
+    diff: 3,
+    q: "過学習の検出と対策を実演してください。\n少量のデータ（50サンプル）で複雑なモデルを学習させ、\n訓練 loss と検証 loss の乖離を確認した後、\nDropout と 重み減衰で改善するコードを書きましょう。",
+    code: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torch.utils.data import TensorDataset, DataLoader, random_split\n# 過学習の検出と対策`,
+    answer: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torch.utils.data import TensorDataset, DataLoader, random_split\n\ntorch.manual_seed(42)\n\n# 少量データ（過学習しやすい）\nx = torch.randn(50, 10)\ny = (x[:, 0] > 0).long()\ndataset = TensorDataset(x, y)\ntrain_ds, val_ds = random_split(dataset, [35, 15])\ntrain_loader = DataLoader(train_ds, batch_size=8, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=15)\n\ndef train_and_eval(model, name, wd=0):\n    optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=wd)\n    criterion = nn.CrossEntropyLoss()\n    for epoch in range(100):\n        model.train()\n        t_loss = 0\n        for bx, by in train_loader:\n            out = model(bx)\n            loss = criterion(out, by)\n            optimizer.zero_grad(); loss.backward(); optimizer.step()\n            t_loss += loss.item()\n        if (epoch+1) % 50 == 0:\n            model.eval()\n            with torch.no_grad():\n                vx, vy = next(iter(val_loader))\n                v_loss = criterion(model(vx), vy).item()\n            print(f"  [{name}] Epoch {epoch+1}: "\n                  f"train={t_loss/len(train_loader):.4f}, val={v_loss:.4f}")\n\n# 過学習モデル\nprint("=== 対策なし ===")\nm1 = nn.Sequential(nn.Linear(10,128), nn.ReLU(),\n                   nn.Linear(128,64), nn.ReLU(), nn.Linear(64,2))\ntrain_and_eval(m1, "過学習")\n\n# Dropout + 重み減衰\nprint("\\n=== Dropout + weight_decay ===")\nm2 = nn.Sequential(nn.Linear(10,128), nn.ReLU(), nn.Dropout(0.5),\n                   nn.Linear(128,64), nn.ReLU(), nn.Dropout(0.3),\n                   nn.Linear(64,2))\ntrain_and_eval(m2, "正則化", wd=0.01)`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "PyTorchの設計思想と環境構築",
+  est: "45分",
+  goal: "PyTorch がなぜ研究者に選ばれるのかを「Define-by-Run（動的計算グラフ）」という設計思想から理解し、TensorFlow との違いを自分の言葉で説明できるようになる。手元に PyTorch + CUDA の環境を構築し、テンソルを作って GPU 上で演算を実行できる状態をゴールとする。",
+  sections: [{
+    title: "PyTorch とは何か",
+    body: "PyTorch は Facebook（現 Meta）AI Research が開発したオープンソースの深層学習フレームワークです。2017 年に最初の安定版がリリースされて以来、研究コミュニティで爆発的に普及し、2024 年以降は arXiv に投稿される論文の 80% 以上が PyTorch を使用しています。\n\nPyTorch の最大の特徴は「NumPy に GPU サポートと自動微分を足したもの」という設計思想です。NumPy の ndarray に相当する Tensor というデータ構造を中心に据え、そこに GPU 計算・自動微分（Autograd）・ニューラルネットワークモジュール（nn）を積み上げた構成になっています。NumPy を知っている Python 開発者であれば、API の命名規則やインデクシングの仕方がほぼ同じなので、驚くほど短い時間で使い始められます。\n\nもう一つの重要な特徴は「Define-by-Run」と呼ばれる動的計算グラフです。これは後のセクションで詳しく説明しますが、簡単に言えば「Python のコードをそのまま実行しながら計算グラフを組み立てる」方式です。if 文や for ループといった Python の制御構文がそのまま計算グラフに反映されるため、デバッグが直感的で、複雑なモデル構造も自然に書けます。",
+    afterCode: "PyTorch はテンソル計算ライブラリであると同時に、深層学習のエコシステム全体を提供しています。torchvision（画像）、torchaudio（音声）、torchtext（テキスト）といったドメイン別ライブラリが充実しており、研究から本番デプロイまで一貫してカバーできます。"
+  }, {
+    title: "Define-by-Run vs Define-and-Run",
+    body: "深層学習フレームワークの設計は大きく 2 つの流派に分かれます。TensorFlow 1.x が採用していた「Define-and-Run」は、まず計算グラフを構築し、その後にデータを流して実行する方式です。これに対して PyTorch の「Define-by-Run」は、Python のコードを 1 行ずつ実行しながらその場で計算グラフを構築します。\n\nDefine-and-Run ではグラフ全体が静的に決まるため最適化がしやすく、本番環境でのパフォーマンスに有利です。一方で、デバッグ時に Python の print や pdb が計算グラフの内部で使えないという大きな欠点がありました。Define-by-Run ではいつでも途中のテンソルを print でき、Python の条件分岐がそのままモデルの条件分岐になるため、研究段階での試行錯誤が圧倒的に楽です。\n\nなお、TensorFlow 2.x では Eager Execution（Define-by-Run 相当）がデフォルトになり、両フレームワークの差は以前ほど大きくありません。ただし PyTorch は最初からこの設計を貫いてきたため、エコシステム全体が動的グラフ前提で構築されており、一貫性の面で優位です。",
+    table: T.frameworks,
+    afterTable: "実務的な選択基準として、研究プロトタイプや論文実装なら PyTorch がほぼ一択です。大規模な本番サービスへのデプロイでは TensorFlow のエコシステム（TF Serving, TF Lite）が成熟していますが、PyTorch も TorchServe や ONNX 経由で十分に対応できるようになっています。"
+  }, {
+    title: "環境構築 — pip / conda / CUDA",
+    body: "PyTorch のインストールは公式サイト（pytorch.org）で環境に合ったコマンドを生成するのが最も確実です。CPU のみで始めるなら pip install torch torchvision だけで済みますが、GPU を使う場合は CUDA ドライバとの対応バージョンに注意が必要です。\n\nCUDA は NVIDIA の GPU で汎用計算を行うためのプラットフォームで、PyTorch はこれを通じて GPU 上のテンソル演算を高速に実行します。CUDA 12.x 系の場合、pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121 のように CUDA バージョンを指定してインストールします。\n\nconda を使う場合は conda install pytorch torchvision pytorch-cuda=12.1 -c pytorch -c nvidia が公式推奨です。仮想環境（venv か conda env）を必ず作成してからインストールしましょう。システム全体に入れるとバージョン管理が困難になります。",
+    code: `# CPU版（最もシンプル）\npip install torch torchvision\n\n# CUDA 12.1 対応版（NVIDIA GPU使用時）\npip install torch torchvision --index-url https://download.pytorch.org/whl/cu121\n\n# conda の場合\nconda install pytorch torchvision pytorch-cuda=12.1 -c pytorch -c nvidia\n\n# インストール確認\npython -c "import torch; print(torch.__version__); print('CUDA:', torch.cuda.is_available())"`,
+    afterCode: "GPU が利用可能かどうかは torch.cuda.is_available() で確認できます。True が返れば CUDA ドライバ・CUDA Toolkit・PyTorch の CUDA ビルドが全て正しくセットアップされています。False の場合はドライバのバージョン（nvidia-smi で確認）と PyTorch の CUDA バージョンが一致しているか確認してください。"
+  }, {
+    title: "最初のテンソル演算",
+    body: "環境構築が完了したら、最初のテンソルを作ってみましょう。torch.tensor() は Python のリストや NumPy 配列からテンソルを生成する最も基本的な関数です。NumPy の np.array() と同じ感覚で使えます。\n\nテンソルは多次元配列であると同時に、GPU 上に配置したり自動微分を追跡したりする追加機能を持ちます。この入門コースでは、まず NumPy と同じ感覚でテンソルを操作することから始め、徐々に GPU 転送や自動微分といった PyTorch 固有の機能を学んでいきます。\n\n以下のコードで、テンソルの作成・基本演算・GPU 転送の一連の流れを体験してみてください。GPU がなくても CPU 上で全ての演算は動作します。",
+    code: `import torch\n\n# テンソル作成\nx = torch.tensor([1, 2, 3, 4, 5], dtype=torch.float32)\nprint("x:", x)\nprint("shape:", x.shape)\nprint("dtype:", x.dtype)\n\n# 基本演算（NumPyと同じ）\ny = x * 2 + 1\nprint("y = x*2+1:", y)\n\n# GPU転送（CUDAが使える場合）\nif torch.cuda.is_available():\n    x_gpu = x.cuda()\n    print("GPU上のテンソル:", x_gpu.device)`,
+    afterCode: "ポイント: PyTorch のテンソルは NumPy の ndarray とほぼ同じ API を持ちますが、device（CPU/GPU の配置場所）と requires_grad（自動微分の追跡）という 2 つの追加属性を持ちます。この 2 つが PyTorch を「GPU 対応の自動微分付き NumPy」たらしめている核心です。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "Tensor基礎",
+  est: "60分",
+  goal: "PyTorch の Tensor を NumPy の ndarray と同等以上に操作できるようになる。作成方法・dtype・形状操作・インデクシング・NumPy 変換・GPU 転送を自在に使いこなし、テンソル操作で困ることがない状態をゴールとする。",
+  sections: [{
+    title: "テンソルの作成方法",
+    body: "テンソルの作成方法は NumPy とほぼ 1 対 1 で対応しています。torch.tensor() でリストや NumPy 配列から変換するほか、torch.zeros / torch.ones / torch.rand / torch.randn / torch.arange / torch.linspace / torch.eye など、用途別の生成関数が揃っています。\n\n関数名や引数の順序は NumPy と微妙に異なる点に注意してください。NumPy の np.zeros((3, 4))（タプルで渡す）に対して PyTorch は torch.zeros(3, 4)（カンマ区切りで渡す）です。どちらも動作しますが、PyTorch ではカンマ区切りが一般的です。\n\ntorch.empty() は未初期化のテンソルを返す高速な生成関数です。メモリを確保するだけで値を設定しないため高速ですが、中身は不定値です。直後に値を上書きすることが確定している場合（たとえばループ内で結果を書き込む前のバッファ確保）に使います。",
+    table: T.tensorCreate,
+    afterTable: "実務では torch.randn（正規分布）を使ってダミーデータやパラメータの初期化に使う場面が最も多いです。入力テンソルの shape を確認するためにダミー入力を作って通す、という作業は日常的に発生します。"
+  }, {
+    title: "dtype — データ型",
+    body: "テンソルのデータ型（dtype）はメモリ使用量と数値精度に直結します。PyTorch のデフォルトの浮動小数点型は torch.float32（32ビット浮動小数点）で、これが深層学習の標準精度です。NumPy のデフォルトが float64 であるのとは異なるため、NumPy から変換するときに dtype の不一致でエラーが出ることがあります。\n\n整数のデフォルトは torch.int64 です。ラベルやインデックスは int64 で問題ありませんが、大量のカテゴリ変数を扱う場合は int32 にすることでメモリを節約できます。\n\n近年重要性が増しているのが float16 と bfloat16 です。混合精度学習（Automatic Mixed Precision, AMP）では、計算の大部分を float16/bfloat16 で行い、勾配の累積など精度が必要な部分だけ float32 で行うことで、GPU メモリの消費を半減しつつ学習速度を大幅に向上させます。A100 以降の NVIDIA GPU では bfloat16 が特に効率的です。",
+    table: T.dtypes,
+    code: `import torch\n\n# dtype の指定\na = torch.tensor([1.0, 2.0, 3.0])          # デフォルト: float32\nb = torch.tensor([1, 2, 3])                 # デフォルト: int64\nc = torch.tensor([1.0], dtype=torch.float64)\n\n# dtype 変換\nd = a.to(torch.float16)     # .to() で変換\ne = a.half()                # .half() も同じ\nf = b.float()               # int64 → float32\n\nprint(f"a: {a.dtype}, b: {b.dtype}, c: {c.dtype}")\nprint(f"d: {d.dtype}, e: {e.dtype}, f: {f.dtype}")`,
+    afterCode: "ポイント: nn.Module のパラメータはデフォルトで float32 です。入力テンソルが float64 だとエラーになるので、入力を .float() で変換するか、モデルを .double() で float64 に変換する必要があります。通常は入力を float32 に合わせます。"
+  }, {
+    title: "形状操作",
+    body: "テンソルの形状操作はニューラルネットワークを組む上で最も頻繁に使う操作です。畳み込み層の出力を全結合層に渡すために Flatten する、バッチ次元を追加する、チャネルの順序を入れ替える、といった場面が日常的に発生します。\n\nview と reshape はどちらも形状を変更しますが、view はメモリが連続していることを要求し、reshape は必要に応じてコピーを作ります。パフォーマンスが重要な場面では view を使い、安全に動かしたい場合は reshape を使うのが定石です。contiguous() を呼んでメモリを連続化してから view する、というパターンもよく見かけます。\n\npermute は任意の軸順序の入れ替えに使います。画像データは (B, C, H, W) と (B, H, W, C) の 2 つの慣例がありますが、PyTorch は (B, C, H, W) がデフォルトです。NumPy や TensorFlow から持ってきた (B, H, W, C) のデータを permute(0, 3, 1, 2) で変換する場面は非常に多いです。",
+    table: T.shapeOps,
+    code: `import torch\n\nx = torch.randn(2, 3, 4)  # [2, 3, 4]\n\n# view / reshape\na = x.view(6, 4)          # [6, 4]\nb = x.reshape(2, 12)      # [2, 12]\n\n# permute（軸入れ替え）\nc = x.permute(2, 0, 1)    # [4, 2, 3]\n\n# unsqueeze / squeeze\nd = x.unsqueeze(0)        # [1, 2, 3, 4] バッチ次元追加\ne = d.squeeze(0)          # [2, 3, 4] 元に戻る\n\n# cat / stack\nf = torch.cat([x, x], dim=0)    # [4, 3, 4]\ng = torch.stack([x, x], dim=0)  # [2, 2, 3, 4]\n\nprint(f"view: {a.shape}, reshape: {b.shape}")\nprint(f"permute: {c.shape}")\nprint(f"unsqueeze: {d.shape}, squeeze: {e.shape}")\nprint(f"cat: {f.shape}, stack: {g.shape}")`,
+    afterCode: "ミニ演習: (B, H, W, C) = (4, 28, 28, 3) のテンソルを PyTorch の CNN に入力できる (B, C, H, W) = (4, 3, 28, 28) に変換してみましょう。permute(0, 3, 1, 2) を使います。"
+  }, {
+    title: "NumPy との相互変換",
+    body: "PyTorch と NumPy の間でデータを行き来させることは日常的に発生します。scikit-learn のデータセットを PyTorch に渡す、PyTorch の出力を matplotlib で可視化する、といった場面です。\n\n最も重要なのは、torch.from_numpy() で作ったテンソルは NumPy 配列とメモリを共有するということです。一方を変更するともう一方も変わります。これはゼロコピー変換なので高速ですが、意図しない副作用を引き起こす可能性もあります。独立したコピーが欲しい場合は torch.tensor(numpy_array) を使います（こちらはコピーを作ります）。\n\nGPU 上のテンソルを NumPy に変換するには、まず .cpu() で CPU に転送し、さらに requires_grad=True のテンソルは .detach() で計算グラフから切り離してから .numpy() を呼ぶ必要があります。これは頻出パターンなので tensor.detach().cpu().numpy() を覚えておきましょう。",
+    code: `import torch\nimport numpy as np\n\n# NumPy → Tensor（メモリ共有）\nnp_arr = np.array([1.0, 2.0, 3.0], dtype=np.float32)\nt1 = torch.from_numpy(np_arr)\nnp_arr[0] = 99  # 元のNumPy配列を変更\nprint("共有:", t1)  # t1も変わる！\n\n# NumPy → Tensor（コピー）\nt2 = torch.tensor(np_arr)  # 独立コピー\nnp_arr[0] = -1\nprint("独立:", t2)  # t2は変わらない\n\n# Tensor → NumPy\nt3 = torch.tensor([10.0, 20.0, 30.0], requires_grad=True)\n# t3.numpy()  # エラー！ requires_grad=True\nnp_out = t3.detach().numpy()  # OK\nprint("Tensor→NumPy:", np_out)`,
+    afterCode: "ポイント: matplotlib でテンソルを直接プロットしようとするとエラーになります。.detach().cpu().numpy() を忘れずに。なお PyTorch 2.x では一部の matplotlib 関数がテンソルを直接受け付けるようになっていますが、明示的に変換するのが安全です。"
+  }, {
+    title: "GPU 転送と device 管理",
+    body: "テンソルを GPU に転送するには .to(device) または .cuda() を使います。device は torch.device('cuda') や torch.device('cpu') で指定し、複数 GPU がある場合は torch.device('cuda:0') のようにインデックスを付けます。\n\n重要なルールとして、演算する 2 つのテンソルは同じ device 上に存在する必要があります。CPU 上のテンソルと GPU 上のテンソルを足し算しようとするとエラーになります。モデルのパラメータとデータは常に同じ device に揃えてください。\n\nGPU メモリは限られているため、不要なテンソルが GPU 上に残らないよう注意が必要です。with torch.no_grad() ブロック内では中間テンソルの計算グラフが保持されないため、推論時のメモリ消費を大幅に減らせます。torch.cuda.empty_cache() を呼ぶと、未使用のキャッシュメモリを解放できます。",
+    code: `import torch\n\n# device 設定の定番パターン\ndevice = torch.device("cuda" if torch.cuda.is_available() else "cpu")\nprint("device:", device)\n\n# テンソルの転送\nx = torch.randn(3, 3)\nx = x.to(device)  # GPU（or CPU）へ転送\n\n# 直接 GPU 上に作成\ny = torch.randn(3, 3, device=device)\n\n# 演算（同じ device 上でないとエラー）\nz = x + y\nprint("z device:", z.device)\n\n# CPU に戻す\nz_cpu = z.cpu()\nprint("numpy:", z_cpu.numpy())`,
+    afterCode: "ポイント: device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') をスクリプトの冒頭に 1 回書いておき、以降は全て .to(device) で統一するのがベストプラクティスです。こうしておけば GPU なし環境でもコードを変えずに動きます。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "自動微分 — Autograd",
+  est: "50分",
+  goal: "深層学習の核心である「誤差逆伝播法」が PyTorch の Autograd によってどう自動化されているかを理解する。requires_grad / backward() / grad の関係を把握し、計算グラフがどう構築・破棄されるかをコードで確認できるようになることがゴール。勾配の累積問題と torch.no_grad() の使いどころも押さえる。",
+  sections: [{
+    title: "微分と勾配降下法の復習",
+    body: "ニューラルネットワークの学習は「損失関数の値を最小化するようにパラメータを調整する」プロセスです。調整の方向を決めるために必要なのが微分（勾配）で、損失関数の各パラメータに対する偏微分を計算し、その逆方向にパラメータを動かします。これが勾配降下法です。\n\n手動で微分を計算するのは小さなモデルでも大変ですが、ニューラルネットワークのように数百万〜数十億のパラメータを持つ関数の微分を人手で導出するのは現実的に不可能です。そこで自動微分（Automatic Differentiation）が登場します。\n\nPyTorch の Autograd は連鎖律（chain rule）を自動で適用し、計算グラフを遡ってすべてのパラメータの勾配を一度に計算します。ユーザーは forward 計算（予測値の計算）を書くだけで、backward 計算（勾配計算）は PyTorch が自動で行ってくれます。",
+    afterCode: "深層学習の理論を深く理解するには線形代数と微積分の基礎が欠かせませんが、PyTorch を使う上では「損失を backward() すれば勾配が自動で計算される」という事実を理解していれば十分に実装を進められます。"
+  }, {
+    title: "requires_grad と計算グラフ",
+    body: "テンソルに requires_grad=True を設定すると、そのテンソルを含む全ての演算が計算グラフとして記録されるようになります。計算グラフとは「どのテンソルにどんな演算を適用して結果を得たか」の履歴を保持する有向非巡回グラフ（DAG）です。\n\nDefine-by-Run の名の通り、計算グラフは Python のコードを実行するたびに動的に構築されます。if 文で条件分岐した場合、実行されたパスだけがグラフに含まれます。これが静的グラフ（Define-and-Run）との本質的な違いで、データに依存して構造が変わるモデル（再帰的ニューラルネットワークや木構造 LSTM など）を自然に記述できる理由です。\n\n各テンソルの .grad_fn 属性を見ると、そのテンソルを生成した演算が分かります。これは計算グラフのノードに対応しており、backward() はこの情報を逆方向にたどって勾配を計算します。",
+    code: `import torch\n\n# requires_grad=True で勾配追跡を有効化\nx = torch.tensor(3.0, requires_grad=True)\nprint("x:", x)\nprint("x.grad_fn:", x.grad_fn)  # None（リーフテンソル）\n\n# 演算すると計算グラフが構築される\ny = x * 2\nz = y + 1\nprint("y.grad_fn:", y.grad_fn)  # MulBackward0\nprint("z.grad_fn:", z.grad_fn)  # AddBackward0\n\n# backward() で勾配計算\nz.backward()\nprint("dz/dx:", x.grad)  # 2.0 (z = 2x+1 → dz/dx = 2)`,
+    afterCode: "ポイント: リーフテンソル（ユーザーが直接作成したテンソル）は grad_fn が None です。演算の結果として生まれたテンソルには grad_fn が設定され、計算グラフの逆方向リンクとして機能します。"
+  }, {
+    title: "backward() と勾配の取得",
+    body: "loss.backward() を呼ぶと、loss から遡って requires_grad=True の全てのリーフテンソルに勾配が計算され、各テンソルの .grad 属性に格納されます。これが誤差逆伝播法（バックプロパゲーション）の自動実行です。\n\nbackward() を呼ぶと計算グラフは破棄されます（retain_graph=True を指定しない限り）。つまり 1 回の forward で作ったグラフは 1 回の backward でしか使えません。次のイテレーションでは新しい forward で新しいグラフが構築されます。\n\n重要な注意点として、勾配はデフォルトで累積されます。optimizer.zero_grad()（または x.grad.zero_()）を呼ばないと、前回の勾配に今回の勾配が足し算されてしまいます。これは勾配累積（gradient accumulation）が必要な場面では便利ですが、通常の学習ループでは明示的にリセットする必要があります。",
+    table: T.autogradOps,
+    code: `import torch\n\n# 多変数関数の勾配\nx = torch.tensor(2.0, requires_grad=True)\ny = torch.tensor(3.0, requires_grad=True)\n\nz = x**2 + x*y + y**2  # z = x^2 + xy + y^2\nz.backward()\n\nprint(f"z = {z.item()}")\nprint(f"dz/dx = {x.grad.item()}")  # 2x + y = 7\nprint(f"dz/dy = {y.grad.item()}")  # x + 2y = 8`,
+    afterCode: "ポイント: .item() はスカラーテンソルを Python の float/int に変換します。loss の値をログに記録する際は loss.item() を使いましょう。テンソルのまま保持すると計算グラフが解放されず、メモリリークの原因になります。"
+  }, {
+    title: "torch.no_grad() と推論モード",
+    body: "学習済みモデルで推論（予測）を行うとき、勾配を計算する必要はありません。with torch.no_grad(): ブロック内ではテンソルの演算が計算グラフに記録されなくなり、メモリの消費が大幅に減り、計算速度も向上します。\n\nmodel.eval() と torch.no_grad() は役割が異なります。model.eval() は Dropout や BatchNorm の挙動を推論モードに切り替えるもので、勾配計算を止める効果はありません。推論時は両方を使うのが正しいパターンです。\n\nPyTorch 2.x では torch.inference_mode() というさらに高速な推論用コンテキストマネージャも追加されています。no_grad() よりも制約が強い（テンソルの inplace 変更ができないなど）代わりに、より積極的な最適化が効きます。新規コードでは inference_mode() を使うのが推奨されています。",
+    code: `import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(5, 3)\nx = torch.randn(1, 5)\n\n# 学習時（勾配あり）\nout_train = model(x)\nprint("requires_grad:", out_train.requires_grad)  # True\n\n# 推論時（勾配なし）\nmodel.eval()\nwith torch.no_grad():\n    out_eval = model(x)\n    print("requires_grad:", out_eval.requires_grad)  # False\n\n# inference_mode（PyTorch 2.x推奨）\nwith torch.inference_mode():\n    out_infer = model(x)\n    print("requires_grad:", out_infer.requires_grad)  # False`,
+    afterCode: "ポイント: 学習ループ内でも、validation のステップでは torch.no_grad() を使いましょう。勾配を計算しないことで GPU メモリが節約され、より大きなバッチサイズで検証できます。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "nn.Module基礎",
+  est: "55分",
+  goal: "PyTorch でニューラルネットワークを定義する中核クラス nn.Module の仕組みを理解する。__init__ でレイヤーを定義し forward で計算を記述するパターンを体得し、Sequential での簡易構築、パラメータの列挙・初期化まで自在に扱えることがゴール。",
+  sections: [{
+    title: "nn.Module とは",
+    body: "PyTorch のニューラルネットワークは全て nn.Module を継承して定義します。nn.Module はレイヤー・モデル・さらにはモデルの一部分（ブロック）まで、あらゆる計算ユニットの基底クラスです。nn.Linear, nn.Conv2d, nn.LSTM なども全て nn.Module のサブクラスです。\n\nnn.Module を継承したクラスでは、__init__ メソッドでレイヤー（サブモジュール）を定義し、forward メソッドでデータの流れを記述します。forward に Python の if 文やループを自由に入れられるのが Define-by-Run の恩恵で、条件に応じて異なるレイヤーを通すような複雑な構造も素直に書けます。\n\n呼び出しは model(x) の形で行います。model.forward(x) を直接呼んではいけません。model(x) は内部で forward 以外にもフック処理などを実行するため、必ず __call__ 経由で呼び出す必要があります。",
+    code: `import torch\nimport torch.nn as nn\n\nclass MyNet(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc1 = nn.Linear(10, 32)\n        self.relu = nn.ReLU()\n        self.fc2 = nn.Linear(32, 5)\n\n    def forward(self, x):\n        x = self.relu(self.fc1(x))\n        x = self.fc2(x)\n        return x\n\nmodel = MyNet()\nprint(model)\n\n# 呼び出し\nx = torch.randn(4, 10)\nout = model(x)  # model.forward(x) ではない！\nprint("出力:", out.shape)`,
+    afterCode: "ポイント: super().__init__() を忘れるとパラメータの登録が行われず、optimizer にパラメータが渡されません。必ず書きましょう。"
+  }, {
+    title: "nn.Sequential",
+    body: "レイヤーを単純に順番に通すだけのネットワークであれば、nn.Sequential を使うとクラス定義なしで構築できます。Sequential はレイヤーのリストを受け取り、forward 時に先頭から順番に入力を通します。\n\nSequential は手軽ですが、条件分岐やスキップ接続（ResNet の shortcut connection）のような複雑な構造は表現できません。そういった場合は nn.Module を継承して forward を自前で書く必要があります。実務では、ネットワーク全体は nn.Module で定義し、その中の直線的な部分を nn.Sequential でまとめる、という組み合わせが多いです。\n\nOrderedDict を使えば各レイヤーに名前を付けることもでき、model.layer_name のようにアクセスできるようになります。デバッグや特定レイヤーの出力取得に便利です。",
+    code: `import torch\nimport torch.nn as nn\nfrom collections import OrderedDict\n\n# 基本的な Sequential\nmodel = nn.Sequential(\n    nn.Linear(10, 32),\n    nn.ReLU(),\n    nn.Linear(32, 16),\n    nn.ReLU(),\n    nn.Linear(16, 5)\n)\n\n# 名前付き Sequential\nmodel_named = nn.Sequential(OrderedDict([\n    ("fc1", nn.Linear(10, 32)),\n    ("relu1", nn.ReLU()),\n    ("fc2", nn.Linear(32, 5)),\n]))\n\nprint(model)\nprint(model_named.fc1.weight.shape)  # 名前でアクセス`,
+    afterCode: "ポイント: nn.Sequential の中に nn.Sequential をネストすることもできます。CNN の features 部分と classifier 部分を分けて Sequential にし、全体を nn.Module で束ねるパターンは torchvision の既存モデルでよく見られます。"
+  }, {
+    title: "パラメータ管理",
+    body: "nn.Module に登録されたサブモジュール（nn.Linear など）のパラメータは、model.parameters() や model.named_parameters() で一括して取得できます。これが optimizer にパラメータを渡す仕組みで、optimizer = optim.Adam(model.parameters(), lr=0.001) と書くだけで全パラメータが最適化対象になります。\n\n特定のレイヤーだけ学習率を変えたい場合は、パラメータグループを分けて optimizer に渡します。転移学習で事前学習済み部分は低い学習率、新しく追加した分類ヘッドは高い学習率にする、という場面で使います。\n\nmodel.state_dict() はモデルの全パラメータをディクショナリとして返します。キーはパラメータ名（fc1.weight, fc1.bias など）、値はテンソルです。モデルの保存・読み込みはこの state_dict を介して行うのが PyTorch の標準パターンです。",
+    code: `import torch\nimport torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(10, 32),\n    nn.ReLU(),\n    nn.Linear(32, 5)\n)\n\n# パラメータ一覧\nfor name, param in model.named_parameters():\n    print(f"{name}: {param.shape}, requires_grad={param.requires_grad}")\n\n# 総パラメータ数\ntotal = sum(p.numel() for p in model.parameters())\nprint(f"\\n総パラメータ数: {total}")\n\n# state_dict\nsd = model.state_dict()\nfor k, v in sd.items():\n    print(f"state_dict[{k}]: {v.shape}")`,
+    afterCode: "ポイント: パラメータの requires_grad を False にすると、そのパラメータは学習時に更新されません。事前学習済みモデルの特定レイヤーを凍結（freeze）する際に使います。"
+  }, {
+    title: "活性化関数とレイヤーの選び方",
+    body: "活性化関数はニューラルネットワークに非線形性を導入する重要な要素です。活性化関数がなければ、何層重ねても線形変換の合成にすぎず、表現力が上がりません。\n\nReLU（Rectified Linear Unit）は max(0, x) というシンプルな関数で、深層学習で最も広く使われています。計算が高速で、勾配消失問題を緩和します。ただし「x < 0 の領域で勾配がゼロになる」（dying ReLU 問題）があるため、LeakyReLU や GELU といった改良版も場面に応じて使われます。\n\nGELU（Gaussian Error Linear Unit）は Transformer 系モデルで標準的に使われる活性化関数で、BERT / GPT / ViT などの基盤モデルが採用しています。ReLU のように入力を急に切り捨てるのではなく、確率的にスムーズに抑制するため、学習が安定しやすいとされています。",
+    code: `import torch\nimport torch.nn as nn\n\nx = torch.linspace(-3, 3, 7)\n\n# 各活性化関数の出力比較\nrelu = nn.ReLU()\nleaky = nn.LeakyReLU(0.1)\ngelu = nn.GELU()\nsigmoid = nn.Sigmoid()\ntanh = nn.Tanh()\n\nprint("入力:    ", x.tolist())\nprint("ReLU:    ", relu(x).tolist())\nprint("LeakyReLU:", leaky(x).tolist())\nprint("GELU:    ", [round(v, 3) for v in gelu(x).tolist()])\nprint("Sigmoid: ", [round(v, 3) for v in sigmoid(x).tolist()])\nprint("Tanh:    ", [round(v, 3) for v in tanh(x).tolist()])`,
+    afterCode: "使い分けの指針: 隠れ層の活性化は ReLU（または GELU）、二値分類の出力は Sigmoid、多クラス分類の出力は Softmax（通常 CrossEntropyLoss に内蔵）、回帰の出力は活性化なし（恒等関数）。Transformer ベースのモデルを組む場合は GELU が標準です。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "損失関数と最適化",
+  est: "55分",
+  goal: "問題の種類（回帰・二値分類・多クラス分類）に応じた損失関数の選択、および SGD / Adam / AdamW の動作原理と使い分けを理解する。学習率スケジューラの効果を体感し、「損失関数 + オプティマイザ + スケジューラ」を組み合わせた標準的な学習ループをゼロから書ける状態がゴール。",
+  sections: [{
+    title: "損失関数の選び方",
+    body: "損失関数（Loss Function）はモデルの予測と正解のズレを数値化する関数で、この値を最小化するのが学習の目標です。問題の種類によって使う損失関数が変わります。\n\n回帰問題では MSELoss（平均二乗誤差）が最も一般的です。予測値と正解値の差の二乗の平均を取るため、大きな誤差に対して強くペナルティをかけます。外れ値が多いデータでは L1Loss（平均絶対誤差）や HuberLoss（MSE と L1 のハイブリッド）の方が頑健です。\n\n分類問題では CrossEntropyLoss が標準です。内部で softmax を適用してくれるので、モデルの出力は生の logit（softmax 前の値）でよく、別途 softmax 層を追加する必要はありません。二値分類の場合は BCEWithLogitsLoss（内部で sigmoid を適用）を使います。",
+    table: T.losses,
+    code: `import torch\nimport torch.nn as nn\n\n# 回帰: MSELoss\npred = torch.tensor([2.5, 0.5, 2.1])\ntarget = torch.tensor([3.0, -0.5, 2.0])\nmse = nn.MSELoss()\nprint("MSE:", mse(pred, target).item())\n\n# 多クラス分類: CrossEntropyLoss\n# 注意: 入力は logit（softmax前）、ターゲットはクラスインデックス\nlogits = torch.tensor([[2.0, 1.0, 0.1],\n                        [0.5, 2.5, 0.3]])\nlabels = torch.tensor([0, 1])  # 正解クラス\nce = nn.CrossEntropyLoss()\nprint("CE:", ce(logits, labels).item())`,
+    afterCode: "ポイント: CrossEntropyLoss のターゲットはクラスインデックス（0, 1, 2, ...）であって one-hot ベクトルではありません。NumPy や scikit-learn で one-hot にしてしまった場合は argmax でインデックスに戻す必要があります。"
+  }, {
+    title: "最適化アルゴリズム",
+    body: "オプティマイザは損失関数の勾配を使ってパラメータを更新するアルゴリズムです。最もシンプルな SGD（確率的勾配降下法）は θ = θ - lr * grad という更新式で、lr（学習率）だけがハイパーパラメータです。\n\nAdam は学習率を各パラメータごとに適応的に調整する手法で、2015 年の提案以来最も広く使われています。勾配の 1 次モーメント（平均）と 2 次モーメント（分散）の移動平均を保持し、パラメータごとに最適な学習率を推定します。ほとんどのタスクで SGD より速く収束し、学習率のチューニングも比較的容易です。\n\nAdamW は Adam の重み減衰（weight decay）を修正したバージョンで、正則化の効果がより正確に働きます。Transformer 系モデルの学習では AdamW が事実上の標準です。SGD + momentum は Adam に比べて汎化性能が高いケースがあり、画像分類では依然として好まれる場面があります。",
+    table: T.optimizers,
+    code: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\n\nmodel = nn.Linear(10, 1)\n\n# SGD\nopt_sgd = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)\n\n# Adam\nopt_adam = optim.Adam(model.parameters(), lr=0.001)\n\n# AdamW（重み減衰付き）\nopt_adamw = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)\n\n# パラメータグループ別の学習率\nmodel2 = nn.Sequential(nn.Linear(10, 32), nn.Linear(32, 1))\nopt_multi = optim.Adam([\n    {"params": model2[0].parameters(), "lr": 0.0001},  # 低学習率\n    {"params": model2[1].parameters(), "lr": 0.001},   # 高学習率\n])`,
+    afterCode: "ポイント: 初めてのタスクではまず Adam(lr=1e-3) で試し、ベースラインを確立してから SGD + momentum やスケジューラのチューニングに進むのが効率的です。"
+  }, {
+    title: "学習ループの定石",
+    body: "PyTorch の学習ループは 5 つのステップで構成されます: (1) forward（予測計算）、(2) 損失計算、(3) zero_grad（勾配リセット）、(4) backward（勾配計算）、(5) step（パラメータ更新）。この順番は必ず守る必要があります。\n\nzero_grad() を backward() の前に呼ぶのは、PyTorch が勾配を累積する仕様になっているためです。リセットしないと前回の勾配に今回の勾配が加算され、正しい更新ができません。なお、zero_grad(set_to_none=True) とするとゼロ埋めではなく None にリセットされ、わずかにメモリ効率が良くなります。\n\nvalidation ループでは model.eval() と torch.no_grad() を忘れずに使います。model.eval() は Dropout と BatchNorm を推論モードに切り替え、torch.no_grad() は計算グラフの生成を止めてメモリを節約します。",
+    code: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\n\n# データ\ntorch.manual_seed(42)\nX = torch.randn(100, 5)\ny = X @ torch.tensor([1., 2., 3., 4., 5.]) + 0.5\ny = y.unsqueeze(1)\n\n# モデル・損失・最適化\nmodel = nn.Linear(5, 1)\ncriterion = nn.MSELoss()\noptimizer = optim.Adam(model.parameters(), lr=0.01)\n\n# 学習ループ\nfor epoch in range(500):\n    # 1. forward\n    pred = model(X)\n    # 2. 損失計算\n    loss = criterion(pred, y)\n    # 3. 勾配リセット\n    optimizer.zero_grad()\n    # 4. backward\n    loss.backward()\n    # 5. パラメータ更新\n    optimizer.step()\n\n    if (epoch + 1) % 100 == 0:\n        print(f"Epoch {epoch+1}: loss={loss.item():.4f}")\n\nprint("\\n学習結果:", model.weight.data.flatten().tolist())`,
+    afterCode: "ミニ演習: 上のコードに validation ステップを追加して、学習データの 20% を検証用に分けてみましょう。torch.utils.data.random_split が便利です。"
+  }, {
+    title: "学習率スケジューラ",
+    body: "学習率スケジューラは学習の進行に応じて学習率を動的に変更する仕組みです。最初は大きな学習率で素早く大まかな解に到達し、徐々に学習率を下げて精密に最適解に近づける、という戦略が一般的です。\n\nStepLR は指定エポックごとに学習率を固定比率で減衰させるシンプルなスケジューラです。CosineAnnealingLR はコサイン曲線に沿って学習率を滑らかに減衰させ、論文でよく使われます。ReduceLROnPlateau は検証損失が改善しなくなった時に学習率を下げる適応的なスケジューラで、チューニングの手間を減らせます。\n\nTransformer モデルの学習では、最初にウォームアップ（学習率を 0 から目標値まで線形に増やす）を行い、その後コサイン減衰させる「warmup + cosine」スケジュールが事実上の標準です。",
+    code: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\n\nmodel = nn.Linear(10, 1)\noptimizer = optim.Adam(model.parameters(), lr=0.01)\n\n# StepLR: 30エポックごとに lr × 0.1\nscheduler1 = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)\n\n# CosineAnnealing: 100エポックで lr → 0 まで減衰\nscheduler2 = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)\n\n# ReduceLROnPlateau: val_loss が5エポック改善しなかったら lr × 0.5\nscheduler3 = optim.lr_scheduler.ReduceLROnPlateau(\n    optimizer, mode="min", factor=0.5, patience=5\n)\n\n# 使い方\nfor epoch in range(100):\n    # ... 学習ループ ...\n    scheduler1.step()  # StepLR / CosineAnnealing はここ\n    # scheduler3.step(val_loss)  # Plateau はval_lossを渡す`,
+    afterCode: "ポイント: scheduler.step() は optimizer.step() の後に呼びます。順序を間違えると学習率の更新がずれます。get_last_lr() で現在の学習率を確認できるので、ログに記録しておくとデバッグに役立ちます。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "DatasetとDataLoader",
+  est: "50分",
+  goal: "PyTorch のデータパイプライン（Dataset → transforms → DataLoader）の全体像を理解する。組み込みデータセットの使い方に加え、カスタム Dataset を自作してバッチ処理・シャッフル・データ拡張を組み合わせた実践的なデータローダーを構築できることがゴール。",
+  sections: [{
+    title: "Dataset と DataLoader の役割",
+    body: "深層学習の学習ループでは、大量のデータを小さなバッチに分割し、シャッフルしながらモデルに投入する必要があります。PyTorch はこの処理を Dataset（データの管理）と DataLoader（バッチ化・シャッフル・並列読み込み）の 2 つのクラスに分離しています。\n\nDataset はデータの格納と個別アクセスを担当します。__len__() でデータ数を返し、__getitem__(idx) で idx 番目のデータを返すだけのシンプルなインターフェースです。DataLoader は Dataset を受け取り、バッチサイズ・シャッフル・ワーカー数などを設定して、学習ループに for で回せるイテラブルを提供します。\n\nこの分離のおかげで、データの取得方法（ファイルから読む、API から取る、メモリに全部載せる）とバッチ処理のロジック（シャッフル、並列化）が独立し、柔軟な組み合わせが可能になっています。",
+    code: `import torch\nfrom torch.utils.data import TensorDataset, DataLoader\n\n# 最もシンプルな例: TensorDataset\nX = torch.randn(100, 5)\ny = torch.randint(0, 3, (100,))\n\ndataset = TensorDataset(X, y)\nloader = DataLoader(dataset, batch_size=16, shuffle=True)\n\nfor batch_x, batch_y in loader:\n    print(f"バッチ: x={batch_x.shape}, y={batch_y.shape}")\n    break  # 最初の1バッチだけ表示`,
+    afterCode: "ポイント: DataLoader の num_workers パラメータでデータの読み込みを並列化できます。画像データのように前処理が重い場合は num_workers=4 程度に設定すると、GPU がデータ待ちで遊ぶ時間を減らせます。"
+  }, {
+    title: "カスタム Dataset の作成",
+    body: "TensorDataset は全データをメモリに載せる前提なので、大規模データセットには適しません。ファイルから逐次読み込む場合や、前処理ロジックをデータ取得時に適用したい場合は、Dataset を継承してカスタムクラスを作ります。\n\n必要なメソッドは __init__（初期化）、__len__（データ数の返却）、__getitem__（データの取得）の 3 つだけです。__getitem__ で index を受け取り、その位置のデータと正解ラベルをタプルで返すのが慣例です。\n\n__getitem__ 内で画像ファイルの読み込みや前処理を行うことで、メモリには「今使っているバッチ分」だけが載り、大規模データでもメモリ不足になりません。DataLoader の num_workers によって __getitem__ の呼び出しが並列化されるため、I/O のボトルネックも緩和されます。",
+    code: `import torch\nfrom torch.utils.data import Dataset, DataLoader\n\nclass CSVDataset(Dataset):\n    def __init__(self, filepath):\n        # 実際はCSVを読む。ここではダミー\n        self.data = torch.randn(500, 10)\n        self.labels = torch.randint(0, 5, (500,))\n\n    def __len__(self):\n        return len(self.data)\n\n    def __getitem__(self, idx):\n        return self.data[idx], self.labels[idx]\n\ndataset = CSVDataset("dummy.csv")\nloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)\n\nprint(f"データ数: {len(dataset)}")\nprint(f"バッチ数: {len(loader)}")\n\nfor x, y in loader:\n    print(f"バッチ: x={x.shape}, y={y.shape}")\n    break`,
+    afterCode: "ポイント: Windows 環境では num_workers > 0 の場合に if __name__ == '__main__': ガードが必要です。macOS / Linux では不要ですが、書いておくと移植性が上がります。"
+  }, {
+    title: "transforms — 前処理パイプライン",
+    body: "torchvision.transforms は画像データの前処理とデータ拡張のための変換関数群です。transforms.Compose で複数の変換を連鎖させ、Dataset の __getitem__ 内で適用するのが標準パターンです。\n\nToTensor() は PIL 画像や NumPy 配列を [0, 1] の範囲の FloatTensor に変換し、チャネル順序を (H, W, C) から (C, H, W) に入れ替えます。Normalize(mean, std) はチャネルごとに平均・標準偏差で正規化し、学習を安定させます。ImageNet で学習されたモデルを使う場合は mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225] が慣例です。\n\nデータ拡張（Data Augmentation）は訓練データのバリエーションを人工的に増やす手法で、過学習の抑制に効果的です。RandomHorizontalFlip, RandomCrop, RandomRotation, ColorJitter などを組み合わせて使います。注意点として、データ拡張は訓練時のみ適用し、テスト時は ToTensor + Normalize のみにします。",
+    table: T.transforms,
+    code: `from torchvision import transforms\n\n# 訓練用（データ拡張あり）\ntrain_transform = transforms.Compose([\n    transforms.RandomResizedCrop(224),\n    transforms.RandomHorizontalFlip(),\n    transforms.ToTensor(),\n    transforms.Normalize([0.485, 0.456, 0.406],\n                         [0.229, 0.224, 0.225])\n])\n\n# テスト用（データ拡張なし）\ntest_transform = transforms.Compose([\n    transforms.Resize(256),\n    transforms.CenterCrop(224),\n    transforms.ToTensor(),\n    transforms.Normalize([0.485, 0.456, 0.406],\n                         [0.229, 0.224, 0.225])\n])`,
+    afterCode: "ポイント: transforms.v2（torchvision 0.15 以降）では、画像とバウンディングボックスを同時に変換するなど、より柔軟な前処理が可能になっています。物体検出タスクでは v2 の利用を検討しましょう。"
+  }, {
+    title: "組み込みデータセットの利用",
+    body: "torchvision.datasets には MNIST, CIFAR-10, ImageNet, COCO などの有名データセットがクラスとして用意されており、download=True を指定するだけで自動ダウンロードしてくれます。初めての学習実験にはこれらを使うのが最も手軽です。\n\ntorchtext, torchaudio にも同様の組み込みデータセットがあり、自然言語処理や音声認識のデータも同じパターンで扱えます。\n\ntrain=True / train=False で訓練データとテストデータを切り替えます。検証データ（validation）が別途必要な場合は、torch.utils.data.random_split で訓練データの一部を分割するか、Subset を使ってインデックスで指定します。",
+    code: `from torchvision import datasets, transforms\nfrom torch.utils.data import DataLoader, random_split\n\ntransform = transforms.Compose([\n    transforms.ToTensor(),\n    transforms.Normalize((0.5,), (0.5,))\n])\n\n# MNIST ダウンロード\nfull_train = datasets.MNIST("./data", train=True, download=True, transform=transform)\ntest_data = datasets.MNIST("./data", train=False, download=True, transform=transform)\n\n# 訓練/検証に分割\ntrain_data, val_data = random_split(full_train, [50000, 10000])\n\ntrain_loader = DataLoader(train_data, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_data, batch_size=256)\ntest_loader = DataLoader(test_data, batch_size=256)\n\nprint(f"訓練: {len(train_data)}, 検証: {len(val_data)}, テスト: {len(test_data)}")`,
+    afterCode: "ポイント: データは一度ダウンロードすると root で指定したディレクトリにキャッシュされます。次回以降は download=True でも再ダウンロードは発生しません。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "画像分類CNN",
+  est: "65分",
+  goal: "畳み込みニューラルネットワーク（CNN）の構造と動作原理を理解し、MNIST または CIFAR-10 で実際に訓練・評価を行える状態になる。Conv2d / MaxPool2d / Flatten の組み合わせ方、出力サイズの計算方法、精度評価の書き方をマスターすることがゴール。",
+  sections: [{
+    title: "畳み込み層の仕組み",
+    body: "畳み込み層（Conv2d）は画像認識の核心となるレイヤーです。小さなフィルタ（カーネル）を画像上でスライドさせ、局所的なパターン（エッジ、テクスチャ、形状など）を検出します。全結合層が全ピクセルを一度に見るのに対し、畳み込み層は局所的な受容野を持つため、空間的な構造を効率的に捉えられます。\n\nnn.Conv2d の主要パラメータは in_channels（入力チャネル数）、out_channels（出力チャネル数 = フィルタ数）、kernel_size（フィルタサイズ）です。stride（ストライド）はフィルタの移動幅、padding は入力の周囲に追加するゼロ埋めの幅です。\n\n出力サイズの計算式は output_size = (input_size - kernel_size + 2 * padding) / stride + 1 です。この計算を間違えるとネットワークの構築でサイズ不一致エラーが出るので、常に意識しましょう。padding=kernel_size//2 とすれば入力と同じサイズを維持できます（same padding）。",
+    table: T.convOps,
+    code: `import torch\nimport torch.nn as nn\n\n# 例: 1ch入力, 32フィルタ, 3x3カーネル\nconv = nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1)\n\n# 入力: (batch=1, channels=1, height=28, width=28)\nx = torch.randn(1, 1, 28, 28)\nout = conv(x)\nprint(f"入力: {x.shape}")   # [1, 1, 28, 28]\nprint(f"出力: {out.shape}")  # [1, 32, 28, 28]  padding=1で同サイズ\n\n# padding=0 の場合\nconv_nopad = nn.Conv2d(1, 32, 3, padding=0)\nout2 = conv_nopad(x)\nprint(f"padding=0: {out2.shape}")  # [1, 32, 26, 26]`,
+    afterCode: "ポイント: パラメータ数は out_channels * (in_channels * kernel_h * kernel_w + 1) です。全結合層に比べて大幅に少なく、これが CNN のパラメータ効率の良さの源泉です。"
+  }, {
+    title: "プーリング層",
+    body: "プーリング層は特徴マップの空間サイズを縮小し、計算量を減らすと同時に位置のずれに対する頑健性を高めます。MaxPool2d は各領域の最大値を取り、AvgPool2d は平均値を取ります。\n\n典型的な CNN では、畳み込み → 活性化 → プーリング を繰り返してダウンサンプリングし、最終的に Flatten して全結合層に接続します。MaxPool2d(2) は縦横を半分にし、特徴マップの面積を 1/4 にします。\n\nAdaptiveAvgPool2d は出力サイズを直接指定できるプーリング層で、入力サイズに関係なく固定サイズの出力を得られます。これにより、異なるサイズの画像を同じモデルで処理できるようになります。ResNet などのモダンな CNN では、最終段で AdaptiveAvgPool2d(1) を使って (C, 1, 1) に縮小するのが一般的です。",
+    code: `import torch\nimport torch.nn as nn\n\nx = torch.randn(1, 32, 28, 28)  # conv層の出力を想定\n\n# MaxPool: 28 → 14\npool = nn.MaxPool2d(2)\nout = pool(x)\nprint(f"MaxPool: {x.shape} → {out.shape}")  # [1, 32, 14, 14]\n\n# AdaptiveAvgPool: 任意サイズ → 1x1\nadapt = nn.AdaptiveAvgPool2d(1)\nout2 = adapt(x)\nprint(f"Adaptive: {x.shape} → {out2.shape}")  # [1, 32, 1, 1]\n\n# Flatten して全結合層へ\nflat = out2.flatten(1)  # バッチ次元は保持\nprint(f"Flatten: {flat.shape}")  # [1, 32]`,
+    afterCode: "ポイント: 最近のアーキテクチャ（ConvNeXt など）では、MaxPool の代わりにストライド付き畳み込み（stride=2 の Conv2d）でダウンサンプリングする設計も増えています。こちらの方がパラメータを持つため学習可能で、柔軟性が高いです。"
+  }, {
+    title: "CNN モデルの構築",
+    body: "MNIST（28x28 のグレースケール手書き数字、10クラス）を対象に、基本的な CNN モデルを構築してみましょう。典型的な構造は Conv → ReLU → Pool を 2〜3 回繰り返し、最後に Flatten → Linear で分類するパターンです。\n\n各レイヤーの出力サイズを追跡することが重要です。28x28 の入力に Conv(3, padding=1) → MaxPool(2) を適用すると 14x14 に、もう一度適用すると 7x7 になります。Flatten 後のサイズ（channels * 7 * 7）が全結合層の入力サイズになります。\n\nモデルを定義したら、まずダミー入力を通して各レイヤーの出力サイズが期待通りかを確認する習慣をつけましょう。サイズの不一致はモデル構築で最も多いバグです。",
+    code: `import torch\nimport torch.nn as nn\n\nclass MNISTCNN(nn.Module):\n    def __init__(self):\n        super().__init__()\n        # 特徴抽出部\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 16, 3, padding=1),   # [B,1,28,28]→[B,16,28,28]\n            nn.ReLU(),\n            nn.MaxPool2d(2),                   # →[B,16,14,14]\n            nn.Conv2d(16, 32, 3, padding=1),  # →[B,32,14,14]\n            nn.ReLU(),\n            nn.MaxPool2d(2),                   # →[B,32,7,7]\n        )\n        # 分類部\n        self.classifier = nn.Sequential(\n            nn.Flatten(),                      # →[B,32*7*7]\n            nn.Linear(32 * 7 * 7, 128),\n            nn.ReLU(),\n            nn.Dropout(0.5),\n            nn.Linear(128, 10)\n        )\n\n    def forward(self, x):\n        x = self.features(x)\n        x = self.classifier(x)\n        return x\n\nmodel = MNISTCNN()\nprint(model)\n\n# サイズ確認\nx = torch.randn(1, 1, 28, 28)\nprint(f"出力: {model(x).shape}")  # [1, 10]`,
+    afterCode: "ポイント: Dropout(0.5) は訓練時にランダムに 50% のユニットを無効化して過学習を抑制します。model.eval() にすると Dropout は自動で無効になり、全ユニットが使われます。"
+  }, {
+    title: "訓練と精度評価",
+    body: "CNN の訓練ループは全結合ネットワークと同じ 5 ステップ（forward → loss → zero_grad → backward → step）です。違いは入力データの形状が (B, C, H, W) の 4 次元テンソルになることだけです。\n\n精度（Accuracy）の計算は、予測ラベル（logit の argmax）と正解ラベルを比較し、一致する割合を求めます。argmax は torch.argmax(output, dim=1) または output.argmax(1) で取得できます。\n\n訓練中に train loss / val loss / val accuracy を記録し、train loss は下がっているのに val loss が上がり始めたら過学習の兆候です。早期停止（Early Stopping）を検討するタイミングです。",
+    code: `import torch\nimport torch.nn as nn\n\n# 精度計算の例\ndef accuracy(output, target):\n    pred = output.argmax(dim=1)\n    correct = (pred == target).sum().item()\n    return correct / target.size(0)\n\n# ダミーデータで確認\noutput = torch.tensor([[2.0, 0.5, 0.1],\n                       [0.3, 2.5, 0.2],\n                       [0.1, 0.3, 2.8]])\ntarget = torch.tensor([0, 1, 2])\nprint(f"精度: {accuracy(output, target):.2%}")  # 100%\n\n# 1つ間違えた場合\ntarget2 = torch.tensor([0, 0, 2])  # 2番目が不正解\nprint(f"精度: {accuracy(output, target2):.2%}")  # 66.67%`,
+    afterCode: "ポイント: MNIST の CNN なら 5 エポック程度で 98〜99% の精度が出ます。99% を超えるには、データ拡張・バッチ正規化・学習率スケジューラなどのテクニックを組み合わせます。CIFAR-10 はより難しく、ResNet のような深いモデルが必要になります。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "自然言語処理基礎",
+  est: "55分",
+  goal: "テキストデータを PyTorch で扱う基礎を習得する。単語の Embedding、系列データを処理する RNN/LSTM の仕組みを理解し、簡単なテキスト分類モデルを構築・訓練できる状態がゴール。CNN との違い（空間 vs 時間方向のパターン認識）も把握する。",
+  sections: [{
+    title: "テキストデータの表現",
+    body: "ニューラルネットワークは数値しか扱えないため、テキストを数値に変換する必要があります。最も基本的な方法は、各単語に一意の整数 ID を割り当て（トークン化 + ID化）、その ID を Embedding 層で密ベクトルに変換する方式です。\n\none-hot エンコーディング（語彙サイズの次元のベクトルで該当位置だけ 1）は直感的ですが、語彙数が万〜十万になると非現実的です。Embedding は各単語を低次元（32〜512 次元）の連続ベクトルに圧縮し、意味的に近い単語が近いベクトルになるよう学習されます。\n\n近年は subword トークナイザ（BPE, WordPiece, SentencePiece）が主流で、単語単位ではなく部分文字列単位でトークン化します。これにより未知語（OOV）問題を大幅に緩和できます。ただし、この入門コースでは基本を理解するために単語単位の Embedding から始めます。",
+    code: `import torch\nimport torch.nn as nn\n\n# 語彙数1000, 埋め込み次元64\nembed = nn.Embedding(1000, 64)\n\n# 入力: 単語IDの系列 (バッチ2, 系列長5)\ninput_ids = torch.tensor([\n    [12, 45, 78, 3, 901],\n    [67, 23, 456, 0, 11]\n])\n\n# Embedding: 各IDが64次元ベクトルに変換\nvectors = embed(input_ids)\nprint(f"入力: {input_ids.shape}")      # [2, 5]\nprint(f"出力: {vectors.shape}")       # [2, 5, 64]\nprint(f"ID=12のベクトル（先頭5次元）: {vectors[0, 0, :5]}")`,
+    afterCode: "ポイント: Embedding のパラメータは vocab_size * embed_dim 個の浮動小数点数です。語彙 30,000 で次元 256 なら約 770 万パラメータになります。事前学習済みの Embedding（Word2Vec, GloVe, FastText）で初期化すると、少ないデータでも良い性能が出やすくなります。"
+  }, {
+    title: "RNN と LSTM",
+    body: "RNN（Recurrent Neural Network）は系列データ（テキスト、時系列）を処理するためのアーキテクチャです。各時刻の入力と前の時刻の隠れ状態を受け取り、新しい隠れ状態を出力します。これにより系列の「文脈」を保持しながら処理を進められます。\n\n単純な RNN は長い系列で勾配消失問題が起きやすく、実用には向きません。これを解決するのが LSTM（Long Short-Term Memory）で、ゲート機構（forget gate, input gate, output gate）により長期的な依存関係を学習できます。GRU は LSTM の簡略版で、パラメータ数が少なくても同等の性能を出すことが多いです。\n\nPyTorch の nn.LSTM は batch_first=True を指定すると入力形状が (batch, seq_len, input_size) になります（デフォルトは (seq_len, batch, input_size)）。batch_first=True を使う方が直感的なので、常に指定することを推奨します。",
+    table: T.nlpLayers,
+    code: `import torch\nimport torch.nn as nn\n\n# LSTM: 入力64次元, 隠れ層128次元\nlstm = nn.LSTM(\n    input_size=64,\n    hidden_size=128,\n    num_layers=2,       # 2層LSTM\n    batch_first=True,\n    dropout=0.3,        # 層間のドロップアウト\n    bidirectional=True  # 双方向\n)\n\n# 入力: (batch=4, seq_len=20, input=64)\nx = torch.randn(4, 20, 64)\noutput, (h_n, c_n) = lstm(x)\n\nprint(f"出力: {output.shape}")  # [4, 20, 256] (128*2 双方向)\nprint(f"h_n: {h_n.shape}")     # [4, 4, 128] (2layers*2directions)\nprint(f"c_n: {c_n.shape}")     # [4, 4, 128]`,
+    afterCode: "ポイント: bidirectional=True にすると順方向と逆方向の 2 つの LSTM が走り、出力のチャネル数が 2 倍になります。テキスト分類のように系列全体を見てから判断するタスクでは、双方向の方が精度が出やすいです。"
+  }, {
+    title: "テキスト分類モデル",
+    body: "テキスト分類は Embedding → LSTM → Linear という構成で実装します。LSTM の出力は各時刻の隠れ状態のリスト (batch, seq_len, hidden) ですが、分類に使うのは最終時刻の隠れ状態（h_n）が一般的です。最終隠れ状態は系列全体の情報を要約したベクトルとみなせます。\n\n別のアプローチとして、全時刻の出力を平均プーリングする方法もあります。こちらは系列の各位置から均等に情報を取り込むため、長い系列での性能が安定しやすい傾向があります。\n\nパディング（系列長を揃えるためのゼロ埋め）への対応も重要です。nn.utils.rnn.pack_padded_sequence を使うと、パディング部分を LSTM の計算から除外でき、効率と精度の両方が向上します。",
+    code: `import torch\nimport torch.nn as nn\n\nclass TextClassifier(nn.Module):\n    def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes):\n        super().__init__()\n        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)\n        self.lstm = nn.LSTM(embed_dim, hidden_dim,\n                            batch_first=True, bidirectional=True)\n        self.fc = nn.Linear(hidden_dim * 2, num_classes)  # *2: 双方向\n        self.dropout = nn.Dropout(0.5)\n\n    def forward(self, x):\n        embedded = self.dropout(self.embedding(x))  # [B, L, E]\n        _, (h_n, _) = self.lstm(embedded)\n        # h_n: [2, B, H] → 順方向と逆方向を結合\n        hidden = torch.cat([h_n[0], h_n[1]], dim=1)  # [B, H*2]\n        hidden = self.dropout(hidden)\n        return self.fc(hidden)\n\nmodel = TextClassifier(vocab_size=5000, embed_dim=128,\n                        hidden_dim=64, num_classes=3)\nprint(model)\n\nx = torch.randint(0, 5000, (8, 30))  # バッチ8, 系列長30\nout = model(x)\nprint(f"出力: {out.shape}")  # [8, 3]`,
+    afterCode: "ポイント: padding_idx=0 を指定すると、ID=0 の Embedding ベクトルは常にゼロベクトルとなり、学習で更新されません。パディングトークンに ID=0 を割り当てることで、パディング部分が分類結果に影響しないようにできます。"
+  }, {
+    title: "Transformer への橋渡し",
+    body: "現代の自然言語処理は Transformer アーキテクチャ（BERT, GPT, T5 など）が主流であり、RNN/LSTM は研究の前線からは退きつつあります。しかし、RNN/LSTM の理解は Transformer を学ぶ上での重要な土台です。「なぜ Attention 機構が必要だったのか」「なぜ並列化できることが重要なのか」を理解するには、RNN の限界を体感しておく必要があります。\n\nRNN/LSTM の主な限界は 2 つです。(1) 系列を順番に処理するため並列化ができず、長い系列で訓練が遅い。(2) 系列が長くなるほど初期の情報が薄れる（LSTM でも完全には解決できない）。Transformer の Self-Attention は全位置のペアを一度に計算するため、これらの問題を解決しています。\n\nPyTorch には nn.Transformer, nn.TransformerEncoder, nn.MultiheadAttention など、Transformer を構築するためのモジュールが用意されています。また、Hugging Face の transformers ライブラリを使えば、BERT や GPT の事前学習済みモデルを数行で利用できます。これらは中級コースで詳しく扱います。",
+    code: `import torch\nimport torch.nn as nn\n\n# PyTorch の Transformer モジュール（参考）\nencoder_layer = nn.TransformerEncoderLayer(\n    d_model=256, nhead=8, dim_feedforward=512,\n    dropout=0.1, batch_first=True\n)\ntransformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=6)\n\nx = torch.randn(4, 20, 256)  # バッチ4, 系列長20, 次元256\nout = transformer_encoder(x)\nprint(f"入力: {x.shape} → 出力: {out.shape}")  # 同じshape\n\n# → 中級コースで詳しく学びます`,
+    afterCode: "ポイント: RNN/LSTM は今でも時系列予測やリアルタイムの系列処理（音声認識のストリーミングなど）で使われています。適材適所で選択することが重要です。"
+  }]
+}, {
+  id: "ch9",
+  num: 9,
+  title: "モデルの保存・読み込み・推論",
+  est: "45分",
+  goal: "学習済みモデルを正しく保存・復元し、本番環境で推論に使える状態にするまでの流れを理解する。state_dict による標準保存、チェックポイントによる学習再開、TorchScript と ONNX によるポータブルな推論形式への変換をそれぞれ実装できることがゴール。",
+  sections: [{
+    title: "state_dict による保存・読み込み",
+    body: "PyTorch で推奨されるモデル保存方法は、モデルのパラメータ（state_dict）のみを保存する方式です。torch.save(model.state_dict(), path) で保存し、model.load_state_dict(torch.load(path)) で復元します。\n\nこの方法では、読み込み時に同じモデル定義クラスが必要です。モデルの構造はコードで定義し、パラメータ（重み）だけをファイルに保存するという分離により、モデル構造の変更に柔軟に対応できます。\n\ntorch.save(model, path) でモデル全体を保存することもできますが、これは pickle に依存するため、Python のバージョンやモジュールの配置が変わると読み込めなくなるリスクがあります。state_dict 方式を標準として使い、全体保存は避けるのがベストプラクティスです。",
+    table: T.saveLoad,
+    code: `import torch\nimport torch.nn as nn\n\nclass SimpleModel(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc = nn.Linear(10, 5)\n    def forward(self, x):\n        return self.fc(x)\n\n# 保存\nmodel = SimpleModel()\ntorch.save(model.state_dict(), "model.pth")\n\n# 読み込み\nmodel2 = SimpleModel()  # 同じ定義が必要\nmodel2.load_state_dict(torch.load("model.pth"))\nmodel2.eval()  # 推論モードに切り替え`,
+    afterCode: "ポイント: load_state_dict に strict=False を渡すと、キーが一部不一致でもエラーにならずに読み込めます。転移学習で一部のレイヤーだけ事前学習済みの重みを使いたい場合に便利です。"
+  }, {
+    title: "チェックポイント",
+    body: "長時間の学習を行う場合、途中経過を保存して学習を再開できるようにすることが重要です。チェックポイントにはモデルのパラメータだけでなく、オプティマイザの状態（モーメンタムのバッファなど）、現在のエポック、最良の精度などを含めます。\n\nGPU で学習したモデルを CPU で読み込む場合は torch.load(path, map_location='cpu') を指定します。逆に CPU で保存したモデルを GPU で読み込む場合は map_location='cuda' とするか、読み込み後に model.to(device) します。\n\nベストモデル（検証精度が最高のエポック）を別途保存しておくのも定石です。学習を最後まで走らせた後、最終エポックのモデルよりもベストモデルの方が汎化性能が高いことはよくあります。",
+    code: `import torch\nimport torch.nn as nn\nimport torch.optim as optim\n\ndef save_checkpoint(model, optimizer, epoch, loss, path):\n    torch.save({\n        "epoch": epoch,\n        "model_state_dict": model.state_dict(),\n        "optimizer_state_dict": optimizer.state_dict(),\n        "loss": loss,\n    }, path)\n\ndef load_checkpoint(model, optimizer, path, device="cpu"):\n    checkpoint = torch.load(path, map_location=device)\n    model.load_state_dict(checkpoint["model_state_dict"])\n    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])\n    return checkpoint["epoch"], checkpoint["loss"]\n\n# 使い方\nmodel = nn.Linear(10, 5)\noptimizer = optim.Adam(model.parameters())\nsave_checkpoint(model, optimizer, epoch=10, loss=0.05, path="ckpt.pth")\n\n# 復元\nmodel2 = nn.Linear(10, 5)\nopt2 = optim.Adam(model2.parameters())\nepoch, loss = load_checkpoint(model2, opt2, "ckpt.pth")\nprint(f"再開: epoch={epoch}, loss={loss}")`,
+    afterCode: "ポイント: クラウド環境で学習する場合、スポットインスタンスが途中で停止されるリスクがあります。一定間隔でチェックポイントを保存し、学習を再開できるようにしておきましょう。"
+  }, {
+    title: "TorchScript と ONNX",
+    body: "学習済みモデルを Python 以外の環境で使いたい場合、TorchScript または ONNX 形式にエクスポートします。TorchScript は PyTorch 独自の中間表現で、C++ ランタイム（LibTorch）やモバイル（PyTorch Mobile）から直接実行できます。\n\ntorch.jit.script(model) はモデルの forward メソッドを解析して TorchScript に変換します。Python の if 文やループも対応していますが、全ての Python 構文が変換できるわけではありません。動的な Python 機能を使っている場合は torch.jit.trace(model, example_input) の方が確実です。trace は実際にデータを通して計算グラフを記録する方式で、制御フローは固定されます。\n\nONNX（Open Neural Network Exchange）は、フレームワーク間でモデルを交換するための標準形式です。PyTorch → ONNX にエクスポートすれば、ONNX Runtime, TensorRT, CoreML など多様な推論エンジンで実行できます。本番環境でのデプロイでは ONNX + ONNX Runtime の組み合わせが高速かつポータブルです。",
+    code: `import torch\nimport torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(10, 32), nn.ReLU(), nn.Linear(32, 5)\n)\nmodel.eval()\n\n# TorchScript (script)\nscripted = torch.jit.script(model)\nscripted.save("model_scripted.pt")\n\n# TorchScript (trace)\ndummy = torch.randn(1, 10)\ntraced = torch.jit.trace(model, dummy)\ntraced.save("model_traced.pt")\n\n# 読み込み（クラス定義不要）\nloaded = torch.jit.load("model_scripted.pt")\nout = loaded(torch.randn(1, 10))\nprint(f"TorchScript推論: {out.shape}")\n\n# ONNX エクスポート\ntorch.onnx.export(\n    model, dummy, "model.onnx",\n    input_names=["input"],\n    output_names=["output"],\n    dynamic_axes={"input": {0: "batch"}, "output": {0: "batch"}}\n)\nprint("ONNX エクスポート完了")`,
+    afterCode: "ポイント: dynamic_axes を指定すると、バッチサイズが可変の ONNX モデルを出力できます。推論時にバッチサイズが固定でない場合は必ず指定しましょう。"
+  }]
+}, {
+  id: "ch10",
+  num: 10,
+  title: "学習の可視化とデバッグ",
+  est: "50分",
+  goal: "TensorBoard による学習曲線の可視化、tqdm によるプログレス表示、勾配の健全性チェック、過学習の検出と対策（Dropout, weight_decay, 早期停止）をひと通り実装できるようになる。「学習がうまくいかない時に何を確認すべきか」のチェックリストを自分で組み立てられることがゴール。",
+  sections: [{
+    title: "TensorBoard で学習を可視化",
+    body: "TensorBoard は学習の進行状況をリアルタイムに可視化するツールです。もともと TensorFlow 用に開発されましたが、PyTorch からも torch.utils.tensorboard.SummaryWriter を通じてログを書き込み、同じ Web UI で閲覧できます。\n\n記録できる情報は多岐にわたります。スカラー値（loss, accuracy, learning rate）のグラフ、ヒストグラム（パラメータや勾配の分布）、画像（入力データや生成画像）、モデルのグラフ構造、そしてハイパーパラメータの比較実験結果まで可視化できます。\n\n特に重要なのは train loss と val loss の同時プロットです。train loss は下がっているのに val loss が横ばいまたは上昇していれば過学習のサインです。両者が共に下がり続けていれば、まだ学習の余地があるということです。",
+    table: T.debugTools,
+    code: `from torch.utils.tensorboard import SummaryWriter\nimport torch\n\nwriter = SummaryWriter("runs/experiment_1")\n\n# スカラーのログ\nfor step in range(100):\n    train_loss = 1.0 / (step + 1) + 0.01 * torch.rand(1).item()\n    val_loss = 1.0 / (step + 1) + 0.05 * torch.rand(1).item()\n    writer.add_scalar("Loss/train", train_loss, step)\n    writer.add_scalar("Loss/val", val_loss, step)\n\n# パラメータのヒストグラム\nmodel = torch.nn.Linear(10, 5)\nfor name, param in model.named_parameters():\n    writer.add_histogram(name, param, 0)\n\nwriter.close()\n# 起動: tensorboard --logdir=runs`,
+    afterCode: "ポイント: 複数の実験を比較するには、runs/exp_1, runs/exp_2 のようにサブディレクトリを分けてログを書きます。TensorBoard の UI で全実験のグラフを重ねて表示でき、ハイパーパラメータの効果を視覚的に比較できます。"
+  }, {
+    title: "tqdm でプログレス表示",
+    body: "tqdm は反復処理にプログレスバーを追加する Python ライブラリです。学習ループの DataLoader を tqdm で包むだけで、進捗率・経過時間・推定残り時間・現在の loss 値などをターミナルにリアルタイム表示できます。\n\n特に長時間の学習（数時間〜数日）では、プログレスバーがあるだけで「止まっていないか」「あとどれくらいかかるか」が一目で分かり、心理的にも実用的にも大きな差があります。\n\npbar.set_postfix() で任意の情報（loss, accuracy, learning rate など）をプログレスバーの右側に表示できます。エポック単位の外側ループと、バッチ単位の内側ループの両方に tqdm を使うパターンもありますが、通常はバッチ単位のループだけで十分です。",
+    code: `from tqdm import tqdm\nimport torch\nfrom torch.utils.data import TensorDataset, DataLoader\n\n# ダミーデータ\nloader = DataLoader(\n    TensorDataset(torch.randn(1000, 10), torch.randint(0, 2, (1000,))),\n    batch_size=32\n)\n\n# tqdm付きループ\nfor epoch in range(3):\n    pbar = tqdm(loader, desc=f"Epoch {epoch+1}/3")\n    for batch_x, batch_y in pbar:\n        # 学習処理（ダミー）\n        loss = torch.rand(1).item()\n        pbar.set_postfix(loss=f"{loss:.4f}", lr="0.001")`,
+    afterCode: "ポイント: Jupyter Notebook では tqdm.notebook.tqdm を使うときれいなプログレスバーが表示されます。from tqdm.auto import tqdm とすると環境に応じて自動で切り替わります。"
+  }, {
+    title: "勾配の確認とデバッグ",
+    body: "学習がうまくいかない場合の最も一般的な原因は、勾配の問題です。勾配消失（gradient vanishing）は深い層で勾配がゼロに近づく現象で、下層のパラメータがほとんど更新されません。勾配爆発（gradient exploding）はその逆で、勾配が非常に大きな値になり、パラメータが発散します。\n\n勾配ノルムを監視することで、これらの問題を早期に検出できます。各パラメータの .grad.norm() を確認し、極端に小さい（< 1e-7）または大きい（> 100）値がないか確認します。\n\ntorch.nn.utils.clip_grad_norm_ は勾配クリッピングで、勾配ノルムが閾値を超えた場合にスケーリングして抑制します。RNN/LSTM の学習では勾配爆発が起きやすいため、clip_grad_norm_(model.parameters(), max_norm=1.0) を backward() と step() の間に入れるのが定石です。",
+    code: `import torch\nimport torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(10, 64), nn.ReLU(),\n    nn.Linear(64, 32), nn.ReLU(),\n    nn.Linear(32, 2)\n)\n\n# forward + backward\nx = torch.randn(4, 10)\nout = model(x)\nloss = nn.CrossEntropyLoss()(out, torch.tensor([0, 1, 0, 1]))\nloss.backward()\n\n# 勾配ノルムの確認\nfor name, param in model.named_parameters():\n    if param.grad is not None:\n        print(f"{name}: grad_norm={param.grad.norm():.6f}")\n\n# 勾配クリッピング\ntorch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)\nprint("\\nクリッピング後:")\nfor name, param in model.named_parameters():\n    if param.grad is not None:\n        print(f"{name}: grad_norm={param.grad.norm():.6f}")`,
+    afterCode: "ポイント: torch.autograd.set_detect_anomaly(True) を有効にすると、NaN や Inf が発生した演算を特定できます。デバッグ時だけ有効にし、学習時は False にしてください（オーバーヘッドがあるため）。"
+  }, {
+    title: "過学習の検出と対策",
+    body: "過学習（overfitting）は訓練データに対しては良い性能を示すが、未知のデータに対する性能が低いという状態です。train loss が下がり続けているのに val loss が上がり始めたら過学習です。\n\n対策は複数あり、組み合わせて使うのが一般的です。Dropout は訓練時にランダムにユニットを無効化することで、特定のニューロンへの依存を防ぎます。weight_decay（L2 正則化）はパラメータが大きくなりすぎることにペナルティを課し、モデルの複雑さを制限します。データ拡張は訓練データのバリエーションを増やして汎化性能を高めます。\n\n早期停止（Early Stopping）は val loss が一定エポック改善しなかった時点で学習を打ち切る手法です。最もシンプルかつ効果的な正則化手法の一つで、必要以上に学習を続けることによる過学習を防ぎます。ベストモデルを保存しておき、学習終了時にベストモデルを復元するのが標準的なパターンです。",
+    code: `import torch\nimport torch.nn as nn\n\n# 過学習対策を組み込んだモデル\nclass RegularizedNet(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc1 = nn.Linear(10, 64)\n        self.bn1 = nn.BatchNorm1d(64)  # バッチ正規化\n        self.drop1 = nn.Dropout(0.5)   # ドロップアウト\n        self.fc2 = nn.Linear(64, 32)\n        self.drop2 = nn.Dropout(0.3)\n        self.fc3 = nn.Linear(32, 2)\n\n    def forward(self, x):\n        x = torch.relu(self.bn1(self.fc1(x)))\n        x = self.drop1(x)\n        x = torch.relu(self.fc2(x))\n        x = self.drop2(x)\n        return self.fc3(x)\n\n# Early Stopping の実装\nclass EarlyStopping:\n    def __init__(self, patience=10, min_delta=0):\n        self.patience = patience\n        self.min_delta = min_delta\n        self.counter = 0\n        self.best_loss = None\n\n    def __call__(self, val_loss):\n        if self.best_loss is None:\n            self.best_loss = val_loss\n        elif val_loss > self.best_loss - self.min_delta:\n            self.counter += 1\n            if self.counter >= self.patience:\n                return True  # 学習停止\n        else:\n            self.best_loss = val_loss\n            self.counter = 0\n        return False\n\n# 使い方\nearly_stop = EarlyStopping(patience=10)\n# for epoch in ...:\n#     if early_stop(val_loss):\n#         print("Early stopping!"); break`,
+    afterCode: "コース完了後に習得できる状態: PyTorch の基本概念（Tensor, Autograd, nn.Module, DataLoader）を理解し、画像分類 CNN やテキスト分類 LSTM を自力で構築・訓練・評価・保存でき、学習の可視化とデバッグのアプローチを身につけている。次のステップとして、Transformer・転移学習・分散学習などの中級トピックに進む準備ができている。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, React.createElement("thead", null, React.createElement("tr", null, data.h.map(function(h, i) { return React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h); }))), React.createElement("tbody", null, data.r.map(function(row, ri) { return React.createElement("tr", {
+    key: ri
+  }, row.map(function(cell, ci) { return React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell); })); }))), data.cap && React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+var diffLabel = function(d) { return d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55"; };
+var diffColor = function(d) { return d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626"; };
+function Exercise({
+  ex,
+  idx
+}) {
+  var _useState = useState(false), showAnswer = _useState[0], setShowAnswer = _useState[1];
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, React.createElement("button", {
+    onClick: function() { setShowAnswer(!showAnswer); },
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  var _useState2 = useState(defaultOpen), open = _useState2[0], setOpen = _useState2[1];
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, React.createElement("button", {
+    onClick: function() { setOpen(!open); },
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function PyTorchCourse() {
+  var _useState3 = useState(0), ch = _useState3[0], setCh = _useState3[1];
+  var _useState4 = useState(false), menuOpen = _useState4[0], setMenuOpen = _useState4[1];
+  var chapter = chapters[ch];
+  var exKey = chapter.id;
+  var exercises = EX[exKey] || [];
+  return React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, React.createElement("div", {
+    style: {
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\uD83D\uDD26"), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "PyTorch \u5165\u9580\u30B3\u30FC\u30B9"), React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "NumPy\u306E\u57FA\u672C\u3092\u77E5\u3063\u3066\u3044\u308BPython\u958B\u767A\u8005\u3092\u5BFE\u8C61\u306B\u3001PyTorch\u306E\u8A2D\u8A08\u601D\u60F3\u304B\u3089Tensor\u64CD\u4F5C\u30FB\u81EA\u52D5\u5FAE\u5206\u30FB\u30CB\u30E5\u30FC\u30E9\u30EB\u30CD\u30C3\u30C8\u306E\u69CB\u7BC9\u30FB\u8A13\u7DF4\u30FB\u8A55\u4FA1\u30FB\u4FDD\u5B58\u30FB\u30C7\u30D0\u30C3\u30B0\u307E\u3067\u3092\u4E00\u6C17\u901A\u8CAB\u3067\u5B66\u3073\u307E\u3059\u3002\u300C\u81EA\u5206\u3067CNN\u3084LSTM\u3092\u7D44\u3093\u3067\u5B9F\u969B\u306B\u52D5\u304B\u305B\u308B\u300D\u72B6\u614B\u3092\u30B4\u30FC\u30EB\u3068\u3057\u307E\u3059\u3002"), React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map(function(_, i) { return React.createElement("div", {
+    key: i,
+    onClick: function() {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  }); }))), React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("button", {
+    onClick: function() { setMenuOpen(!menuOpen); },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "\u25B2" : "\u25BC")), menuOpen && React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map(function(c, i) { return React.createElement("button", {
+    key: c.id,
+    onClick: function() {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F")); }))), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? " \u30FB \u6F14\u7FD2" + exercises.length + "\u554F" : ""))), chapter.goal && React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"), React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map(function(sec, i) { return React.createElement(Section, {
+    key: ch + "-" + i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }); })), exercises.length > 0 && React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map(function(ex, i) { return React.createElement(Exercise, {
+    key: ch + "-" + i,
+    ex: ex,
+    idx: i
+  }); })), React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? React.createElement("button", {
+    onClick: function() {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? React.createElement("button", {
+    onClick: function() {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : React.createElement("a", {
+    href: "../index.html",
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "PyTorch 2.2 \u30FB CUDA 12.x \u30FB torchvision 0.17 \u6E96\u62E0 \u30FB 2026\u5E744\u6708\u6642\u70B9")));
+}
+var root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(PyTorchCourse));
+  </script>
+</body>
+</html>

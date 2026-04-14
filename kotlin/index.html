@@ -1,0 +1,2637 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kotlin 入門コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのKotlin入門コース。全10章・30問の演習付き。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  langCompare: {
+    h: ["項目", "Python", "Kotlin", "Java"],
+    r: [["型付け", "動的型付け", "静的型付け（型推論あり）", "静的型付け（型推論限定的）"], ["Null安全", "なし（None参照で実行時エラー）", "言語レベルで保証", "Optional等で対処"], ["コンパイル", "インタプリタ", "JVM/Native/JS にコンパイル", "JVMにコンパイル"], ["関数型", "限定的（lambda, map等）", "ファーストクラス関数", "ラムダ式あり（制限付き）"], ["拡張関数", "なし", "あり", "なし"], ["コルーチン", "asyncio（シングルスレッド）", "構造化並行性", "仮想スレッド（Java 21+）"]]
+  },
+  runMode: {
+    h: ["実行方法", "コマンド", "特徴"],
+    r: [["kotlinc REPL", "kotlinc", "対話的に式を評価。学習に最適。"], ["スクリプト実行", "kotlinc -script hello.kts", ".kts ファイルをスクリプトとして実行。main不要。"], ["コンパイル実行", "kotlinc hello.kt -include-runtime -d hello.jar && java -jar hello.jar", "JARファイルを生成して実行。配布向き。"], ["Gradle", "gradle run", "実務プロジェクトの標準ビルドツール。"]]
+  },
+  valVar: {
+    h: ["宣言", "再代入", "Python相当", "用途"],
+    r: [["val name = \"Alice\"", "不可", "（なし — 定数がない）", "基本はこちら。イミュータブル参照。"], ["var count = 0", "可", "count = 0", "ループカウンタなど再代入が必要な場合のみ。"], ["const val PI = 3.14", "不可（コンパイル時定数）", "（なし）", "トップレベルやobject内でのみ使用可。"]]
+  },
+  types: {
+    h: ["Python", "Kotlin", "サイズ", "説明"],
+    r: [["int", "Int", "32bit", "整数（Kotlinは固定幅）"], ["int（大きい値）", "Long", "64bit", "大きな整数"], ["float", "Double", "64bit", "倍精度浮動小数点（デフォルト）"], ["float", "Float", "32bit", "単精度浮動小数点"], ["bool", "Boolean", "—", "真偽値（true/false、小文字）"], ["str", "String", "—", "文字列（ダブルクォートのみ）"], ["None", "Unit / Nothing", "—", "Unit=戻り値なし、Nothing=到達不能"], ["chr (1文字)", "Char", "16bit", "シングルクォートで表す: 'A'"]]
+  },
+  nullOps: {
+    h: ["演算子", "名前", "動作", "Python相当"],
+    r: [["?.", "セーフコール", "nullなら全体がnull、非nullならメソッド実行", "obj and obj.method()（近似）"], ["?:", "エルビス演算子", "左がnullなら右を返す", "value if value is not None else default"], ["!!", "非null表明", "nullならKotlinNullPointerException送出", "assert value is not None; value"], ["as?", "安全キャスト", "キャスト失敗時にnull", "（なし）"], ["?.let { }", "スコープ付きセーフコール", "非nullの場合のみブロック実行", "if value is not None: ..."]]
+  },
+  funCompare: {
+    h: ["機能", "Python", "Kotlin"],
+    r: [["関数定義", "def greet(name):", "fun greet(name: String): Unit"], ["デフォルト引数", "def f(x, y=10):", "fun f(x: Int, y: Int = 10): Int"], ["名前付き引数", "f(y=20, x=5)", "f(y = 20, x = 5)"], ["可変長引数", "def f(*args):", "fun f(vararg items: Int)"], ["ラムダ", "lambda x: x * 2", "{ x: Int -> x * 2 }"], ["高階関数", "def apply(f, x): return f(x)", "fun apply(f: (Int) -> Int, x: Int) = f(x)"]]
+  },
+  whenVsMatch: {
+    h: ["機能", "Python (match/case)", "Kotlin (when)"],
+    r: [["基本構文", "match x: case 1: ...", "when (x) { 1 -> ... }"], ["複数値", "case 1 | 2:", "1, 2 -> ..."], ["範囲", "（ガード式で代替）", "in 1..10 -> ..."], ["型チェック", "case str():", "is String -> ..."], ["式として使用", "不可", "val result = when (x) { ... }"], ["else", "case _:", "else -> ..."]]
+  },
+  ranges: {
+    h: ["式", "意味", "Python相当"],
+    r: [["1..10", "1から10まで（10含む）", "range(1, 11)"], ["1..<10", "1から10未満", "range(1, 10)"], ["10 downTo 1", "10から1まで降順", "range(10, 0, -1)"], ["1..10 step 2", "1から10まで2刻み", "range(1, 11, 2)"], ["'a'..'z'", "文字範囲", "（なし）"]]
+  },
+  classCompare: {
+    h: ["機能", "Python", "Kotlin"],
+    r: [["クラス定義", "class Person:", "class Person(val name: String)"], ["コンストラクタ", "def __init__(self, name):", "プライマリコンストラクタ（クラス宣言に含む）"], ["プロパティ", "self.name = name", "val/var で宣言（自動getter/setter）"], ["データクラス", "@dataclass", "data class"], ["シングルトン", "（手動実装）", "object宣言"], ["静的メンバ", "@staticmethod", "companion object"], ["文字列表現", "__str__", "toString()"], ["等値比較", "__eq__", "equals() / == （data classは自動）"]]
+  },
+  visibility: {
+    h: ["修飾子", "可視範囲", "Python相当"],
+    r: [["public（デフォルト）", "どこからでもアクセス可", "通常の属性"], ["private", "同クラス内のみ", "_name（慣習のみ）"], ["protected", "同クラスとサブクラス", "（なし）"], ["internal", "同モジュール内", "（なし）"]]
+  },
+  inheritCompare: {
+    h: ["機能", "Python", "Kotlin"],
+    r: [["継承", "class Dog(Animal):", "class Dog : Animal()"], ["オーバーライド", "同名メソッド定義", "override fun ...（明示必須）"], ["抽象クラス", "from abc import ABC", "abstract class"], ["インターフェース", "from abc import ABC（同じ）", "interface（状態もデフォルト実装も可）"], ["多重継承", "class C(A, B):", "class C : InterfaceA, InterfaceB（interfaceのみ複数可）"], ["open/final", "常にopen", "デフォルトfinal、openで継承許可"]]
+  },
+  delegation: {
+    h: ["パターン", "Python", "Kotlin"],
+    r: [["委譲（delegation）", "手動で転送メソッドを書く", "by キーワードで自動委譲"], ["プロパティ委譲", "property + descriptor", "by lazy, by Delegates.observable 等"], ["用途", "Composition over Inheritance", "同じ思想を言語レベルでサポート"]]
+  },
+  collections: {
+    h: ["Python", "Kotlin（不変）", "Kotlin（可変）", "説明"],
+    r: [["list", "listOf(1, 2, 3)", "mutableListOf(1, 2, 3)", "順序付きコレクション"], ["set", "frozenset({1, 2})", "setOf(1, 2, 3)", "重複なしコレクション"], ["set（可変）", "set({1, 2})", "—", "mutableSetOf(1, 2, 3)"], ["dict", "（なし）", "mapOf(\"a\" to 1)", "キーと値のペア"], ["dict（可変）", "dict()", "—", "mutableMapOf(\"a\" to 1)"]]
+  },
+  collectionOps: {
+    h: ["操作", "Python", "Kotlin"],
+    r: [["変換", "[x*2 for x in lst]", "list.map { it * 2 }"], ["フィルタ", "[x for x in lst if x > 0]", "list.filter { it > 0 }"], ["グルーピング", "itertools.groupby(...)", "list.groupBy { it.category }"], ["ソート", "sorted(lst, key=...)", "list.sortedBy { it.name }"], ["集約", "sum(lst)", "list.sum() / list.fold(0) { acc, x -> acc + x }"], ["フラット化", "[y for x in nested for y in x]", "nested.flatten() / nested.flatMap { it }"], ["存在チェック", "any(x > 0 for x in lst)", "list.any { it > 0 }"], ["全要素チェック", "all(x > 0 for x in lst)", "list.all { it > 0 }"]]
+  },
+  scopeFunctions: {
+    h: ["関数", "レシーバ参照", "戻り値", "主な用途"],
+    r: [["let", "it", "ラムダの結果", "null チェック後の変換処理"], ["run", "this", "ラムダの結果", "オブジェクト初期化 + 結果の計算"], ["with", "this（引数で渡す）", "ラムダの結果", "既存オブジェクトの複数操作"], ["apply", "this", "レシーバ自身", "オブジェクトの設定・初期化"], ["also", "it", "レシーバ自身", "副作用（ログ出力、デバッグ等）"]]
+  },
+  exceptionCompare: {
+    h: ["機能", "Python", "Kotlin"],
+    r: [["try/catch", "try: ... except:", "try { ... } catch (e: Exception) { ... }"], ["finally", "finally:", "finally { ... }"], ["独自例外", "class MyError(Exception):", "class MyError : Exception()"], ["検査例外", "なし", "なし（Javaと異なる）"], ["Result型", "（なし）", "runCatching { ... }.getOrElse { default }"], ["リソース管理", "with open(...) as f:", "file.use { reader -> ... }"]]
+  },
+  coroutineCompare: {
+    h: ["概念", "Python (asyncio)", "Kotlin (coroutines)"],
+    r: [["非同期関数", "async def", "suspend fun"], ["起動", "asyncio.create_task()", "launch { }"], ["結果取得", "await task", "async { }.await()"], ["スコープ", "asyncio.run()", "coroutineScope { } / runBlocking { }"], ["並行実行", "asyncio.gather()", "複数のlaunch/async"], ["スレッドモデル", "シングルスレッド", "マルチスレッド（ディスパッチャ指定可）"], ["構造化", "TaskGroup（Python 3.11+）", "構造化並行性（CoroutineScope）"]]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "以下のPythonコードをKotlinに変換してください。\nポイント: fun main() の中に書くこと。",
+    code: `# Python
+print("Hello, Kotlin!")`,
+    answer: `fun main() {
+    println("Hello, Kotlin!")
+}`
+  }, {
+    diff: 1,
+    q: "Kotlinで変数を使って自己紹介を表示してください。\n文字列テンプレートを使うこと。",
+    code: `# Python
+name = "太郎"
+age = 25
+print(f"{name}は{age}歳です")`,
+    answer: `fun main() {
+    val name = "太郎"
+    val age = 25
+    println("\${name}は\${age}歳です")
+}`
+  }, {
+    diff: 2,
+    q: "KotlinのREPLまたはスクリプト(.kts)で、\n1から10までの合計を計算して表示してください。\nIntRangeのsumメソッドを使うこと。",
+    code: `# Python
+print(sum(range(1, 11)))  # 55`,
+    answer: `fun main() {
+    val total = (1..10).sum()
+    println("合計: \$total")  // 合計: 55
+}`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "以下のPythonコードをKotlinに変換してください。\nvalとvarを適切に使い分けること。\n・名前は変更しない → val\n・スコアは変更する → var",
+    code: `# Python
+name = "Alice"
+score = 85
+score = 90
+print(f"{name}: {score}")`,
+    answer: `fun main() {
+    val name = "Alice"
+    var score = 85
+    score = 90
+    println("\$name: \$score")
+}`
+  }, {
+    diff: 2,
+    q: "Nullable型を使って、ユーザー名がnullの場合に\n\"ゲスト\"と表示するプログラムを書いてください。\nエルビス演算子 ?: を使うこと。",
+    code: `# Python
+username = None
+display = username if username is not None else "ゲスト"
+print(display)`,
+    answer: `fun main() {
+    val username: String? = null
+    val display = username ?: "ゲスト"
+    println(display)  // ゲスト
+}`
+  }, {
+    diff: 2,
+    q: "セーフコール演算子 ?. を使って、\nnullかもしれない文字列の長さを安全に取得してください。\nnullの場合は-1を返すこと。",
+    code: `# Python
+text = None
+length = len(text) if text is not None else -1
+print(length)`,
+    answer: `fun main() {
+    val text: String? = null
+    val length = text?.length ?: -1
+    println(length)  // -1
+
+    val text2: String? = "Hello"
+    val length2 = text2?.length ?: -1
+    println(length2)  // 5
+}`
+  }, {
+    diff: 3,
+    q: "以下の要件を満たす関数 parseAge を書いてください。\n・String? を受け取り Int? を返す\n・nullなら null を返す\n・数値に変換できなければ null を返す\n・toIntOrNull() を使うこと",
+    code: `# Python
+def parse_age(s):
+    if s is None:
+        return None
+    try:
+        return int(s)
+    except ValueError:
+        return None`,
+    answer: `fun parseAge(s: String?): Int? {
+    return s?.toIntOrNull()
+}
+
+fun main() {
+    println(parseAge("25"))    // 25
+    println(parseAge("abc"))   // null
+    println(parseAge(null))    // null
+}`
+  }],
+  ch3: [{
+    diff: 1,
+    q: "2つのIntを受け取り大きい方を返す関数maxOfTwoを書いてください。\nif式（式として値を返すif）を使うこと。",
+    code: `# Python
+def max_of_two(a, b):
+    return a if a > b else b`,
+    answer: `fun maxOfTwo(a: Int, b: Int): Int = if (a > b) a else b
+
+fun main() {
+    println(maxOfTwo(3, 7))   // 7
+    println(maxOfTwo(10, 2))  // 10
+}`
+  }, {
+    diff: 2,
+    q: "デフォルト引数と名前付き引数を使って、\n挨拶メッセージを生成する関数greetを書いてください。\n・name: String（必須）\n・greeting: String = \"こんにちは\"\n・punctuation: String = \"!\"",
+    code: `# Python
+def greet(name, greeting="こんにちは", punctuation="!"):
+    return f"{greeting}、{name}{punctuation}"`,
+    answer: `fun greet(
+    name: String,
+    greeting: String = "こんにちは",
+    punctuation: String = "!"
+): String = "\$greeting、\$name\$punctuation"
+
+fun main() {
+    println(greet("太郎"))
+    println(greet("Alice", greeting = "Hello"))
+    println(greet("Bob", punctuation = ".", greeting = "Hi"))
+}`
+  }, {
+    diff: 2,
+    q: "高階関数applyOperationを書いてください。\n・Int2つと (Int, Int) -> Int の関数を受け取る\n・trailing lambda構文で呼び出すこと",
+    code: `# Python
+def apply_operation(a, b, op):
+    return op(a, b)
+
+result = apply_operation(10, 3, lambda a, b: a + b)`,
+    answer: `fun applyOperation(a: Int, b: Int, op: (Int, Int) -> Int): Int = op(a, b)
+
+fun main() {
+    val sum = applyOperation(10, 3) { a, b -> a + b }
+    val product = applyOperation(10, 3) { a, b -> a * b }
+    println("合計: \$sum")    // 合計: 13
+    println("積: \$product")  // 積: 30
+}`
+  }],
+  ch4: [{
+    diff: 1,
+    q: "when式を使って、数値の月(1-12)を\n日本語の季節名に変換する関数を書いてください。\n3-5月→春、6-8月→夏、9-11月→秋、12,1,2月→冬",
+    code: `# Python (match/case)
+def season(month):
+    match month:
+        case 3 | 4 | 5: return "春"
+        case 6 | 7 | 8: return "夏"
+        case 9 | 10 | 11: return "秋"
+        case 12 | 1 | 2: return "冬"
+        case _: return "不明"`,
+    answer: `fun season(month: Int): String = when (month) {
+    in 3..5 -> "春"
+    in 6..8 -> "夏"
+    in 9..11 -> "秋"
+    12, 1, 2 -> "冬"
+    else -> "不明"
+}
+
+fun main() {
+    for (m in 1..12) {
+        println("\${m}月 → \${season(m)}")
+    }
+}`
+  }, {
+    diff: 1,
+    q: "for文とrangeを使って、FizzBuzz（1〜30）を書いてください。\nwhen式を使うとスマートに書けます。",
+    code: `# Python
+for n in range(1, 31):
+    if n % 15 == 0: print("FizzBuzz")
+    elif n % 3 == 0: print("Fizz")
+    elif n % 5 == 0: print("Buzz")
+    else: print(n)`,
+    answer: `fun main() {
+    for (n in 1..30) {
+        println(when {
+            n % 15 == 0 -> "FizzBuzz"
+            n % 3 == 0 -> "Fizz"
+            n % 5 == 0 -> "Buzz"
+            else -> n.toString()
+        })
+    }
+}`
+  }, {
+    diff: 2,
+    q: "分割代入（destructuring）を使って、\nPairとTripleの値を取り出して表示してください。",
+    code: `# Python
+point = (3, 4)
+x, y = point
+color = (255, 128, 0)
+r, g, b = color`,
+    answer: `fun main() {
+    val point = Pair(3, 4)
+    val (x, y) = point
+    println("x=\$x, y=\$y")
+
+    val color = Triple(255, 128, 0)
+    val (r, g, b) = color
+    println("R=\$r, G=\$g, B=\$b")
+}`
+  }],
+  ch5: [{
+    diff: 1,
+    q: "data class Personを定義してください。\n・name: String, age: Int\n・2つのインスタンスを作り == で比較\n・copy() で年齢だけ変えたコピーを作成",
+    code: `# Python
+from dataclasses import dataclass
+@dataclass
+class Person:
+    name: str
+    age: int`,
+    answer: `data class Person(val name: String, val age: Int)
+
+fun main() {
+    val p1 = Person("Alice", 25)
+    val p2 = Person("Alice", 25)
+    println(p1 == p2)           // true
+    println(p1)                 // Person(name=Alice, age=25)
+
+    val p3 = p1.copy(age = 30)
+    println(p3)                 // Person(name=Alice, age=30)
+}`
+  }, {
+    diff: 2,
+    q: "companion objectを使って、Userクラスに\nファクトリメソッド fromEmail を実装してください。\n・メールアドレスの@前をnameとして使う",
+    code: `# Python
+class User:
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+
+    @staticmethod
+    def from_email(email):
+        name = email.split("@")[0]
+        return User(name, email)`,
+    answer: `class User(val name: String, val email: String) {
+    companion object {
+        fun fromEmail(email: String): User {
+            val name = email.substringBefore("@")
+            return User(name, email)
+        }
+    }
+
+    override fun toString() = "User(name=\$name, email=\$email)"
+}
+
+fun main() {
+    val user = User.fromEmail("taro@example.com")
+    println(user)  // User(name=taro, email=taro@example.com)
+}`
+  }, {
+    diff: 2,
+    q: "カスタムgetter/setterを使ったTemperatureクラスを定義してください。\n・celsius: Double（摂氏）をプロパティとして保持\n・fahrenheit: Double をカスタムgetter/setterで実装\n　（取得: celsius * 9/5 + 32、設定: (value - 32) * 5/9 をcelsiusに代入）",
+    code: `# Python
+class Temperature:
+    def __init__(self, celsius):
+        self.celsius = celsius
+
+    @property
+    def fahrenheit(self):
+        return self.celsius * 9 / 5 + 32
+
+    @fahrenheit.setter
+    def fahrenheit(self, value):
+        self.celsius = (value - 32) * 5 / 9`,
+    answer: `class Temperature(var celsius: Double) {
+    var fahrenheit: Double
+        get() = celsius * 9.0 / 5.0 + 32.0
+        set(value) {
+            celsius = (value - 32.0) * 5.0 / 9.0
+        }
+}
+
+fun main() {
+    val t = Temperature(100.0)
+    println("摂氏: \${t.celsius}")     // 100.0
+    println("華氏: \${t.fahrenheit}")   // 212.0
+    t.fahrenheit = 32.0
+    println("摂氏: \${t.celsius}")     // 0.0
+}`
+  }],
+  ch6: [{
+    diff: 1,
+    q: "interface Shape を定義し、Circle と Rectangle で実装してください。\n・area(): Double を持つ\n・printShape関数でShape型を受け取り面積を表示",
+    code: `# Python
+from abc import ABC, abstractmethod
+class Shape(ABC):
+    @abstractmethod
+    def area(self): pass`,
+    answer: `interface Shape {
+    fun area(): Double
+}
+
+class Circle(val radius: Double) : Shape {
+    override fun area() = Math.PI * radius * radius
+}
+
+class Rectangle(val width: Double, val height: Double) : Shape {
+    override fun area() = width * height
+}
+
+fun printShape(shape: Shape) {
+    println("面積: \${shape.area()}")
+}
+
+fun main() {
+    printShape(Circle(5.0))
+    printShape(Rectangle(3.0, 4.0))
+}`
+  }, {
+    diff: 2,
+    q: "abstract class Animalを定義し、Dog と Cat で継承してください。\n・name: String をコンストラクタで受け取る\n・abstract fun speak(): String\n・fun introduce(): String をデフォルト実装（\"name: speak()の結果\"）\nopenキーワードを忘れないこと。",
+    code: `# Python
+from abc import ABC, abstractmethod
+class Animal(ABC):
+    def __init__(self, name):
+        self.name = name
+    @abstractmethod
+    def speak(self): pass
+    def introduce(self):
+        return f"{self.name}: {self.speak()}"`,
+    answer: `abstract class Animal(val name: String) {
+    abstract fun speak(): String
+    fun introduce(): String = "\$name: \${speak()}"
+}
+
+class Dog(name: String) : Animal(name) {
+    override fun speak() = "ワンワン"
+}
+
+class Cat(name: String) : Animal(name) {
+    override fun speak() = "ニャー"
+}
+
+fun main() {
+    val animals = listOf(Dog("ポチ"), Cat("タマ"))
+    for (animal in animals) {
+        println(animal.introduce())
+    }
+}`
+  }, {
+    diff: 3,
+    q: "インターフェース委譲 (by) を使って、\nLoggingList クラスを実装してください。\n・MutableList<String> の操作を内部リストに委譲\n・add時にログを出力するようにオーバーライド",
+    code: `# Python（手動委譲）
+class LoggingList:
+    def __init__(self):
+        self._list = []
+    def add(self, item):
+        print(f"追加: {item}")
+        self._list.append(item)
+    def __len__(self):
+        return len(self._list)`,
+    answer: `class LoggingList(
+    private val inner: MutableList<String> = mutableListOf()
+) : MutableList<String> by inner {
+
+    override fun add(element: String): Boolean {
+        println("追加: \$element")
+        return inner.add(element)
+    }
+}
+
+fun main() {
+    val list = LoggingList()
+    list.add("Apple")
+    list.add("Banana")
+    println("サイズ: \${list.size}")
+    println("内容: \$list")
+}`
+  }],
+  ch7: [{
+    diff: 1,
+    q: "不変リストと可変リストの違いを確認するプログラムを書いてください。\n・listOfで不変リスト作成\n・mutableListOfで可変リスト作成、要素追加/削除",
+    code: `# Python
+immutable = (1, 2, 3)  # タプル
+mutable = [1, 2, 3]
+mutable.append(4)
+mutable.remove(2)`,
+    answer: `fun main() {
+    val immutable = listOf(1, 2, 3)
+    // immutable.add(4)  // コンパイルエラー！
+
+    val mutable = mutableListOf(1, 2, 3)
+    mutable.add(4)
+    mutable.remove(2)
+    println("不変: \$immutable")
+    println("可変: \$mutable")
+}`
+  }, {
+    diff: 2,
+    q: "以下のPythonコードをKotlinのコレクション操作に変換してください。\nmap, filter, sortedBy を使うこと。",
+    code: `# Python
+students = [
+    {"name": "Alice", "score": 85},
+    {"name": "Bob", "score": 72},
+    {"name": "Carol", "score": 93},
+    {"name": "Dave", "score": 60},
+]
+passed = [s["name"] for s in students if s["score"] >= 70]
+passed.sort()
+print(passed)`,
+    answer: `data class Student(val name: String, val score: Int)
+
+fun main() {
+    val students = listOf(
+        Student("Alice", 85),
+        Student("Bob", 72),
+        Student("Carol", 93),
+        Student("Dave", 60)
+    )
+    val passed = students
+        .filter { it.score >= 70 }
+        .map { it.name }
+        .sorted()
+    println(passed)  // [Alice, Bob, Carol]
+}`
+  }, {
+    diff: 3,
+    q: "groupBy と mapValues を使って、\n生徒をグレード別にグルーピングし、各グレードの平均点を計算してください。\n・90以上→A、80以上→B、70以上→C、それ未満→D",
+    code: `# Python
+from itertools import groupby
+students = [("Alice",85),("Bob",72),("Carol",93),("Dave",60),("Eve",88)]
+def grade(score):
+    if score >= 90: return "A"
+    elif score >= 80: return "B"
+    elif score >= 70: return "C"
+    else: return "D"`,
+    answer: `fun grade(score: Int): String = when {
+    score >= 90 -> "A"
+    score >= 80 -> "B"
+    score >= 70 -> "C"
+    else -> "D"
+}
+
+fun main() {
+    val students = listOf(
+        "Alice" to 85, "Bob" to 72, "Carol" to 93,
+        "Dave" to 60, "Eve" to 88
+    )
+    val grouped = students
+        .groupBy { grade(it.second) }
+        .mapValues { (_, v) -> v.map { it.second }.average() }
+
+    grouped.forEach { (g, avg) ->
+        println("\$g: 平均 \${"%.1f".format(avg)}")
+    }
+}`
+  }],
+  ch8: [{
+    diff: 1,
+    q: "let と also を使い分けて以下を書いてください。\n・let: 文字列をトリム→大文字変換→表示\n・also: リストに要素を追加しつつログ表示",
+    code: `# Python（相当する概念なし）
+text = "  hello  "
+result = text.strip().upper()
+print(result)
+
+items = []
+items.append("A")
+print(f"追加: A")`,
+    answer: `fun main() {
+    // let: 変換チェーン
+    "  hello  ".let {
+        it.trim().uppercase()
+    }.let {
+        println(it)  // HELLO
+    }
+
+    // also: 副作用
+    val items = mutableListOf<String>()
+    items.also { println("初期: \$it") }
+        .also { it.add("A"); println("追加: A") }
+        .also { it.add("B"); println("追加: B") }
+    println("結果: \$items")
+}`
+  }, {
+    diff: 2,
+    q: "apply と run を使い分けてください。\n・apply: StringBuilderの設定\n・run: オブジェクトの設定 + 結果の計算",
+    code: `# Python
+# apply相当: メソッドチェーンで設定
+sb = []
+sb.append("Hello")
+sb.append(", ")
+sb.append("World!")
+result = "".join(sb)`,
+    answer: `fun main() {
+    // apply: 設定して自身を返す
+    val sb = StringBuilder().apply {
+        append("Hello")
+        append(", ")
+        append("World!")
+    }
+    println(sb)  // Hello, World!
+
+    // run: 設定して結果を返す
+    val length = StringBuilder().run {
+        append("Hello")
+        append(", ")
+        append("World!")
+        length  // 最後の式が戻り値
+    }
+    println("長さ: \$length")  // 長さ: 13
+}`
+  }, {
+    diff: 3,
+    q: "拡張関数を定義してください。\n1. String.toSlug(): スペースをハイフンに置換し小文字化\n2. List<Int>.secondOrNull(): 2番目の要素またはnull\n3. Int.isEven(): 偶数判定\nそれぞれ呼び出して動作確認すること。",
+    code: `# Python（拡張関数の概念なし）
+def to_slug(s):
+    return s.replace(" ", "-").lower()
+
+def second_or_none(lst):
+    return lst[1] if len(lst) >= 2 else None`,
+    answer: `fun String.toSlug(): String = this.replace(" ", "-").lowercase()
+
+fun List<Int>.secondOrNull(): Int? = if (this.size >= 2) this[1] else null
+
+fun Int.isEven(): Boolean = this % 2 == 0
+
+fun main() {
+    println("Hello World".toSlug())    // hello-world
+    println(listOf(10, 20, 30).secondOrNull())  // 20
+    println(listOf<Int>().secondOrNull())        // null
+    println(42.isEven())               // true
+    println(7.isEven())                // false
+}`
+  }],
+  ch9: [{
+    diff: 1,
+    q: "try/catchを使って文字列を整数に変換する\n安全な関数 safeToInt を書いてください。\n変換失敗時はデフォルト値を返すこと。",
+    code: `# Python
+def safe_to_int(s, default=0):
+    try:
+        return int(s)
+    except ValueError:
+        return default`,
+    answer: `fun safeToInt(s: String, default: Int = 0): Int {
+    return try {
+        s.toInt()
+    } catch (e: NumberFormatException) {
+        default
+    }
+}
+
+fun main() {
+    println(safeToInt("42"))       // 42
+    println(safeToInt("abc"))      // 0
+    println(safeToInt("xyz", -1))  // -1
+}`
+  }, {
+    diff: 2,
+    q: "runCatchingとResult型を使って、\nファイルパスからファイル名を抽出する処理を書いてください。\n・成功時: ファイル名を返す\n・失敗時: \"unknown\" を返す\n・onSuccess / onFailure でログ出力",
+    code: `# Python（Result型の概念なし）
+def extract_filename(path):
+    try:
+        return path.split("/")[-1]
+    except:
+        return "unknown"`,
+    answer: `fun extractFilename(path: String?): String {
+    return runCatching {
+        requireNotNull(path) { "パスがnullです" }
+        require(path.contains("/")) { "不正なパス形式" }
+        path.substringAfterLast("/")
+    }.onSuccess {
+        println("成功: \$it")
+    }.onFailure {
+        println("失敗: \${it.message}")
+    }.getOrDefault("unknown")
+}
+
+fun main() {
+    println(extractFilename("/home/user/file.txt"))
+    println(extractFilename(null))
+    println(extractFilename("nopath"))
+}`
+  }, {
+    diff: 3,
+    q: "use関数（Pythonのwith文相当）を使って、\nリソースの自動解放パターンを実装してください。\n・Closeableを実装した DatabaseConnection クラスを定義\n・use ブロック内でクエリを実行、ブロック終了で自動close",
+    code: `# Python
+class DatabaseConnection:
+    def __init__(self, url):
+        self.url = url
+        print(f"接続: {url}")
+    def query(self, sql):
+        return f"結果: {sql}"
+    def close(self):
+        print(f"切断: {self.url}")
+    def __enter__(self): return self
+    def __exit__(self, *args): self.close()`,
+    answer: `import java.io.Closeable
+
+class DatabaseConnection(val url: String) : Closeable {
+    init { println("接続: \$url") }
+    fun query(sql: String): String = "結果: \$sql"
+    override fun close() { println("切断: \$url") }
+}
+
+fun main() {
+    val result = DatabaseConnection("localhost:5432").use { conn ->
+        conn.query("SELECT * FROM users")
+    }
+    // ここで自動的にclose()が呼ばれている
+    println(result)
+}`
+  }],
+  ch10: [{
+    diff: 1,
+    q: "runBlockingとlaunchを使って、\n3つの非同期タスクを並行実行してください。\n各タスクは delay で異なる時間待機すること。",
+    code: `# Python
+import asyncio
+async def task(name, seconds):
+    await asyncio.sleep(seconds)
+    print(f"{name} 完了")
+
+async def main():
+    await asyncio.gather(
+        task("A", 1),
+        task("B", 2),
+        task("C", 0.5)
+    )`,
+    answer: `import kotlinx.coroutines.*
+
+fun main() = runBlocking {
+    launch {
+        delay(1000)
+        println("A 完了")
+    }
+    launch {
+        delay(2000)
+        println("B 完了")
+    }
+    launch {
+        delay(500)
+        println("C 完了")
+    }
+    println("全タスク起動済み")
+    // 出力順: 全タスク起動済み → C完了 → A完了 → B完了
+}`
+  }, {
+    diff: 2,
+    q: "asyncとawaitを使って、2つの計算を並行実行し\n結果を合算してください。\n各計算にはdelayで疑似的な処理時間を設定。",
+    code: `# Python
+import asyncio
+async def compute_a():
+    await asyncio.sleep(1)
+    return 10
+
+async def compute_b():
+    await asyncio.sleep(1)
+    return 20
+
+async def main():
+    a, b = await asyncio.gather(compute_a(), compute_b())
+    print(f"合計: {a + b}")`,
+    answer: `import kotlinx.coroutines.*
+
+suspend fun computeA(): Int {
+    delay(1000)
+    return 10
+}
+
+suspend fun computeB(): Int {
+    delay(1000)
+    return 20
+}
+
+fun main() = runBlocking {
+    val a = async { computeA() }
+    val b = async { computeB() }
+    println("合計: \${a.await() + b.await()}")
+    // 並行実行なので約1秒で完了（逐次なら2秒）
+}`
+  }, {
+    diff: 3,
+    q: "構造化並行性（structured concurrency）を使って、\nタイムアウト付きの処理を実装してください。\n・withTimeout で制限時間を設定\n・TimeoutCancellationException をキャッチ\n・coroutineScope で子コルーチンのキャンセル伝播を確認",
+    code: `# Python
+import asyncio
+async def slow_task():
+    await asyncio.sleep(5)
+    return "完了"
+
+async def main():
+    try:
+        result = await asyncio.wait_for(slow_task(), timeout=2)
+    except asyncio.TimeoutError:
+        print("タイムアウト!")`,
+    answer: `import kotlinx.coroutines.*
+
+suspend fun slowTask(): String {
+    delay(5000)
+    return "完了"
+}
+
+fun main() = runBlocking {
+    val result = try {
+        withTimeout(2000) {
+            slowTask()
+        }
+    } catch (e: TimeoutCancellationException) {
+        "タイムアウト!"
+    }
+    println(result)  // タイムアウト!
+
+    // coroutineScope: 子が失敗すると全体がキャンセル
+    try {
+        coroutineScope {
+            launch {
+                delay(1000)
+                println("子タスク1 完了")
+            }
+            launch {
+                delay(500)
+                throw RuntimeException("子タスク2 失敗")
+            }
+        }
+    } catch (e: Exception) {
+        println("スコープ全体がキャンセル: \${e.message}")
+    }
+}`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "Kotlinの位置づけと環境構築",
+  est: "30分",
+  goal: "Kotlin がどのような言語でどこで使われているのかを理解し、開発環境を整えて最初の Hello World を実行できるようになる。Python・Java との違いを大まかに把握し、Kotlin を学ぶモチベーションを明確にすることがゴール。",
+  sections: [{
+    title: "Kotlinとは何か",
+    body: "Kotlin は JetBrains 社が 2011 年に発表し、2016 年に正式リリースした汎用プログラミング言語です。JVM（Java Virtual Machine）上で動作するため、Java の膨大なエコシステムをそのまま利用できるのが最大の強みです。2019 年に Google が Android 開発の推奨言語に指定して以来、モバイル開発の世界で爆発的に普及しました。\n\nPython 開発者から見ると、Kotlin は「型推論のおかげで Python 並みに簡潔に書けるが、コンパイル時に型エラーを全て検出してくれる静的型付け言語」です。動的型付けに慣れていると最初は型を書くことに窮屈さを感じるかもしれませんが、IDE の補完がフルに効くため、書き始めると実は Python より快適に感じる場面が多いでしょう。\n\nまた、Kotlin は JVM だけでなく、JavaScript（Kotlin/JS）やネイティブバイナリ（Kotlin/Native）にもコンパイルでき、Kotlin Multiplatform を使えば iOS・Android・Web・デスクトップで共通のビジネスロジックを共有できます。現代のマルチプラットフォーム開発において非常に注目されている言語です。",
+    table: T.langCompare,
+    afterTable: "Python は柔軟で学びやすい反面、大規模プロジェクトでは型の不整合やNull参照エラーが実行時まで分からないという弱点があります。Kotlin はこれらの問題をコンパイル時に解決しつつ、Python 的な書きやすさを維持しています。"
+  }, {
+    title: "Kotlinが使われる場面",
+    body: "Kotlin の主戦場は大きく 4 つあります。まず Android アプリ開発は Kotlin の最も有名な用途で、Google Play のトップアプリの 80% 以上が Kotlin を使用しています。次にサーバーサイド開発で、Spring Boot や Ktor といったフレームワークと組み合わせて RESTful API やマイクロサービスを構築できます。\n\n3 つ目は Kotlin Multiplatform で、iOS・Android 間でビジネスロジックを共有するプロジェクトが増えています。4 つ目はビルドスクリプトで、Gradle のビルドスクリプトを Groovy から Kotlin DSL（.gradle.kts）に移行するプロジェクトが増えています。\n\nPython が得意なデータサイエンスや機械学習の領域では Kotlin の出番は少ないですが、それ以外のアプリケーション開発全般では、Python よりも型安全で、Java よりも簡潔に書ける選択肢として Kotlin は非常に魅力的です。"
+  }, {
+    title: "環境構築",
+    body: "Kotlin の開発環境は IntelliJ IDEA（JetBrains社の IDE）を使うのが最も快適です。Community Edition（無料版）でも Kotlin の開発に必要な機能は全て揃っています。JetBrains が Kotlin を作った会社なので、IDE のサポートが圧倒的に充実しているのは当然と言えます。\n\nIntelliJ IDEA をインストールしたら、JDK（Java Development Kit）21 以降を設定し、新規 Kotlin プロジェクトを作成するだけで環境構築は完了です。VS Code でも Kotlin 拡張機能を使えば開発できますが、リファクタリングやデバッグの快適さでは IntelliJ に軍配が上がります。\n\nコマンドラインで手軽に試したい場合は、SDKMAN! または Homebrew で kotlinc（Kotlin コンパイラ）をインストールできます。REPL（対話環境）も付属しているので、新しい構文を試す際に便利です。",
+    table: T.runMode,
+    code: `# macOSの場合（Homebrew）
+brew install kotlin
+
+# バージョン確認
+kotlinc -version
+
+# REPL起動
+kotlinc
+>>> println("Hello from REPL!")
+Hello from REPL!
+
+# スクリプト実行（main不要）
+echo 'println("Hello, Script!")' > hello.kts
+kotlinc -script hello.kts`,
+    afterCode: "ポイント: .kt ファイルは fun main() が必要ですが、.kts（スクリプト）ファイルではトップレベルにコードを直接書けます。Python のようにサッと試したい場合は .kts が便利です。"
+  }, {
+    title: "最初のKotlinプログラム",
+    body: "Kotlin のエントリポイントは fun main() です。Python ではファイルの先頭にいきなり print() を書けますが、Kotlin ではこの main 関数の中にロジックを書きます。この点は Java の public static void main(String[] args) と同じですが、Kotlin では修飾子もクラスも不要で、シンプルに fun main() だけで済みます。\n\n出力には println()（改行あり）と print()（改行なし）を使います。Python の print() に相当するのが println() で、Python の print(end=\"\") に相当するのが print() です。文字列の中に変数を埋め込むには、Python の f-string に似た「文字列テンプレート」を使います。$変数名 または ${式} と書くだけで、Python の f\"{変数}\" と同じ結果が得られます。\n\nKotlin ではセミコロンは不要で、行末が文の区切りになります。インデントもスタイルの問題であり、Python のように文法上の意味はありません。代わりに波括弧 {} でブロックを区切ります。",
+    code: `// hello.kt
+fun main() {
+    // 基本的な出力
+    println("Hello, Kotlin!")
+
+    // 文字列テンプレート（Pythonのf-stringに相当）
+    val name = "太郎"
+    val age = 25
+    println("\${name}は\${age}歳です")      // 太郎は25歳です
+    println("来年は\${age + 1}歳")          // 来年は26歳
+
+    // 複数行文字列（Pythonの三重引用符と同じ）
+    val message = """
+        |こんにちは
+        |Kotlinの世界へ
+        |ようこそ！
+    """.trimMargin()
+    println(message)
+}`,
+    afterCode: "ミニ演習: このコードを hello.kt に保存し、kotlinc hello.kt -include-runtime -d hello.jar && java -jar hello.jar で実行してみましょう。trimMargin() は各行の | より前の空白を除去する関数です。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "変数・型・Null安全",
+  est: "50分",
+  goal: "val と var の使い分けを習得し、Kotlin の型推論が Python の動的型付けとどう異なるかを理解する。Null安全の仕組み（?、!!、セーフコール、エルビス演算子）を使いこなし、NullPointerException を言語レベルで防ぐ書き方を身に付けるのがゴール。",
+  sections: [{
+    title: "val と var",
+    body: "Kotlin の変数宣言には val（再代入不可）と var（再代入可）の 2 つがあります。Python には直接対応する概念がなく、全ての変数が再代入可能です。Kotlin では「変更する必要がない変数は val にする」のがベストプラクティスで、実際のコードでは 8 割以上が val になるのが理想的です。\n\nval は「値（value）」の略で、一度代入したら変更できません。Java の final に相当しますが、Kotlin ではこちらがデフォルトの選択です。var は「変数（variable）」の略で、Python の通常の変数と同じ感覚で使えます。「迷ったら val」と覚えておけば、バグの温床となる意図しない再代入を未然に防げます。\n\n注意すべきは、val は「参照」が不変なだけで、参照先のオブジェクト自体が不変とは限らない点です。例えば val list = mutableListOf(1, 2, 3) と書くと、list 変数に別のリストを代入することはできませんが、list.add(4) でリストの中身を変更することは可能です。この点は Python の概念と同じです。",
+    table: T.valVar,
+    code: `fun main() {
+    // val: 再代入不可（推奨）
+    val name = "Alice"
+    // name = "Bob"  // コンパイルエラー！
+
+    // var: 再代入可
+    var score = 85
+    score = 90  // OK
+
+    // 型推論: 初期値から型が自動決定
+    val count = 42        // Int
+    val pi = 3.14         // Double
+    val greeting = "Hi"   // String
+    val isActive = true   // Boolean
+
+    // 明示的な型指定
+    val temperature: Double = 36.5
+    val message: String = "Kotlin"
+}`,
+    afterCode: "ポイント: Python では全てが再代入可能なため「ここで変数が書き換わっているかも」と常に気にする必要がありますが、Kotlin では val を見た瞬間に「この変数は不変」と確信できます。コードリーディングが格段に楽になります。"
+  }, {
+    title: "基本型と型推論",
+    body: "Kotlin の型は全てオブジェクトです。Java のようなプリミティブ型（int, double 等）は言語仕様上は存在せず、Int, Double, Boolean といったクラスとして統一されています。ただし、コンパイラが自動的にJVMのプリミティブ型に最適化するため、パフォーマンスの心配は不要です。\n\nPython と最も異なるのは、変数の型が一度決まったら別の型の値を代入できない点です。Python では x = 42 の後に x = \"hello\" と書けますが、Kotlin では x は Int 型として確定しているため String を代入するとコンパイルエラーになります。型推論のおかげで型を明示的に書かなくても済む場面が多いですが、「型が変わらない」という制約は常に適用されます。\n\n数値型間の変換は Python とは異なり、暗黙的に行われません。Int から Long への変換ですら .toLong() の明示呼び出しが必要です。これは精度の問題を防ぐための設計で、Java とも異なる Kotlin 独自の方針です。",
+    table: T.types,
+    code: `fun main() {
+    // 型推論
+    val n = 42              // Int
+    val big = 100_000_000L  // Long（Lサフィックス）
+    val pi = 3.14           // Double
+    val f = 2.5f            // Float（fサフィックス）
+    val c = 'A'             // Char
+    val s = "Hello"         // String
+    val b = true            // Boolean
+
+    // 明示的な型変換（暗黙変換はない）
+    val intVal = 42
+    val longVal: Long = intVal.toLong()  // 明示変換が必要
+    val doubleVal: Double = intVal.toDouble()
+    val strVal: String = intVal.toString()
+
+    // 文字列テンプレート
+    println("型の例: Int=$intVal, Long=$longVal, Double=$doubleVal")
+}`,
+    afterCode: "ミニ演習: val x: Int = 3.14 と書くとどうなるか確認してみましょう。Python では暗黙の切り捨てが起きますが、Kotlin ではコンパイルエラーになります。安全側に倒す設計思想が表れています。"
+  }, {
+    title: "Null安全 — KotlinはNullPointerExceptionを撲滅する",
+    body: "Null安全は Kotlin の最も革新的な機能です。Python では None は自由に変数に入れられ、None のメソッドを呼ぶと実行時に AttributeError になります。Java でも null 参照は「10億ドルの失敗」と呼ばれるほど多くのバグを生んできました。Kotlin はこの問題を型システムで根本的に解決しました。\n\nKotlin では、通常の型（String, Int など）に null を代入できません。null を許容したい場合は、型名の後に ? を付けて String? のように宣言します。つまり String と String? は全く別の型であり、String? 型の値に対してメソッドを呼ぶには、null チェックが必要です。このチェックをコンパイラが強制するため、NullPointerException が原理的に発生しません。\n\nPython 開発者は「None チェックを忘れてバグになった」経験が一度はあるでしょう。Kotlin ではそのチェック忘れをコンパイラが代わりに検出してくれるのです。最初は ? を書くのが面倒に感じますが、実行時エラーのデバッグに費やす時間と比べれば圧倒的に効率的です。",
+    table: T.nullOps,
+    code: `fun main() {
+    // 通常の型にはnullを代入できない
+    // val name: String = null  // コンパイルエラー！
+
+    // Nullable型（?付き）にはnull OK
+    val name: String? = null
+
+    // セーフコール ?.
+    println(name?.length)      // null（エラーにならない）
+    println(name?.uppercase()) // null
+
+    // エルビス演算子 ?:
+    val display = name ?: "名無し"
+    println(display)           // 名無し
+
+    // 非null表明 !!（危険！nullならクラッシュ）
+    // println(name!!.length)  // KotlinNullPointerException
+
+    // スマートキャスト: nullチェック後は自動的に非null型に
+    val text: String? = "Hello"
+    if (text != null) {
+        // ここでは text は String 型として扱える
+        println(text.length)   // 5（セーフコール不要）
+    }
+
+    // ?.let: nullでない場合のみブロック実行
+    val email: String? = "user@example.com"
+    email?.let {
+        println("メール送信先: \$it")
+    }
+}`,
+    afterCode: "ポイント: !! は「nullではないと開発者が保証する」という宣言で、間違っていた場合は実行時エラーになります。可能な限り ?. や ?: で安全に処理し、!! は本当にnullがありえない場面（テストコード等）に限定するのが正しい使い方です。"
+  }, {
+    title: "型チェックとスマートキャスト",
+    body: "Python の isinstance() に相当するのが Kotlin の is 演算子です。しかし Kotlin にはスマートキャストという強力な機能があり、is でチェックした後のスコープでは自動的にその型にキャストされます。Python では isinstance() の後でも明示的にキャストする必要はありませんが（動的型付けなので）、Java ではチェック後に手動キャストが必要でした。Kotlin はこの Java の面倒さを完全に解消しています。\n\nスマートキャストは null チェックでも働きます。if (x != null) の中では x は自動的に非Nullable型になるため、セーフコール ?. が不要になります。コンパイラがフロー解析を行い、「この時点で x は null ではありえない」と証明できる場合に自動的にキャストしてくれるのです。\n\nまた、when 式と is を組み合わせると、Python の match/case に構造的パターンマッチを加えたような強力な分岐が書けます。when ブロックの中で型チェックした分岐では、自動的にその型として扱えるため、キャストコードが一切不要です。",
+    code: `fun describe(obj: Any): String = when (obj) {
+    is Int    -> "整数: \${obj + 1}"     // 自動キャスト
+    is String -> "文字列(長さ\${obj.length})"  // 自動キャスト
+    is List<*> -> "リスト(要素数\${obj.size})"
+    is Boolean -> if (obj) "真" else "偽"
+    else -> "不明: \$obj"
+}
+
+fun main() {
+    println(describe(42))          // 整数: 43
+    println(describe("Hello"))     // 文字列(長さ5)
+    println(describe(listOf(1)))   // リスト(要素数1)
+    println(describe(true))        // 真
+}`,
+    afterCode: "ポイント: Any は Python の object に相当する全ての型の親です。Any? にすると null も受け入れ可能になります。型階層のトップに位置する点は Python と同じですが、型チェック後のスマートキャストが Kotlin の大きなアドバンテージです。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "関数とラムダ",
+  est: "50分",
+  goal: "fun による関数定義、デフォルト引数・名前付き引数の活用、高階関数とラムダ式の書き方を習得する。trailing lambda 構文を理解し、Kotlin らしい簡潔なコードを書けるようになることがゴール。",
+  sections: [{
+    title: "関数定義の基本",
+    body: "Kotlin の関数は fun キーワードで定義します。Python の def に相当しますが、引数と戻り値に型が必須です。Python では型ヒントはあくまで任意のアノテーションですが、Kotlin では型を書かないとコンパイルエラーになります。\n\n関数本体が単一の式で表せる場合は、= で式を直接書く「式本体関数（single-expression function）」が使えます。波括弧とreturn文が不要になるため、Python の lambda のような簡潔さで通常の関数を定義できます。ただし式本体関数でも再帰や複雑なロジックは入れられるので、Python の lambda よりも自由度が高いです。\n\n戻り値がない関数の戻り値型は Unit です。Python の None に相当しますが、Kotlin では戻り値型が Unit の場合は省略できます。Java の void に近い概念ですが、Unit はオブジェクトとして存在し、代入や比較が可能です。",
+    table: T.funCompare,
+    code: `// 通常の関数定義
+fun add(a: Int, b: Int): Int {
+    return a + b
+}
+
+// 式本体関数（return不要）
+fun multiply(a: Int, b: Int): Int = a * b
+
+// 戻り値なし（Unit省略可）
+fun greet(name: String) {
+    println("こんにちは、\$name!")
+}
+
+// 複数行でもreturn可
+fun factorial(n: Int): Long {
+    var result = 1L
+    for (i in 2..n) {
+        result *= i
+    }
+    return result
+}`,
+    afterCode: "ポイント: Kotlin では関数をトップレベル（クラスの外）に書けます。Java のように全てをクラスの中に入れる必要はありません。Python と同じ感覚でファイル直下に関数を置けるのは、Kotlin の大きな利点です。"
+  }, {
+    title: "デフォルト引数と名前付き引数",
+    body: "Kotlin のデフォルト引数と名前付き引数は Python とほぼ同じ使い方ができます。Python 開発者にとって馴染みのある機能なので、すぐに使いこなせるでしょう。Java にはこの機能がなく、オーバーロードで代替する必要があったため、Java 開発者が Kotlin に移行する際に最も感動する機能の一つです。\n\n名前付き引数を使うと引数の順序を自由に変えられるため、ブール引数やオプション引数が多い関数の呼び出しが格段に読みやすくなります。Python でも同様のことができますが、Kotlin ではコンパイル時に引数名の一致がチェックされるため、typo による実行時エラーを防げます。\n\n可変長引数は Python の *args に相当する vararg キーワードで宣言します。Python ではタプルとして受け取りますが、Kotlin では Array として受け取ります。既存の配列を展開して渡す場合は、Python の *list に相当する *(スプレッド演算子) を使います。",
+    code: `// デフォルト引数
+fun createUser(
+    name: String,
+    age: Int = 20,
+    role: String = "member",
+    active: Boolean = true
+): String = "\$name(age=\$age, role=\$role, active=\$active)"
+
+// 可変長引数
+fun sum(vararg numbers: Int): Int {
+    var total = 0
+    for (n in numbers) total += n
+    return total
+}
+
+fun main() {
+    // 位置引数
+    println(createUser("Alice", 25))
+
+    // 名前付き引数（順序自由）
+    println(createUser("Bob", role = "admin", age = 30))
+
+    // 特定の引数だけ指定
+    println(createUser("Carol", active = false))
+
+    // 可変長引数
+    println(sum(1, 2, 3, 4, 5))   // 15
+
+    // 配列をスプレッド演算子で展開
+    val nums = intArrayOf(10, 20, 30)
+    println(sum(*nums))            // 60
+}`,
+    afterCode: "ポイント: Kotlin ではデフォルト引数があるため、Java のようにオーバーロードを大量に書く必要がありません。Python でも同様ですが、Kotlin では型安全なので、間違った型を渡すとコンパイル時にエラーになります。"
+  }, {
+    title: "ラムダ式",
+    body: "Kotlin のラムダ式は Python の lambda よりもはるかに強力です。Python の lambda は式一つしか書けませんが、Kotlin のラムダは複数行の処理を含められ、最後の式が戻り値になります。波括弧 {} で囲み、引数 -> 本体 の形式で書きます。\n\nラムダが引数を1つだけ取る場合、暗黙の引数名 it が使えます。Python には対応する概念がなく、lambda x: x * 2 のように引数名を必ず書く必要がありますが、Kotlin では { it * 2 } と書けます。この it は Kotlin のラムダコードを非常に簡潔にする鍵です。\n\nまた、ラムダの外側の変数を自由にキャプチャして変更できます。Python のラムダでは外側の変数を読めますが変更できず（nonlocal 宣言が必要）、Java のラムダでは実質的に final な変数しかキャプチャできません。Kotlin にはこれらの制限がなく、直感的にクロージャが書けます。",
+    code: `fun main() {
+    // 基本的なラムダ
+    val double = { x: Int -> x * 2 }
+    println(double(5))  // 10
+
+    // 暗黙の引数 it（引数が1つの場合）
+    val triple: (Int) -> Int = { it * 3 }
+    println(triple(5))  // 15
+
+    // 複数行ラムダ（最後の式が戻り値）
+    val classify = { score: Int ->
+        val grade = when {
+            score >= 90 -> "A"
+            score >= 80 -> "B"
+            score >= 70 -> "C"
+            else -> "D"
+        }
+        "スコア\$score → グレード\$grade"
+    }
+    println(classify(85))  // スコア85 → グレードB
+
+    // 外側の変数をキャプチャ＆変更
+    var counter = 0
+    val increment = { counter++ }
+    increment()
+    increment()
+    println("counter = \$counter")  // counter = 2
+}`,
+    afterCode: "ポイント: Python の lambda は「式一つ」という制約が強く、複雑な処理は def で名前付き関数にする必要があります。Kotlin のラムダにはこの制約がないため、無名関数として自然に使えます。"
+  }, {
+    title: "高階関数とtrailing lambda",
+    body: "高階関数（関数を引数に取る関数、または関数を返す関数）は Python にも map(), filter(), sorted(key=...) などで存在しますが、Kotlin ではより体系的に言語に組み込まれています。関数の型は (引数型) -> 戻り値型 という構文で表現し、通常の型と同じように扱えます。\n\nKotlin 独自の強力な構文として trailing lambda（末尾ラムダ）があります。関数の最後の引数がラムダの場合、そのラムダを丸括弧の外に書けるというルールです。これにより list.filter({ it > 0 }) を list.filter { it > 0 } と書けます。さらに、ラムダが唯一の引数なら丸括弧自体を省略でき、list.forEach { println(it) } のように書けます。\n\nこの構文のおかげで、Kotlin では「自作の制御構文」を関数として定義できます。例えば repeat(3) { println(\"Hello\") } は一見組み込みの構文に見えますが、実は高階関数の呼び出しです。DSL（Domain Specific Language）を構築する際の基盤になる重要な仕組みです。",
+    code: `// 関数型を引数に取る高階関数
+fun operateOnList(
+    list: List<Int>,
+    operation: (Int) -> Int
+): List<Int> {
+    val result = mutableListOf<Int>()
+    for (item in list) {
+        result.add(operation(item))
+    }
+    return result
+}
+
+// 関数を返す関数
+fun multiplier(factor: Int): (Int) -> Int = { it * factor }
+
+fun main() {
+    val nums = listOf(1, 2, 3, 4, 5)
+
+    // trailing lambda
+    val doubled = operateOnList(nums) { it * 2 }
+    println(doubled)  // [2, 4, 6, 8, 10]
+
+    // 関数を返す関数
+    val triple = multiplier(3)
+    val tripled = operateOnList(nums) { triple(it) }
+    println(tripled)  // [3, 6, 9, 12, 15]
+
+    // 標準ライブラリの高階関数
+    val evens = nums.filter { it % 2 == 0 }
+    val squares = nums.map { it * it }
+    println("偶数: \$evens")    // [2, 4]
+    println("二乗: \$squares")  // [1, 4, 9, 16, 25]
+
+    // repeat: 組み込みのように見えるが高階関数
+    repeat(3) {
+        println("繰り返し \${it + 1} 回目")
+    }
+}`,
+    afterCode: "ポイント: Python の map(lambda x: x * 2, list) と Kotlin の list.map { it * 2 } を比べると、trailing lambda のおかげで Kotlin の方が直感的に読めることがわかります。メソッドチェーンと組み合わせると特に威力を発揮します。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "制御構文",
+  est: "45分",
+  goal: "when 式と if 式の「値を返す式」としての使い方を理解し、Python の match/case や三項演算子との違いを把握する。for ループ、range、分割代入を使いこなし、Kotlin らしい制御フローを書けるようになるのがゴール。",
+  sections: [{
+    title: "if式 — 値を返すif",
+    body: "Python では条件式（三項演算子）を value_if_true if condition else value_if_false と書きますが、Kotlin では if 文そのものが式として値を返します。つまり val result = if (x > 0) \"正\" else \"非正\" のように書けます。文と式の区別がない（全ての if が値を返せる）ため、Python の三項演算子よりも自然に使えます。\n\nKotlin には Python の三項演算子に当たる専用の構文はありません。if-else がそのまま式として機能するので、専用構文が不要なのです。Java でも三項演算子 condition ? a : b がありますが、Kotlin の if 式は複数行のブロックも含められるため、より柔軟です。ブロックの場合は最後の式が値になります。\n\n注意点として、if を式として使う場合は else が必須です。値を返す以上、全てのケースを網羅しなければならないからです。これは Python の三項演算子でも同じルールなので、Python 開発者にとっては自然な制約でしょう。",
+    code: `fun main() {
+    val score = 85
+
+    // if式（Python の三項演算子に相当）
+    val result = if (score >= 60) "合格" else "不合格"
+    println(result)  // 合格
+
+    // 複数行のif式（最後の式が値）
+    val grade = if (score >= 90) {
+        println("素晴らしい！")
+        "A"
+    } else if (score >= 80) {
+        "B"
+    } else if (score >= 70) {
+        "C"
+    } else {
+        "D"
+    }
+    println("グレード: \$grade")  // グレード: B
+}`,
+    afterCode: "ポイント: Python では x if condition else y ですが、Kotlin では if (condition) x else y です。条件が先に来るか後に来るかの違いに最初は戸惑いますが、Kotlin の方が C系言語の慣習に沿っています。"
+  }, {
+    title: "when式 — 強化版switch/match",
+    body: "when は Kotlin の最も強力な制御構文で、Python の match/case（3.10+）や Java の switch を大幅に強化したものです。単純な値の比較だけでなく、範囲チェック（in 1..10）、型チェック（is String）、条件式（when without argument）など、あらゆるパターンマッチに使えます。\n\nwhen も if と同じく式として値を返せるため、val result = when(x) { ... } のように書けます。式として使う場合は全ケースを網羅する必要があり、else が必須です（enum の全値を網羅する場合は不要）。Python の match/case が式として使えないのに対し、Kotlin の when は常に式として使えるのが大きなアドバンテージです。\n\n引数なしの when は、Python の if/elif/else チェーンを簡潔に書く手段として非常に便利です。各ブランチに任意の条件式を書けるため、複数の変数をまたいだ条件分岐もすっきり記述できます。",
+    table: T.whenVsMatch,
+    code: `fun main() {
+    val x = 7
+
+    // 基本的なwhen（Python の match/case に相当）
+    when (x) {
+        1 -> println("一")
+        2, 3 -> println("二か三")
+        in 4..10 -> println("4から10の間")
+        else -> println("その他")
+    }
+
+    // when式（値を返す）
+    val label = when {
+        x < 0 -> "負"
+        x == 0 -> "ゼロ"
+        x < 10 -> "一桁"
+        x < 100 -> "二桁"
+        else -> "三桁以上"
+    }
+    println(label)  // 一桁
+
+    // 型チェック + スマートキャスト
+    val obj: Any = "Hello"
+    val desc = when (obj) {
+        is Int -> "整数: \${obj + 1}"
+        is String -> "文字列: \${obj.uppercase()}"
+        is List<*> -> "リスト: サイズ\${obj.size}"
+        else -> "不明"
+    }
+    println(desc)  // 文字列: HELLO
+}`,
+    afterCode: "ポイント: when は Python の match/case よりも使える場面が広いです。特に「引数なし when」は if/elif/else の代替として日常的に使われます。Java の switch にはない範囲マッチや型マッチも強力です。"
+  }, {
+    title: "forループとrange",
+    body: "Kotlin の for ループは Python と同じく for-in 構文です。range の書き方が異なるので、そこだけ覚えれば Python と同じ感覚で使えます。最も大きな違いは、Kotlin の .. 演算子が終端を含む（inclusive）点です。Python の range(1, 10) は 1〜9 ですが、Kotlin の 1..10 は 1〜10（10を含む）です。\n\n終端を含まない範囲は ..< 演算子（Kotlin 1.8+）で書けます。1..<10 は Python の range(1, 10) と同じ 1〜9 になります。降順は downTo、ステップ指定は step で行います。Python の range(10, 0, -1) は Kotlin では 10 downTo 1 に対応します。\n\nリストのインデックス付き反復は、Python の enumerate() に相当する .withIndex() を使います。分割代入と組み合わせて for ((index, value) in list.withIndex()) と書くと、Python の for i, v in enumerate(lst): と全く同じ感覚で使えます。",
+    table: T.ranges,
+    code: `fun main() {
+    // 基本的なfor（終端含む）
+    for (i in 1..5) print("\$i ")   // 1 2 3 4 5
+    println()
+
+    // 終端含まない
+    for (i in 1..<5) print("\$i ")  // 1 2 3 4
+    println()
+
+    // 降順
+    for (i in 5 downTo 1) print("\$i ")  // 5 4 3 2 1
+    println()
+
+    // ステップ
+    for (i in 0..20 step 5) print("\$i ")  // 0 5 10 15 20
+    println()
+
+    // リストの反復
+    val fruits = listOf("apple", "banana", "cherry")
+    for (fruit in fruits) println(fruit)
+
+    // インデックス付き（Python の enumerate()）
+    for ((i, fruit) in fruits.withIndex()) {
+        println("\$i: \$fruit")
+    }
+
+    // Mapの反復（Python の dict.items()）
+    val scores = mapOf("Alice" to 85, "Bob" to 72)
+    for ((name, score) in scores) {
+        println("\$name: \$score")
+    }
+}`,
+    afterCode: "ポイント: Kotlin の文字範囲 'a'..'z' は Python にはない便利な機能です。for (c in 'a'..'z') でアルファベットを簡単に反復できます。"
+  }, {
+    title: "分割代入（destructuring）",
+    body: "Python のタプルアンパッキング（x, y = point）に相当するのが Kotlin の分割代入（destructuring declarations）です。Kotlin では val (x, y) = point のように括弧で囲んで書きます。data class、Pair、Triple、Map.Entry などが分割代入に対応しています。\n\ndata class は自動的に componentN() 関数を生成するため、何もしなくても分割代入が使えます。通常の class で分割代入を使いたい場合は、operator fun component1() などを手動で定義する必要があります。Python では __iter__ メソッドがあればアンパッキングできるのに対し、Kotlin は componentN 関数が必要という違いがあります。\n\n分割代入は for ループや let ブロックの中でも使えます。特に Map の反復で for ((key, value) in map) と書くパターンは非常によく使います。使わない要素は _ で無視できる点も Python と同じです。",
+    code: `data class Point(val x: Int, val y: Int)
+data class Person(val name: String, val age: Int, val city: String)
+
+fun main() {
+    // data classの分割代入
+    val (x, y) = Point(3, 4)
+    println("x=\$x, y=\$y")  // x=3, y=4
+
+    // 一部を無視（Pythonの _ と同じ）
+    val (name, _, city) = Person("Alice", 25, "Tokyo")
+    println("\$name in \$city")
+
+    // Pair / Triple
+    val (first, second) = "key" to "value"
+    println("\$first: \$second")
+
+    // forループ内での分割代入
+    val scores = mapOf("Alice" to 85, "Bob" to 72, "Carol" to 93)
+    for ((student, score) in scores) {
+        println("\$student → \$score点")
+    }
+
+    // ラムダ内での分割代入
+    scores.forEach { (student, score) ->
+        println("\$student: \${if (score >= 80) "合格" else "不合格"}")
+    }
+}`,
+    afterCode: "ポイント: Python との最大の違いは、Kotlin の分割代入が「位置ベース」であることです。data class のプロパティの宣言順序で component1(), component2()... が決まるため、プロパティの順序を変えると分割代入の対応も変わります。名前ではなく位置で対応することに注意してください。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "クラスとプロパティ",
+  est: "60分",
+  goal: "Kotlin のクラス定義、プライマリコンストラクタ、data class、companion object、プロパティのカスタム getter/setter を理解し、Python の class との違いを明確に把握する。Kotlin らしいクラス設計ができるようになるのがゴール。",
+  sections: [{
+    title: "クラスの基本定義",
+    body: "Kotlin のクラス定義は Python と比べて圧倒的に簡潔です。Python では __init__ メソッドの中で self.name = name のようにフィールドを一つずつ代入する必要がありますが、Kotlin ではクラス宣言と同時にプロパティを定義できます。class Person(val name: String, val age: Int) の一行で、Python なら 4-5 行かかるコンストラクタ定義が完了します。\n\nこの構文を「プライマリコンストラクタ」と呼びます。val で宣言したプロパティは自動的に getter が、var で宣言したプロパティは getter と setter が生成されます。Java のように getXxx() / setXxx() を手書きする必要はありません。Python の @property デコレータに近い機能がデフォルトで備わっているイメージです。\n\n初期化時に追加のロジックが必要な場合は init ブロックを使います。Python の __init__ の本体部分に相当しますが、Kotlin ではプロパティの宣言はプライマリコンストラクタで行い、init ブロックにはバリデーションなどの追加処理だけを書くのが一般的です。",
+    table: T.classCompare,
+    code: `// Kotlin: プライマリコンストラクタ（超簡潔）
+class Person(val name: String, var age: Int) {
+    // initブロック: コンストラクタの追加処理
+    init {
+        require(age >= 0) { "年齢は0以上である必要があります" }
+    }
+
+    // メソッド
+    fun greet() = "こんにちは、\${name}です（\${age}歳）"
+}
+
+// セカンダリコンストラクタ
+class User(val name: String, val email: String) {
+    // セカンダリコンストラクタ（プライマリを呼ぶ）
+    constructor(email: String) : this(
+        name = email.substringBefore("@"),
+        email = email
+    )
+}
+
+fun main() {
+    val p = Person("太郎", 25)
+    println(p.name)     // 太郎（自動getter）
+    p.age = 26          // varなので再代入可（自動setter）
+    println(p.greet())
+
+    val u1 = User("Alice", "alice@example.com")
+    val u2 = User("bob@example.com")  // セカンダリコンストラクタ
+    println("\${u2.name}: \${u2.email}")
+}`,
+    afterCode: "ポイント: Python の __init__ は常に手書きですが、Kotlin のプライマリコンストラクタは宣言型で、ボイラープレートが激減します。Java のレコード（Java 16+）に似ていますが、Kotlin のクラスはより柔軟にメソッドやプロパティを追加できます。"
+  }, {
+    title: "data class — Pythonの@dataclassに相当",
+    body: "Kotlin の data class は Python の @dataclass デコレータとほぼ同じ機能を提供します。equals(), hashCode(), toString(), copy() が自動生成されるため、データを保持するためのクラスを非常に簡潔に定義できます。Python では @dataclass(frozen=True) でイミュータブルにしますが、Kotlin では全プロパティを val にすれば同じ効果が得られます。\n\ndata class の copy() メソッドは、一部のプロパティだけを変更したコピーを作るのに使います。Python の dataclasses.replace() に相当しますが、Kotlin では名前付き引数で変更したいプロパティだけを指定でき、より直感的です。イミュータブルなデータを扱う関数型プログラミングスタイルでは、この copy() が頻繁に登場します。\n\nまた、data class は自動的に分割代入にも対応します。componentN() 関数が自動生成されるため、val (name, age) = person のように書けます。Python の dataclass でタプルアンパッキングするには astuple() が必要ですが、Kotlin ではそのまま使えます。",
+    code: `// data class（Python の @dataclass に相当）
+data class Point(val x: Double, val y: Double) {
+    // 追加メソッドも定義可能
+    fun distanceTo(other: Point): Double {
+        val dx = x - other.x
+        val dy = y - other.y
+        return Math.sqrt(dx * dx + dy * dy)
+    }
+}
+
+data class Config(
+    val host: String = "localhost",
+    val port: Int = 8080,
+    val debug: Boolean = false
+)
+
+fun main() {
+    val p1 = Point(3.0, 4.0)
+    val p2 = Point(3.0, 4.0)
+
+    // 自動生成された equals
+    println(p1 == p2)       // true（Pythonの==と同じ意味）
+    println(p1 === p2)      // false（参照比較、Pythonのisに相当）
+
+    // 自動生成された toString
+    println(p1)             // Point(x=3.0, y=4.0)
+
+    // copy で一部変更
+    val p3 = p1.copy(y = 0.0)
+    println(p3)             // Point(x=3.0, y=0.0)
+
+    // 分割代入
+    val (x, y) = p1
+    println("x=\$x, y=\$y")
+
+    // デフォルト引数付き data class
+    val config = Config(port = 3000, debug = true)
+    println(config)
+}`,
+    afterCode: "ポイント: == は Kotlin では構造的等価（Python の == と同じ）、=== は参照等価（Python の is と同じ）です。Java の == が参照比較だったのに対し、Kotlin は Python と同じ直感的な挙動になっています。"
+  }, {
+    title: "companion objectとobject宣言",
+    body: "Python の @staticmethod や @classmethod に相当するのが Kotlin の companion object です。Kotlin にはクラスレベルの static メンバがなく、代わりに companion object というシングルトンオブジェクトをクラス内に定義し、そこにファクトリメソッドや定数を置きます。\n\nobject 宣言はシングルトンパターンを言語レベルでサポートする機能です。Python ではシングルトンを __new__ や metaclass で実装する必要がありますが、Kotlin では object キーワード一つで完了します。設定オブジェクト、ロガー、データベース接続プールなど、インスタンスが一つだけ存在すべきオブジェクトに使います。\n\n匿名オブジェクト（object : InterfaceName { ... }）は Python にはない概念で、Java の匿名クラスに相当します。インターフェースや抽象クラスを即座に実装したい場合に使い、わざわざクラスを定義する手間を省けます。",
+    code: `// companion object（Python の @staticmethod / @classmethod 相当）
+class User private constructor(
+    val name: String,
+    val email: String
+) {
+    companion object {
+        // ファクトリメソッド
+        fun create(email: String): User {
+            val name = email.substringBefore("@")
+            return User(name, email)
+        }
+
+        // 定数
+        const val MAX_NAME_LENGTH = 50
+    }
+}
+
+// object宣言（シングルトン）
+object AppConfig {
+    var debug = false
+    val version = "1.0.0"
+    fun logLevel() = if (debug) "DEBUG" else "INFO"
+}
+
+fun main() {
+    // companion object のメンバにアクセス
+    val user = User.create("taro@example.com")
+    println("\${user.name}: \${user.email}")
+    println("最大文字数: \${User.MAX_NAME_LENGTH}")
+
+    // シングルトン
+    AppConfig.debug = true
+    println("ログレベル: \${AppConfig.logLevel()}")
+}`,
+    afterCode: "ポイント: companion object は一見 Python の @staticmethod に似ていますが、実体はオブジェクトなのでインターフェースを実装したり、拡張関数を付けたりできます。Java の static よりも柔軟です。"
+  }, {
+    title: "カスタムgetter/setter",
+    body: "Kotlin のプロパティは Python の @property デコレータに相当するカスタム getter/setter を定義できます。ただし構文は大きく異なり、Kotlin ではプロパティ宣言の直後に get() / set() を書く形式です。Python のように別メソッドとしてデコレータを付ける必要がなく、プロパティ定義と getter/setter が一か所にまとまるため可読性が高いです。\n\nバッキングフィールド（実際に値を保持するフィールド）には field というキーワードでアクセスします。Python の self._name に相当するもので、getter/setter 内でのみ使用できます。カスタム setter でバリデーションを行い、不正な値の設定を防ぐパターンは非常によく使います。\n\n計算プロパティ（バッキングフィールドを持たない、計算結果だけを返すプロパティ）も定義できます。val で宣言しカスタム getter だけを書くと、アクセスのたびに値が計算されます。Python の @property で getter だけを定義するパターンと同じです。",
+    table: T.visibility,
+    code: `class BankAccount(val owner: String, initialBalance: Double) {
+    // カスタムsetter でバリデーション
+    var balance: Double = initialBalance
+        private set  // setterをprivateに
+
+    // 計算プロパティ（バッキングフィールドなし）
+    val isOverdrawn: Boolean
+        get() = balance < 0
+
+    // カスタムsetter + バリデーション
+    var nickname: String = owner
+        set(value) {
+            require(value.isNotBlank()) { "ニックネームは空にできません" }
+            field = value  // fieldでバッキングフィールドにアクセス
+        }
+
+    fun deposit(amount: Double) {
+        require(amount > 0)
+        balance += amount
+    }
+
+    fun withdraw(amount: Double): Boolean {
+        if (amount > balance) return false
+        balance -= amount
+        return true
+    }
+}
+
+fun main() {
+    val account = BankAccount("Alice", 1000.0)
+    account.deposit(500.0)
+    account.withdraw(200.0)
+    println("残高: \${account.balance}")   // 1300.0
+    println("マイナス?: \${account.isOverdrawn}")  // false
+    account.nickname = "Ally"
+    println("ニックネーム: \${account.nickname}")
+}`,
+    afterCode: "ポイント: private set のように setter だけのアクセスレベルを変更できるのは Kotlin 独自の機能です。「外からは読めるが書けない」プロパティが簡潔に定義でき、カプセル化が容易になります。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "継承とインターフェース",
+  est: "55分",
+  goal: "Kotlin の継承（open/override）、抽象クラス、インターフェースの仕組みを理解する。Python との多重継承の違い、Kotlin の by による委譲パターンを把握し、適切な設計選択ができるようになるのがゴール。",
+  sections: [{
+    title: "継承の基本 — open と override",
+    body: "Kotlin のクラスはデフォルトで final（継承不可）です。これは Python や Java のデフォルト（常に継承可能）とは真逆の設計で、「Effective Java」の「継承のために設計するか、さもなくば禁止せよ」という原則に基づいています。継承を許可するには open キーワードを明示的に付ける必要があります。\n\nメソッドのオーバーライドにも override キーワードが必須です。Python では親クラスと同名のメソッドを定義するだけでオーバーライドになりますが、Kotlin では意図的にオーバーライドしていることを明示する必要があります。これにより「偶然の名前衝突によるオーバーライド」が防げます。Java では @Override アノテーションが推奨されていましたが、Kotlin ではコンパイルエラーとして強制されます。\n\nまた、オーバーライドされるメソッド側にも open が必要です。つまり、親クラスの作者が「このメソッドはオーバーライドしてよい」と明示的に設計した場合のみ、子クラスでオーバーライドできます。この二重の安全装置により、予期しない振る舞いの変更を防ぎます。",
+    table: T.inheritCompare,
+    code: `// openで継承を許可（デフォルトはfinal）
+open class Animal(val name: String) {
+    // openでオーバーライドを許可
+    open fun speak(): String = "..."
+
+    // openなしはオーバーライド不可
+    fun breathe() = "\${name}は呼吸している"
+}
+
+class Dog(name: String) : Animal(name) {
+    override fun speak() = "ワンワン"
+}
+
+class Cat(name: String) : Animal(name) {
+    override fun speak() = "ニャー"
+}
+
+// さらに継承を防ぐ場合は final override
+open class PoliceDog(name: String) : Dog(name) {
+    final override fun speak() = "ワン！（警察犬）"
+}
+
+fun main() {
+    val animals = listOf(Dog("ポチ"), Cat("タマ"))
+    for (animal in animals) {
+        println("\${animal.name}: \${animal.speak()}")
+    }
+}`,
+    afterCode: "ポイント: Python では全てのクラスが暗黙的に open ですが、大規模プロジェクトでは「意図しない継承」がバグの温床になります。Kotlin のデフォルト final は、安全性を重視した設計判断です。"
+  }, {
+    title: "抽象クラス",
+    body: "抽象クラスは Python の ABC（Abstract Base Class）に相当します。abstract キーワードを付けたクラスは直接インスタンス化できず、サブクラスで抽象メソッドを実装する必要があります。Python では @abstractmethod デコレータを使いますが、Kotlin では abstract fun で宣言するだけです。\n\n抽象クラスは open を付けなくても自動的に継承可能です（abstract は暗黙的に open を含む）。抽象メソッドも同様に自動的にオーバーライド可能です。具象メソッド（実装済みメソッド）を持つこともでき、共通のロジックを親クラスにまとめるテンプレートメソッドパターンに適しています。\n\nPython の ABC との大きな違いは、チェックのタイミングです。Python では ABC の抽象メソッドを実装し忘れると実行時にエラーになりますが、Kotlin ではコンパイル時にエラーになります。このため、「テストを書かなくても抽象メソッドの実装漏れが検出される」という安心感があります。",
+    code: `abstract class Vehicle(val brand: String) {
+    // 抽象メソッド（サブクラスで実装必須）
+    abstract fun fuelType(): String
+
+    // 具象メソッド（そのまま使える）
+    fun info() = "\$brand (\${fuelType()})"
+}
+
+class ElectricCar(brand: String) : Vehicle(brand) {
+    override fun fuelType() = "電気"
+}
+
+class GasolineCar(brand: String) : Vehicle(brand) {
+    override fun fuelType() = "ガソリン"
+}
+
+fun main() {
+    // val v = Vehicle("test")  // コンパイルエラー！抽象クラスはインスタンス化不可
+
+    val cars = listOf(
+        ElectricCar("Tesla"),
+        GasolineCar("Toyota")
+    )
+    cars.forEach { println(it.info()) }
+}`,
+    afterCode: "ポイント: 抽象クラスはコンストラクタを持てるため、共通の初期化ロジックを持つ場合に適しています。一方、インターフェースはコンストラクタを持てません。「初期化ロジックが必要か」が使い分けの判断基準の一つです。"
+  }, {
+    title: "インターフェース",
+    body: "Kotlin のインターフェースは Java のインターフェースを大幅に強化したもので、Python の ABC（Protocol）に近い役割を果たします。最大の特徴は、デフォルト実装を持てる点です。Java 8 で追加された default メソッドと同様の機能ですが、Kotlin ではプロパティの抽象宣言やデフォルト実装もサポートしています。\n\nKotlin ではクラスの多重継承は禁止されていますが、インターフェースは複数実装できます。Python では多重継承が自由にできますが、MRO（Method Resolution Order）の複雑さやダイヤモンド問題があります。Kotlin のインターフェースはこの問題を避けつつ、多態性を実現する手段を提供します。\n\n複数のインターフェースが同名のデフォルト実装を持つ場合、実装クラスで明示的にどちらを呼ぶか指定する必要があります（super<InterfaceName>.method()）。Python の MRO とは異なるアプローチですが、意図が明確になるため保守性は高いです。",
+    code: `interface Printable {
+    fun print()  // 抽象メソッド
+
+    // デフォルト実装
+    fun prettyPrint() {
+        println("=== Pretty ===")
+        print()
+        println("==============")
+    }
+}
+
+interface Loggable {
+    fun log(message: String) {
+        println("[LOG] \$message")
+    }
+}
+
+// 複数インターフェースの実装
+class Document(val title: String, val content: String) : Printable, Loggable {
+    override fun print() {
+        println("Title: \$title")
+        println("Content: \$content")
+    }
+}
+
+fun main() {
+    val doc = Document("レポート", "Kotlin入門の感想")
+    doc.print()
+    doc.prettyPrint()
+    doc.log("ドキュメントを作成しました")
+}`,
+    afterCode: "ポイント: Python の duck typing（「quack() できるなら Duck」）に対し、Kotlin のインターフェースは「明示的に Duck を実装していることをコンパイラが検証する」というアプローチです。安全性は高いですが、既存クラスに後からインターフェースを追加できない制約もあります（拡張関数で部分的に回避可能）。"
+  }, {
+    title: "委譲（delegation）",
+    body: "「継承よりコンポジション」は OOP の重要な原則ですが、コンポジションを実装すると転送メソッドを大量に書く必要があります。Python では __getattr__ で動的に転送できますが、型安全ではありません。Kotlin の by キーワードはこの問題を言語レベルで解決します。\n\nclass LoggingList(inner: MutableList<String>) : MutableList<String> by inner と書くと、MutableList のメソッド全てが inner に自動転送されます。個別にオーバーライドしたいメソッドだけを書けばよく、残りは委譲先がそのまま処理します。デコレータパターンやラッパークラスの実装が劇的に簡単になります。\n\nプロパティ委譲（by lazy, by Delegates.observable 等）も強力な機能です。val config by lazy { loadConfig() } と書くと、最初にアクセスされた時に一度だけ計算され、以降はキャッシュされた値が返ります。Python には @cached_property がありますが、Kotlin の by lazy はスレッドセーフがデフォルトで保証される点が異なります。",
+    table: T.delegation,
+    code: `// インターフェース委譲
+interface Greeter {
+    fun greet(): String
+}
+
+class EnglishGreeter : Greeter {
+    override fun greet() = "Hello!"
+}
+
+// by で委譲（全メソッドが自動転送）
+class PoliteGreeter(base: Greeter) : Greeter by base {
+    // 必要なメソッドだけオーバーライド
+    override fun greet() = "Excuse me, " + "hello!"
+}
+
+// プロパティ委譲: by lazy
+class HeavyResource {
+    val data: List<String> by lazy {
+        println("初回ロード中...")
+        listOf("item1", "item2", "item3")  // 重い処理の代替
+    }
+}
+
+fun main() {
+    val greeter = PoliteGreeter(EnglishGreeter())
+    println(greeter.greet())
+
+    val resource = HeavyResource()
+    println("リソース作成済み（まだロードされていない）")
+    println(resource.data)  // ここで初めてロード
+    println(resource.data)  // 2回目はキャッシュから
+}`,
+    afterCode: "ポイント: by lazy はシングルトンの遅延初期化やコストの高い計算のキャッシュに最適です。Python の @functools.lru_cache や @cached_property に相当しますが、プロパティとして自然に使えるのが Kotlin の利点です。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "コレクション",
+  est: "55分",
+  goal: "Kotlin のコレクション（List, Set, Map）の不変/可変の区別を理解し、filter, map, groupBy などの関数型操作を使いこなせるようになる。Python のリスト内包表記に相当するメソッドチェーンを書け、コレクション処理を流暢に記述できるのがゴール。",
+  sections: [{
+    title: "不変コレクションと可変コレクション",
+    body: "Kotlin のコレクションは「不変（Immutable）」と「可変（Mutable）」の 2 種類が明確に区別されています。Python のリストは常に可変で、タプルが不変コレクションに相当しますが、Kotlin ではリスト・セット・マップの全てに不変版と可変版が用意されています。\n\nlistOf(), setOf(), mapOf() で作成すると不変コレクションになり、要素の追加・削除・変更はできません。mutableListOf(), mutableSetOf(), mutableMapOf() で作成すると可変コレクションになり、Python のリストと同じ感覚で操作できます。val と組み合わせると「参照も中身も変更不可」が保証され、関数の引数として渡しても安全です。\n\n不変コレクションを基本とし、必要な場合のみ可変コレクションを使うのが Kotlin のベストプラクティスです。Python では全てが可変なため「この関数はリストを書き換えるかもしれない」と常に警戒する必要がありますが、Kotlin では型から明確に判断できます。",
+    table: T.collections,
+    code: `fun main() {
+    // 不変リスト（追加・削除不可）
+    val fruits = listOf("apple", "banana", "cherry")
+    // fruits.add("date")  // コンパイルエラー！
+    println(fruits[0])      // apple
+    println(fruits.size)    // 3
+
+    // 可変リスト
+    val mutableFruits = mutableListOf("apple", "banana")
+    mutableFruits.add("cherry")
+    mutableFruits.removeAt(0)
+    println(mutableFruits)  // [banana, cherry]
+
+    // 不変マップ
+    val scores = mapOf("Alice" to 85, "Bob" to 72)
+    println(scores["Alice"])  // 85
+
+    // 可変マップ
+    val mutableScores = mutableMapOf("Alice" to 85)
+    mutableScores["Bob"] = 72
+    mutableScores += "Carol" to 93
+    println(mutableScores)
+
+    // 不変→可変、可変→不変の変換
+    val immutable = mutableFruits.toList()       // 可変→不変
+    val mutable = fruits.toMutableList()          // 不変→可変
+}`,
+    afterCode: "ポイント: Kotlin の不変コレクションは「読み取り専用のビュー」であり、内部のデータが変更されないことを完全には保証しません（Java 側から変更される可能性がある）。完全に不変にしたい場合は kotlinx.collections.immutable ライブラリを使用します。"
+  }, {
+    title: "コレクション操作 — filter, map, flatMap",
+    body: "Python のリスト内包表記 [x*2 for x in lst if x > 0] に相当するのが、Kotlin の lst.filter { it > 0 }.map { it * 2 } というメソッドチェーンです。Python の内包表記は簡潔ですが、複雑な処理になると読みにくくなります。Kotlin のメソッドチェーンは各ステップが明示的で、途中に let や also を挟んでデバッグ出力を入れることもできます。\n\nKotlin の標準ライブラリには数十種類のコレクション操作関数が用意されており、Python の itertools や functools に分散している機能がコレクションのメソッドとして統合されています。filter, map, flatMap, groupBy, sortedBy, take, drop, zip, chunked, windowed など、関数型プログラミングの基本操作が全て揃っています。\n\n注意すべき点として、Kotlin のコレクション操作は各ステップで新しいリストを生成します（eager evaluation）。大量のデータを処理する場合は .asSequence() で遅延評価に切り替えると、中間リストの生成を避けてメモリ効率が向上します。Python のジェネレータに相当する仕組みです。",
+    table: T.collectionOps,
+    code: `data class Student(val name: String, val score: Int, val grade: Int)
+
+fun main() {
+    val students = listOf(
+        Student("Alice", 85, 3),
+        Student("Bob", 72, 2),
+        Student("Carol", 93, 3),
+        Student("Dave", 60, 2),
+        Student("Eve", 88, 3)
+    )
+
+    // filter + map（Python: [s.name for s in students if s.score >= 80]）
+    val honors = students
+        .filter { it.score >= 80 }
+        .map { it.name }
+    println("優秀: \$honors")  // [Alice, Carol, Eve]
+
+    // sortedBy
+    val ranked = students.sortedByDescending { it.score }
+    ranked.forEach { println("\${it.name}: \${it.score}") }
+
+    // groupBy
+    val byGrade = students.groupBy { it.grade }
+    byGrade.forEach { (grade, list) ->
+        println("学年\$grade: \${list.map { it.name }}")
+    }
+
+    // 集約
+    println("平均点: \${students.map { it.score }.average()}")
+    println("最高点: \${students.maxOf { it.score }}")
+    println("全員合格?: \${students.all { it.score >= 60 }}")
+}`,
+    afterCode: "ポイント: Python のリスト内包表記は1行で書くスタイルですが、Kotlin のメソッドチェーンは各操作を改行して書くスタイルが主流です。どちらも同じことを表現していますが、Kotlin の方がパイプライン的で、各ステップの入出力が明確です。"
+  }, {
+    title: "Sequence — 遅延評価のコレクション",
+    body: "Kotlin のコレクション操作は通常、各ステップで中間リストを生成します。list.filter { ... }.map { ... }.take(3) と書くと、filter で新しいリスト、map でまた新しいリストが作られ、最後に take で 3 要素だけが取り出されます。要素数が少なければ問題ありませんが、100万件のデータに対してこれを行うと、無駄なメモリ消費が発生します。\n\nこの問題を解決するのが Sequence（シーケンス）です。.asSequence() を先頭に付けると、全ての操作が遅延評価に切り替わります。Python のジェネレータ（yield を使う関数）やジェネレータ式に相当し、要素が一つずつパイプラインを通過するため、中間リストが生成されません。\n\n使い分けの目安は、要素数が数百程度ならコレクション操作で十分、数千以上や無限シーケンスを扱う場合は Sequence を使う、というものです。Sequence は最後に .toList() 等で具体化するまで実際の計算は行われないため、必ず末端操作（toList, forEach, first 等）で結果を取り出してください。",
+    code: `fun main() {
+    val largeList = (1..1_000_000).toList()
+
+    // 通常のコレクション操作（中間リストが毎回生成される）
+    val result1 = largeList
+        .filter { it % 2 == 0 }  // 50万要素のリスト生成
+        .map { it * 3 }           // さらに50万要素のリスト生成
+        .take(5)                  // 5要素だけ取得
+    println(result1)
+
+    // Sequence（遅延評価 — 中間リスト不要）
+    val result2 = largeList.asSequence()
+        .filter { it % 2 == 0 }
+        .map { it * 3 }
+        .take(5)
+        .toList()  // ここで初めて計算実行
+    println(result2)
+
+    // 無限シーケンス
+    val fibonacci = generateSequence(Pair(0, 1)) { Pair(it.second, it.first + it.second) }
+        .map { it.first }
+    println(fibonacci.take(10).toList())  // [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
+}`,
+    afterCode: "ポイント: Python のジェネレータは yield で値を一つずつ返すのに対し、Kotlin の Sequence は sequence { yield(value) } ビルダーか generateSequence() で作成します。Kotlin 2.0 時点では yield は suspend 関数として実装されており、コルーチンの仕組みを活用しています。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "拡張関数とスコープ関数",
+  est: "50分",
+  goal: "拡張関数の仕組みを理解し、既存クラスにメソッドを後付けする方法を習得する。let, run, with, apply, also の5つのスコープ関数の使い分けを明確にし、Kotlin らしいイディオマティックなコードを書けるようになるのがゴール。",
+  sections: [{
+    title: "拡張関数 — 既存クラスにメソッドを追加",
+    body: "拡張関数は Kotlin の最もユニークな機能の一つで、既存のクラスを変更せずにメソッドを追加できます。Python には直接対応する概念がなく、Java でもユーティリティクラスに static メソッドとして定義するしかありませんでした。Kotlin では fun String.toSlug() のように書くだけで、あたかも String クラスにもともと toSlug() メソッドがあったかのように使えます。\n\n内部的には、拡張関数は普通の static メソッドにコンパイルされ、第一引数にレシーバ（this）が渡されます。Python でいえば「第一引数に self を取る関数を、クラスの外部で定義してモンキーパッチする」ようなものですが、Kotlin ではモンキーパッチと違って元のクラスを一切変更しないため安全です。\n\n拡張関数はクラスの private メンバにはアクセスできません。これは通常のメソッドとの重要な違いです。あくまで「外から見える API を使って、便利なメソッドを後付けする」仕組みであり、カプセル化を破壊することはありません。ライブラリのクラスに便利なメソッドを追加したい場合や、特定のドメインに特化した操作を定義したい場合に非常に有用です。",
+    code: `// String に拡張関数を追加
+fun String.toSlug(): String =
+    this.trim()
+        .lowercase()
+        .replace(Regex("[^a-z0-9\\s-]"), "")
+        .replace(Regex("\\s+"), "-")
+
+// List に拡張関数を追加
+fun <T> List<T>.secondOrNull(): T? =
+    if (this.size >= 2) this[1] else null
+
+// Int に拡張関数を追加
+fun Int.isEven(): Boolean = this % 2 == 0
+fun Int.factorial(): Long {
+    require(this >= 0) { "負の数の階乗は定義されていません" }
+    var result = 1L
+    for (i in 2..this) result *= i
+    return result
+}
+
+// 拡張プロパティ
+val String.wordCount: Int
+    get() = this.trim().split(Regex("\\s+")).size
+
+fun main() {
+    println("Hello World Kotlin".toSlug())  // hello-world-kotlin
+    println(listOf(10, 20, 30).secondOrNull())  // 20
+    println(42.isEven())       // true
+    println(5.factorial())     // 120
+    println("Hello Kotlin World".wordCount)  // 3
+}`,
+    afterCode: "ポイント: Kotlin の標準ライブラリ自体が拡張関数を多用しています。例えば Iterable<T>.map { } や String.toIntOrNull() なども拡張関数として定義されています。Kotlin を使いこなすには拡張関数の仕組みを理解することが不可欠です。"
+  }, {
+    title: "スコープ関数の概要",
+    body: "Kotlin のスコープ関数（let, run, with, apply, also）は、オブジェクトに対する一連の操作を簡潔に書くための仕組みです。Python には直接対応する概念がなく、Java にもありません。Kotlin 特有の強力なイディオムです。\n\n5 つのスコープ関数は全て「コンテキストオブジェクトに対してラムダを実行する」という基本構造は同じですが、コンテキストオブジェクトの参照方法（this か it か）と戻り値（ラムダの結果かコンテキストオブジェクト自身か）の 2 軸で区別されます。この 2x2 + 1（with）の組み合わせを理解すれば、使い分けは明確です。\n\n最初は全てを使いこなす必要はなく、まず let（null チェック）と apply（オブジェクト初期化）から始めるのがおすすめです。慣れてきたら also（デバッグ・ログ）、run（初期化 + 結果計算）、with（複数操作のグルーピング）を使い分けていくとよいでしょう。",
+    table: T.scopeFunctions,
+    afterTable: "覚え方のコツ: it を使うのは let と also、this を使うのは run, with, apply です。戻り値がラムダ結果なのは let, run, with、コンテキストオブジェクト自身なのは apply, also です。"
+  }, {
+    title: "let と also",
+    body: "let はオブジェクトを it で参照し、ラムダの結果を返します。最も一般的な用途は null チェックとの組み合わせで、obj?.let { /* objが非nullの場合のみ実行 */ } というパターンです。Python の if obj is not None: ... に相当しますが、Kotlin では一行で書ける上に、ラムダの戻り値をそのまま変数に代入できるため、より関数的なスタイルで書けます。\n\nalso はオブジェクトを it で参照し、オブジェクト自身を返します。主な用途は副作用（ログ出力、デバッグ、バリデーション）です。チェーンの途中に .also { println(it) } を挟むことで、処理の流れを変えずにデバッグ出力を追加できます。Python には直接対応する概念がなく、デバッグ時に一時変数を導入して print する必要がある場面で重宝します。\n\nlet と also の選び方は単純で、「変換が目的なら let」「副作用が目的なら also」です。let は結果を返すため変換チェーンに使い、also はオブジェクト自身を返すためチェーンの途中に挟むのに適しています。",
+    code: `fun main() {
+    // let: nullチェック + 変換
+    val email: String? = "USER@EXAMPLE.COM"
+    val normalized = email?.let {
+        it.trim().lowercase()
+    } ?: "no-email"
+    println(normalized)  // user@example.com
+
+    // let: スコープの限定
+    val result = "Hello, World!".let { greeting ->
+        val words = greeting.split(", ")
+        "\${words[1]} says \${words[0]}"
+    }
+    println(result)  // World! says Hello
+
+    // also: デバッグ・ログ
+    val numbers = mutableListOf(3, 1, 4, 1, 5)
+        .also { println("元のリスト: \$it") }
+        .apply { sort() }
+        .also { println("ソート後: \$it") }
+    println("結果: \$numbers")
+}`,
+    afterCode: "ポイント: ?.let は Kotlin のイディオムとして非常に頻繁に使われます。Python の if x is not None: result = f(x) else: result = default を、Kotlin では val result = x?.let { f(it) } ?: default と1行で書けます。"
+  }, {
+    title: "apply, run, with",
+    body: "apply はオブジェクトを this で参照し、オブジェクト自身を返します。オブジェクトの初期化や設定に最適で、Builder パターンの代替として使えます。this は省略可能なので、プロパティや メソッドを直接呼べます。Python には対応する概念がなく、obj.prop1 = val1; obj.prop2 = val2 と書くところを、apply ブロック内にまとめることで可読性が向上します。\n\nrun は this で参照し、ラムダの結果を返します。apply との違いは戻り値だけで、「初期化した後に何か値を計算して返す」場合に使います。例えば StringBuilder().run { append(\"Hello\"); append(\" World\"); toString() } のように、オブジェクトを組み立てて最終的な結果を返すパターンに適しています。\n\nwith は run と同じく this で参照し結果を返しますが、拡張関数ではなく通常の関数で、引数としてオブジェクトを渡します。with(obj) { ... } と書き、既存のオブジェクトに対する複数の操作をグルーピングする場合に使います。null 安全な呼び出しができない（?. が使えない）ため、非nullが確実なオブジェクトに対してのみ使用します。",
+    code: `class ServerConfig {
+    var host = "localhost"
+    var port = 8080
+    var maxConnections = 100
+    var timeout = 30_000L
+    override fun toString() =
+        "ServerConfig(host=\$host, port=\$port, max=\$maxConnections, timeout=\$timeout)"
+}
+
+fun main() {
+    // apply: オブジェクト初期化（自身を返す）
+    val config = ServerConfig().apply {
+        host = "192.168.1.100"
+        port = 3000
+        maxConnections = 500
+        timeout = 60_000L
+    }
+    println(config)
+
+    // run: 初期化 + 結果計算（結果を返す）
+    val greeting = StringBuilder().run {
+        append("こんにちは、")
+        append("Kotlin")
+        append("の世界へ！")
+        toString()
+    }
+    println(greeting)
+
+    // with: 既存オブジェクトの操作まとめ
+    val info = with(config) {
+        "サーバー \$host:\$port (最大\${maxConnections}接続)"
+    }
+    println(info)
+}`,
+    afterCode: "使い分けまとめ: 「オブジェクトを設定して返す」→ apply、「オブジェクトを使って結果を計算」→ run/with、「null安全に変換」→ let、「副作用を挟む」→ also。迷ったらこの基準で選べば間違いありません。"
+  }]
+}, {
+  id: "ch9",
+  num: 9,
+  title: "例外処理とNull安全パターン",
+  est: "45分",
+  goal: "Kotlin の例外処理（try/catch/finally）を理解し、Python との違いを把握する。runCatching と Result 型を使った関数型エラーハンドリング、use 関数によるリソース管理を習得し、堅牢なエラー処理を書けるようになるのがゴール。",
+  sections: [{
+    title: "try/catch/finally",
+    body: "Kotlin の例外処理は Python の try/except/finally とほぼ同じ構造です。except の代わりに catch を使い、括弧内に例外の型を指定します。Python では except ValueError as e: と書きますが、Kotlin では catch (e: NumberFormatException) と書きます。finally は両言語で同じキーワードです。\n\nKotlin と Java の最大の違いは、Kotlin には検査例外（checked exception）がないことです。Java では IOException などの検査例外を throws で宣言するか try/catch で処理することが強制されますが、Kotlin ではこの強制がありません。これは Python と同じ思想で、「例外を catch するかどうかは呼び出し側の判断に任せる」というアプローチです。\n\nKotlin の try は式として値を返せるため、val result = try { risky() } catch (e: Exception) { default } のように書けます。Python では try 文は値を返せないため、一時変数を使う必要がありますが、Kotlin ではより簡潔に書けます。",
+    table: T.exceptionCompare,
+    code: `// try式（値を返す）
+fun parseNumber(s: String): Int {
+    return try {
+        s.toInt()
+    } catch (e: NumberFormatException) {
+        println("変換失敗: \${e.message}")
+        0
+    } finally {
+        println("処理完了: \$s")
+    }
+}
+
+// 独自例外
+class InsufficientFundsException(
+    val amount: Double,
+    val balance: Double
+) : Exception("残高不足: 残高\${balance}に対して\${amount}の引き出し")
+
+fun withdraw(balance: Double, amount: Double): Double {
+    if (amount > balance) {
+        throw InsufficientFundsException(amount, balance)
+    }
+    return balance - amount
+}
+
+fun main() {
+    println(parseNumber("42"))   // 42
+    println(parseNumber("abc"))  // 0
+
+    try {
+        withdraw(1000.0, 1500.0)
+    } catch (e: InsufficientFundsException) {
+        println(e.message)
+    }
+}`,
+    afterCode: "ポイント: Kotlin は Java の検査例外を廃止しました。大規模プロジェクトでは検査例外が「catch して握りつぶす」だけのコードを量産してしまう問題があり、Kotlin はこれを設計レベルで排除しています。"
+  }, {
+    title: "runCatchingとResult型",
+    body: "runCatching は Kotlin の関数型エラーハンドリング手法で、Python の try/except をラップしたような関数です。runCatching { 処理 } と書くと、成功時は Result.success(値)、失敗時は Result.failure(例外) を返します。これにより、例外をデータとして扱い、メソッドチェーンで処理できます。\n\nResult 型には getOrNull(), getOrDefault(), getOrElse { }, fold { onSuccess, onFailure }, map { }, recover { } など豊富な操作が用意されています。Python には直接対応する概念がなく、try/except で分岐するか、Optional 型を自作するしかありません。Rust の Result 型や Scala の Try に影響を受けた設計です。\n\nonSuccess / onFailure は副作用（ログ出力等）を挟むのに使います。also に似ていますが、成功/失敗に応じて呼び分けられる点が異なります。Result 型を使いこなすと、例外処理がデータフローの一部として自然に表現でき、コードの見通しが格段に良くなります。",
+    code: `fun divide(a: Int, b: Int): Result<Double> = runCatching {
+    require(b != 0) { "ゼロ除算はできません" }
+    a.toDouble() / b.toDouble()
+}
+
+fun main() {
+    // 基本的な使い方
+    val result1 = divide(10, 3)
+    val result2 = divide(10, 0)
+
+    // getOrNull: 失敗時はnull
+    println(result1.getOrNull())  // 3.333...
+    println(result2.getOrNull())  // null
+
+    // getOrElse: 失敗時のデフォルト値（例外情報も使える）
+    val value = result2.getOrElse { e ->
+        println("エラー: \${e.message}")
+        -1.0
+    }
+    println(value)  // -1.0
+
+    // fold: 成功/失敗を分岐処理
+    val message = result1.fold(
+        onSuccess = { "結果: \${"%.2f".format(it)}" },
+        onFailure = { "エラー: \${it.message}" }
+    )
+    println(message)
+
+    // map: 成功時のみ変換
+    val formatted = result1.map { "%.2f".format(it) }
+    println(formatted.getOrDefault("N/A"))
+
+    // onSuccess / onFailure: 副作用（ログ等）
+    divide(100, 7)
+        .onSuccess { println("計算成功: \$it") }
+        .onFailure { println("計算失敗: \${it.message}") }
+}`,
+    afterCode: "ポイント: runCatching は内部で try/catch を使っているため、パフォーマンス的には通常の例外処理と同等です。ただし、例外を「期待されるケース」として使う（バリデーション等）場合は、sealed class による独自の Result 型を定義する方が適切な場合もあります。"
+  }, {
+    title: "リソース管理 — use関数",
+    body: "Python の with 文（コンテキストマネージャ）に相当するのが Kotlin の use 関数です。Closeable または AutoCloseable を実装したオブジェクトに対して使え、ブロックの終了時に自動的に close() が呼ばれます。例外が発生しても確実にリソースが解放されます。\n\nPython の with open('file.txt') as f: と Kotlin の File(\"file.txt\").bufferedReader().use { reader -> } は同じパターンです。use は拡張関数として実装されており、Kotlin の拡張関数の力を活かした好例です。Python のように __enter__ / __exit__ を実装する必要はなく、close() メソッドがあれば use が使えます。\n\nuse はラムダの結果を返すため、val content = File(\"file.txt\").readText() のように一行で書くこともできますが、大きなファイルを行単位で処理する場合は useLines { lines -> ... } が適しています。Python のイテレータによるファイル読み込みと同じく、全体をメモリに載せずに処理できます。",
+    code: `import java.io.File
+import java.io.Closeable
+
+// use によるファイル読み込み
+fun readFile(path: String): String {
+    return File(path).bufferedReader().use { reader ->
+        reader.readText()
+    }
+}
+
+// カスタムリソースクラス
+class Connection(val name: String) : Closeable {
+    init { println("接続開始: \$name") }
+    fun query(sql: String) = "結果: \$sql"
+    override fun close() { println("接続終了: \$name") }
+}
+
+fun main() {
+    // use: 自動クローズ
+    Connection("DB1").use { conn ->
+        println(conn.query("SELECT * FROM users"))
+    }
+    // ここで自動的にclose()が呼ばれる
+
+    // 複数リソースのネスト
+    Connection("Source").use { source ->
+        Connection("Target").use { target ->
+            val data = source.query("SELECT *")
+            println("転送: \$data → \${target.name}")
+        }
+    }
+}`,
+    afterCode: "ポイント: Python の with は複数のコンテキストマネージャを with open(a) as f1, open(b) as f2: のように書けますが、Kotlin では use をネストする必要があります。ただし、Kotlin の use はラムダベースなので、インデントが深くなる問題はスコープ関数で軽減できます。"
+  }]
+}, {
+  id: "ch10",
+  num: 10,
+  title: "コルーチン入門",
+  est: "60分",
+  goal: "Kotlin のコルーチンの基本概念（suspend 関数、launch、async、CoroutineScope）を理解し、Python の asyncio との違いを把握する。構造化並行性の利点を理解し、基本的な非同期処理を書けるようになるのがゴール。",
+  sections: [{
+    title: "コルーチンとは",
+    body: "コルーチンは「中断と再開が可能な計算」です。Python の asyncio と基本的な概念は同じですが、Kotlin のコルーチンはいくつかの点で大幅に強化されています。まず、Kotlin のコルーチンはマルチスレッドで動作します。Python の asyncio はシングルスレッド（GIL の制約）ですが、Kotlin のコルーチンは複数のスレッドに分散して実行でき、CPU バウンドな処理も並列化できます。\n\nKotlin のコルーチンは言語機能ではなくライブラリとして提供されています。kotlinx.coroutines ライブラリを追加するだけで使え、言語本体は suspend キーワードだけを提供します。これにより、コルーチンの実装を柔軟に進化させることができ、実際に Kotlin 1.0 から現在まで大幅に改良されてきました。\n\nPython の async/await に馴染みがあれば、Kotlin のコルーチンの学習コストは低いです。async def が suspend fun に、await が .await() に、asyncio.run() が runBlocking に対応します。ただし、Kotlin には「構造化並行性（Structured Concurrency）」という重要な概念があり、これが Python の asyncio との最大の違いです。",
+    table: T.coroutineCompare,
+    afterTable: "最大の違い: Python の asyncio はシングルスレッドで I/O 多重化に特化していますが、Kotlin のコルーチンはマルチスレッドで CPU バウンドな並列処理にも対応します。また、構造化並行性により、コルーチンの親子関係が明確になり、リソースリークを防げます。"
+  }, {
+    title: "suspend関数とlaunch",
+    body: "suspend 関数は Python の async def に相当し、内部で中断可能な処理を含む関数を定義します。suspend fun fetchData(): String は、実行途中で一時停止し、結果が準備できたら再開されます。通常の関数から suspend 関数を直接呼ぶことはできず、別の suspend 関数やコルーチンビルダーの中からのみ呼び出せます。\n\nlaunch はコルーチンを「起動して結果を気にしない（fire-and-forget）」ビルダーです。Python の asyncio.create_task() に相当します。戻り値は Job オブジェクトで、キャンセルや完了待ちに使えます。launch は結果を返さないため、副作用（ログ出力、データ保存等）を非同期に実行する場合に使います。\n\nrunBlocking は通常の関数からコルーチンの世界に入るためのブリッジです。Python の asyncio.run() と同じ役割で、main 関数やテストコードで使います。本番のアプリケーションコードでは runBlocking を多用すべきではなく、フレームワーク（Spring、Ktor等）が提供するコルーチンスコープを使うのが正しいアプローチです。",
+    code: `import kotlinx.coroutines.*
+
+// suspend関数（Python の async def に相当）
+suspend fun fetchUser(id: Int): String {
+    delay(1000)  // 非同期の待機（Thread.sleepとは違いスレッドをブロックしない）
+    return "User-\$id"
+}
+
+suspend fun fetchScore(userId: String): Int {
+    delay(800)
+    return (80..100).random()
+}
+
+fun main() = runBlocking {
+    println("開始: \${System.currentTimeMillis()}")
+
+    // launch: 結果を気にしないコルーチン
+    val job = launch {
+        val user = fetchUser(1)
+        println("取得完了: \$user")
+    }
+
+    // 複数のlaunchは並行実行される
+    launch {
+        val user = fetchUser(2)
+        println("取得完了: \$user")
+    }
+
+    println("コルーチン起動済み")
+    job.join()  // job の完了を待つ（省略可 — runBlockingが全子コルーチンを待つ）
+    println("終了")
+}`,
+    afterCode: "ポイント: delay() は Thread.sleep() と違い、スレッドをブロックしません。コルーチンを一時停止し、他のコルーチンにスレッドを譲ります。Python の await asyncio.sleep() と同じ挙動です。"
+  }, {
+    title: "async/await — 結果を返す並行処理",
+    body: "async は launch と似ていますが、結果を返すコルーチンビルダーです。戻り値は Deferred<T>（Python の asyncio.Task に相当）で、.await() で結果を取得します。Python では await task でしたが、Kotlin では deferred.await() とメソッド呼び出しの形式です。\n\n複数の独立した非同期処理を並行実行する場合、async を使って起動し、全ての結果を await で集約します。Python の asyncio.gather() に相当するパターンですが、Kotlin では各 async を個別に起動して個別に await するスタイルが一般的です。coroutineScope { } 内で複数の async を起動すると、全ての完了を自動的に待ちます。\n\n注意すべきは、async { }.await() をすぐに呼ぶと逐次実行になってしまう点です。val result = async { compute() }.await() は compute() の結果が出るまで次の処理に進まないため、並行性のメリットがありません。先に全ての async を起動してから、後でまとめて await するのが正しいパターンです。",
+    code: `import kotlinx.coroutines.*
+
+suspend fun fetchPrice(product: String): Double {
+    delay((500L..1500L).random())  // API呼び出しのシミュレーション
+    return when (product) {
+        "Apple" -> 150.0
+        "Banana" -> 100.0
+        "Cherry" -> 300.0
+        else -> 0.0
+    }
+}
+
+fun main() = runBlocking {
+    val start = System.currentTimeMillis()
+
+    // 逐次実行（遅い！）
+    val price1 = fetchPrice("Apple")
+    val price2 = fetchPrice("Banana")
+    println("逐次: \${price1 + price2} (\${System.currentTimeMillis() - start}ms)")
+
+    val start2 = System.currentTimeMillis()
+
+    // 並行実行（速い！）
+    val deferred1 = async { fetchPrice("Apple") }
+    val deferred2 = async { fetchPrice("Banana") }
+    val deferred3 = async { fetchPrice("Cherry") }
+
+    val total = deferred1.await() + deferred2.await() + deferred3.await()
+    println("並行: \$total (\${System.currentTimeMillis() - start2}ms)")
+}`,
+    afterCode: "ポイント: Python の asyncio.gather(task1, task2, task3) に相当するのは、Kotlin では awaitAll(deferred1, deferred2, deferred3) です。ただし Kotlin では個別に await する方が柔軟性が高く、エラーハンドリングも細かく制御できます。"
+  }, {
+    title: "構造化並行性とCoroutineScope",
+    body: "構造化並行性（Structured Concurrency）は Kotlin コルーチンの核心的な設計思想です。全てのコルーチンは必ず CoroutineScope に属し、親のスコープが終了すると全ての子コルーチンも自動的にキャンセルされます。これにより、コルーチンのリークが原理的に防がれます。\n\nPython の asyncio でも TaskGroup（3.11+）で構造化並行性がサポートされましたが、Kotlin は言語設計の初期段階からこの概念を取り入れています。coroutineScope { } ブロックは、内部の全コルーチンが完了するまで待機し、いずれかが例外を投げると他の全コルーチンをキャンセルします。これにより「一部が失敗したのに他が動き続ける」という危険な状態を防げます。\n\nwithTimeout は指定時間内に完了しなかった場合にキャンセルする機能で、Python の asyncio.wait_for() に相当します。ネットワーク通信やデータベースクエリにタイムアウトを設定する際に重要です。タイムアウト時は TimeoutCancellationException が発生しますが、これは CancellationException のサブクラスなので、通常の例外とは区別して処理されます。",
+    code: `import kotlinx.coroutines.*
+
+suspend fun processItem(id: Int): String {
+    delay(1000)
+    if (id == 3) throw RuntimeException("アイテム\$id の処理に失敗")
+    return "アイテム\$id 完了"
+}
+
+fun main() = runBlocking {
+    // coroutineScope: 子の失敗で全体がキャンセル
+    try {
+        coroutineScope {
+            val results = (1..5).map { id ->
+                async { processItem(id) }
+            }
+            results.forEach { println(it.await()) }
+        }
+    } catch (e: Exception) {
+        println("エラー発生: \${e.message}")
+    }
+
+    println("--- タイムアウト ---")
+
+    // withTimeout
+    val result = try {
+        withTimeout(2000) {
+            delay(3000)  // 2秒でタイムアウト
+            "完了"
+        }
+    } catch (e: TimeoutCancellationException) {
+        "タイムアウト"
+    }
+    println(result)
+
+    // withTimeoutOrNull: タイムアウト時にnull（例外なし）
+    val result2 = withTimeoutOrNull(500) {
+        delay(1000)
+        "完了"
+    }
+    println(result2 ?: "タイムアウト（null）")
+}`,
+    afterCode: "コース完了後に習得できる状態: Kotlin の基本文法を読み書きでき、Python との差分を具体例で説明でき、公式ドキュメントを読みながらアプリケーションを書き始められる。Null安全、コレクション操作、コルーチンという Kotlin の三大特徴を理解し、次のステップ（Android開発やサーバーサイド開発）に進む準備が整います。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, React.createElement("thead", null, React.createElement("tr", null, data.h.map(function(h, i) { return React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h); }))), React.createElement("tbody", null, data.r.map(function(row, ri) { return React.createElement("tr", {
+    key: ri
+  }, row.map(function(cell, ci) { return React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell); })); }))), data.cap && React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+var diffLabel = function(d) { return d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55"; };
+var diffColor = function(d) { return d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626"; };
+function Exercise({
+  ex,
+  idx
+}) {
+  var _useState = useState(false), showAnswer = _useState[0], setShowAnswer = _useState[1];
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, React.createElement("button", {
+    onClick: function() { setShowAnswer(!showAnswer); },
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  var _useState2 = useState(defaultOpen), open = _useState2[0], setOpen = _useState2[1];
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, React.createElement("button", {
+    onClick: function() { setOpen(!open); },
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function KotlinCourse() {
+  var _useState3 = useState(0), ch = _useState3[0], setCh = _useState3[1];
+  var _useState4 = useState(false), menuOpen = _useState4[0], setMenuOpen = _useState4[1];
+  var chapter = chapters[ch];
+  var exKey = chapter.id;
+  var exercises = EX[exKey] || [];
+  return React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, React.createElement("div", {
+    style: {
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\uD83D\uDFE3"), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "Kotlin \u5165\u9580\u30B3\u30FC\u30B9"), React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "Kotlin \u306E\u8A00\u8A9E\u4ED5\u69D8\u3092 Python \u3068\u306E\u5DEE\u5206\u3092\u8EF8\u306B\u4FEF\u77B0\u3057\u307E\u3059\u3002\u9759\u7684\u578B\u4ED8\u3051\u30FBNull\u5B89\u5168\u30FB\u30B3\u30EC\u30AF\u30B7\u30E7\u30F3\u64CD\u4F5C\u30FB\u30B3\u30EB\u30FC\u30C1\u30F3\u3068\u3044\u3063\u305F Kotlin \u306E\u4E3B\u8981\u6A5F\u80FD\u3092\u4E00\u901A\u308A\u89E6\u308A\u3001\u300CAndroid \u3084\u30B5\u30FC\u30D0\u30FC\u30B5\u30A4\u30C9\u3067\u6B21\u306B\u4F55\u3092\u5B66\u3079\u3070\u3088\u3044\u304B\u300D\u306E\u5730\u56F3\u3092\u624B\u306B\u5165\u308C\u308B\u3053\u3068\u304C\u30B4\u30FC\u30EB\u3067\u3059\u3002"), React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map(function(_, i) { return React.createElement("div", {
+    key: i,
+    onClick: function() {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  }); }))), React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("button", {
+    onClick: function() { setMenuOpen(!menuOpen); },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "\u25B2" : "\u25BC")), menuOpen && React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map(function(c, i) { return React.createElement("button", {
+    key: c.id,
+    onClick: function() {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F")); }))), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? " \u30FB \u6F14\u7FD2" + exercises.length + "\u554F" : ""))), chapter.goal && React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"), React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map(function(sec, i) { return React.createElement(Section, {
+    key: ch + "-" + i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }); })), exercises.length > 0 && React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map(function(ex, i) { return React.createElement(Exercise, {
+    key: ch + "-" + i,
+    ex: ex,
+    idx: i
+  }); })), React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? React.createElement("button", {
+    onClick: function() {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? React.createElement("button", {
+    onClick: function() {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : React.createElement("a", {
+    href: "../index.html",
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "Kotlin 2.0 \u30FB JVM 21 \u6E96\u62E0 \u30FB 2026\u5E744\u6708\u6642\u70B9")));
+}
+var root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(KotlinCourse));
+  </script>
+</body>
+</html>
