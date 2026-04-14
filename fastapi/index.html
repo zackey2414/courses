@@ -1,0 +1,2849 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FastAPI 入門コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのFastAPI入門コース。全10章・30問の演習付き。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  frameworkComp: {
+    h: ["項目", "Flask", "Django", "FastAPI"],
+    r: [
+      ["リリース年", "2010", "2005", "2018"],
+      ["サーバ仕様", "WSGI（同期）", "WSGI（同期）", "ASGI（非同期対応）"],
+      ["型ヒント活用", "なし", "なし", "全面的に活用"],
+      ["バリデーション", "手動 or WTForms", "Forms / DRF Serializer", "Pydantic で自動"],
+      ["APIドキュメント", "手動 or Swagger拡張", "DRF + drf-yasg", "自動生成（Swagger UI / ReDoc）"],
+      ["非同期サポート", "限定的", "Django 4.1〜（部分的）", "ネイティブ対応"],
+      ["学習コスト", "低い", "高い（フルスタック）", "中程度"],
+      ["パフォーマンス", "普通", "普通", "高い（Starlette基盤）"]
+    ]
+  },
+  httpMethods: {
+    h: ["メソッド", "用途", "FastAPIデコレータ"],
+    r: [
+      ["GET", "リソースの取得", "@app.get()"],
+      ["POST", "リソースの新規作成", "@app.post()"],
+      ["PUT", "リソースの全体更新", "@app.put()"],
+      ["PATCH", "リソースの部分更新", "@app.patch()"],
+      ["DELETE", "リソースの削除", "@app.delete()"]
+    ]
+  },
+  paramTypes: {
+    h: ["パラメータ種別", "取得元", "FastAPIでの指定方法"],
+    r: [
+      ["パスパラメータ", "URL パス（/items/{id}）", "関数引数名をパスに含める"],
+      ["クエリパラメータ", "URL クエリ文字列（?skip=0）", "関数引数にデフォルト値を付ける"],
+      ["リクエストボディ", "HTTP ボディ（JSON）", "Pydantic モデルを引数型にする"],
+      ["ヘッダー", "HTTP ヘッダー", "Header() を使う"],
+      ["Cookie", "Cookie", "Cookie() を使う"]
+    ]
+  },
+  pydanticField: {
+    h: ["Field パラメータ", "型", "説明"],
+    r: [
+      ["default", "Any", "デフォルト値"],
+      ["default_factory", "Callable", "デフォルト値を返す関数"],
+      ["alias", "str", "JSON キーの別名"],
+      ["title", "str", "OpenAPI 上のフィールド名"],
+      ["description", "str", "OpenAPI 上の説明文"],
+      ["gt / ge / lt / le", "number", "数値の範囲制約"],
+      ["min_length / max_length", "int", "文字列長の制約"],
+      ["pattern", "str", "正規表現パターン"],
+      ["examples", "list", "OpenAPI ドキュメント用サンプル"]
+    ]
+  },
+  statusCodes: {
+    h: ["ステータスコード", "定数名", "用途"],
+    r: [
+      ["200", "HTTP_200_OK", "成功（デフォルト）"],
+      ["201", "HTTP_201_CREATED", "リソース作成成功"],
+      ["204", "HTTP_204_NO_CONTENT", "成功だがレスポンスボディなし"],
+      ["400", "HTTP_400_BAD_REQUEST", "クライアント側のリクエスト不正"],
+      ["401", "HTTP_401_UNAUTHORIZED", "認証が必要"],
+      ["403", "HTTP_403_FORBIDDEN", "認可されていない"],
+      ["404", "HTTP_404_NOT_FOUND", "リソースが見つからない"],
+      ["422", "HTTP_422_UNPROCESSABLE_ENTITY", "バリデーションエラー（FastAPI自動）"],
+      ["500", "HTTP_500_INTERNAL_SERVER_ERROR", "サーバ内部エラー"]
+    ]
+  },
+  dependsScope: {
+    h: ["スコープ", "指定方法", "ライフサイクル"],
+    r: [
+      ["関数単位", "引数に Depends(dep_func)", "リクエストごとに呼ばれる"],
+      ["パスオペレーション単位", "dependencies=[Depends(...)]", "そのエンドポイントで毎回呼ばれる"],
+      ["ルーター単位", "APIRouter(dependencies=[...])", "そのルーター配下で毎回呼ばれる"],
+      ["アプリケーション全体", "FastAPI(dependencies=[...])", "全エンドポイントで毎回呼ばれる"]
+    ]
+  },
+  asyncComp: {
+    h: ["項目", "同期 (def)", "非同期 (async def)"],
+    r: [
+      ["実行モデル", "スレッドプールで実行", "イベントループで実行"],
+      ["I/O 待ち", "スレッドがブロック", "await で他タスクに切替"],
+      ["CPU負荷の高い処理", "適している", "イベントループをブロックするため不向き"],
+      ["DB ドライバ", "psycopg2, pymysql 等", "asyncpg, aiomysql 等"],
+      ["HTTP クライアント", "requests", "httpx (async), aiohttp"],
+      ["スループット", "スレッド数に依存", "高い（数千接続可）"]
+    ]
+  },
+  sqlalchemyComp: {
+    h: ["項目", "SQLAlchemy 1.x", "SQLAlchemy 2.0"],
+    r: [
+      ["クエリ記法", "session.query(Model)", "select(Model)"],
+      ["実行", "暗黙コミット", "session.execute() で明示的"],
+      ["型ヒント", "限定的", "Mapped[type] で完全対応"],
+      ["非同期", "非対応", "AsyncSession 対応"],
+      ["マッピング", "declarative_base()", "DeclarativeBase クラス"]
+    ]
+  },
+  authComp: {
+    h: ["方式", "仕組み", "適用場面"],
+    r: [
+      ["API Key", "ヘッダーやクエリでキーを送信", "内部 API・シンプルな認証"],
+      ["OAuth2 Password", "ユーザー名+パスワードでトークン取得", "自前ユーザー管理"],
+      ["OAuth2 + JWT", "JWT トークンで状態レス認証", "SPA・モバイル向け API"],
+      ["OAuth2 Code Flow", "外部 IdP（Google等）で認証", "ソーシャルログイン"],
+      ["HTTP Basic", "Authorization ヘッダーに Base64", "管理画面・簡易認証"]
+    ]
+  },
+  fileUpload: {
+    h: ["クラス", "用途", "特徴"],
+    r: [
+      ["UploadFile", "ファイルアップロード", "SpooledTemporaryFile ベース。大容量対応。"],
+      ["File(...)", "小さいファイル", "bytes としてメモリに読み込み"],
+      ["Form(...)", "フォームデータ", "application/x-www-form-urlencoded"]
+    ]
+  },
+  testMethods: {
+    h: ["テスト対象", "手法", "ツール"],
+    r: [
+      ["エンドポイント", "TestClient で HTTP リクエスト送信", "pytest + httpx"],
+      ["Pydantic モデル", "直接インスタンス化して検証", "pytest"],
+      ["依存性注入", "app.dependency_overrides で差し替え", "pytest + fixture"],
+      ["DB 連携", "テスト用 DB + トランザクションロールバック", "pytest + SQLAlchemy"],
+      ["非同期", "pytest-asyncio + AsyncClient", "pytest-asyncio"],
+      ["E2E", "Docker Compose で全体テスト", "pytest + docker"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [
+    {
+      diff: 1,
+      q: "FastAPI の最小アプリケーションを作成し、GET / にアクセスすると {\"message\": \"Hello, FastAPI!\"} を返すエンドポイントを実装してください。",
+      code: `# main.py を作成し、uvicorn main:app --reload で起動
+# http://127.0.0.1:8000/ にアクセスして確認`,
+      answer: `from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello, FastAPI!"}`
+    },
+    {
+      diff: 1,
+      q: "上記のアプリに GET /health エンドポイントを追加し、{\"status\": \"ok\"} を返すようにしてください。\nヘルスチェック用途でよく使われるパターンです。",
+      code: `# /health にアクセスすると {"status": "ok"} が返る`,
+      answer: `from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello, FastAPI!"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}`
+    },
+    {
+      diff: 2,
+      q: "FastAPI アプリにタイトル・説明・バージョンを設定し、/docs にアクセスした際に表示されるようにしてください。\n\n【使う知識】FastAPI() のコンストラクタ引数",
+      code: `# タイトル: \"My API\"
+# 説明: \"学習用の FastAPI アプリケーション\"
+# バージョン: \"0.1.0\"`,
+      answer: `from fastapi import FastAPI
+
+app = FastAPI(
+    title="My API",
+    description="学習用の FastAPI アプリケーション",
+    version="0.1.0"
+)
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello, FastAPI!"}`
+    }
+  ],
+  ch2: [
+    {
+      diff: 1,
+      q: "パスパラメータを使って、GET /users/{user_id} にアクセスすると {\"user_id\": 123} のように受け取った ID を返すエンドポイントを作成してください。\nuser_id は int 型で型注釈をつけること。",
+      code: `# GET /users/42 → {"user_id": 42}
+# GET /users/abc → 422 バリデーションエラー`,
+      answer: `from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/users/{user_id}")
+def read_user(user_id: int):
+    return {"user_id": user_id}`
+    },
+    {
+      diff: 2,
+      q: "クエリパラメータを使って、GET /items にページネーション機能を実装してください。\nskip（デフォルト0）と limit（デフォルト10）を受け取り、ダミーデータのスライスを返すこと。",
+      code: `# GET /items?skip=0&limit=5 → 最初の5件
+# GET /items → デフォルトで skip=0, limit=10`,
+      answer: `from fastapi import FastAPI
+
+app = FastAPI()
+
+fake_items = [{"id": i, "name": f"Item {i}"} for i in range(100)]
+
+@app.get("/items")
+def read_items(skip: int = 0, limit: int = 10):
+    return fake_items[skip : skip + limit]`
+    },
+    {
+      diff: 2,
+      q: "パスパラメータとクエリパラメータを組み合わせて、GET /users/{user_id}/items でそのユーザーのアイテム一覧を返すエンドポイントを実装してください。\nクエリパラメータ q（オプション、文字列）で名前フィルタも可能にすること。",
+      code: `# GET /users/1/items → ユーザー1の全アイテム
+# GET /users/1/items?q=book → 名前に"book"を含むアイテム`,
+      answer: `from fastapi import FastAPI
+from typing import Optional
+
+app = FastAPI()
+
+fake_db = {
+    1: [{"name": "book"}, {"name": "pen"}, {"name": "notebook"}],
+    2: [{"name": "laptop"}, {"name": "mouse"}]
+}
+
+@app.get("/users/{user_id}/items")
+def read_user_items(user_id: int, q: Optional[str] = None):
+    items = fake_db.get(user_id, [])
+    if q:
+        items = [item for item in items if q in item["name"]]
+    return items`
+    },
+    {
+      diff: 3,
+      q: "Enum を使ってパスパラメータの値を制限してください。\nGET /models/{model_name} で model_name は \"alexnet\", \"resnet\", \"lenet\" のいずれかのみ受け付けること。",
+      code: `# GET /models/alexnet → {"model_name": "alexnet", ...}
+# GET /models/invalid → 422 エラー`,
+      answer: `from enum import Enum
+from fastapi import FastAPI
+
+class ModelName(str, Enum):
+    alexnet = "alexnet"
+    resnet = "resnet"
+    lenet = "lenet"
+
+app = FastAPI()
+
+@app.get("/models/{model_name}")
+def get_model(model_name: ModelName):
+    messages = {
+        ModelName.alexnet: "Deep Learning FTW!",
+        ModelName.resnet: "LeCun all the images",
+        ModelName.lenet: "Have some residuals",
+    }
+    return {"model_name": model_name, "message": messages[model_name]}`
+    }
+  ],
+  ch3: [
+    {
+      diff: 1,
+      q: "Pydantic の BaseModel を使って、name (str) と price (float) を持つ Item モデルを定義し、POST /items でリクエストボディを受け取って返すエンドポイントを作成してください。",
+      code: `# POST /items に {"name": "Apple", "price": 1.5} を送信
+# → そのまま返却`,
+      answer: `from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Item(BaseModel):
+    name: str
+    price: float
+
+@app.post("/items")
+def create_item(item: Item):
+    return item`
+    },
+    {
+      diff: 2,
+      q: "Field を使ってバリデーション付きの User モデルを定義してください。\n・name: 2文字以上50文字以下\n・age: 0以上150以下\n・email: メールアドレスのパターン\nPOST /users で受け取りバリデーション結果を確認できるようにすること。",
+      code: `# 正常: {"name": "太郎", "age": 25, "email": "taro@example.com"}
+# エラー: {"name": "a", "age": -1, "email": "invalid"}`,
+      answer: `from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class User(BaseModel):
+    name: str = Field(..., min_length=2, max_length=50)
+    age: int = Field(..., ge=0, le=150)
+    email: str = Field(..., pattern=r"^[\\w.-]+@[\\w.-]+\\.\\w+$")
+
+@app.post("/users")
+def create_user(user: User):
+    return {"message": "User created", "user": user}`
+    },
+    {
+      diff: 2,
+      q: "ネストされた Pydantic モデルを定義してください。\nOrder モデルは item (Item) と quantity (int, 1以上) を持ち、total_price を計算する @computed_field を実装すること。",
+      code: `# POST /orders に {"item": {"name": "Apple", "price": 1.5}, "quantity": 3}
+# → {"item": {...}, "quantity": 3, "total_price": 4.5}`,
+      answer: `from fastapi import FastAPI
+from pydantic import BaseModel, Field, computed_field
+
+app = FastAPI()
+
+class Item(BaseModel):
+    name: str
+    price: float = Field(..., gt=0)
+
+class Order(BaseModel):
+    item: Item
+    quantity: int = Field(..., ge=1)
+
+    @computed_field
+    @property
+    def total_price(self) -> float:
+        return self.item.price * self.quantity
+
+@app.post("/orders")
+def create_order(order: Order):
+    return order`
+    }
+  ],
+  ch4: [
+    {
+      diff: 1,
+      q: "response_model を使って、レスポンスから password フィールドを除外してください。\nUserIn（入力）に name, email, password を持たせ、UserOut（出力）には password を含めないこと。",
+      code: `# POST /users に {"name": "太郎", "email": "taro@example.com", "password": "secret"}
+# → {"name": "太郎", "email": "taro@example.com"} (password なし)`,
+      answer: `from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class UserIn(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class UserOut(BaseModel):
+    name: str
+    email: str
+
+@app.post("/users", response_model=UserOut)
+def create_user(user: UserIn):
+    # 実際にはここで DB 保存
+    return user`
+    },
+    {
+      diff: 2,
+      q: "HTTPException を使って、存在しないアイテムへのアクセスで 404 エラーを返すエンドポイントを実装してください。\nまた、カスタムの detail メッセージも含めること。",
+      code: `# GET /items/1 → {"id": 1, "name": "Apple"} (存在する場合)
+# GET /items/999 → 404 {"detail": "Item with id 999 not found"}`,
+      answer: `from fastapi import FastAPI, HTTPException
+
+app = FastAPI()
+
+items_db = {1: {"id": 1, "name": "Apple"}, 2: {"id": 2, "name": "Banana"}}
+
+@app.get("/items/{item_id}")
+def read_item(item_id: int):
+    if item_id not in items_db:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Item with id {item_id} not found"
+        )
+    return items_db[item_id]`
+    },
+    {
+      diff: 3,
+      q: "status_code パラメータと response_model を組み合わせた CRUD API を実装してください。\n・POST /items → 201 Created で作成\n・GET /items/{id} → 200 OK で取得\n・DELETE /items/{id} → 204 No Content で削除\n存在しない ID には 404 を返すこと。",
+      code: `# POST /items → 201
+# GET /items/1 → 200
+# DELETE /items/1 → 204
+# GET /items/999 → 404`,
+      answer: `from fastapi import FastAPI, HTTPException, Response, status
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class ItemCreate(BaseModel):
+    name: str
+    price: float
+
+class ItemOut(BaseModel):
+    id: int
+    name: str
+    price: float
+
+db: dict[int, dict] = {}
+counter = 0
+
+@app.post("/items", response_model=ItemOut, status_code=status.HTTP_201_CREATED)
+def create_item(item: ItemCreate):
+    global counter
+    counter += 1
+    db[counter] = {"id": counter, **item.model_dump()}
+    return db[counter]
+
+@app.get("/items/{item_id}", response_model=ItemOut)
+def read_item(item_id: int):
+    if item_id not in db:
+        raise HTTPException(status_code=404, detail="Not found")
+    return db[item_id]
+
+@app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_item(item_id: int):
+    if item_id not in db:
+        raise HTTPException(status_code=404, detail="Not found")
+    del db[item_id]`
+    }
+  ],
+  ch5: [
+    {
+      diff: 1,
+      q: "Depends を使って共通のページネーションパラメータを抽出する依存関数を作成してください。\n複数のエンドポイントで同じ skip/limit ロジックを再利用できるようにすること。",
+      code: `# GET /items?skip=10&limit=5
+# GET /users?skip=0&limit=20
+# どちらも同じページネーションロジックを使う`,
+      answer: `from fastapi import FastAPI, Depends
+
+app = FastAPI()
+
+def common_pagination(skip: int = 0, limit: int = 10):
+    return {"skip": skip, "limit": limit}
+
+fake_items = [f"item_{i}" for i in range(100)]
+fake_users = [f"user_{i}" for i in range(50)]
+
+@app.get("/items")
+def read_items(pagination: dict = Depends(common_pagination)):
+    s, l = pagination["skip"], pagination["limit"]
+    return fake_items[s : s + l]
+
+@app.get("/users")
+def read_users(pagination: dict = Depends(common_pagination)):
+    s, l = pagination["skip"], pagination["limit"]
+    return fake_users[s : s + l]`
+    },
+    {
+      diff: 2,
+      q: "依存性の連鎖（サブ依存性）を実装してください。\nget_db → get_repository → get_service のように3段階の依存関係を作り、各段階でログ出力してライフサイクルを確認すること。",
+      code: `# GET /items → get_db → get_repository → get_service の順で呼ばれる`,
+      answer: `from fastapi import FastAPI, Depends
+
+app = FastAPI()
+
+def get_db():
+    print("DB接続を取得")
+    return {"db": "connected"}
+
+def get_repository(db: dict = Depends(get_db)):
+    print("リポジトリを初期化")
+    return {"repo": "initialized", **db}
+
+def get_service(repo: dict = Depends(get_repository)):
+    print("サービスを初期化")
+    return {"service": "ready", **repo}
+
+@app.get("/items")
+def read_items(service: dict = Depends(get_service)):
+    return {"message": "Items fetched", "context": service}`
+    },
+    {
+      diff: 3,
+      q: "yield を使った依存関数で、リクエスト処理の前後でリソースの取得・解放を行うパターンを実装してください。\nデータベースセッションの開始・コミット/ロールバック・クローズを模擬すること。",
+      code: `# リクエスト時: セッション開始 → 処理 → コミット → クローズ
+# エラー時: セッション開始 → 処理 → ロールバック → クローズ`,
+      answer: `from fastapi import FastAPI, Depends, HTTPException
+
+app = FastAPI()
+
+class FakeSession:
+    def __init__(self):
+        print("Session: 開始")
+    def commit(self):
+        print("Session: コミット")
+    def rollback(self):
+        print("Session: ロールバック")
+    def close(self):
+        print("Session: クローズ")
+
+def get_session():
+    session = FakeSession()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+@app.get("/items")
+def read_items(session: FakeSession = Depends(get_session)):
+    return {"message": "Items fetched"}
+
+@app.get("/error")
+def trigger_error(session: FakeSession = Depends(get_session)):
+    raise HTTPException(status_code=500, detail="Something went wrong")`
+    }
+  ],
+  ch6: [
+    {
+      diff: 1,
+      q: "同期関数 (def) と非同期関数 (async def) の両方でエンドポイントを作成し、それぞれの動作を確認してください。\n同期版は time.sleep、非同期版は asyncio.sleep を使うこと。",
+      code: `# GET /sync → 1秒待ってからレスポンス
+# GET /async → 1秒待ってからレスポンス（非同期）`,
+      answer: `import time
+import asyncio
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/sync")
+def sync_endpoint():
+    time.sleep(1)
+    return {"message": "sync done"}
+
+@app.get("/async")
+async def async_endpoint():
+    await asyncio.sleep(1)
+    return {"message": "async done"}`
+    },
+    {
+      diff: 2,
+      q: "BackgroundTasks を使って、メール送信を模擬するバックグラウンドタスクを実装してください。\nエンドポイントは即座にレスポンスを返し、バックグラウンドでタスクが実行されること。",
+      code: `# POST /send-notification?email=user@example.com
+# → 即座に {"message": "Notification will be sent"} を返す
+# → バックグラウンドで送信処理が実行される`,
+      answer: `import time
+from fastapi import FastAPI, BackgroundTasks
+
+app = FastAPI()
+
+def send_email(email: str, message: str):
+    # メール送信を模擬（実際は SMTP 等）
+    time.sleep(3)
+    print(f"Email sent to {email}: {message}")
+
+@app.post("/send-notification")
+async def send_notification(
+    email: str,
+    background_tasks: BackgroundTasks
+):
+    background_tasks.add_task(send_email, email, "Welcome!")
+    return {"message": "Notification will be sent"}`
+    },
+    {
+      diff: 3,
+      q: "httpx の AsyncClient を使って、外部 API を非同期で呼び出すエンドポイントを実装してください。\n複数の外部 API を asyncio.gather で並列呼び出しして結果を集約すること。",
+      code: `# GET /aggregate → 3つの外部APIを並列呼び出し → 結果をまとめて返す`,
+      answer: `import asyncio
+import httpx
+from fastapi import FastAPI
+
+app = FastAPI()
+
+async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
+    response = await client.get(url)
+    return {"url": url, "status": response.status_code}
+
+@app.get("/aggregate")
+async def aggregate():
+    urls = [
+        "https://httpbin.org/get",
+        "https://httpbin.org/ip",
+        "https://httpbin.org/user-agent",
+    ]
+    async with httpx.AsyncClient() as client:
+        tasks = [fetch_url(client, url) for url in urls]
+        results = await asyncio.gather(*tasks)
+    return {"results": results}`
+    }
+  ],
+  ch7: [
+    {
+      diff: 2,
+      q: "SQLAlchemy 2.0 スタイルでモデルを定義し、FastAPI と連携する最小構成を作成してください。\nUser テーブル（id, name, email）を定義し、CRUD エンドポイントを実装すること。\n（SQLite をインメモリで使用）",
+      code: `# POST /users → ユーザー作成
+# GET /users → ユーザー一覧
+# GET /users/{id} → ユーザー取得`,
+      answer: `from fastapi import FastAPI, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import create_engine, String
+from sqlalchemy.orm import (
+    DeclarativeBase, Mapped, mapped_column,
+    Session, sessionmaker
+)
+
+# --- DB設定 ---
+engine = create_engine("sqlite:///./test.db", echo=True)
+SessionLocal = sessionmaker(bind=engine)
+
+class Base(DeclarativeBase):
+    pass
+
+class UserModel(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(50))
+    email: Mapped[str] = mapped_column(String(100), unique=True)
+
+Base.metadata.create_all(bind=engine)
+
+# --- Pydantic ---
+class UserCreate(BaseModel):
+    name: str
+    email: str
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+    email: str
+    model_config = {"from_attributes": True}
+
+# --- FastAPI ---
+app = FastAPI()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@app.post("/users", response_model=UserOut, status_code=201)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = UserModel(**user.model_dump())
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+@app.get("/users", response_model=list[UserOut])
+def read_users(db: Session = Depends(get_db)):
+    return db.query(UserModel).all()
+
+@app.get("/users/{user_id}", response_model=UserOut)
+def read_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.get(UserModel, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user`
+    },
+    {
+      diff: 3,
+      q: "Alembic を使ったマイグレーション設定の手順を示してください。\n以下のコマンドとファイル構成を書くこと。\n1. Alembic の初期化\n2. env.py の設定\n3. マイグレーションファイルの自動生成\n4. マイグレーションの適用",
+      code: `# Alembic のセットアップから初回マイグレーションまでの手順`,
+      answer: `# 1. Alembic の初期化
+# pip install alembic
+# alembic init alembic
+
+# 2. alembic/env.py の設定
+# --- env.py (抜粋) ---
+# from app.database import Base
+# target_metadata = Base.metadata
+#
+# config = context.config
+# config.set_main_option(
+#     "sqlalchemy.url",
+#     "sqlite:///./test.db"
+# )
+
+# 3. マイグレーションファイルの自動生成
+# alembic revision --autogenerate -m "create users table"
+
+# 4. マイグレーションの適用
+# alembic upgrade head
+
+# 5. 確認
+# alembic history       # マイグレーション履歴
+# alembic current       # 現在のリビジョン
+# alembic downgrade -1  # 1つ戻す`
+    },
+    {
+      diff: 3,
+      q: "非同期セッション（AsyncSession）を使った DB 連携を実装してください。\naiosqlite を使い、async def のエンドポイントから非同期でクエリを実行すること。",
+      code: `# async def でDB操作を行う最小構成`,
+      answer: `from fastapi import FastAPI, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import String, select
+from sqlalchemy.ext.asyncio import (
+    AsyncSession, async_sessionmaker, create_async_engine
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+# --- 非同期DB設定 ---
+engine = create_async_engine("sqlite+aiosqlite:///./async_test.db")
+async_session = async_sessionmaker(engine, class_=AsyncSession)
+
+class Base(DeclarativeBase):
+    pass
+
+class ItemModel(Base):
+    __tablename__ = "items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+
+class ItemCreate(BaseModel):
+    name: str
+
+class ItemOut(BaseModel):
+    id: int
+    name: str
+    model_config = {"from_attributes": True}
+
+app = FastAPI()
+
+@app.on_event("startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+async def get_db():
+    async with async_session() as session:
+        yield session
+
+@app.post("/items", response_model=ItemOut, status_code=201)
+async def create_item(item: ItemCreate, db: AsyncSession = Depends(get_db)):
+    db_item = ItemModel(**item.model_dump())
+    db.add(db_item)
+    await db.commit()
+    await db.refresh(db_item)
+    return db_item
+
+@app.get("/items", response_model=list[ItemOut])
+async def read_items(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ItemModel))
+    return result.scalars().all()`
+    }
+  ],
+  ch8: [
+    {
+      diff: 2,
+      q: "OAuth2PasswordBearer と JWT を使った認証フローを実装してください。\n・POST /token でユーザー名・パスワードを受け取り JWT を発行\n・GET /users/me で現在のユーザー情報を返す（トークン必須）",
+      code: `# POST /token → {"access_token": "...", "token_type": "bearer"}
+# GET /users/me (Authorization: Bearer ...) → {"username": "..."}`,
+      answer: `from datetime import datetime, timedelta, timezone
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic import BaseModel
+import jwt
+
+SECRET_KEY = "your-secret-key"
+ALGORITHM = "HS256"
+
+app = FastAPI()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+fake_users = {
+    "testuser": {"username": "testuser", "password": "testpass"}
+}
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+def create_access_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = fake_users.get(username)
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+@app.post("/token", response_model=Token)
+def login(form: OAuth2PasswordRequestForm = Depends()):
+    user = fake_users.get(form.username)
+    if not user or user["password"] != form.password:
+        raise HTTPException(status_code=401, detail="Incorrect credentials")
+    token = create_access_token(data={"sub": form.username})
+    return {"access_token": token, "token_type": "bearer"}
+
+@app.get("/users/me")
+def read_users_me(user: dict = Depends(get_current_user)):
+    return {"username": user["username"]}`
+    },
+    {
+      diff: 2,
+      q: "パスワードのハッシュ化を実装してください。\npasslib の bcrypt を使い、パスワードの保存時にハッシュ化、認証時にベリファイを行うこと。",
+      code: `# パスワードを平文で保存せず、bcrypt でハッシュ化する`,
+      answer: `from passlib.context import CryptContext
+from pydantic import BaseModel
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+class UserInDB(BaseModel):
+    username: str
+    hashed_password: str
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+# 使用例
+hashed = hash_password("mypassword")
+print(f"Hashed: {hashed}")
+print(f"Verify: {verify_password('mypassword', hashed)}")
+print(f"Wrong:  {verify_password('wrong', hashed)}")`
+    },
+    {
+      diff: 3,
+      q: "ロールベースのアクセス制御（RBAC）を Depends で実装してください。\n・admin ロールのみアクセス可能なエンドポイント\n・user ロール以上でアクセス可能なエンドポイント\nを作り分けること。",
+      code: `# GET /admin/dashboard → admin のみ
+# GET /profile → user 以上（user, admin）`,
+      answer: `from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from enum import Enum
+
+app = FastAPI()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+class Role(str, Enum):
+    user = "user"
+    admin = "admin"
+
+fake_tokens = {
+    "admin-token": {"username": "admin", "role": Role.admin},
+    "user-token": {"username": "user1", "role": Role.user},
+}
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    user = fake_tokens.get(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return user
+
+def require_role(*roles: Role):
+    def checker(user: dict = Depends(get_current_user)):
+        if user["role"] not in roles:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return user
+    return checker
+
+@app.get("/admin/dashboard")
+def admin_dashboard(user: dict = Depends(require_role(Role.admin))):
+    return {"message": "Admin dashboard", "user": user["username"]}
+
+@app.get("/profile")
+def profile(user: dict = Depends(require_role(Role.user, Role.admin))):
+    return {"message": "Profile", "user": user["username"]}`
+    }
+  ],
+  ch9: [
+    {
+      diff: 1,
+      q: "UploadFile を使ったファイルアップロードのエンドポイントを実装してください。\nファイル名・サイズ・Content-Type を返すこと。",
+      code: `# POST /upload にファイルをアップロード
+# → {"filename": "test.txt", "size": 1234, "content_type": "text/plain"}`,
+      answer: `from fastapi import FastAPI, UploadFile
+
+app = FastAPI()
+
+@app.post("/upload")
+async def upload_file(file: UploadFile):
+    contents = await file.read()
+    return {
+        "filename": file.filename,
+        "size": len(contents),
+        "content_type": file.content_type,
+    }`
+    },
+    {
+      diff: 2,
+      q: "複数ファイルのアップロードと、ファイルサイズ制限（5MB以下）を実装してください。\n制限を超えた場合は 413 エラーを返すこと。",
+      code: `# POST /upload-multiple にファイルを複数アップロード
+# → 各ファイルの情報をリストで返す
+# → 5MB超のファイルは413エラー`,
+      answer: `from fastapi import FastAPI, UploadFile, HTTPException
+
+app = FastAPI()
+
+MAX_SIZE = 5 * 1024 * 1024  # 5MB
+
+@app.post("/upload-multiple")
+async def upload_files(files: list[UploadFile]):
+    results = []
+    for file in files:
+        contents = await file.read()
+        if len(contents) > MAX_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"{file.filename} exceeds 5MB limit"
+            )
+        results.append({
+            "filename": file.filename,
+            "size": len(contents),
+        })
+    return results`
+    },
+    {
+      diff: 3,
+      q: "WebSocket を使ったリアルタイムチャットのエンドポイントを実装してください。\n接続管理クラスを作り、複数クライアントへのブロードキャストを可能にすること。",
+      code: `# ws://localhost:8000/ws/{client_id} で接続
+# メッセージ送信 → 全接続クライアントにブロードキャスト`,
+      answer: `from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
+app = FastAPI()
+
+class ConnectionManager:
+    def __init__(self):
+        self.active: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active:
+            await connection.send_text(message)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await manager.broadcast(f"{client_id}: {data}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        await manager.broadcast(f"{client_id} left the chat")`
+    }
+  ],
+  ch10: [
+    {
+      diff: 1,
+      q: "TestClient を使って、GET / エンドポイントの動作をテストしてください。\nステータスコードとレスポンスボディの両方を検証すること。",
+      code: `# pytest で実行: pytest test_main.py`,
+      answer: `from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello"}
+
+# --- テスト ---
+client = TestClient(app)
+
+def test_read_root():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Hello"}
+
+def test_not_found():
+    response = client.get("/nonexistent")
+    assert response.status_code == 404`
+    },
+    {
+      diff: 2,
+      q: "dependency_overrides を使って、DB 依存をモックに差し替えたテストを書いてください。\n実際の DB に接続せずにエンドポイントをテストすること。",
+      code: `# テスト時だけ get_db をモックに差し替える`,
+      answer: `from fastapi import FastAPI, Depends
+from fastapi.testclient import TestClient
+
+app = FastAPI()
+
+def get_db():
+    return {"real": "database"}
+
+@app.get("/items")
+def read_items(db: dict = Depends(get_db)):
+    return {"db_type": db.get("real", db.get("mock", "unknown"))}
+
+# --- テスト ---
+def override_get_db():
+    return {"mock": "database"}
+
+app.dependency_overrides[get_db] = override_get_db
+client = TestClient(app)
+
+def test_read_items_with_mock():
+    response = client.get("/items")
+    assert response.status_code == 200
+    assert response.json() == {"db_type": "database"}
+
+# テスト後にクリア
+app.dependency_overrides.clear()`
+    },
+    {
+      diff: 3,
+      q: "POST / GET / DELETE を含む CRUD API の統合テストを書いてください。\nテストの順序に依存しない設計（各テストが独立）にすること。",
+      code: `# 作成 → 取得 → 削除 の流れをテスト
+# 各テストが独立して動作すること`,
+      answer: `from fastapi import FastAPI, HTTPException, status
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class ItemCreate(BaseModel):
+    name: str
+
+db: dict[int, dict] = {}
+counter = 0
+
+@app.post("/items", status_code=201)
+def create_item(item: ItemCreate):
+    global counter
+    counter += 1
+    db[counter] = {"id": counter, "name": item.name}
+    return db[counter]
+
+@app.get("/items/{item_id}")
+def read_item(item_id: int):
+    if item_id not in db:
+        raise HTTPException(status_code=404)
+    return db[item_id]
+
+@app.delete("/items/{item_id}", status_code=204)
+def delete_item(item_id: int):
+    if item_id not in db:
+        raise HTTPException(status_code=404)
+    del db[item_id]
+
+# --- テスト ---
+client = TestClient(app)
+
+def test_create_and_read():
+    # 作成
+    res = client.post("/items", json={"name": "Apple"})
+    assert res.status_code == 201
+    item_id = res.json()["id"]
+    # 取得
+    res = client.get(f"/items/{item_id}")
+    assert res.status_code == 200
+    assert res.json()["name"] == "Apple"
+
+def test_delete():
+    # 作成 → 削除 → 再取得で404
+    res = client.post("/items", json={"name": "Temp"})
+    item_id = res.json()["id"]
+    res = client.delete(f"/items/{item_id}")
+    assert res.status_code == 204
+    res = client.get(f"/items/{item_id}")
+    assert res.status_code == 404
+
+def test_not_found():
+    res = client.get("/items/99999")
+    assert res.status_code == 404`
+    }
+  ]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "FastAPIの設計思想と環境構築",
+  est: "40分",
+  goal: "FastAPI がなぜ「モダンで高速な Python Web フレームワーク」と呼ばれるのか、ASGI・Starlette 基盤・型ヒント駆動という 3 つの柱から理解する。Flask や Django との位置づけの違いを自分の言葉で説明でき、手元に開発環境を用意して最初の Hello World API を起動・確認できる状態がゴール。",
+  sections: [{
+    title: "FastAPI とは何か",
+    body: "FastAPI は 2018 年に Sebastián Ramírez 氏がリリースした Python の Web フレームワークです。名前の通り「速い API 開発」を標榜しており、その速さには 2 つの意味があります。1 つは開発速度（型ヒントを書くだけでバリデーションとドキュメント生成が自動化される）、もう 1 つは実行速度（ASGI + Starlette 基盤で Node.js や Go に匹敵するスループットを出す）です。\n\nPython の Web フレームワークと言えば Flask と Django が二大巨頭ですが、どちらも WSGI（同期）ベースで設計されており、非同期 I/O への対応は後付けです。FastAPI は最初から ASGI（非同期対応のサーバインタフェース）を前提に設計されているため、WebSocket や HTTP/2、大量の同時接続を自然に扱えます。\n\nもう 1 つの大きな特徴は、Python 3.5 以降で導入された型ヒント（type hints）を全面的に活用している点です。関数の引数に int や str といった型注釈を付けるだけで、FastAPI がリクエストパラメータの型変換・バリデーション・OpenAPI ドキュメント生成を自動的に行います。Flask では手動で request.args.get() してバリデーションも自分で書く必要がありましたが、FastAPI ではその大部分が不要になります。",
+    table: T.frameworkComp,
+    afterTable: "Flask は軽量でシンプル、Django はフルスタックで管理画面まで付属、FastAPI は API 開発に特化して型安全性と速度を両立、という位置づけです。REST API を構築するなら FastAPI がもっとも開発効率が高い選択肢と言えます。"
+  }, {
+    title: "ASGI と Starlette",
+    body: "ASGI（Asynchronous Server Gateway Interface）は、WSGI の非同期版にあたるインタフェース仕様です。WSGI は 1 リクエスト = 1 スレッドで処理するため、I/O 待ちが多い API では効率が悪くなります。ASGI は async/await をネイティブに扱えるため、1 プロセスで数千の同時接続をさばくことが可能です。\n\nFastAPI は内部で Starlette というマイクロフレームワークをベースに構築されています。ルーティング、ミドルウェア、WebSocket、静的ファイル配信といった低レイヤーの機能は全て Starlette が担当し、FastAPI はその上に型ヒント駆動のバリデーション、依存性注入、自動ドキュメント生成を載せています。\n\nこの二層構造のおかげで、パフォーマンスは Starlette 直書きとほぼ同等でありながら、開発者は宣言的で読みやすいコードを書けます。Flask で言えば Werkzeug が裏方を担当しているのと同じ関係です。",
+    code: `# ASGI アプリケーションの最小構造（参考）
+# FastAPI はこれを内部で自動構築している
+async def app(scope, receive, send):
+    # scope: リクエスト情報
+    # receive: リクエストボディ受信
+    # send: レスポンス送信
+    pass
+
+# 実際には Uvicorn がこの ASGI アプリを起動する
+# uvicorn main:app --reload`,
+    afterCode: "ポイント: Uvicorn は ASGI サーバの実装で、FastAPI アプリを実行するために使います。Flask での flask run や Django での manage.py runserver に相当します。--reload オプションを付けるとファイル変更時に自動再起動します。"
+  }, {
+    title: "環境構築",
+    body: "FastAPI の環境構築は pip だけで完結します。venv で仮想環境を作り、fastapi と uvicorn をインストールすれば準備完了です。Django のような startproject コマンドや設定ファイルの生成は不要で、Python ファイル 1 つから始められるのが FastAPI のシンプルさです。\n\n開発時には uvicorn main:app --reload で起動し、http://127.0.0.1:8000/docs にアクセスすると自動生成された Swagger UI が表示されます。ここからブラウザ上でエンドポイントを試せるため、curl や Postman を使わなくても動作確認ができます。\n\nPython 3.10 以上を推奨します。型ヒント構文が簡潔になり、match 文なども使えるためです。",
+    code: `# 仮想環境の作成と有効化
+python -m venv venv
+source venv/bin/activate    # Windows: venv\\Scripts\\activate
+
+# FastAPI と Uvicorn のインストール
+pip install "fastapi[standard]"
+
+# 最小限のアプリケーション (main.py)
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello, FastAPI!"}
+
+# 起動
+# uvicorn main:app --reload`,
+    afterCode: "起動したら以下の URL にアクセスしてみましょう:\n・http://127.0.0.1:8000/ → JSON レスポンス確認\n・http://127.0.0.1:8000/docs → Swagger UI（対話的ドキュメント）\n・http://127.0.0.1:8000/redoc → ReDoc（見やすいドキュメント）"
+  }, {
+    title: "型ヒント駆動開発",
+    body: "FastAPI の最大の革新は「型ヒントを書くだけで 3 つのことが同時に起きる」点です。第一にリクエストパラメータの自動パース（文字列 '42' を int の 42 に変換）、第二にバリデーション（型が合わなければ 422 エラーを自動返却）、第三に OpenAPI ドキュメントの自動生成です。\n\nFlask では request.args.get('id') で取得して int() で変換し、ValueError をキャッチして 400 を返す、というコードを手動で書く必要がありました。Django REST Framework では Serializer クラスを別途定義する必要がありました。FastAPI では関数引数に item_id: int と書くだけで、これら全てが自動化されます。\n\nこの設計は「同じ情報を二度書かない（DRY）」原則の徹底であり、コードがそのままドキュメントになるという理想に近づいています。型ヒントは IDE の補完とも連携するため、開発体験が非常に良いのも大きな魅力です。",
+    code: `from fastapi import FastAPI
+
+app = FastAPI()
+
+# 型ヒントだけで自動パース + バリデーション + ドキュメント生成
+@app.get("/items/{item_id}")
+def read_item(item_id: int, q: str | None = None):
+    return {"item_id": item_id, "q": q}
+
+# Flask で同じことをする場合（比較）
+# @app.route("/items/<item_id>")
+# def read_item(item_id):
+#     try:
+#         item_id = int(item_id)
+#     except ValueError:
+#         abort(400)
+#     q = request.args.get("q")
+#     return jsonify({"item_id": item_id, "q": q})`,
+    afterCode: "ミニ演習: item_id を str のまま渡したら何が起きるか確認してみましょう。/docs の Swagger UI から試すと、422 Unprocessable Entity とともにどのパラメータが不正だったかが JSON で返ります。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "最初のAPIエンドポイント",
+  est: "50分",
+  goal: "HTTP メソッド（GET/POST/PUT/DELETE）の使い分けを理解し、パスパラメータ・クエリパラメータ・リクエストボディの 3 つのデータ受け取り方法をコードで書き分けられるようになる。Flask / Django との記法の違いを把握し、型ヒントによるバリデーションの恩恵を体感することがゴール。",
+  sections: [{
+    title: "HTTP メソッドとルーティング",
+    body: "REST API の基本は HTTP メソッドの使い分けです。リソースの取得には GET、作成には POST、全体更新には PUT、部分更新には PATCH、削除には DELETE を使います。FastAPI ではこの 5 つのメソッドそれぞれに対応するデコレータが用意されています。\n\nFlask では @app.route('/items', methods=['GET', 'POST']) のように 1 つのルートに複数メソッドを割り当てることが多いですが、FastAPI では @app.get('/items') と @app.post('/items') を別々に定義します。メソッドごとに関数が分かれるため、各処理の責務が明確になり、OpenAPI ドキュメントにも正しく反映されます。\n\nDjango REST Framework の ViewSet が class ベースでメソッドをまとめるのに対し、FastAPI は関数ベースで 1 エンドポイント 1 関数という原則を取ります。シンプルな API ではこちらのほうが見通しが良くなります。",
+    table: T.httpMethods,
+    code: `from fastapi import FastAPI
+
+app = FastAPI()
+
+items = {}
+
+@app.get("/items")
+def list_items():
+    return list(items.values())
+
+@app.post("/items")
+def create_item(name: str, price: float):
+    item_id = len(items) + 1
+    items[item_id] = {"id": item_id, "name": name, "price": price}
+    return items[item_id]
+
+@app.put("/items/{item_id}")
+def update_item(item_id: int, name: str, price: float):
+    items[item_id] = {"id": item_id, "name": name, "price": price}
+    return items[item_id]
+
+@app.delete("/items/{item_id}")
+def delete_item(item_id: int):
+    del items[item_id]
+    return {"message": "deleted"}`,
+    afterCode: "ポイント: FastAPI のデコレータ名がそのまま HTTP メソッド名になっているので、コードを見るだけでどのメソッドかが一目瞭然です。"
+  }, {
+    title: "パスパラメータ",
+    body: "パスパラメータは URL の一部としてデータを受け取る方法です。/users/{user_id} のように波括弧で囲んだ部分が引数名と対応します。FastAPI では関数の引数名がパスの変数名と一致していれば自動的にバインドされ、型注釈に従って変換・バリデーションが行われます。\n\nFlask では @app.route('/users/<int:user_id>') のように型指定を明示する必要がありましたが、FastAPI では Python 標準の型ヒントだけで済みます。型が合わない値（例: /users/abc に int を期待している場合）は 422 エラーとして自動的に拒否されるため、手動のバリデーションコードが不要です。\n\n複数のパスパラメータを組み合わせることも可能で、/users/{user_id}/items/{item_id} のように階層的なリソース構造を表現できます。",
+    code: `from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/users/{user_id}")
+def read_user(user_id: int):
+    return {"user_id": user_id}
+
+# 複数パスパラメータ
+@app.get("/users/{user_id}/items/{item_id}")
+def read_user_item(user_id: int, item_id: int):
+    return {"user_id": user_id, "item_id": item_id}
+
+# 順序に注意: 固定パスを先に定義する
+@app.get("/users/me")       # ← 先に定義
+def read_current_user():
+    return {"user": "current"}
+
+@app.get("/users/{user_id}")  # ← 後に定義
+def read_user_by_id(user_id: int):
+    return {"user_id": user_id}`,
+    afterCode: "注意: /users/me と /users/{user_id} のように固定パスと変数パスが競合する場合、固定パスを先に定義する必要があります。そうしないと me が user_id として解釈されてしまいます。"
+  }, {
+    title: "クエリパラメータ",
+    body: "クエリパラメータは URL の ? 以降に付くパラメータで、/items?skip=0&limit=10 のような形式です。FastAPI ではパスに含まれない関数引数が自動的にクエリパラメータとして扱われます。デフォルト値を設定すれば省略可能になり、Optional を使えば None も許容されます。\n\nFlask では request.args.get('skip', default=0, type=int) と書く必要があり、型変換・デフォルト値・None チェックを手動で行う必要がありました。FastAPI では関数シグネチャだけで全てが表現され、Swagger UI にもパラメータの型・デフォルト値・必須/任意の区別が自動的に反映されます。\n\nクエリパラメータは主に一覧取得時のフィルタリング・ソート・ページネーションに使われます。RESTful 設計では、リソースの識別にはパスパラメータ、オプショナルな修飾にはクエリパラメータ、という使い分けが定石です。",
+    table: T.paramTypes,
+    code: `from fastapi import FastAPI, Query
+
+app = FastAPI()
+
+@app.get("/items")
+def read_items(
+    skip: int = 0,
+    limit: int = Query(default=10, le=100),  # 最大100件
+    q: str | None = None
+):
+    results = {"skip": skip, "limit": limit}
+    if q:
+        results["q"] = q
+    return results
+
+# Query() でバリデーションを追加
+@app.get("/search")
+def search(
+    keyword: str = Query(..., min_length=1, max_length=50),
+    page: int = Query(default=1, ge=1)
+):
+    return {"keyword": keyword, "page": page}`,
+    afterCode: "ポイント: Query(...) の ... は「必須」を意味します。デフォルト値を設定しない場合はクエリパラメータが必須になり、省略すると 422 エラーが返ります。Query(default=10) のように明示的に書くほうが可読性は高くなります。"
+  }, {
+    title: "リクエストボディ",
+    body: "POST や PUT でクライアントからデータを送る場合、リクエストボディを使います。FastAPI では Pydantic モデルを引数の型として指定するだけで、JSON ボディの自動パース・バリデーションが行われます（Pydantic の詳細は次章で解説します）。\n\nFlask では request.get_json() で辞書を取得し、各フィールドの存在チェックと型チェックを手動で行うのが一般的でした。Django REST Framework では Serializer クラスを定義する必要がありました。FastAPI では Pydantic モデルの定義が入力バリデーション・ドキュメント生成・コード補完の全てを兼ねるため、情報の重複がありません。\n\nパスパラメータ・クエリパラメータ・リクエストボディは 1 つのエンドポイントで同時に使えます。FastAPI は引数の型と位置から自動的にどこからデータを取るかを判定します。",
+    code: `from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Item(BaseModel):
+    name: str
+    price: float
+    description: str | None = None
+
+# ボディ + パスパラメータ + クエリパラメータの組み合わせ
+@app.put("/items/{item_id}")
+def update_item(
+    item_id: int,           # パスパラメータ
+    item: Item,              # リクエストボディ（Pydantic モデル）
+    importance: int = 0      # クエリパラメータ
+):
+    return {
+        "item_id": item_id,
+        "item": item,
+        "importance": importance
+    }`,
+    afterCode: "判定ルール: パスに含まれる名前 → パスパラメータ。Pydantic モデル型 → リクエストボディ。それ以外 → クエリパラメータ。このルールさえ覚えれば混乱しません。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "Pydanticモデルとバリデーション",
+  est: "60分",
+  goal: "FastAPI のバリデーション基盤である Pydantic v2 の BaseModel を自在に使いこなせるようになる。Field によるフィールド制約、model_validator によるモデル全体のバリデーション、ネストされたモデル構造の定義、そして入力用・出力用モデルの使い分けまでを習得するのがゴール。",
+  sections: [{
+    title: "Pydantic の役割",
+    body: "Pydantic は Python の型ヒントを使ってデータの検証と変換を行うライブラリです。FastAPI はこの Pydantic を全面的に採用しており、リクエストボディの解析、レスポンスの整形、設定ファイルの読み込みなど、あらゆる場面でデータバリデーションの基盤として機能しています。\n\nFlask ではリクエストの JSON を辞書として受け取った後、各フィールドの存在チェック・型チェック・範囲チェックを手動で書く必要がありました。marshmallow や cerberus といったバリデーションライブラリを追加で導入する開発者も多いですが、それでも「スキーマ定義」「バリデーション」「ドキュメント」が分散しがちでした。Pydantic はこの 3 つを 1 つのクラス定義に集約します。\n\nPydantic v2（2023 年リリース）は Rust で書かれたコアエンジンを持ち、v1 比で 5〜50 倍の高速化を実現しています。FastAPI 0.100 以降は Pydantic v2 をネイティブサポートしており、本コースでも v2 の記法を使います。",
+    code: `from pydantic import BaseModel, Field
+
+class User(BaseModel):
+    name: str
+    age: int
+    email: str | None = None
+
+# 自動バリデーション
+user = User(name="太郎", age=25)         # OK
+# user = User(name="太郎", age="abc")    # ValidationError
+
+# 辞書から生成
+user = User.model_validate({"name": "太郎", "age": 25})
+
+# JSON 文字列から生成
+user = User.model_validate_json('{"name": "太郎", "age": 25}')
+
+# 辞書・JSON への変換
+print(user.model_dump())       # {"name": "太郎", "age": 25, "email": None}
+print(user.model_dump_json())  # '{"name":"太郎","age":25,"email":null}'`,
+    afterCode: "ポイント: model_dump() は Pydantic v2 のメソッドです。v1 では .dict() / .json() でしたが、v2 で名前が変わりました。ネット上の古い記事に注意してください。"
+  }, {
+    title: "Field によるバリデーション",
+    body: "Field() を使うと、各フィールドに対して詳細なバリデーションルールを宣言的に定義できます。数値の範囲（gt, ge, lt, le）、文字列の長さ（min_length, max_length）、正規表現パターン（pattern）、デフォルト値、OpenAPI 上の説明文などを 1 行で指定できます。\n\nFlask + marshmallow の場合、Schema クラスの中で Length(min=2, max=50) や Range(min=0) のようにバリデータを記述しますが、Pydantic では Python の型注釈に統合されているため、IDE の補完が効き、読みやすさも格段に上です。\n\nField の第 1 引数に ... を渡すと「必須フィールド」、default=値 を渡すと「省略可能でデフォルト値あり」という意味になります。None を許容するには型を str | None にして default=None とします。",
+    table: T.pydanticField,
+    code: `from pydantic import BaseModel, Field
+
+class Product(BaseModel):
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="商品名"
+    )
+    price: float = Field(
+        ...,
+        gt=0,
+        description="価格（0より大きい）"
+    )
+    quantity: int = Field(
+        default=0,
+        ge=0,
+        description="在庫数"
+    )
+    category: str = Field(
+        default="general",
+        pattern=r"^[a-z]+$",
+        description="カテゴリ（小文字英字のみ）"
+    )`,
+    afterCode: "ミニ演習: price に -100 を、category に 'ABC'（大文字）を渡すと、それぞれどんな ValidationError が出るか確認してみましょう。エラーメッセージにはどのフィールドのどのルールに違反したかが明示されます。"
+  }, {
+    title: "model_validator とカスタムバリデーション",
+    body: "個々のフィールドの制約を超えて「フィールド間の関係」を検証したい場合は、model_validator を使います。たとえば「開始日が終了日より前であること」や「パスワードと確認パスワードが一致すること」といった複合条件です。\n\nPydantic v2 では @model_validator(mode='before') と @model_validator(mode='after') の 2 つのタイミングがあります。before はデータが Pydantic モデルに変換される前（つまり dict 段階）、after は全フィールドのバリデーションが通った後に実行されます。ほとんどの場合は after を使います。\n\n個別のフィールド単位のバリデーションには @field_validator を使います。こちらは特定の 1 フィールドに対するカスタムルールを書く場合に使います。",
+    code: `from pydantic import BaseModel, model_validator, field_validator
+
+class DateRange(BaseModel):
+    start_date: str
+    end_date: str
+
+    @model_validator(mode="after")
+    def check_dates(self):
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be before end_date")
+        return self
+
+class Username(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_contain_spaces(cls, v: str) -> str:
+        if " " in v:
+            raise ValueError("name must not contain spaces")
+        return v.strip()`,
+    afterCode: "ポイント: field_validator は classmethod として定義し、引数 v にそのフィールドの値が渡されます。戻り値がそのまま最終的な値になるので、strip() のような正規化処理も可能です。"
+  }, {
+    title: "ネストされたモデル",
+    body: "実際の API では、JSON の構造がフラットであることは稀です。ユーザーの中に住所があり、住所の中に都道府県がある、というようなネスト構造が一般的です。Pydantic ではモデルの中にモデルを入れることで、任意の深さのネストを表現できます。\n\nネストされたモデルもバリデーションは再帰的に適用されるため、内側のモデルのルール違反はエラーメッセージに「どの階層のどのフィールドか」がパス形式（address.city など）で示されます。これにより、フロントエンド側でどのフォームフィールドにエラーを表示すべきかが一目で分かります。\n\nリストや辞書との組み合わせも自然に書けます。list[Item] と書けば Item のリストとして検証され、各要素に対して Item のバリデーションが走ります。",
+    code: `from pydantic import BaseModel, Field
+
+class Address(BaseModel):
+    prefecture: str
+    city: str
+    street: str | None = None
+
+class User(BaseModel):
+    name: str
+    age: int = Field(..., ge=0)
+    address: Address                # ネスト
+    tags: list[str] = []            # リスト
+    scores: dict[str, int] = {}     # 辞書
+
+# 使用例
+user = User(
+    name="太郎",
+    age=25,
+    address={"prefecture": "東京都", "city": "渋谷区"},
+    tags=["python", "fastapi"],
+    scores={"math": 90, "english": 85}
+)`,
+    afterCode: "ポイント: address に辞書を渡しても Pydantic が自動的に Address モデルに変換してくれます。これは「コアシング（型強制）」と呼ばれる機能で、JSON のようなシリアライズ済みデータとの親和性が高い設計です。"
+  }, {
+    title: "入力モデルと出力モデルの分離",
+    body: "実務では「入力時に受け取るフィールド」と「出力時に返すフィールド」が異なることがほとんどです。たとえばユーザー作成時にはパスワードを受け取りますが、レスポンスにパスワードを含めてはいけません。また、id は DB が自動生成するため入力には不要ですが出力には必要です。\n\nFastAPI ではこの問題を「モデルの継承」で解決するのが定番です。共通フィールドを持つ Base クラスを定義し、入力用（Create）と出力用（Out / Response）で必要なフィールドだけを追加・除外します。Django REST Framework の Serializer でも同様のパターンがありますが、Pydantic のほうが Python の型システムとの統合が深く、IDE サポートも強力です。\n\nPydantic v2 では model_config で from_attributes = True を指定すると、SQLAlchemy のモデルオブジェクトを直接 Pydantic モデルに変換できます（ORM モード）。これにより、DB のモデルと API のレスポンスモデルの変換がシームレスになります。",
+    code: `from pydantic import BaseModel
+
+class UserBase(BaseModel):
+    name: str
+    email: str
+
+class UserCreate(UserBase):
+    password: str              # 入力時のみ
+
+class UserOut(UserBase):
+    id: int                    # 出力時のみ
+    model_config = {"from_attributes": True}
+
+# class UserUpdate(BaseModel):
+#     name: str | None = None  # 全フィールド Optional（部分更新用）
+#     email: str | None = None`,
+    afterCode: "ポイント: from_attributes = True を設定すると、user_out = UserOut.model_validate(db_user) のように SQLAlchemy の ORM オブジェクトから直接変換できます。db_user.name のような属性アクセスが自動的にフィールドにマッピングされます。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "レスポンスモデルとステータスコード",
+  est: "45分",
+  goal: "response_model でレスポンスの形状を制御し、不要なフィールド（パスワード等）の漏洩を防ぐ方法を習得する。HTTP ステータスコードの正しい使い分けと、HTTPException による明示的なエラー返却、カスタム例外ハンドラの定義までを一通り書けるようになるのがゴール。",
+  sections: [{
+    title: "response_model",
+    body: "FastAPI のデコレータには response_model パラメータを指定でき、レスポンス JSON のフィルタリングとバリデーションを自動化できます。関数が返す値が response_model に合致しないフィールドを持っていた場合、そのフィールドは自動的に除外されます。\n\nこの仕組みが特に重要なのはセキュリティの観点です。たとえば ORM からユーザーオブジェクトを取得すると hashed_password フィールドが含まれていますが、response_model に UserOut（password フィールドなし）を指定しておけば、実装者がうっかり return user しても パスワードが漏洩することはありません。\n\nFlask ではこのフィルタリングを手動で行う（辞書から不要なキーを pop する、Marshmallow で dump する等）必要がありましたが、FastAPI では宣言的に解決できます。Django REST Framework の Serializer と似た役割ですが、response_model はデコレータ引数として外から指定するため、関数の本体をシンプルに保てます。",
+    code: `from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class UserIn(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class UserOut(BaseModel):
+    name: str
+    email: str
+
+@app.post("/users", response_model=UserOut)
+def create_user(user: UserIn):
+    # user には password が含まれているが、
+    # response_model=UserOut により自動的に除外される
+    return user
+
+# response_model_exclude_unset=True で未設定フィールドを除外
+@app.get("/items/{id}", response_model_exclude_unset=True)
+def read_item(id: int):
+    return {"id": id, "name": "Apple"}  # price が未設定なら含めない`,
+    afterCode: "ポイント: response_model はレスポンスのバリデーションも行います。関数が返した値が response_model の型に合わない場合は 500 Internal Server Error になります。これはバグの早期発見に役立ちます。"
+  }, {
+    title: "ステータスコード",
+    body: "HTTP ステータスコードは API のクライアントに「リクエストがどう処理されたか」を伝える重要な手段です。FastAPI ではデコレータの status_code パラメータで正常系のステータスコードを指定します。\n\nデフォルトは 200 OK ですが、リソース作成時は 201 Created、削除成功時は 204 No Content を返すのが RESTful の慣例です。Flask でも make_response() でステータスコードを指定できましたが、FastAPI のほうがデコレータレベルで宣言的に書けるため、エンドポイントの仕様が一目で分かります。\n\nfastapi.status モジュールには HTTP_201_CREATED のような定数が用意されており、マジックナンバーを避けてコードの可読性を上げられます。これらの定数は starlette.status からの再エクスポートで、Starlette と同じものです。",
+    table: T.statusCodes,
+    code: `from fastapi import FastAPI, status
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Item(BaseModel):
+    name: str
+    price: float
+
+@app.post("/items", status_code=status.HTTP_201_CREATED)
+def create_item(item: Item):
+    return {"id": 1, **item.model_dump()}
+
+@app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_item(item_id: int):
+    # 204 の場合、レスポンスボディは返さない
+    pass`,
+    afterCode: "ポイント: 204 No Content のエンドポイントでは関数の戻り値が無視されます。return で何か返しても実際のレスポンスボディは空になります。"
+  }, {
+    title: "HTTPException",
+    body: "エラー時にはステータスコードとエラーメッセージを含むレスポンスを返す必要があります。FastAPI では HTTPException を raise するだけで、指定したステータスコードとメッセージが JSON レスポンスとして返されます。\n\nFlask では abort(404) や jsonify + make_response で手動構築していましたが、FastAPI の HTTPException は Python の例外機構に乗っているため、処理の途中で即座に脱出できます。ネストされた関数呼び出しの深いところからでも raise 一発でエラーレスポンスを返せるのは大きな利点です。\n\nheaders パラメータで追加の HTTP ヘッダー（WWW-Authenticate など）を付けることもでき、認証エラーの標準的なレスポンス形式に対応しています。",
+    code: `from fastapi import FastAPI, HTTPException, status
+
+app = FastAPI()
+
+items_db = {1: {"id": 1, "name": "Apple"}}
+
+@app.get("/items/{item_id}")
+def read_item(item_id: int):
+    if item_id not in items_db:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item {item_id} not found",
+            headers={"X-Error": "Item not found"}  # カスタムヘッダー
+        )
+    return items_db[item_id]`,
+    afterCode: "detail にはテキストだけでなく辞書やリストも渡せます。例: detail={\"error\": \"not_found\", \"item_id\": 42}。フロントエンド側でプログラム的にエラー種別を判定したい場合に便利です。"
+  }, {
+    title: "カスタム例外ハンドラ",
+    body: "アプリケーション固有の例外クラスを定義し、それに対応するハンドラを登録することで、エラーレスポンスの形式を統一できます。@app.exception_handler() デコレータで例外クラスとハンドラ関数を紐付けます。\n\nこのパターンは Flask の @app.errorhandler() や Django の EXCEPTION_HANDLER 設定に相当します。実務では「全ての API エラーを統一フォーマットで返す」という要件が多く、カスタム例外ハンドラはほぼ必須のテクニックです。\n\nRequestValidationError（Pydantic のバリデーションエラー）のハンドラを上書きすることで、デフォルトの 422 レスポンスのフォーマットをカスタマイズすることも可能です。",
+    code: `from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+
+app = FastAPI()
+
+# カスタム例外クラス
+class ItemNotFoundError(Exception):
+    def __init__(self, item_id: int):
+        self.item_id = item_id
+
+# 例外ハンドラの登録
+@app.exception_handler(ItemNotFoundError)
+async def item_not_found_handler(request: Request, exc: ItemNotFoundError):
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": "ITEM_NOT_FOUND",
+            "detail": f"Item {exc.item_id} does not exist",
+            "path": str(request.url)
+        }
+    )
+
+# バリデーションエラーのカスタマイズ
+@app.exception_handler(RequestValidationError)
+async def validation_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "VALIDATION_ERROR",
+            "detail": exc.errors()
+        }
+    )
+
+@app.get("/items/{item_id}")
+def read_item(item_id: int):
+    raise ItemNotFoundError(item_id=item_id)`,
+    afterCode: "ポイント: 例外ハンドラは async def で定義します。Request オブジェクトからリクエストの URL やメソッドなどの情報を取得でき、エラーログに含めるのに便利です。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "依存性注入",
+  est: "55分",
+  goal: "FastAPI の依存性注入（DI）システムを理解し、Depends() を使って共通ロジック（認証・DB 接続・ページネーション等）をエンドポイントから分離できるようになる。サブ依存性（依存の連鎖）、yield を使ったリソース管理、スコープ制御まで実装できるのがゴール。",
+  sections: [{
+    title: "依存性注入とは",
+    body: "依存性注入（Dependency Injection, DI）は「関数が必要とするもの（依存）を外部から渡す」設計パターンです。FastAPI では Depends() を使ってこれを宣言的に実現します。\n\nたとえば「全てのエンドポイントで認証チェックを行いたい」場合、各関数に認証コードをコピーペーストするのではなく、認証ロジックを 1 つの依存関数に切り出し、Depends() で注入します。Flask ではデコレータ（@login_required）や before_request フックで実現していましたが、FastAPI の DI はテスト時にモック差し替えが容易という点で優れています。\n\nDjango REST Framework にも permission_classes や authentication_classes による DI 的な仕組みがありますが、FastAPI の Depends() はより汎用的で、認証に限らずあらゆる「共通処理」を注入できます。DB セッションの取得、設定値の読み込み、レートリミット、ログ出力など、用途は無限です。",
+    code: `from fastapi import FastAPI, Depends
+
+app = FastAPI()
+
+# 依存関数: 共通のページネーションパラメータ
+def pagination(skip: int = 0, limit: int = 10):
+    return {"skip": skip, "limit": limit}
+
+# Depends() で注入
+@app.get("/items")
+def read_items(paging: dict = Depends(pagination)):
+    return {"pagination": paging}
+
+@app.get("/users")
+def read_users(paging: dict = Depends(pagination)):
+    return {"pagination": paging}`,
+    afterCode: "ポイント: 依存関数もクエリパラメータを持てます。pagination 関数の skip と limit は自動的にクエリパラメータとして Swagger UI に表示されます。"
+  }, {
+    title: "依存性のスコープ",
+    body: "Depends() は関数引数だけでなく、パスオペレーション・ルーター・アプリケーション全体にも適用できます。スコープが広いほど多くのエンドポイントに影響し、狭いほど局所的な適用になります。\n\n実務では「認証はアプリ全体」「ログ出力はルーター単位」「DB トランザクションは関数単位」のように、目的に応じてスコープを使い分けます。Flask の before_request（アプリ全体）と個別デコレータ（関数単位）の使い分けに相当しますが、FastAPI のほうが階層が明確です。\n\nルーター単位の依存性は APIRouter の dependencies パラメータに指定します。たとえば管理者用ルーターに認証チェックを付ければ、そのルーター配下の全エンドポイントで認証が必須になります。",
+    table: T.dependsScope,
+    code: `from fastapi import FastAPI, Depends, APIRouter
+
+def verify_token():
+    # トークン検証ロジック
+    pass
+
+def log_request():
+    print("Request received")
+
+# アプリ全体に適用
+app = FastAPI(dependencies=[Depends(verify_token)])
+
+# ルーター単位に適用
+admin_router = APIRouter(
+    prefix="/admin",
+    dependencies=[Depends(log_request)]
+)
+
+# パスオペレーション単位に適用
+@app.get("/special", dependencies=[Depends(log_request)])
+def special_endpoint():
+    return {"message": "special"}`,
+    afterCode: "ポイント: dependencies=[...] で指定した依存関数の戻り値はエンドポイント関数には渡されません。副作用（認証チェック、ログ出力など）だけが目的の場合にこの形式を使います。"
+  }, {
+    title: "サブ依存性（依存の連鎖）",
+    body: "依存関数の中でさらに別の依存関数を Depends() で要求できます。これをサブ依存性と呼び、A → B → C のような依存の連鎖を宣言的に構築できます。\n\nたとえば「DB セッション → リポジトリ → サービス」という三層構造は、get_db → get_repository(db=Depends(get_db)) → get_service(repo=Depends(get_repository)) のように書けます。各層がそれぞれの関心に集中でき、テスト時には任意の層をモックに差し替えられます。\n\nFastAPI は依存グラフを解析し、同じ依存関数が複数回参照されている場合はリクエストごとに 1 回だけ実行してキャッシュします（use_cache=True がデフォルト）。これにより DB セッションが複数回作られるといった問題が自動的に防がれます。",
+    code: `from fastapi import FastAPI, Depends
+
+app = FastAPI()
+
+def get_db():
+    return {"type": "database"}
+
+def get_repository(db: dict = Depends(get_db)):
+    return {"repo": True, "db": db}
+
+def get_service(repo: dict = Depends(get_repository)):
+    return {"service": True, "repo": repo}
+
+@app.get("/items")
+def read_items(service: dict = Depends(get_service)):
+    # service には get_service → get_repository → get_db の結果が含まれる
+    return service`,
+    afterCode: "ポイント: use_cache=False を指定すると、同じ依存関数でもリクエスト内で毎回新しく呼ばれます。通常はデフォルトのキャッシュで十分ですが、呼び出しごとに異なる結果を返したい場合に使います。"
+  }, {
+    title: "yield を使った依存関数",
+    body: "yield を使った依存関数は、リクエスト処理の前後でリソースの取得・解放を行う強力なパターンです。yield の前がセットアップ（リソース取得）、yield の後がティアダウン（リソース解放）に対応します。\n\nこれは Python の contextmanager と同じ発想で、DB セッションのオープン/クローズ、ファイルのオープン/クローズ、ロックの取得/解放などに使います。Flask では @app.teardown_appcontext で後処理を登録する必要がありましたが、FastAPI では yield 1 つで前処理と後処理をまとめて書けます。\n\nエラーが発生した場合でも finally ブロックが実行されるため、リソースリークの心配がありません。try / except / finally と組み合わせることで、正常時はコミット・エラー時はロールバック・最後にクローズ、という DB トランザクション管理の定番パターンが簡潔に書けます。",
+    code: `from fastapi import FastAPI, Depends
+
+app = FastAPI()
+
+# yield を使った依存関数
+def get_db():
+    db = {"connection": "open"}
+    print("DB接続を開始")
+    try:
+        yield db                  # ← ここでリクエスト処理が走る
+    finally:
+        print("DB接続をクローズ")  # ← リクエスト処理後に必ず実行
+
+@app.get("/items")
+def read_items(db: dict = Depends(get_db)):
+    return {"items": [], "db_status": db["connection"]}`,
+    afterCode: "ポイント: yield は 1 回だけ使えます。yield の前がリクエスト処理前、yield の後がリクエスト処理後に対応します。async def と async yield も使えます。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "非同期処理",
+  est: "55分",
+  goal: "FastAPI における async/await の使い方と、同期処理との使い分けを理解する。イベントループの仕組み、BackgroundTasks による非同期タスク、httpx を使った非同期 HTTP クライアントの実装まで書けるようになるのがゴール。",
+  sections: [{
+    title: "async def と def の違い",
+    body: "FastAPI では async def と def の両方でエンドポイントを定義できます。async def の場合はイベントループ上で実行され、await で I/O 待ちの間に他のリクエストを処理できます。def の場合は外部のスレッドプールで実行され、従来の同期的なコードがそのまま動きます。\n\nFlask は基本的に全て同期で、非同期にしたい場合は Celery などの外部タスクキューを使うのが一般的でした。Django も 4.1 から async view をサポートしましたが、ORM が同期のままなど制約が多い状態です。FastAPI は ASGI ネイティブなので、非同期の恩恵をフルに受けられます。\n\n重要な注意点として、async def の中で time.sleep() や requests.get() のようなブロッキング処理を呼ぶと、イベントループ全体が止まってしまいます。非同期エンドポイントでは必ず asyncio.sleep() や httpx.AsyncClient を使うようにしましょう。",
+    table: T.asyncComp,
+    code: `import asyncio
+import time
+from fastapi import FastAPI
+
+app = FastAPI()
+
+# 同期: スレッドプールで実行される
+@app.get("/sync")
+def sync_endpoint():
+    time.sleep(1)  # OK: スレッドプールなのでブロックしない
+    return {"type": "sync"}
+
+# 非同期: イベントループで実行される
+@app.get("/async")
+async def async_endpoint():
+    await asyncio.sleep(1)  # OK: await で他のリクエストに切り替え
+    return {"type": "async"}
+
+# NG: async def 内で同期ブロッキング
+# @app.get("/bad")
+# async def bad_endpoint():
+#     time.sleep(1)  # ❌ イベントループ全体がブロック！
+#     return {"type": "bad"}`,
+    afterCode: "判断基準: 非同期ライブラリ（asyncpg, httpx, aiofiles 等）を使うなら async def。同期ライブラリ（psycopg2, requests, open 等）を使うなら def。迷ったら def のほうが安全です。"
+  }, {
+    title: "BackgroundTasks",
+    body: "エンドポイントの処理は完了したいが、時間のかかるタスク（メール送信、ログ書き込み、画像リサイズなど）は後回しにしたい、という場面で BackgroundTasks を使います。レスポンスはすぐに返し、タスクはバックグラウンドで非同期に実行されます。\n\nFlask では Celery + Redis を別途セットアップする必要がありましたが、FastAPI の BackgroundTasks は外部依存なしで使えます。ただし、プロセスが終了するとタスクも消えるため、信頼性が求められるタスク（課金処理など）には Celery や AWS SQS のような本格的なタスクキューを使うべきです。\n\nBackgroundTasks は依存性注入にも対応しており、Depends() で取得した DB セッションをバックグラウンドタスクに渡すことも可能です（ただしセッションの寿命に注意）。",
+    code: `from fastapi import FastAPI, BackgroundTasks
+import time
+
+app = FastAPI()
+
+def write_log(message: str):
+    time.sleep(2)  # 重い処理を模擬
+    with open("log.txt", "a") as f:
+        f.write(f"{message}\\n")
+
+@app.post("/items")
+def create_item(name: str, background_tasks: BackgroundTasks):
+    # バックグラウンドで実行（レスポンスは即座に返る）
+    background_tasks.add_task(write_log, f"Item created: {name}")
+    return {"name": name, "status": "created"}
+
+# 複数のタスクを追加
+@app.post("/notifications")
+async def send_notifications(background_tasks: BackgroundTasks):
+    background_tasks.add_task(write_log, "Email sent")
+    background_tasks.add_task(write_log, "Push notification sent")
+    return {"message": "Notifications queued"}`,
+    afterCode: "ポイント: BackgroundTasks は add_task で複数のタスクを追加でき、順番に実行されます。並列実行が必要な場合は asyncio.gather を使うか、Celery を検討してください。"
+  }, {
+    title: "非同期 HTTP クライアント",
+    body: "外部 API を呼び出す場面は実務で頻繁にあります。同期の requests ライブラリは async def 内で使えないため、FastAPI と相性の良い httpx を使います。httpx は requests とほぼ同じ API を持ちつつ、async/await に対応しています。\n\nFlask + requests の組み合わせでは、外部 API の応答を待つ間にスレッドが占有されてしまいます。FastAPI + httpx なら await で待っている間に別のリクエストを処理でき、スループットが大幅に向上します。\n\n特に asyncio.gather を使えば、複数の外部 API を同時に呼び出して結果を集約する「ファンアウト」パターンが簡潔に書けます。3 つの API を順番に呼ぶと 3 秒かかる処理が、並列呼び出しなら約 1 秒で完了します。",
+    code: `import httpx
+import asyncio
+from fastapi import FastAPI
+
+app = FastAPI()
+
+# 単一の外部API呼び出し
+@app.get("/proxy")
+async def proxy():
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://httpbin.org/get")
+        return response.json()
+
+# 複数APIの並列呼び出し（ファンアウト）
+@app.get("/aggregate")
+async def aggregate():
+    async with httpx.AsyncClient() as client:
+        results = await asyncio.gather(
+            client.get("https://httpbin.org/get"),
+            client.get("https://httpbin.org/ip"),
+            client.get("https://httpbin.org/user-agent"),
+        )
+    return {
+        "results": [r.json() for r in results]
+    }`,
+    afterCode: "ポイント: httpx.AsyncClient はコンテキストマネージャ（async with）で使い、リクエスト後に接続を確実にクローズします。アプリ起動時に 1 つのクライアントを作って使い回すとコネクションプーリングの恩恵を受けられます。"
+  }, {
+    title: "ライフスパンイベント",
+    body: "アプリケーションの起動時・終了時に実行したい処理（DB 接続プールの初期化、キャッシュのウォームアップ、リソースの解放など）は lifespan パラメータで定義します。\n\nFastAPI の旧バージョンでは @app.on_event('startup') / @app.on_event('shutdown') が使われていましたが、現在は lifespan コンテキストマネージャが推奨されています。yield の前が起動時処理、yield の後が終了時処理に対応し、依存関数の yield パターンと同じ考え方です。\n\nFlask では before_first_request や atexit モジュールで類似のことができましたが、async に対応しておらず、リソース管理の信頼性にも課題がありました。FastAPI の lifespan は async 対応で、確実にクリーンアップが実行されます。",
+    code: `from contextlib import asynccontextmanager
+from fastapi import FastAPI
+import httpx
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 起動時の処理
+    app.state.http_client = httpx.AsyncClient()
+    print("HTTP client initialized")
+    yield
+    # 終了時の処理
+    await app.state.http_client.aclose()
+    print("HTTP client closed")
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/external")
+async def call_external():
+    client = app.state.http_client
+    response = await client.get("https://httpbin.org/get")
+    return response.json()`,
+    afterCode: "ポイント: app.state は FastAPI アプリケーション全体で共有される状態オブジェクトです。lifespan で初期化したリソースをここに保存しておけば、エンドポイントからアクセスできます。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "データベース連携",
+  est: "65分",
+  goal: "SQLAlchemy 2.0 の宣言的マッピングを使って DB モデルを定義し、FastAPI の依存性注入と組み合わせた CRUD API を構築できるようになる。同期セッションと非同期セッション（AsyncSession）の使い分け、Alembic によるマイグレーション管理の基本を理解するのがゴール。",
+  sections: [{
+    title: "SQLAlchemy 2.0 の基本",
+    body: "SQLAlchemy は Python で最も広く使われている ORM（Object-Relational Mapper）です。バージョン 2.0 で大きなリニューアルがあり、型ヒントとの統合が深まりました。FastAPI と組み合わせる場合、SQLAlchemy 2.0 の宣言的マッピング（Mapped[type]）を使うのが現在のベストプラクティスです。\n\nDjango ORM は Django に密結合しており、Django 以外のフレームワークでは使えません。SQLAlchemy はフレームワーク非依存なので、Flask でも FastAPI でも同じ書き方が通用します。クエリの記法も session.query(Model)（1.x スタイル）から select(Model)（2.0 スタイル）に変わり、より SQL に近い宣言的な記述が可能になりました。\n\nFastAPI は SQLAlchemy を同梱していないため、pip install sqlalchemy で別途インストールが必要です。DB ドライバもデータベースに応じて選択します（PostgreSQL なら psycopg2 や asyncpg、SQLite なら標準ライブラリ）。",
+    table: T.sqlalchemyComp,
+    code: `from sqlalchemy import create_engine, String
+from sqlalchemy.orm import (
+    DeclarativeBase, Mapped, mapped_column, sessionmaker
+)
+
+# エンジン作成
+engine = create_engine("sqlite:///./app.db", echo=True)
+SessionLocal = sessionmaker(bind=engine)
+
+# Base クラス（2.0 スタイル）
+class Base(DeclarativeBase):
+    pass
+
+# モデル定義
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(50))
+    email: Mapped[str] = mapped_column(String(100), unique=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+# テーブル作成
+Base.metadata.create_all(bind=engine)`,
+    afterCode: "ポイント: Mapped[int] は SQLAlchemy 2.0 の型ヒント統合です。IDE が型を正しく推論できるようになり、user.name の型が str であることをエディタが知っています。1.x の Column(String(50)) よりも格段に型安全です。"
+  }, {
+    title: "FastAPI との統合",
+    body: "SQLAlchemy のセッション管理を FastAPI の依存性注入に載せるのが定番パターンです。get_db() という依存関数を定義し、リクエストごとにセッションを作成・yield・クローズします。\n\nこのパターンのメリットは 3 つあります。第一に、各エンドポイントが DB の接続管理を意識しなくてよい。第二に、テスト時に get_db をモックに差し替えてインメモリ DB を使える。第三に、yield + finally でセッションのクローズが確実に実行される。\n\nFlask では g オブジェクトにセッションを保存し、@app.teardown_appcontext でクローズする方法が一般的でしたが、FastAPI の Depends + yield のほうが明示的でテストしやすい設計です。",
+    code: `from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+
+app = FastAPI()
+
+# 依存関数: セッション管理
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Pydantic モデル
+class UserCreate(BaseModel):
+    name: str
+    email: str
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+    email: str
+    model_config = {"from_attributes": True}
+
+# エンドポイント
+@app.post("/users", response_model=UserOut, status_code=201)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = User(**user.model_dump())
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+@app.get("/users", response_model=list[UserOut])
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return db.query(User).offset(skip).limit(limit).all()`,
+    afterCode: "ポイント: model_config = {\"from_attributes\": True} を設定すると、SQLAlchemy のモデルオブジェクトを Pydantic モデルに直接変換できます。db_user.name のような属性アクセスが自動的にフィールドにマッピングされます。"
+  }, {
+    title: "非同期セッション（AsyncSession）",
+    body: "高トラフィックな API では、DB の I/O 待ちの間に他のリクエストを処理できる非同期セッションが有効です。SQLAlchemy 2.0 は AsyncSession をネイティブサポートしており、asyncpg（PostgreSQL）や aiosqlite（SQLite）と組み合わせて使います。\n\n非同期セッションを使う場合、エンドポイントは async def で定義し、DB 操作には await を付けます。select() 文を session.execute() で実行し、結果を scalars().all() で取得するのが 2.0 スタイルです。\n\n同期セッションとの使い分けは、アプリケーションの負荷特性に依存します。同時接続数が少ないなら同期で十分ですが、数百〜数千の同時接続をさばく必要があるなら非同期が必須です。",
+    code: `from sqlalchemy.ext.asyncio import (
+    AsyncSession, async_sessionmaker, create_async_engine
+)
+from sqlalchemy import select
+
+# 非同期エンジン
+async_engine = create_async_engine("sqlite+aiosqlite:///./app.db")
+async_session = async_sessionmaker(async_engine, class_=AsyncSession)
+
+# 依存関数
+async def get_async_db():
+    async with async_session() as session:
+        yield session
+
+# エンドポイント
+@app.get("/users", response_model=list[UserOut])
+async def read_users(db: AsyncSession = Depends(get_async_db)):
+    result = await db.execute(select(User).offset(0).limit(100))
+    return result.scalars().all()
+
+@app.post("/users", response_model=UserOut, status_code=201)
+async def create_user(user: UserCreate, db: AsyncSession = Depends(get_async_db)):
+    db_user = User(**user.model_dump())
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+    return db_user`,
+    afterCode: "ポイント: 非同期エンジンの URL は sqlite+aiosqlite:// や postgresql+asyncpg:// のように、非同期ドライバを明示します。通常の sqlite:// は同期専用です。"
+  }, {
+    title: "Alembic によるマイグレーション",
+    body: "開発が進むにつれてモデルのフィールドが増えたりテーブルが追加されたりします。その都度 DB を手動で ALTER TABLE するのは現実的ではないため、マイグレーションツールで変更を管理します。SQLAlchemy と組み合わせるなら Alembic が標準的な選択肢です。\n\nDjango には makemigrations / migrate が組み込まれていますが、Flask + SQLAlchemy では Flask-Migrate（Alembic のラッパー）を使います。FastAPI でも Alembic を直接使うのが一般的で、Flask-Migrate のようなラッパーは不要です。\n\nAlembic はモデル定義と実際の DB スキーマの差分を検出し、マイグレーションファイルを自動生成します。このファイルには upgrade()（適用）と downgrade()（巻き戻し）の両方が含まれるため、安全にスキーマを変更・ロールバックできます。",
+    code: `# Alembic のセットアップ手順
+# 1. インストール
+# pip install alembic
+
+# 2. 初期化（alembic/ ディレクトリが生成される）
+# alembic init alembic
+
+# 3. alembic.ini の sqlalchemy.url を設定
+# sqlalchemy.url = sqlite:///./app.db
+
+# 4. alembic/env.py で Base.metadata を設定
+# from app.models import Base
+# target_metadata = Base.metadata
+
+# 5. マイグレーション生成
+# alembic revision --autogenerate -m "create users table"
+
+# 6. マイグレーション適用
+# alembic upgrade head
+
+# 7. 履歴確認
+# alembic history
+# alembic current`,
+    afterCode: "注意: --autogenerate は万能ではありません。カラム名の変更やデータの移行は自動検出できないため、生成されたマイグレーションファイルを必ず目視で確認してください。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "認証・認可",
+  est: "60分",
+  goal: "FastAPI のセキュリティユーティリティ（OAuth2PasswordBearer, SecurityScopes 等）を使って、JWT ベースの認証フローを実装できるようになる。パスワードのハッシュ化、トークンの発行・検証、ロールベースのアクセス制御まで一通り書けるのがゴール。",
+  sections: [{
+    title: "認証方式の概要",
+    body: "Web API の認証方式には複数の選択肢があり、用途に応じて使い分けます。最もシンプルなのは API Key 方式で、ヘッダーやクエリにキーを含めて送信します。SPA やモバイルアプリ向けには OAuth2 + JWT が標準的で、トークンベースの状態レス認証を実現します。\n\nFastAPI は fastapi.security モジュールに OAuth2PasswordBearer, OAuth2AuthorizationCodeBearer, HTTPBasic, APIKeyHeader などのセキュリティスキームを用意しています。これらは単にリクエストからトークンや資格情報を抽出するだけで、検証ロジックは開発者が書きます。\n\nFlask では Flask-Login や Flask-JWT-Extended、Django では Django REST Framework の認証バックエンドが使われますが、FastAPI のアプローチはより低レベルで透過的です。フレームワークが「どうやって認証するか」を強制せず、ビルディングブロックだけを提供する設計思想です。",
+    table: T.authComp,
+    afterTable: "本コースでは最も実用的な OAuth2 + JWT 方式を詳しく解説します。API Key は内部 API 向け、HTTP Basic は管理画面向けと使い分けるのが実務的です。"
+  }, {
+    title: "OAuth2 + JWT の実装",
+    body: "OAuth2PasswordBearer は「ログインフォームでユーザー名とパスワードを受け取り、JWT トークンを発行する」フローの入り口です。tokenUrl パラメータにトークン取得用のエンドポイントを指定すると、Swagger UI にログインフォームが自動生成されます。\n\nJWT（JSON Web Token）はヘッダー・ペイロード・署名の 3 部分で構成される URL セーフなトークンです。サーバは秘密鍵で署名を検証するだけでユーザーを特定でき、DB にセッション情報を保存する必要がありません（状態レス）。PyJWT ライブラリで簡単にエンコード・デコードできます。\n\nDjango REST Framework の TokenAuthentication はトークンを DB に保存しますが、JWT はサーバサイドに保存不要なのが利点です。一方で、発行済みの JWT を無効化するにはブラックリスト機構を別途用意する必要があるというトレードオフがあります。",
+    code: `from datetime import datetime, timedelta, timezone
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+import jwt
+
+SECRET_KEY = "your-secret-key-change-in-production"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+app = FastAPI()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def create_access_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+@app.post("/token")
+def login(form: OAuth2PasswordRequestForm = Depends()):
+    # 実際には DB からユーザーを検索してパスワード検証
+    if form.username != "admin" or form.password != "secret":
+        raise HTTPException(status_code=401, detail="Incorrect credentials")
+    token = create_access_token(data={"sub": form.username})
+    return {"access_token": token, "token_type": "bearer"}`,
+    afterCode: "ポイント: OAuth2PasswordRequestForm は application/x-www-form-urlencoded 形式でデータを受け取ります。JSON ではなくフォームデータです。これは OAuth2 仕様に準拠した動作です。"
+  }, {
+    title: "パスワードのハッシュ化",
+    body: "パスワードを平文で DB に保存するのは重大なセキュリティリスクです。必ずハッシュ化して保存し、認証時にはハッシュ値を照合します。Python では passlib ライブラリの bcrypt アルゴリズムが広く使われています。\n\nbcrypt はソルト（ランダムな付加値）を自動的に生成するため、同じパスワードでも毎回異なるハッシュ値が生成されます。これによりレインボーテーブル攻撃（事前計算した辞書を使って逆引きする攻撃）を防ぎます。\n\nDjango は PBKDF2 をデフォルトのハッシュアルゴリズムとして採用していますが、bcrypt のほうが GPU 攻撃への耐性が高いとされています。FastAPI は特定のハッシュアルゴリズムを強制しないため、要件に応じて argon2（最新の推奨）や scrypt を選ぶこともできます。",
+    code: `from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+# ユーザー作成時
+hashed = hash_password("user_password")
+# → "$2b$12$LJ3m4ys..." のようなハッシュ文字列
+
+# 認証時
+is_valid = verify_password("user_password", hashed)
+# → True`,
+    afterCode: "ポイント: ハッシュ化は不可逆変換です。ハッシュ値から元のパスワードを復元することはできません。パスワードリセット機能では新しいパスワードのハッシュ値で上書きします。"
+  }, {
+    title: "認可（ロールベースアクセス制御）",
+    body: "認証（誰であるかの確認）の次は認可（何ができるかの制御）です。最も一般的なパターンはロールベースアクセス制御（RBAC）で、ユーザーにロール（admin, user, viewer など）を割り当て、ロールに応じてアクセスを制限します。\n\nFastAPI では Depends() を使ってロールチェックを依存関数として実装するのが自然です。require_role(\"admin\") のようなファクトリ関数を作り、各エンドポイントに Depends(require_role(\"admin\")) として適用します。\n\nDjango REST Framework の permission_classes（IsAuthenticated, IsAdminUser 等）に相当しますが、FastAPI のほうがカスタムロールの定義が柔軟です。Enum でロールを定義すれば型安全になり、存在しないロール名をタイポする心配もなくなります。",
+    code: `from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+from enum import Enum
+
+app = FastAPI()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+class Role(str, Enum):
+    admin = "admin"
+    user = "user"
+    viewer = "viewer"
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    # JWT をデコードしてユーザー情報を取得
+    return {"username": "admin", "role": Role.admin}
+
+def require_role(*allowed_roles: Role):
+    def checker(user: dict = Depends(get_current_user)):
+        if user["role"] not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        return user
+    return checker
+
+@app.get("/admin")
+def admin_only(user: dict = Depends(require_role(Role.admin))):
+    return {"message": "Admin area", "user": user["username"]}
+
+@app.get("/dashboard")
+def dashboard(user: dict = Depends(require_role(Role.admin, Role.user))):
+    return {"message": "Dashboard", "user": user["username"]}`,
+    afterCode: "ポイント: require_role はクロージャ（関数を返す関数）で、許可するロールを引数で受け取ります。このパターンは Flask の @roles_required デコレータに似ていますが、Depends() と統合されている点が異なります。"
+  }]
+}, {
+  id: "ch9",
+  num: 9,
+  title: "ファイルアップロードとWebSocket",
+  est: "50分",
+  goal: "UploadFile を使ったファイルアップロード（単一・複数）とサイズ制限の実装、WebSocket を使ったリアルタイム双方向通信の基本パターンを習得する。HTTP の一方向通信と WebSocket の双方向通信の違いを理解し、チャットやリアルタイム通知の実装パターンを書けるようになるのがゴール。",
+  sections: [{
+    title: "ファイルアップロード",
+    body: "FastAPI では UploadFile クラスを使ってファイルアップロードを処理します。UploadFile は内部的に SpooledTemporaryFile を使っており、小さなファイルはメモリに保持し、大きなファイルは一時ファイルに自動的にスプールされます。これにより、大容量ファイルのアップロードでもメモリを圧迫しません。\n\nFlask では request.files からファイルオブジェクトを取得しますが、ファイルサイズの制限は MAX_CONTENT_LENGTH 設定に依存し、超過時のエラーハンドリングが面倒でした。FastAPI では UploadFile のプロパティ（filename, content_type, size）で情報を取得でき、バリデーションも関数内で自由に書けます。\n\nFile(...) を使うとファイル全体を bytes として読み込みます。小さなファイル（アイコン画像など）にはこちらが手軽ですが、大きなファイルではメモリを消費するため UploadFile を使いましょう。",
+    table: T.fileUpload,
+    code: `from fastapi import FastAPI, UploadFile, File, HTTPException
+import shutil
+from pathlib import Path
+
+app = FastAPI()
+
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+@app.post("/upload")
+async def upload_file(file: UploadFile):
+    # ファイル情報の取得
+    info = {
+        "filename": file.filename,
+        "content_type": file.content_type,
+    }
+    # ファイルの保存
+    dest = UPLOAD_DIR / file.filename
+    with open(dest, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return info
+
+# bytes として読み込む場合
+@app.post("/upload-bytes")
+async def upload_bytes(file: bytes = File(...)):
+    return {"size": len(file)}`,
+    afterCode: "ポイント: UploadFile は async メソッド（await file.read(), await file.write()）を持っていますが、shutil.copyfileobj を使ったチャンク単位のコピーのほうがメモリ効率が良いです。"
+  }, {
+    title: "複数ファイルとバリデーション",
+    body: "複数のファイルを同時にアップロードするには、引数の型を list[UploadFile] にします。フォームデータとファイルを同時に受け取ることもでき、Form() と UploadFile を併用します。\n\nファイルサイズの制限やファイル種別の検証は、アップロードされたファイルの content_type や size を確認して行います。許可されていない場合は HTTPException を raise してエラーを返します。\n\nDjango では MAX_UPLOAD_SIZE の設定とフォームの clean メソッドでバリデーションしますが、FastAPI ではエンドポイント関数内で直接チェックするのが一般的です。Pydantic のバリデーションはファイルには適用されないため、手動でのチェックが必要です。",
+    code: `from fastapi import FastAPI, UploadFile, Form, HTTPException
+
+app = FastAPI()
+
+ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif"}
+MAX_SIZE = 5 * 1024 * 1024  # 5MB
+
+@app.post("/upload-multiple")
+async def upload_multiple(
+    files: list[UploadFile],
+    description: str = Form(default="")
+):
+    results = []
+    for file in files:
+        # Content-Type チェック
+        if file.content_type not in ALLOWED_TYPES:
+            raise HTTPException(400, f"Invalid file type: {file.content_type}")
+        # サイズチェック
+        contents = await file.read()
+        if len(contents) > MAX_SIZE:
+            raise HTTPException(413, f"{file.filename} exceeds 5MB")
+        results.append({"filename": file.filename, "size": len(contents)})
+        await file.seek(0)  # 読み取り位置をリセット
+    return {"description": description, "files": results}`,
+    afterCode: "注意: await file.read() 後にもう一度読みたい場合は await file.seek(0) でポインタを先頭に戻す必要があります。Flask の request.files でも同様です。"
+  }, {
+    title: "WebSocket の基本",
+    body: "HTTP は「クライアントがリクエスト → サーバがレスポンス」の一方向通信ですが、WebSocket は接続を維持したまま双方向のメッセージをやり取りできます。チャット、リアルタイム通知、株価ティッカー、ゲームなどの用途に使われます。\n\nFastAPI は Starlette の WebSocket サポートを継承しており、@app.websocket() デコレータでエンドポイントを定義します。Flask では Flask-SocketIO などの拡張が必要でしたが、FastAPI では標準機能として使えます。\n\nWebSocket のライフサイクルは「接続（accept）→ メッセージ送受信（send/receive ループ）→ 切断（disconnect）」の 3 段階です。接続管理のためにコネクションマネージャクラスを作るのが定番パターンです。",
+    code: `from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
+app = FastAPI()
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()       # 接続を受け入れ
+    try:
+        while True:
+            data = await websocket.receive_text()   # メッセージ受信
+            await websocket.send_text(f"Echo: {data}")  # メッセージ送信
+    except WebSocketDisconnect:
+        print("Client disconnected")
+
+# HTML テストページ（/docs では WebSocket をテストできないため）
+@app.get("/ws-test")
+def ws_test_page():
+    return {"html": """
+    <script>
+      const ws = new WebSocket("ws://localhost:8000/ws");
+      ws.onmessage = (event) => console.log(event.data);
+      ws.onopen = () => ws.send("Hello!");
+    </script>
+    """}`,
+    afterCode: "ポイント: WebSocket エンドポイントは Swagger UI (/docs) からはテストできません。ブラウザの JavaScript コンソールや wscat コマンドラインツールでテストします。"
+  }, {
+    title: "コネクション管理とブロードキャスト",
+    body: "チャットルームのように複数のクライアントが同時に接続し、あるクライアントのメッセージを全員に配信する場合、接続を管理するクラスが必要です。ConnectionManager クラスを作り、接続・切断・ブロードキャストのロジックをカプセル化します。\n\nこのパターンでは、全アクティブ接続をリストで管理し、broadcast メソッドで全接続にメッセージを送信します。実運用では Redis の Pub/Sub を使って複数のサーバプロセス間で WebSocket メッセージを共有する構成が必要になりますが、入門段階では単一プロセスでの実装を理解しておけば十分です。\n\nFlask-SocketIO は Socket.IO プロトコル（WebSocket の上位互換）を使いますが、FastAPI は素の WebSocket プロトコルを使います。Socket.IO のほうがフォールバック（ロングポーリング等）に強い一方、WebSocket はシンプルで標準的です。",
+    code: `from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
+app = FastAPI()
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def send_personal(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_text(message)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    await manager.connect(websocket)
+    await manager.broadcast(f"{client_id} joined")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await manager.broadcast(f"{client_id}: {data}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        await manager.broadcast(f"{client_id} left")`,
+    afterCode: "ポイント: manager はグローバル変数として定義されていますが、実運用では Redis や DB を介してプロセス間で状態を共有する設計にします。Uvicorn の --workers オプションで複数ワーカーを起動すると、各ワーカーが独立した manager を持つため、ブロードキャストが同じワーカー内のクライアントにしか届きません。"
+  }]
+}, {
+  id: "ch10",
+  num: 10,
+  title: "テストとドキュメント",
+  est: "50分",
+  goal: "FastAPI アプリケーションのテスト戦略を理解し、TestClient を使った同期テスト、dependency_overrides を使ったモック差し替え、pytest のフィクスチャと組み合わせた効率的なテスト設計を習得する。OpenAPI の自動生成ドキュメントのカスタマイズ方法も把握するのがゴール。",
+  sections: [{
+    title: "テスト戦略の概要",
+    body: "API のテストは品質保証の要です。FastAPI は TestClient クラスを提供しており、実際の HTTP サーバを起動せずにエンドポイントをテストできます。内部的には httpx の同期クライアントが使われており、requests と同じ使い勝手で response.status_code や response.json() を検証できます。\n\nFlask では Flask.test_client() が同様の役割を果たし、Django では Client クラスを使いますが、FastAPI の TestClient は型ヒントによる自動バリデーションも含めてテストできるため、より本番に近い検証が可能です。\n\nテスト対象は大きく 4 層に分かれます。エンドポイント（統合テスト）、Pydantic モデル（単体テスト）、依存関数（モック差し替え）、DB 連携（テスト用 DB）です。pytest と組み合わせるのが FastAPI コミュニティの標準的な選択です。",
+    table: T.testMethods,
+    code: `from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello, World!"}
+
+@app.get("/items/{item_id}")
+def read_item(item_id: int, q: str | None = None):
+    return {"item_id": item_id, "q": q}
+
+# --- テスト ---
+client = TestClient(app)
+
+def test_read_root():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Hello, World!"}
+
+def test_read_item():
+    response = client.get("/items/42?q=test")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["item_id"] == 42
+    assert data["q"] == "test"
+
+def test_invalid_item_id():
+    response = client.get("/items/not-a-number")
+    assert response.status_code == 422  # バリデーションエラー`,
+    afterCode: "ポイント: TestClient は同期的に動作するため、async def で定義されたエンドポイントもテストできます。非同期テストが必要な場合は pytest-asyncio + httpx.AsyncClient を使います。"
+  }, {
+    title: "依存性のモック差し替え",
+    body: "app.dependency_overrides は FastAPI の強力なテスト機能で、依存関数を別の関数に差し替えることができます。DB 接続・外部 API 呼び出し・認証チェックなど、テスト時に本物を使いたくない依存を簡単にモック化できます。\n\nFlask では unittest.mock.patch を使って関数を差し替えるのが一般的ですが、FastAPI の dependency_overrides のほうが宣言的で、何を差し替えているかが一目で分かります。テスト後に clear() でリセットすることを忘れないようにしましょう。\n\npytest のフィクスチャと組み合わせると、テスト関数ごとに異なるモックを適用したり、テスト終了後に自動的にリセットしたりできます。",
+    code: `from fastapi import FastAPI, Depends
+from fastapi.testclient import TestClient
+import pytest
+
+app = FastAPI()
+
+def get_db():
+    return {"type": "production_db"}
+
+@app.get("/items")
+def read_items(db=Depends(get_db)):
+    return {"db": db["type"]}
+
+# --- テスト ---
+def mock_get_db():
+    return {"type": "test_db"}
+
+@pytest.fixture
+def client():
+    app.dependency_overrides[get_db] = mock_get_db
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+def test_with_mock_db(client):
+    response = client.get("/items")
+    assert response.json() == {"db": "test_db"}`,
+    afterCode: "ポイント: fixture に yield を使うと、テスト後のクリーンアップ（dependency_overrides.clear()）が自動的に実行されます。各テストが独立して動作することを保証するために重要です。"
+  }, {
+    title: "DB を使ったテスト",
+    body: "DB 連携のテストでは、本番 DB を汚さないようにテスト用の DB（インメモリ SQLite やテスト専用の PostgreSQL）を使います。各テストの前後でテーブルを作成・破棄するか、トランザクションをロールバックしてデータをリセットします。\n\nDjango は TestCase でトランザクションを自動ロールバックしてくれますが、FastAPI + SQLAlchemy では自分で設計する必要があります。定番パターンは、テスト用エンジンを作成し、フィクスチャでテーブルの作成・破棄を行い、get_db を override してテスト用セッションを返すことです。\n\nインメモリ SQLite（sqlite://）を使えば、テスト実行のたびにクリーンな DB が使え、ファイルの後片付けも不要です。ただし PostgreSQL 固有の機能（JSONB, ARRAY 等）を使っている場合は、テストでも PostgreSQL を使う必要があります。",
+    code: `import pytest
+from fastapi import FastAPI, Depends
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, String
+from sqlalchemy.orm import (
+    DeclarativeBase, Mapped, mapped_column, Session, sessionmaker
+)
+
+# テスト用インメモリDB
+test_engine = create_engine("sqlite://", echo=True)
+TestSession = sessionmaker(bind=test_engine)
+
+class Base(DeclarativeBase):
+    pass
+
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
+
+@pytest.fixture(autouse=True)
+def setup_db():
+    Base.metadata.create_all(bind=test_engine)
+    yield
+    Base.metadata.drop_all(bind=test_engine)
+
+@pytest.fixture
+def client(setup_db):
+    def get_test_db():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+    # app.dependency_overrides[get_db] = get_test_db
+    # yield TestClient(app)
+    # app.dependency_overrides.clear()`,
+    afterCode: "ポイント: autouse=True のフィクスチャは全テスト関数で自動的に実行されます。DB の作成・破棄を毎回行うことで、テスト間のデータ汚染を防ぎます。"
+  }, {
+    title: "OpenAPI ドキュメントのカスタマイズ",
+    body: "FastAPI は /docs（Swagger UI）と /redoc（ReDoc）にアクセスすると、OpenAPI 仕様に基づく API ドキュメントを自動生成します。エンドポイントの説明、パラメータの型と制約、リクエスト/レスポンスのスキーマが全て反映されます。\n\nFlask では Flasgger や flask-restx でドキュメントを生成できましたが、コードとドキュメントの乖離が起きやすいのが課題でした。Django REST Framework + drf-spectacular も優秀ですが、FastAPI のドキュメント生成はコードから自動的に生成されるため、乖離が原理的に発生しません。\n\n関数の docstring やデコレータの description / summary / tags パラメータで、ドキュメントをさらに充実させることができます。タグでエンドポイントをグループ化すると、Swagger UI でカテゴリ別に整理されて見やすくなります。",
+    code: `from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI(
+    title="My Awesome API",
+    description="## 概要\\nこの API は商品管理を行います。",
+    version="1.0.0",
+    contact={"name": "API Support", "email": "support@example.com"},
+    license_info={"name": "MIT"}
+)
+
+class Item(BaseModel):
+    """商品モデル"""
+    name: str = Field(..., description="商品名", examples=["Apple"])
+    price: float = Field(..., gt=0, description="税込価格")
+
+@app.post(
+    "/items",
+    response_model=Item,
+    status_code=201,
+    summary="商品を新規作成する",
+    description="商品名と価格を指定して新しい商品を登録します。",
+    tags=["Items"],
+    responses={
+        201: {"description": "作成成功"},
+        422: {"description": "バリデーションエラー"}
+    }
+)
+def create_item(item: Item):
+    """
+    商品を作成します。
+
+    - **name**: 商品名（必須）
+    - **price**: 税込価格（0より大きい数値）
+    """
+    return item`,
+    afterCode: "ポイント: 関数の docstring は Swagger UI の説明欄に Markdown として表示されます。箇条書きやコードブロックも使えるので、API の使い方を丁寧に書いておくとフロントエンド開発者に喜ばれます。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, React.createElement("thead", null, React.createElement("tr", null, data.h.map((h, i) => React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), React.createElement("tbody", null, data.r.map((row, ri) => React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function FastAPICourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, React.createElement("div", {
+    style: {
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\uD83D\uDE80"), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "FastAPI \u5165\u9580\u30B3\u30FC\u30B9"), React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "FastAPI \u306E\u8A2D\u8A08\u601D\u60F3\u3068\u57FA\u672C\u6A5F\u80FD\u3092\u3001Flask / Django \u3068\u306E\u6BD4\u8F03\u3092\u4EA4\u3048\u3066\u5B66\u3073\u307E\u3059\u3002\u578B\u30D2\u30F3\u30C8\u99C6\u52D5\u306E\u30D0\u30EA\u30C7\u30FC\u30B7\u30E7\u30F3\u3001\u4F9D\u5B58\u6027\u6CE8\u5165\u3001\u975E\u540C\u671F\u51E6\u7406\u3001DB \u9023\u643A\u3001\u8A8D\u8A3C\u30FB\u8A8D\u53EF\u3001\u30C6\u30B9\u30C8\u307E\u3067\u3092\u4E00\u901A\u308A\u89E6\u308A\u3001\u300C\u6B21\u306B\u4F55\u3092\u5B66\u3079\u3070\u3088\u3044\u304B\u300D\u306E\u5730\u56F3\u3092\u624B\u306B\u5165\u308C\u308B\u3053\u3068\u304C\u30B4\u30FC\u30EB\u3067\u3059\u3002"), React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "\u25B2" : "\u25BC")), menuOpen && React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F"))))), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? ` \u30FB \u6F14\u7FD2${exercises.length}\u554F` : ""))), chapter.goal && React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"), React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => React.createElement(Section, {
+    key: ch + "-" + i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => React.createElement(Exercise, {
+    key: ch + "-" + i,
+    ex: ex,
+    idx: i
+  }))), React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : React.createElement("a", {
+    href: "../index.html",
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "FastAPI 0.110 \u00B7 Pydantic 2.6 \u00B7 SQLAlchemy 2.0 \u6E96\u62E0 \u00B7 2026\u5E744\u6708\u6642\u70B9")));
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(FastAPICourse));
+  </script>
+</body>
+</html>
