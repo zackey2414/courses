@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C言語 初級コース — タスク管理CLIアプリ構築</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const T = {
+  malloc: {
+    h: ["関数", "用途", "失敗時"],
+    r: [
+      ["malloc(size)", "size バイトのメモリを確保（初期化なし）", "NULL を返す"],
+      ["calloc(n, size)", "n 個× size バイトを確保（0で初期化）", "NULL を返す"],
+      ["realloc(ptr, size)", "確保済み領域を size バイトに変更", "NULL を返す（元は解放されない）"],
+      ["free(ptr)", "malloc/calloc/reallocで確保した領域を解放", "（戻り値なし）"]
+    ]
+  },
+  linkedList: {
+    h: ["操作", "計算量", "説明"],
+    r: [
+      ["先頭への挿入", "O(1)", "ヘッドポインタを更新するだけ"],
+      ["末尾への挿入", "O(n)", "末尾まで辿る必要がある（末尾ポインタがあればO(1)）"],
+      ["任意位置への挿入", "O(n)", "位置まで辿ってからポインタを付け替え"],
+      ["先頭の削除", "O(1)", "ヘッドを次のノードに更新"],
+      ["任意要素の削除", "O(n)", "前のノードを見つけてポインタを付け替え"],
+      ["検索", "O(n)", "先頭から順に辿る"]
+    ]
+  },
+  fileMode: {
+    h: ["モード", "説明", "ファイルが存在しない場合"],
+    r: [
+      ["\"r\"", "読み取り専用", "エラー（NULLを返す）"],
+      ["\"w\"", "書き込み（既存内容を消す）", "新規作成"],
+      ["\"a\"", "追記", "新規作成"],
+      ["\"r+\"", "読み書き両用", "エラー"],
+      ["\"w+\"", "読み書き（既存内容を消す）", "新規作成"],
+      ["\"rb\",\"wb\"", "バイナリモード読み書き", "rと同様"]
+    ]
+  },
+  funcPtr: {
+    h: ["構文", "意味", "例"],
+    r: [
+      ["int (*fp)(int, int)", "int を2つ受け取り int を返す関数ポインタ fp を宣言", "int (*add_ptr)(int,int) = add;"],
+      ["fp(a, b)", "関数ポインタを通じて関数を呼び出す", "result = fp(3, 5);"],
+      ["typedef int (*BinOp)(int,int)", "関数ポインタ型に別名をつける", "BinOp op = add;"],
+      ["qsort(arr, n, size, cmp)", "比較関数ポインタを使ったソート", "qsort(a, 5, sizeof(int), cmp_int);"]
+    ]
+  },
+  preprocessor: {
+    h: ["指令", "使い方", "説明"],
+    r: [
+      ["#define NAME value", "#define MAX 100", "定数マクロ（テキスト置換）"],
+      ["#define FUNC(x) ...", "#define ABS(x) ((x)<0?-(x):(x))", "関数マクロ"],
+      ["#include <file>", "#include <stdio.h>", "システムヘッダを取り込む"],
+      ["#include \"file\"", "#include \"mylib.h\"", "ユーザーヘッダを取り込む"],
+      ["#ifdef / #ifndef", "#ifdef DEBUG ... #endif", "条件コンパイル"],
+      ["#pragma once", "ヘッダの先頭に書く", "多重インクルード防止（非標準だが広くサポート）"],
+      ["#ifndef GUARD_H / #define GUARD_H / ... / #endif", "include guard", "標準的な多重インクルード防止"]
+    ]
+  }
+};
+
+const EX = {
+  ch1: [
+    {
+      diff: 1,
+      q: "タスク管理アプリの土台となる Task 構造体を定義してください。\n・title: タスク名（char[64]）\n・done: 完了フラグ（int: 0=未完, 1=完了）\n・id: タスクID（int）\n\n構造体を宣言し、1件分のデータを初期化して表示する main を書いてください。\n\n【使う知識】struct/typedef, メンバアクセス, printf",
+      code: `#include <stdio.h>
+#include <string.h>
+
+// Task 構造体を定義
+
+int main(void) {
+    Task t;
+    t.id = 1;
+    strcpy(t.title, "C言語を学ぶ");
+    t.done = 0;
+    // タスク情報を表示
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <string.h>
+
+typedef struct {
+    int id;
+    char title[64];
+    int done;
+} Task;
+
+int main(void) {
+    Task t;
+    t.id = 1;
+    strcpy(t.title, "C言語を学ぶ");
+    t.done = 0;
+    printf("[%s] %d: %s\\n", t.done ? "完了" : "未完", t.id, t.title);
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "Task 配列（最大10件）を管理し、タスクを追加・一覧表示する関数を実装してください。\n・add_task(tasks, count, title): 新しいタスクを追加してカウントを返す\n・print_tasks(tasks, count): 一覧を表示\n\n【使う知識】配列, 関数, ポインタ渡し, strlen",
+      code: `#include <stdio.h>
+#include <string.h>
+
+#define MAX_TASKS 10
+
+typedef struct { int id; char title[64]; int done; } Task;
+
+int add_task(Task tasks[], int count, const char *title) {
+    // タスクを追加して新しいcount を返す
+}
+
+void print_tasks(Task tasks[], int count) {
+    // 全タスクを表示
+}
+
+int main(void) {
+    Task tasks[MAX_TASKS];
+    int count = 0;
+    count = add_task(tasks, count, "買い物");
+    count = add_task(tasks, count, "洗濯");
+    count = add_task(tasks, count, "勉強");
+    print_tasks(tasks, count);
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <string.h>
+
+#define MAX_TASKS 10
+typedef struct { int id; char title[64]; int done; } Task;
+
+int add_task(Task tasks[], int count, const char *title) {
+    if (count >= MAX_TASKS) return count;
+    tasks[count].id = count + 1;
+    strncpy(tasks[count].title, title, 63);
+    tasks[count].title[63] = '\\0';
+    tasks[count].done = 0;
+    return count + 1;
+}
+
+void print_tasks(Task tasks[], int count) {
+    printf("=== タスク一覧 (%d件) ===\\n", count);
+    for (int i = 0; i < count; i++)
+        printf("[%s] %d: %s\\n", tasks[i].done?"完了":"未完", tasks[i].id, tasks[i].title);
+}
+
+int main(void) {
+    Task tasks[MAX_TASKS]; int count = 0;
+    count = add_task(tasks, count, "買い物");
+    count = add_task(tasks, count, "洗濯");
+    count = add_task(tasks, count, "勉強");
+    print_tasks(tasks, count);
+    return 0;
+}`
+    },
+    {
+      diff: 3,
+      q: "complete_task(tasks, count, id) 関数を追加し、指定IDのタスクを完了にしてください。\nIDが存在しなければエラーメッセージを表示。\nまた統計として完了/未完の件数も print_tasks で表示してください。\n\n【使う知識】配列のループ検索, 条件分岐, カウント変数",
+      code: `// 前の問題のコードに complete_task を追加
+// complete_task(tasks, count, 2) で ID=2 を完了にする`,
+      answer: `void complete_task(Task tasks[], int count, int id) {
+    for (int i = 0; i < count; i++) {
+        if (tasks[i].id == id) {
+            tasks[i].done = 1;
+            printf("完了: %s\\n", tasks[i].title);
+            return;
+        }
+    }
+    printf("ID %d は見つかりません\\n", id);
+}
+
+void print_tasks(Task tasks[], int count) {
+    int done = 0;
+    for (int i = 0; i < count; i++) {
+        printf("[%s] %d: %s\\n", tasks[i].done?"完了":"未完", tasks[i].id, tasks[i].title);
+        if (tasks[i].done) done++;
+    }
+    printf("完了: %d/%d\\n", done, count);
+}`
+    }
+  ],
+  ch2: [
+    {
+      diff: 1,
+      q: "malloc でタスク1件分のメモリを動的確保し、データを設定して表示後に free してください。\n\n【使う知識】malloc, free, NULLチェック, ポインタ, ->演算子",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char title[64]; int done; } Task;
+
+int main(void) {
+    Task *t = (Task*)malloc(sizeof(Task));
+    // NULLチェック
+    // データ設定
+    // 表示
+    // 解放
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char title[64]; int done; } Task;
+
+int main(void) {
+    Task *t = (Task*)malloc(sizeof(Task));
+    if (t == NULL) { perror("malloc"); return 1; }
+    t->id = 1;
+    strncpy(t->title, "動的確保タスク", 63);
+    t->done = 0;
+    printf("[%s] %d: %s\\n", t->done?"完了":"未完", t->id, t->title);
+    free(t);
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "malloc で Task の配列を n 件分動的確保し、データを入れて表示、最後に free してください。\nn は実行時に決める（scanf で入力）。\n\n【使う知識】malloc(n * sizeof(Task)), forループ, free",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char title[64]; int done; } Task;
+
+int main(void) {
+    int n;
+    printf("タスク数: "); scanf("%d", &n);
+    Task *tasks = /* malloc で n 件確保 */;
+    // データ設定とループ表示
+    // free
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char title[64]; int done; } Task;
+
+int main(void) {
+    int n;
+    printf("タスク数: "); scanf("%d", &n);
+    Task *tasks = (Task*)malloc(n * sizeof(Task));
+    if (!tasks) { perror("malloc"); return 1; }
+    for (int i = 0; i < n; i++) {
+        tasks[i].id = i + 1;
+        snprintf(tasks[i].title, 64, "タスク%d", i+1);
+        tasks[i].done = 0;
+        printf("%d: %s\\n", tasks[i].id, tasks[i].title);
+    }
+    free(tasks);
+    return 0;
+}`
+    },
+    {
+      diff: 3,
+      q: "タスク配列を realloc で拡張する関数を実装してください。\n初期容量4で始まり、満杯になったら2倍に拡張する dynamic な配列を作ってください。\n\n【使う知識】realloc, 容量管理（capacity vs count）",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char title[64]; } Task;
+
+typedef struct {
+    Task *data;
+    int count;
+    int capacity;
+} TaskList;
+
+void init_list(TaskList *list);
+void push(TaskList *list, const char *title);
+void free_list(TaskList *list);
+
+int main(void) {
+    TaskList list; init_list(&list);
+    const char *titles[] = {"A","B","C","D","E","F"};
+    for (int i = 0; i < 6; i++) push(&list, titles[i]);
+    for (int i = 0; i < list.count; i++)
+        printf("%d: %s\\n", list.data[i].id, list.data[i].title);
+    free_list(&list);
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char title[64]; } Task;
+typedef struct { Task *data; int count, capacity; } TaskList;
+
+void init_list(TaskList *list) {
+    list->capacity = 4;
+    list->data = (Task*)malloc(list->capacity * sizeof(Task));
+    list->count = 0;
+}
+
+void push(TaskList *list, const char *title) {
+    if (list->count >= list->capacity) {
+        list->capacity *= 2;
+        list->data = (Task*)realloc(list->data, list->capacity * sizeof(Task));
+    }
+    list->data[list->count].id = list->count + 1;
+    strncpy(list->data[list->count].title, title, 63);
+    list->count++;
+}
+
+void free_list(TaskList *list) { free(list->data); }
+
+int main(void) {
+    TaskList list; init_list(&list);
+    const char *t[] = {"A","B","C","D","E","F"};
+    for (int i = 0; i < 6; i++) push(&list, t[i]);
+    for (int i = 0; i < list.count; i++)
+        printf("%d: %s\\n", list.data[i].id, list.data[i].title);
+    free_list(&list);
+    return 0;
+}`
+    }
+  ],
+  ch3: [
+    {
+      diff: 1,
+      q: "単方向リンクリストでタスクを管理してください。\nNode構造体（task + next）を定義し、push_back, print_all を実装。\n\n【使う知識】struct内のポインタ, malloc, next辿り",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { char title[64]; int done; } Task;
+typedef struct Node { Task task; struct Node *next; } Node;
+
+Node* push_back(Node *head, const char *title);
+void print_all(Node *head);
+void free_all(Node *head);
+
+int main(void) {
+    Node *head = NULL;
+    head = push_back(head, "タスクA");
+    head = push_back(head, "タスクB");
+    head = push_back(head, "タスクC");
+    print_all(head);
+    free_all(head);
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { char title[64]; int done; } Task;
+typedef struct Node { Task task; struct Node *next; } Node;
+
+Node* push_back(Node *head, const char *title) {
+    Node *n = (Node*)malloc(sizeof(Node));
+    strncpy(n->task.title, title, 63); n->task.done = 0; n->next = NULL;
+    if (!head) return n;
+    Node *p = head; while (p->next) p = p->next;
+    p->next = n; return head;
+}
+
+void print_all(Node *head) {
+    for (Node *p = head; p; p = p->next)
+        printf("[%s] %s\\n", p->task.done?"完":"未", p->task.title);
+}
+
+void free_all(Node *head) {
+    while (head) { Node *t = head->next; free(head); head = t; }
+}
+
+int main(void) {
+    Node *head = NULL;
+    head = push_back(head, "タスクA");
+    head = push_back(head, "タスクB");
+    head = push_back(head, "タスクC");
+    print_all(head); free_all(head);
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "リンクリストにタスク削除（delete_by_title）を追加してください。\n指定タイトルに一致する最初のノードを削除する。\n前のノードのnextを付け替えてから freeする。\n\n【使う知識】前ノード追跡, ポインタの付け替え, free",
+      code: `// push_back, print_all, free_all は前問と同じ
+Node* delete_by_title(Node *head, const char *title) {
+    // 指定タイトルのノードを削除して新しいheadを返す
+}`,
+      answer: `Node* delete_by_title(Node *head, const char *title) {
+    if (!head) return NULL;
+    if (strcmp(head->task.title, title) == 0) {
+        Node *next = head->next; free(head); return next;
+    }
+    Node *prev = head;
+    while (prev->next && strcmp(prev->next->task.title, title) != 0)
+        prev = prev->next;
+    if (prev->next) {
+        Node *del = prev->next;
+        prev->next = del->next;
+        free(del);
+    }
+    return head;
+}`
+    }
+  ],
+  ch4: [
+    {
+      diff: 1,
+      q: "タスクをファイル（tasks.csv）に保存する save_tasks 関数と、\n読み込む load_tasks 関数を実装してください。\nCSV形式: id,title,done（例: 1,買い物,0）\n\n【使う知識】fopen, fprintf, fclose, fgets, sscanf",
+      code: `#include <stdio.h>
+#include <string.h>
+
+#define MAX 10
+typedef struct { int id; char title[64]; int done; } Task;
+
+void save_tasks(Task tasks[], int count, const char *filename);
+int load_tasks(Task tasks[], const char *filename);
+
+int main(void) {
+    Task tasks[MAX]; int count = 0;
+    // テストデータ追加
+    tasks[count++] = (Task){1, "買い物", 0};
+    tasks[count++] = (Task){2, "勉強", 1};
+    save_tasks(tasks, count, "tasks.csv");
+    // 読み込みテスト
+    Task loaded[MAX]; int n = load_tasks(loaded, "tasks.csv");
+    for (int i = 0; i < n; i++)
+        printf("%d: %s [%d]\\n", loaded[i].id, loaded[i].title, loaded[i].done);
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <string.h>
+
+#define MAX 10
+typedef struct { int id; char title[64]; int done; } Task;
+
+void save_tasks(Task tasks[], int count, const char *filename) {
+    FILE *fp = fopen(filename, "w");
+    if (!fp) { perror("save"); return; }
+    for (int i = 0; i < count; i++)
+        fprintf(fp, "%d,%s,%d\\n", tasks[i].id, tasks[i].title, tasks[i].done);
+    fclose(fp);
+}
+
+int load_tasks(Task tasks[], const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+    int count = 0; char line[128];
+    while (fgets(line, sizeof(line), fp) && count < MAX)
+        if (sscanf(line, "%d,%63[^,],%d", &tasks[count].id, tasks[count].title, &tasks[count].done) == 3)
+            count++;
+    fclose(fp); return count;
+}
+
+int main(void) {
+    Task tasks[MAX]; int count = 0;
+    tasks[count++] = (Task){1, "買い物", 0};
+    tasks[count++] = (Task){2, "勉強", 1};
+    save_tasks(tasks, count, "tasks.csv");
+    Task loaded[MAX]; int n = load_tasks(loaded, "tasks.csv");
+    for (int i = 0; i < n; i++)
+        printf("%d: %s [%d]\\n", loaded[i].id, loaded[i].title, loaded[i].done);
+    return 0;
+}`
+    }
+  ],
+  ch5: [
+    {
+      diff: 1,
+      q: "関数ポインタを使って、タスク配列を異なる基準でソートしてください。\n・ID順ソート\n・タイトルのアルファベット順ソート\nqsort と比較関数を使用。\n\n【使う知識】qsort, 関数ポインタ, strcmp",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char title[64]; } Task;
+
+// ID順の比較関数
+int cmp_by_id(const void *a, const void *b);
+// タイトル順の比較関数
+int cmp_by_title(const void *a, const void *b);
+
+int main(void) {
+    Task tasks[] = {{3,"Cherry"},{1,"Apple"},{2,"Banana"}};
+    int n = 3;
+    qsort(tasks, n, sizeof(Task), cmp_by_id);
+    // ID順で表示
+    qsort(tasks, n, sizeof(Task), cmp_by_title);
+    // タイトル順で表示
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char title[64]; } Task;
+
+int cmp_by_id(const void *a, const void *b) {
+    return ((Task*)a)->id - ((Task*)b)->id;
+}
+
+int cmp_by_title(const void *a, const void *b) {
+    return strcmp(((Task*)a)->title, ((Task*)b)->title);
+}
+
+void print_tasks(Task t[], int n) {
+    for (int i = 0; i < n; i++) printf("%d: %s\\n", t[i].id, t[i].title);
+}
+
+int main(void) {
+    Task tasks[] = {{3,"Cherry"},{1,"Apple"},{2,"Banana"}};
+    int n = 3;
+    qsort(tasks, n, sizeof(Task), cmp_by_id);
+    printf("ID順:\\n"); print_tasks(tasks, n);
+    qsort(tasks, n, sizeof(Task), cmp_by_title);
+    printf("タイトル順:\\n"); print_tasks(tasks, n);
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "コールバック関数を使ってタスクをフィルタリングする関数を実装してください。\nfilter_tasks(tasks, count, pred) は pred(task) が真のものだけ表示する。\n「完了済みのみ」「未完のみ」を pred として渡して使う。\n\n【使う知識】関数ポインタ型, typedef, コールバック",
+      code: `typedef int (*TaskPred)(Task*);  // 関数ポインタ型
+
+void filter_tasks(Task tasks[], int count, TaskPred pred);
+int is_done(Task *t);
+int is_undone(Task *t);`,
+      answer: `#include <stdio.h>
+
+typedef struct { int id; char title[64]; int done; } Task;
+typedef int (*TaskPred)(Task*);
+
+void filter_tasks(Task tasks[], int count, TaskPred pred) {
+    for (int i = 0; i < count; i++)
+        if (pred(&tasks[i]))
+            printf("[%s] %d: %s\\n", tasks[i].done?"完了":"未完", tasks[i].id, tasks[i].title);
+}
+
+int is_done(Task *t) { return t->done; }
+int is_undone(Task *t) { return !t->done; }
+
+int main(void) {
+    Task tasks[] = {{1,"A",0},{2,"B",1},{3,"C",0},{4,"D",1}};
+    printf("完了:\\n"); filter_tasks(tasks, 4, is_done);
+    printf("未完:\\n"); filter_tasks(tasks, 4, is_undone);
+    return 0;
+}`
+    }
+  ],
+  ch6: [
+    {
+      diff: 1,
+      q: "複数ファイル構成でタスク管理モジュールを分割してください。\n・task.h: Task構造体の宣言、関数プロトタイプ\n・task.c: 関数の実装\n・main.c: main関数\n各ファイルの内容を示してください。\n\n【使う知識】ヘッダファイル, インクルードガード, 分割コンパイル",
+      code: `// task.h の内容（インクルードガード付き）
+// task.c の内容（task.h をインクルード）
+// main.c の内容
+
+// コンパイル: gcc -Wall task.c main.c -o task_app`,
+      answer: `// task.h
+#ifndef TASK_H
+#define TASK_H
+
+#define MAX_TASKS 10
+
+typedef struct {
+    int id;
+    char title[64];
+    int done;
+} Task;
+
+int add_task(Task tasks[], int count, const char *title);
+void print_tasks(Task tasks[], int count);
+void complete_task(Task tasks[], int count, int id);
+
+#endif
+
+// task.c
+#include <stdio.h>
+#include <string.h>
+#include "task.h"
+
+int add_task(Task tasks[], int count, const char *title) {
+    if (count >= MAX_TASKS) return count;
+    tasks[count].id = count + 1;
+    strncpy(tasks[count].title, title, 63);
+    tasks[count].done = 0;
+    return count + 1;
+}
+
+void print_tasks(Task tasks[], int count) {
+    for (int i = 0; i < count; i++)
+        printf("[%s] %d: %s\\n", tasks[i].done?"完":"未", tasks[i].id, tasks[i].title);
+}
+
+void complete_task(Task tasks[], int count, int id) {
+    for (int i = 0; i < count; i++)
+        if (tasks[i].id == id) { tasks[i].done = 1; return; }
+}
+
+// main.c
+#include <stdio.h>
+#include "task.h"
+
+int main(void) {
+    Task tasks[MAX_TASKS]; int count = 0;
+    count = add_task(tasks, count, "買い物");
+    count = add_task(tasks, count, "勉強");
+    complete_task(tasks, count, 1);
+    print_tasks(tasks, count);
+    return 0;
+}`
+    }
+  ],
+  ch7: [
+    {
+      diff: 2,
+      q: "コマンドライン引数を使ってタスク管理アプリを操作できるようにしてください。\n・./task add \"タスク名\" → タスクを追加\n・./task list → 一覧表示\n・./task done <id> → 完了にする\n\n【使う知識】argc, argv, strcmp, atoi, ファイル永続化",
+      code: `#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+// ./task add "名前" | list | done <id>
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        printf("使い方: ./task [add|list|done] ...\\n");
+        return 1;
+    }
+    // argv[1] でコマンドを判定
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define MAX 50
+#define FILE_NAME "tasks.dat"
+typedef struct { int id; char title[64]; int done; } Task;
+
+int load(Task t[]) {
+    FILE *fp = fopen(FILE_NAME, "r"); if (!fp) return 0;
+    int n = 0; char line[128];
+    while (fgets(line, sizeof(line), fp) && n < MAX)
+        if (sscanf(line, "%d|%63[^|]|%d", &t[n].id, t[n].title, &t[n].done)==3) n++;
+    fclose(fp); return n;
+}
+void save(Task t[], int n) {
+    FILE *fp = fopen(FILE_NAME, "w"); if (!fp) return;
+    for (int i = 0; i < n; i++) fprintf(fp, "%d|%s|%d\\n", t[i].id, t[i].title, t[i].done);
+    fclose(fp);
+}
+int main(int argc, char *argv[]) {
+    if (argc < 2) { printf("使い方: ./task [add|list|done] ...\\n"); return 1; }
+    Task tasks[MAX]; int count = load(tasks);
+    if (strcmp(argv[1], "list") == 0) {
+        for (int i = 0; i < count; i++)
+            printf("[%s] %d: %s\\n", tasks[i].done?"完":"未", tasks[i].id, tasks[i].title);
+    } else if (strcmp(argv[1], "add") == 0 && argc >= 3) {
+        tasks[count].id = count+1;
+        strncpy(tasks[count].title, argv[2], 63);
+        tasks[count].done = 0; count++;
+        save(tasks, count); printf("追加: %s\\n", argv[2]);
+    } else if (strcmp(argv[1], "done") == 0 && argc >= 3) {
+        int id = atoi(argv[2]);
+        for (int i = 0; i < count; i++) if (tasks[i].id == id) tasks[i].done = 1;
+        save(tasks, count); printf("完了: ID=%d\\n", id);
+    }
+    return 0;
+}`
+    }
+  ],
+  ch8: [
+    {
+      diff: 2,
+      q: "スタックをC言語で実装してください。\n・push(stack, val), pop(stack) → int（空なら-1）, peek(stack), is_empty\n配列ベースで実装し、タスクのundo機能として活用することを想定してください。\n\n【使う知識】struct, 関数, 配列ベースのスタック",
+      code: `#include <stdio.h>
+
+#define STACK_MAX 100
+typedef struct {
+    int data[STACK_MAX];
+    int top;
+} Stack;
+
+void stack_init(Stack *s);
+void push(Stack *s, int val);
+int pop(Stack *s);
+int peek(Stack *s);
+int is_empty(Stack *s);
+
+int main(void) {
+    Stack s; stack_init(&s);
+    push(&s, 10); push(&s, 20); push(&s, 30);
+    printf("peek: %d\\n", peek(&s));
+    printf("pop: %d\\n", pop(&s));
+    printf("pop: %d\\n", pop(&s));
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+#define STACK_MAX 100
+typedef struct { int data[STACK_MAX]; int top; } Stack;
+
+void stack_init(Stack *s) { s->top = -1; }
+void push(Stack *s, int val) { if (s->top < STACK_MAX-1) s->data[++s->top] = val; }
+int pop(Stack *s) { return s->top >= 0 ? s->data[s->top--] : -1; }
+int peek(Stack *s) { return s->top >= 0 ? s->data[s->top] : -1; }
+int is_empty(Stack *s) { return s->top < 0; }
+
+int main(void) {
+    Stack s; stack_init(&s);
+    push(&s, 10); push(&s, 20); push(&s, 30);
+    printf("peek: %d\\n", peek(&s));
+    printf("pop: %d\\n", pop(&s));
+    printf("pop: %d\\n", pop(&s));
+    return 0;
+}`
+    }
+  ],
+  ch9: [
+    {
+      diff: 2,
+      q: "タスク管理アプリの完成版を作成してください。\n以下の全機能を統合:\n・動的メモリ（malloc/realloc）\n・CSVファイルへの保存・読込\n・コマンドライン引数での操作\n・関数ポインタによるソート\n・スタックによるundo\n\n【使う知識】これまでの全内容の統合",
+      code: `// 統合アプリの設計:
+// - TaskList: 動的配列（realloc拡張）
+// - ファイル: tasks.csv に自動保存・起動時に自動読込
+// - コマンド: add, list, done, undo, sort-id, sort-name
+// - undo: 直前の操作を取り消す（スタックで操作履歴管理）`,
+      answer: `// 主要な構造のみ示す（フルは200行超）
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define INIT_CAP 4
+#define FNAME "tasks.csv"
+
+typedef struct { int id; char title[64]; int done; } Task;
+typedef struct { Task *data; int count, cap; } TaskList;
+
+void tl_init(TaskList *l) {
+    l->cap = INIT_CAP;
+    l->data = malloc(l->cap * sizeof(Task));
+    l->count = 0;
+}
+void tl_push(TaskList *l, const char *title) {
+    if (l->count >= l->cap) {
+        l->cap *= 2;
+        l->data = realloc(l->data, l->cap * sizeof(Task));
+    }
+    Task *t = &l->data[l->count++];
+    t->id = l->count; strncpy(t->title, title, 63); t->done = 0;
+}
+void tl_save(TaskList *l) {
+    FILE *fp = fopen(FNAME, "w");
+    for (int i = 0; i < l->count; i++)
+        fprintf(fp, "%d,%s,%d\\n", l->data[i].id, l->data[i].title, l->data[i].done);
+    fclose(fp);
+}
+int cmp_id(const void *a, const void *b) { return ((Task*)a)->id - ((Task*)b)->id; }
+int cmp_name(const void *a, const void *b) { return strcmp(((Task*)a)->title, ((Task*)b)->title); }
+
+int main(int argc, char *argv[]) {
+    TaskList l; tl_init(&l);
+    // ファイルから読込 → コマンド処理 → 保存
+    if (argc >= 3 && !strcmp(argv[1],"add")) { tl_push(&l, argv[2]); tl_save(&l); }
+    else if (argc >= 2 && !strcmp(argv[1],"list")) {
+        for (int i = 0; i < l.count; i++)
+            printf("[%s] %d: %s\\n", l.data[i].done?"完":"未", l.data[i].id, l.data[i].title);
+    }
+    free(l.data); return 0;
+}`
+    }
+  ],
+  ch10: [
+    {
+      diff: 3,
+      q: "Makefileを作成してタスク管理プロジェクトをビルドしてください。\n・CC=gcc, CFLAGS=-Wall -Wextra -g\n・ターゲット: all, clean\n・task.c と main.c を分離コンパイルしてリンク\n\n【使う知識】Makefile, 分割コンパイル, make",
+      code: `# Makefile の内容を書いてください
+# make で all を実行
+# make clean でオブジェクトファイルとバイナリを削除`,
+      answer: `# Makefile
+CC = gcc
+CFLAGS = -Wall -Wextra -g
+TARGET = task_app
+SRCS = main.c task.c
+OBJS = $(SRCS:.c=.o)
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^
+
+%.o: %.c task.h
+	$(CC) $(CFLAGS) -c $<
+
+clean:
+	rm -f $(OBJS) $(TARGET)
+
+.PHONY: all clean`
+    }
+  ]
+};
+
+const chapters = [
+  {
+    id: "ch1", num: 1, title: "アプリ設計 — Task構造体の定義", est: "30分",
+    goal: "タスク管理アプリの要件を整理し、Task構造体の設計と基本操作（追加・表示・完了）を実装できる。複数のタスクを配列で管理し、構造体を受け取る関数を書けるようになるのがゴール。",
+    sections: [
+      {
+        title: "アプリの全体設計",
+        body: "このコースでは「CLIタスク管理アプリ」を段階的に構築します。最終的には、コマンドライン引数でタスクを追加・一覧・完了でき、データをファイルに永続保存できるアプリを作ります。Pythonでいえば click や argparse を使ったCLIツールに相当しますが、すべてC言語の標準ライブラリだけで実装します。\n\n各章で新しいC言語の概念を1〜2つ学びながら、アプリに機能を追加していく形式です。最初から動くものを作り、それを育てていくことでC言語の学習に実践的な文脈を持たせます。",
+        code: `// アプリの機能一覧（最終目標）
+// ./task add "C言語を学ぶ"     → タスクを追加
+// ./task list                  → 一覧表示
+// ./task done 1                → ID=1を完了
+// ./task undo                  → 直前の操作を取り消し
+// ./task sort id               → ID順でソート
+// ./task sort name             → 名前順でソート`,
+        afterCode: "まず最小限の「追加・表示」から始め、ファイル保存→コマンドライン引数→動的メモリと順番に拡張します。"
+      },
+      {
+        title: "Task構造体の設計",
+        body: "タスク1件を表す構造体を設計します。Pythonならクラスで書きますが、Cでは struct + 関数という組み合わせで表現します。まずはシンプルに id（識別子）・title（タイトル）・done（完了フラグ）の3フィールドから始めます。\n\nフィールドの型の選択には意味があります。title は可変長の文字列ですが、この段階では char title[64] という固定長バッファを使います。動的確保（malloc）は次章で扱います。done は bool（_Bool）でも良いのですが、int が最もシンプルで互換性があります。",
+        code: `#include <stdio.h>
+#include <string.h>
+
+#define MAX_TASKS 10
+#define TITLE_LEN 64
+
+typedef struct {
+    int    id;
+    char   title[TITLE_LEN];
+    int    done;   // 0=未完, 1=完了
+} Task;
+
+// タスクを表示する関数（値渡し）
+void print_task(Task t) {
+    printf("[%s] %d: %s\\n",
+           t.done ? "完了" : "未完", t.id, t.title);
+}
+
+int main(void) {
+    Task t1 = {1, "C言語を学ぶ", 0};
+    Task t2 = {2, "ポインタをマスターする", 0};
+    t2.done = 1;  // 完了に変更
+
+    print_task(t1);
+    print_task(t2);
+    return 0;
+}`,
+        afterCode: "ポイント: Task を値渡しすると全フィールド（id + 64バイト + done）がコピーされます。小さな構造体なら問題ありませんが、大きくなったらポインタ渡し（Task*）に切り替えます。"
+      },
+      {
+        title: "タスクの追加・管理",
+        body: "配列 Task tasks[MAX_TASKS] と要素数 count を組み合わせてタスクを管理します。Pythonの list.append() に相当する add_task 関数を書きます。\n\nCで配列のサイズを変えることはできないので、最大数（MAX_TASKS）を超えたら追加を断ります。本来はmallocを使って動的に増やすべきですが、まずは固定サイズで動くものを作るのが王道のアプローチです。",
+        code: `#include <stdio.h>
+#include <string.h>
+
+#define MAX_TASKS 10
+
+typedef struct { int id; char title[64]; int done; } Task;
+
+// タスクを追加して新しいcountを返す
+int add_task(Task tasks[], int count, const char *title) {
+    if (count >= MAX_TASKS) {
+        printf("最大数に達しました\\n");
+        return count;
+    }
+    tasks[count].id   = count + 1;
+    tasks[count].done = 0;
+    strncpy(tasks[count].title, title, 63);
+    tasks[count].title[63] = '\\0';  // 必ずヌル終端
+    return count + 1;
+}
+
+int main(void) {
+    Task tasks[MAX_TASKS];
+    int count = 0;
+
+    count = add_task(tasks, count, "C言語入門");
+    count = add_task(tasks, count, "ポインタ理解");
+    count = add_task(tasks, count, "構造体設計");
+
+    for (int i = 0; i < count; i++)
+        printf("[%s] %d: %s\\n",
+               tasks[i].done ? "完了" : "未完",
+               tasks[i].id, tasks[i].title);
+    return 0;
+}`,
+        afterCode: "strncpy の後にヌル終端を明示的に設定しているのは安全のためです。strncpy はコピー先が満杯になると \\0 を付けないため、必ず title[63] = '\\0' でガードします。"
+      }
+    ]
+  },
+  {
+    id: "ch2", num: 2, title: "動的メモリ — malloc と free", est: "45分",
+    goal: "malloc/calloc/realloc/free の役割と使い方を習得し、動的メモリ確保でのNULLチェックを習慣化できる。メモリリークとダングリングポインタの概念を理解し、タスク管理アプリの配列を動的に拡張できるようになるのがゴール。",
+    sections: [
+      {
+        title: "なぜ動的メモリが必要か",
+        body: "前章では Task tasks[MAX_TASKS] という固定サイズの配列を使いました。しかし現実のアプリでは「何件のタスクが追加されるか」が事前にわかりません。固定サイズの配列は「小さすぎれば溢れ、大きすぎればメモリの無駄」という問題があります。\n\nPythonの list は内部で自動的にメモリを確保・拡張してくれます。Cではこれを自分で書きます。malloc（memory allocation）を使うと、実行時に必要な分だけメモリを確保できます。ヒープと呼ばれる領域から確保し、使い終わったら free で返却します。",
+        table: T.malloc,
+        afterTable: "重要: malloc で確保したメモリは、スコープを抜けても自動で解放されません。必ず free() を呼ぶ責任がプログラマにあります。解放を忘れるとメモリリークになります。"
+      },
+      {
+        title: "malloc の基本的な使い方",
+        body: "malloc(size) は「sizeバイトのメモリを確保してそのアドレスを返す」関数です。戻り値の型は void*（型なしポインタ）で、使う際に適切な型にキャストします。確保に失敗すると NULL を返すため、必ずチェックが必要です。\n\nPythonの new に相当しますが、Cでは型のサイズを明示的に計算する必要があります。sizeof(Task) を使うことでアーキテクチャや構造体の変化に対応できます。ハードコードしたバイト数（例: 68）を書くと移植性がなくなるので避けましょう。",
+        code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char title[64]; int done; } Task;
+
+int main(void) {
+    // 1件分の Task をヒープに確保
+    Task *t = (Task*)malloc(sizeof(Task));
+    if (t == NULL) {             // 確保失敗のチェック（必須）
+        perror("malloc failed");
+        return 1;
+    }
+
+    t->id = 1;
+    strncpy(t->title, "動的確保テスト", 63);
+    t->done = 0;
+    printf("[%s] %d: %s\\n", t->done?"完":"未", t->id, t->title);
+
+    free(t);     // 必ず解放
+    t = NULL;    // ダングリングポインタ防止（ベストプラクティス）
+    return 0;
+}`,
+        afterCode: "free(t) の後に t = NULL と書くのは安全のためのベストプラクティスです。NULLポインタへの free は安全（何もしない）ですが、すでに解放されたアドレスへの二重freeは未定義動作です。"
+      },
+      {
+        title: "realloc で配列を動的拡張",
+        body: "realloc は確保済みのメモリ領域のサイズを変更します。Pythonのリストが内部で行う自動拡張を、C言語では自分で書きます。容量（capacity）と実際の要素数（count）を分けて管理するのがポイントです。\n\n一般的なアルゴリズムは「満杯になったら容量を2倍にして realloc する」です。このアモータイズド（償却）戦略により、n回の追加にかかるコストはO(n)に収まります。",
+        code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char title[64]; } Task;
+
+typedef struct {
+    Task *data;
+    int   count;
+    int   capacity;
+} DynArray;
+
+void da_init(DynArray *a, int init_cap) {
+    a->data = (Task*)malloc(init_cap * sizeof(Task));
+    a->count = 0;
+    a->capacity = init_cap;
+}
+
+void da_push(DynArray *a, const char *title) {
+    if (a->count >= a->capacity) {
+        a->capacity *= 2;
+        a->data = (Task*)realloc(a->data, a->capacity * sizeof(Task));
+        if (!a->data) { perror("realloc"); exit(1); }
+        printf("  [拡張] capacity → %d\\n", a->capacity);
+    }
+    a->data[a->count].id = a->count + 1;
+    strncpy(a->data[a->count].title, title, 63);
+    a->count++;
+}
+
+void da_free(DynArray *a) { free(a->data); a->data = NULL; }
+
+int main(void) {
+    DynArray arr;
+    da_init(&arr, 2);  // 初期容量2でスタート
+    const char *items[] = {"A","B","C","D","E"};
+    for (int i = 0; i < 5; i++) da_push(&arr, items[i]);
+    for (int i = 0; i < arr.count; i++)
+        printf("%d: %s\\n", arr.data[i].id, arr.data[i].title);
+    da_free(&arr);
+    return 0;
+}`,
+        afterCode: "出力の [拡張] メッセージで、容量が 2→4 と拡張される様子が確認できます。Python の list も内部でまったく同じことをやっています。"
+      }
+    ]
+  },
+  {
+    id: "ch3", num: 3, title: "リンクリスト — ポインタの応用", est: "50分",
+    goal: "ポインタを使った単方向リンクリストを実装できる。ノードの挿入・削除・探索の各操作でどのポインタを書き換えるべきかを理解し、メモリの確保と解放を正確に行えるようになるのがゴール。",
+    sections: [
+      {
+        title: "リンクリストとは",
+        body: "配列はメモリ上に要素が連続して並ぶため、途中への挿入・削除にはO(n)のシフト操作が必要です。リンクリストは各要素（ノード）が「データ + 次のノードへのポインタ」を持つ構造で、ポインタの付け替えだけで O(1) の先頭挿入・削除が可能です。\n\nトレードオフとして、リンクリストはランダムアクセス（arr[5]のような添字アクセス）ができず、要素を探すには先頭から順に辿るO(n)の操作が必要です。また、各ノードにポインタ分（8バイト）のオーバーヘッドがあります。用途に応じて選択します。",
+        table: T.linkedList,
+        afterTable: "使い分けの目安: 大量のランダムアクセスが必要→配列、先頭への頻繁な挿入・削除が必要→リンクリスト。Pythonのlistは内部的には動的配列です。"
+      },
+      {
+        title: "ノードの定義と挿入",
+        body: "リンクリストのノードは「自分自身と同じ型へのポインタ」を持ちます。これは自己参照構造体と呼ばれます。typedef は struct の定義が完成する前に使えないため、メンバ宣言では struct Node *next のように struct タグを使います。\n\n先頭への挿入（push_front）は最もシンプルで、新しいノードを作ってそのnextに元のheadを設定し、headを新しいノードに更新するだけです。3ステップのポインタ操作を図で想像しながら読むと理解が深まります。",
+        code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct Node {
+    char title[64];
+    int  done;
+    struct Node *next;  // 次のノードへのポインタ
+} Node;
+
+// 先頭に挿入してnew headを返す
+Node* push_front(Node *head, const char *title) {
+    Node *n = (Node*)malloc(sizeof(Node));
+    if (!n) { perror("malloc"); return head; }
+    strncpy(n->title, title, 63);
+    n->done = 0;
+    n->next = head;   // 元のheadを繋ぐ
+    return n;         // 新しいheadを返す
+}
+
+void print_list(Node *head) {
+    for (Node *p = head; p != NULL; p = p->next)
+        printf("[%s] %s\\n", p->done?"完":"未", p->title);
+    printf("(NULL)\\n");
+}
+
+void free_list(Node *head) {
+    while (head) {
+        Node *next = head->next;
+        free(head);
+        head = next;
+    }
+}
+
+int main(void) {
+    Node *head = NULL;
+    head = push_front(head, "タスクC");
+    head = push_front(head, "タスクB");
+    head = push_front(head, "タスクA");
+    print_list(head);   // A → B → C → (NULL)
+    free_list(head);
+    return 0;
+}`,
+        afterCode: "free_listで重要なのは「p = p->next してから free(p)」ではなく「nextを先に保存してからfree」する点です。free後にp->nextにアクセスするのは未定義動作です。"
+      }
+    ]
+  },
+  {
+    id: "ch4", num: 4, title: "ファイルI/O — データの永続化", est: "35分",
+    goal: "fopen/fclose/fprintf/fgets/sscanf を使ってタスクをCSVファイルに保存・読込できるようになる。エラーハンドリング（fopen のNULLチェック、EOF判定）を正しく書けること、アプリ起動時に前回のデータを自動読込できることがゴール。",
+    sections: [
+      {
+        title: "ファイルモードとオープン・クローズ",
+        body: "Cのファイル操作はFILE*（ファイルポインタ）を中心に行います。fopen でファイルを開くと FILE* が返り、以降の操作はこのポインタを通じて行います。使い終わったら必ず fclose で閉じないと、バッファにたまったデータが書き込まれないことがあります。\n\nPythonの with open(...) as f: が自動でクローズしてくれるのに対し、Cでは明示的に fclose を呼ぶ責任があります。早期リターンする処理では fclose を呼び忘れやすいので注意が必要です。",
+        table: T.fileMode,
+        code: `#include <stdio.h>
+
+int main(void) {
+    FILE *fp = fopen("tasks.txt", "w");
+    if (fp == NULL) {           // 失敗チェック（必須）
+        perror("fopen");
+        return 1;
+    }
+    fprintf(fp, "1,C言語入門,0\\n");
+    fprintf(fp, "2,ポインタ学習,1\\n");
+    fclose(fp);                 // 必ずクローズ
+
+    fp = fopen("tasks.txt", "r");
+    if (!fp) { perror("fopen"); return 1; }
+
+    char line[128];
+    while (fgets(line, sizeof(line), fp) != NULL)
+        printf("読込: %s", line);
+    fclose(fp);
+    return 0;
+}`,
+        afterCode: "fgets は改行文字も含めて読み込みます。表示時に \\n を付けないのは fgets が既に含んでいるためです。EOF に達すると NULL を返すため、while の終了条件にも使えます。"
+      },
+      {
+        title: "CSV形式での読み書き",
+        body: "タスクを「id,title,done」というCSV形式でファイルに保存します。書き込みは fprintf で簡単ですが、読み込みは fgets で1行ずつ読んでから sscanf でパースするのが定石です。\n\nsscanf は「文字列からデータをscanfと同じ書式で取り出す」関数です。%63[^,] は「カンマ以外の文字を最大63文字読む」という正規表現的な書式で、カンマ区切りのフィールドを読むのによく使います。戻り値は「成功した変換の数」なので、3 と等しいかチェックするとパース成功の確認になります。",
+        code: `#include <stdio.h>
+#include <string.h>
+
+#define MAX 50
+typedef struct { int id; char title[64]; int done; } Task;
+
+void save_csv(Task tasks[], int n, const char *fname) {
+    FILE *fp = fopen(fname, "w");
+    if (!fp) { perror("save"); return; }
+    for (int i = 0; i < n; i++)
+        fprintf(fp, "%d,%s,%d\\n",
+                tasks[i].id, tasks[i].title, tasks[i].done);
+    fclose(fp);
+    printf("保存: %d件\\n", n);
+}
+
+int load_csv(Task tasks[], const char *fname) {
+    FILE *fp = fopen(fname, "r");
+    if (!fp) return 0;          // ファイルなし=0件
+
+    int count = 0;
+    char line[128];
+    while (fgets(line, sizeof(line), fp) && count < MAX) {
+        if (sscanf(line, "%d,%63[^,],%d",
+                   &tasks[count].id,
+                   tasks[count].title,
+                   &tasks[count].done) == 3)
+            count++;
+    }
+    fclose(fp);
+    return count;
+}
+
+int main(void) {
+    Task tasks[MAX] = {{1,"C入門",0},{2,"ポインタ",1}};
+    save_csv(tasks, 2, "tasks.csv");
+
+    Task loaded[MAX];
+    int n = load_csv(loaded, "tasks.csv");
+    for (int i = 0; i < n; i++)
+        printf("[%s] %d: %s\\n", loaded[i].done?"完":"未",
+               loaded[i].id, loaded[i].title);
+    return 0;
+}`,
+        afterCode: "セキュリティ注意: CSV のフィールドにカンマが含まれるとパースが壊れます。本格的なアプリではカンマをエスケープするか、別の区切り文字（| や \\t）を使うか、バイナリ形式を選択します。"
+      }
+    ]
+  },
+  {
+    id: "ch5", num: 5, title: "関数ポインタ — 柔軟な処理の切り替え", est: "35分",
+    goal: "関数ポインタの宣言・代入・呼び出しの構文を正しく書けるようになる。qsort の比較関数、コールバック関数パターンを習得し、「処理の種類をデータとして渡す」という発想を身につけるのがゴール。",
+    sections: [
+      {
+        title: "関数ポインタとは",
+        body: "C言語では関数も「メモリ上のある番地に置かれたコード」です。変数がデータのアドレスを保持するように、関数ポインタは関数のアドレスを保持できます。「実行時に呼ぶ関数を切り替える」「関数を引数として渡す」ことが可能になります。\n\nPythonでは関数は第一級オブジェクトなので def func(): と書けば func として渡せますが、C では明示的に関数ポインタ型を使う必要があります。構文が複雑に見えますが、typedef で別名をつけると格段に読みやすくなります。",
+        table: T.funcPtr,
+        code: `#include <stdio.h>
+
+int add(int a, int b) { return a + b; }
+int mul(int a, int b) { return a * b; }
+
+// 関数ポインタ型に別名をつける
+typedef int (*BinOp)(int, int);
+
+void apply_and_print(int a, int b, BinOp op, const char *name) {
+    printf("%s(%d, %d) = %d\\n", name, a, b, op(a, b));
+}
+
+int main(void) {
+    BinOp op = add;           // 関数名をそのまま代入
+    printf("%d\\n", op(3, 5)); // 8
+
+    apply_and_print(4, 5, add, "add");
+    apply_and_print(4, 5, mul, "mul");
+    return 0;
+}`,
+        afterCode: "ポイント: op(3, 5) と (*op)(3, 5) は等価です。前者の方が簡潔なので現代Cでは op(3, 5) が好まれます。"
+      },
+      {
+        title: "qsort とコールバック",
+        body: "標準ライブラリの qsort はクイックソートの実装で、比較ロジックを関数ポインタとして受け取ります。これにより「int のソート」「文字列のソート」「構造体の任意フィールドでのソート」を同じ qsort 関数で実現できます。\n\n比較関数の型は int (*)(const void*, const void*) で固定されています。void* は「型がわからないポインタ」で、比較関数の中でキャストして使います。戻り値は「負なら a が先、0 なら等価、正なら b が先」という約束です。",
+        code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct { int id; char name[32]; int score; } Student;
+
+// スコア降順の比較関数
+int cmp_score_desc(const void *a, const void *b) {
+    const Student *sa = (const Student*)a;
+    const Student *sb = (const Student*)b;
+    return sb->score - sa->score;  // 降順: b-a
+}
+
+// 名前順の比較関数
+int cmp_name(const void *a, const void *b) {
+    return strcmp(((Student*)a)->name, ((Student*)b)->name);
+}
+
+int main(void) {
+    Student s[] = {{1,"Alice",85},{2,"Bob",92},{3,"Charlie",78}};
+    int n = 3;
+
+    qsort(s, n, sizeof(Student), cmp_score_desc);
+    for (int i = 0; i < n; i++)
+        printf("%s: %d\\n", s[i].name, s[i].score);
+
+    printf("---\\n");
+    qsort(s, n, sizeof(Student), cmp_name);
+    for (int i = 0; i < n; i++)
+        printf("%s\\n", s[i].name);
+    return 0;
+}`,
+        afterCode: "ミニ演習: cmp_score_desc の戻り値を sb->score - sa->score から sa->score - sb->score に変えると昇順になります。この「引き算で比較」のパターンは整数のオーバーフローに注意が必要で、安全を期すなら if (sa->score > sb->score) return 1; と明示的に書きます。"
+      }
+    ]
+  },
+  {
+    id: "ch6", num: 6, title: "ヘッダファイルと分割コンパイル", est: "30分",
+    goal: "ヘッダファイル（.h）とソースファイル（.c）に役割を分けた複数ファイル構成でプロジェクトを管理できるようになる。インクルードガードの意味と書き方を習得し、Makefileで分割コンパイルを自動化できるのがゴール。",
+    sections: [
+      {
+        title: "分割コンパイルの仕組み",
+        body: "プログラムが大きくなると、1つの .c ファイルにすべてを書くのは管理が困難になります。分割コンパイルでは、機能ごとにファイルを分けて個別にコンパイルし（.o ファイルを生成）、最後にリンクして1つの実行ファイルを作ります。\n\nPythonのモジュール（import mymodule）と発想は同じですが、仕組みが異なります。Pythonのimportはファイルを読んで実行しますが、Cの分割コンパイルはコンパイル時（静的）にモジュールを結合します。ヘッダファイル（.h）は「このモジュールが提供する関数・型の一覧（宣言）」を書く場所です。",
+        table: T.preprocessor,
+        code: `// ファイル構成例
+// task.h   — Task型と関数プロトタイプの宣言
+// task.c   — 関数の実装
+// main.c   — main関数
+
+// コンパイル:
+gcc -Wall -c task.c -o task.o   // task.c → task.o（オブジェクトファイル）
+gcc -Wall -c main.c -o main.o   // main.c → main.o
+gcc task.o main.o -o task_app   // リンク → 実行ファイル
+
+// または一括:
+gcc -Wall task.c main.c -o task_app`,
+        afterCode: "分割コンパイルの最大のメリットは「変更したファイルだけ再コンパイルできる」ことです。大規模なプロジェクトではビルド時間が劇的に短縮されます。Makefileはこの依存関係を自動管理してくれます。"
+      },
+      {
+        title: "ヘッダファイルとインクルードガード",
+        body: "ヘッダファイルは複数の .c ファイルからインクルードされることがあります。同じヘッダが2回インクルードされると、型の二重定義エラーが起きます。これを防ぐのがインクルードガードです。\n\n#ifndef TASK_H / #define TASK_H / #endif というパターンで「まだインクルードされていない場合だけ内容を処理する」という条件コンパイルを実現します。非標準ですが広くサポートされている #pragma once も同じ効果があり、こちらの方が簡潔です。",
+        code: `// task.h
+#ifndef TASK_H        // TASK_H が未定義なら
+#define TASK_H        // 定義して
+
+#define MAX_TASKS 50
+#define TITLE_LEN 64
+
+typedef struct {
+    int  id;
+    char title[TITLE_LEN];
+    int  done;
+} Task;
+
+// 関数プロトタイプ（実装はtask.cに書く）
+int  add_task(Task tasks[], int count, const char *title);
+void print_tasks(const Task tasks[], int count);
+void complete_task(Task tasks[], int count, int id);
+void save_tasks(const Task tasks[], int count, const char *fname);
+int  load_tasks(Task tasks[], const char *fname);
+
+#endif               // TASK_H の終わり
+
+// task.c
+#include <stdio.h>
+#include <string.h>
+#include "task.h"    // "" でユーザーヘッダ、<> でシステムヘッダ
+
+int add_task(Task tasks[], int count, const char *title) {
+    if (count >= MAX_TASKS) return count;
+    tasks[count].id = count + 1;
+    strncpy(tasks[count].title, title, TITLE_LEN - 1);
+    tasks[count].done = 0;
+    return count + 1;
+}
+// 以下略...`,
+        afterCode: "ルール: ヘッダには「宣言」を書き、「定義（実装）」は .c に書く。変数の場合、ヘッダに int g_count; と書くと複数ファイルにリンクする際に多重定義エラーになるため、ヘッダには extern int g_count; と書いて定義は1つの .c に置きます。"
+      }
+    ]
+  },
+  {
+    id: "ch7", num: 7, title: "コマンドライン引数と文字列処理", est: "35分",
+    goal: "main(int argc, char *argv[]) でコマンドライン引数を受け取り、サブコマンド（add/list/done）を実装できるようになる。文字列比較・数値変換（atoi/strtol）・安全な入力の扱いを習得するのがゴール。",
+    sections: [
+      {
+        title: "argc と argv",
+        body: "main 関数は int main(int argc, char *argv[]) という形式で引数を受け取れます。argc は引数の数（プログラム名を含む）、argv は引数の文字列配列です。./task add \"買い物\" を実行すると argc=3、argv[0]=\"./task\"、argv[1]=\"add\"、argv[2]=\"買い物\" になります。\n\nPythonの sys.argv と全く同じ概念です。argv は char *の配列（または char** と等価）なので、各要素は文字列（char*）です。strcmp で比較し、atoi/strtol で数値に変換します。",
+        code: `#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+int main(int argc, char *argv[]) {
+    printf("argc = %d\\n", argc);
+    for (int i = 0; i < argc; i++)
+        printf("argv[%d] = %s\\n", i, argv[i]);
+
+    if (argc < 2) {
+        printf("使い方: %s <command>\\n", argv[0]);
+        return 1;
+    }
+
+    if (strcmp(argv[1], "hello") == 0) {
+        printf("Hello!\\n");
+    } else if (strcmp(argv[1], "count") == 0 && argc >= 3) {
+        int n = atoi(argv[2]);        // 文字列→整数
+        printf("n = %d\\n", n);
+    }
+    return 0;
+}`,
+        afterCode: "atoi(\"abc\") は 0 を返します（エラーを区別できない）。より安全な変換には strtol(str, &endptr, 10) を使い、endptr が str と同じなら変換失敗と判定できます。"
+      },
+      {
+        title: "サブコマンドの実装",
+        body: "add/list/done のようなサブコマンドは、argv[1] の文字列を strcmp で比較することで分岐させます。Pythonの argparse に相当しますが、Cでは自分で実装します。\n\nコードの可読性を保つため、各コマンドを別関数に分けて書くのが定石です。cmd_add(argc, argv, tasks, &count) のように argc と argv をそのまま渡すか、必要な引数だけ切り出して渡します。エラーケース（引数が足りない場合のusage表示）も忘れずに実装します。",
+        code: `#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define MAX 50
+typedef struct { int id; char title[64]; int done; } Task;
+
+void usage(const char *prog) {
+    printf("使い方:\\n");
+    printf("  %s add <タイトル>  タスクを追加\\n", prog);
+    printf("  %s list           一覧表示\\n", prog);
+    printf("  %s done <id>      完了にする\\n", prog);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) { usage(argv[0]); return 1; }
+
+    Task tasks[MAX]; int count = 0;
+    // ここでファイルから読込（load_csv を呼ぶ）
+
+    if (strcmp(argv[1], "add") == 0) {
+        if (argc < 3) { printf("タイトルが必要\\n"); return 1; }
+        // add_task(tasks, count, argv[2]);
+        printf("追加: %s\\n", argv[2]);
+    } else if (strcmp(argv[1], "list") == 0) {
+        for (int i = 0; i < count; i++)
+            printf("[%s] %d: %s\\n",
+                   tasks[i].done?"完":"未", tasks[i].id, tasks[i].title);
+    } else if (strcmp(argv[1], "done") == 0) {
+        if (argc < 3) { printf("IDが必要\\n"); return 1; }
+        int id = atoi(argv[2]);
+        // complete_task(tasks, count, id);
+        printf("完了: ID=%d\\n", id);
+    } else {
+        printf("不明なコマンド: %s\\n", argv[1]);
+        usage(argv[0]); return 1;
+    }
+    // ここでファイルに保存
+    return 0;
+}`,
+        afterCode: "ヒント: 実際のアプリでは起動時に load_csv を呼んでファイルからデータを復元し、操作後に save_csv で保存します。これにより前回のデータが維持されます（永続化）。"
+      }
+    ]
+  },
+  {
+    id: "ch8", num: 8, title: "データ構造 — スタックとキュー", est: "40min",
+    goal: "スタック（LIFO）とキュー（FIFO）を配列ベースで実装できる。undo機能にスタックを、タスク処理順序管理にキューを活用するイメージを持てるのがゴール。",
+    sections: [
+      {
+        title: "スタック（LIFO）の実装",
+        body: "スタックは「最後に入れたものが最初に出る（LIFO: Last In First Out）」データ構造です。実生活では積み重なった皿のイメージです。タスクアプリではundo（取り消し）の実装に使えます。操作をスタックにpushし、undoのたびにpopして逆操作を実行します。\n\n配列ベースの実装は最もシンプルで、top インデックスを管理するだけです。Pythonのリストでも list.append() と list.pop() でスタックを模倣できますが、Cでは明示的に構造体として実装することでより高速かつ予測可能な動作が得られます。",
+        code: `#include <stdio.h>
+#include <string.h>
+
+#define STACK_MAX 100
+
+typedef struct {
+    int ops[STACK_MAX];   // 操作ID を記録
+    int top;              // スタックトップのインデックス
+} OpStack;
+
+void stack_init(OpStack *s) { s->top = -1; }
+int  stack_empty(const OpStack *s) { return s->top < 0; }
+void stack_push(OpStack *s, int op) {
+    if (s->top < STACK_MAX - 1) s->ops[++s->top] = op;
+}
+int stack_pop(OpStack *s) {
+    return s->top >= 0 ? s->ops[s->top--] : -1;
+}
+int stack_peek(const OpStack *s) {
+    return s->top >= 0 ? s->ops[s->top] : -1;
+}
+
+int main(void) {
+    OpStack history;
+    stack_init(&history);
+
+    // タスク操作を記録
+    stack_push(&history, 1);  // タスク1追加
+    stack_push(&history, 2);  // タスク2追加
+    stack_push(&history, 3);  // タスク3追加
+
+    printf("undo: タスクID=%d\\n", stack_pop(&history));  // 3
+    printf("undo: タスクID=%d\\n", stack_pop(&history));  // 2
+    return 0;
+}`,
+        afterCode: "undo機能の実装パターン: 操作を記録するスタックに加えて「元に戻した操作」を記録するredo スタックを用意すると、undo/redo の両方が実装できます。"
+      }
+    ]
+  },
+  {
+    id: "ch9", num: 9, title: "アプリ統合 — 全機能の組み合わせ", est: "60分",
+    goal: "これまでに実装した機能（動的配列・リンクリスト・ファイルI/O・関数ポインタ・スタック・分割コンパイル・CLI）を統合し、実際に動作するタスク管理CLIアプリを完成させるのがゴール。",
+    sections: [
+      {
+        title: "統合アーキテクチャ",
+        body: "各章で実装してきた機能を1つのアプリに統合します。設計の方針として「ファイルを起動時に読み込み→操作→終了時に保存」という流れを採用します。この設計はシンプルですが、複数プロセスからの同時アクセスには対応していません（本格的なDBが必要な場合の出発点になります）。\n\nファイル構成は task.h / task.c / main.c の3ファイルに分割します。make でビルドできるようにMakefileも用意します。テストは「add → list → done → list」の操作が正しく動くことを手動で確認します。",
+        code: `// 最終的なアプリの機能一覧と実装箇所
+// task.h   → Task型, TaskList型, 全関数プロトタイプ
+// task.c   → 全関数の実装
+// main.c   → コマンドライン引数の解析とディスパッチ
+
+// 機能マッピング:
+// add     → tl_push() + save_csv()
+// list    → print_tasks() [ソート付き]
+// done    → complete_task() + save_csv()
+// sort    → qsort() + 比較関数
+// undo    → OpStack からpop + 逆操作`,
+        afterCode: "コードが200行を超えてきたら「関数が1つのことをしているか」「関数名が処理内容を表しているか」を見直すタイミングです。リファクタリングのコストは後になるほど上がります。"
+      }
+    ]
+  },
+  {
+    id: "ch10", num: 10, title: "Makefile とビルド自動化", est: "25min",
+    goal: "Makefileの基本構文（ターゲット・依存関係・レシピ）を書けるようになる。make / make clean が動くMakefileを作成し、分割コンパイルの依存関係を自動管理できるようになるのがゴール。",
+    sections: [
+      {
+        title: "Makefileの基本",
+        body: "Makefileは「何をどのように作るか」を記述したビルドスクリプトです。Python でいえば pyproject.toml や setup.py に近いですが、任意のコマンドを実行できる汎用ビルドツールです。\n\nMakefileの構文は「ターゲット: 依存ファイル」という行の下に「タブ始まりのシェルコマンド」を書きます。make は依存ファイルのタイムスタンプを見て「変更されたファイルに関係するターゲットだけ再ビルド」します。これにより大規模プロジェクトでも変更した部分だけ高速に再ビルドできます。",
+        code: `# Makefile（タブインデント必須）
+
+CC      = gcc
+CFLAGS  = -Wall -Wextra -std=c17 -g
+TARGET  = task_app
+SRCS    = main.c task.c
+OBJS    = $(SRCS:.c=.o)   # .c を .o に置換
+
+# デフォルトターゲット（make だけで実行）
+all: $(TARGET)
+
+# リンク
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^
+
+# コンパイル（パターンルール）
+%.o: %.c task.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# 後片付け
+clean:
+	rm -f $(OBJS) $(TARGET)
+
+# 擬似ターゲット（ファイルではない）
+.PHONY: all clean`,
+        afterCode: "$ @ は「ターゲット名」, $< は「最初の依存ファイル」, $^ は「全依存ファイル」を表す自動変数です。これらを覚えると Makefile をコンパクトに書けます。"
+      }
+    ]
+  }
+];
+
+/* ─── UI Components ─── */
+function DataTable({ data }) {
+  return React.createElement("div", { style:{overflowX:"auto",margin:"12px 0",borderRadius:10,border:"1px solid #d1d5db",background:"#fff"} },
+    React.createElement("table", { style:{width:"100%",borderCollapse:"separate",borderSpacing:0,fontSize:13} },
+      React.createElement("thead", null, React.createElement("tr", null,
+        data.h.map((h,i) => React.createElement("th", { key:i, style:{background:"linear-gradient(180deg,#eef2ff,#e0e7ff)",color:"#312e81",fontWeight:800,fontSize:12.5,padding:"10px 14px",textAlign:"left",borderBottom:"2px solid #a5b4fc",borderRight:i<data.h.length-1?"1px solid #c7d2fe":"none"} }, h))
+      )),
+      React.createElement("tbody", null,
+        data.r.map((row,ri) => React.createElement("tr", {key:ri},
+          row.map((cell,ci) => React.createElement("td", {key:ci, style:{padding:"9px 14px",borderBottom:ri<data.r.length-1?"1px solid #e5e7eb":"none",borderRight:ci<row.length-1?"1px solid #f3f4f6":"none",color:ci===0?"#1e1b4b":"#374151",fontWeight:ci===0?700:400,fontSize:13,lineHeight:1.65,verticalAlign:"top",whiteSpace:"pre-line",background:ri%2===0?"#fff":"#f9fafb"} }, cell))
+        ))
+      )
+    ),
+    data.cap && React.createElement("div", { style:{padding:"8px 14px",fontSize:12,color:"#6b7280",borderTop:"1px solid #e5e7eb",background:"#f9fafb"} }, data.cap)
+  );
+}
+function Code({ code, hl }) {
+  return React.createElement("pre", { style:{background:hl?"#1a1a2e":"#0d0d1a",color:"#d0d0f0",padding:"14px 16px",borderRadius:10,fontSize:12,lineHeight:1.65,overflowX:"auto",margin:"8px 0 0",fontFamily:"'JetBrains Mono','Fira Code',monospace",border:hl?"2px solid #6366f1":"1px solid rgba(255,255,255,0.06)",whiteSpace:"pre-wrap",wordBreak:"break-word"} },
+    React.createElement("code", null, code));
+}
+const diffLabel = d => d===1?"⭐ 基本":d===2?"⭐⭐ 応用":"⭐⭐⭐ 発展";
+const diffColor = d => d===1?"#16a34a":d===2?"#d97706":"#dc2626";
+function Exercise({ ex, idx }) {
+  const [show, setShow] = useState(false);
+  return React.createElement("div", { style:{borderRadius:12,border:"2px solid #f59e0b",overflow:"hidden",background:"#fff",marginBottom:8} },
+    React.createElement("div", { style:{padding:"12px 16px",background:"linear-gradient(135deg,#fffbeb,#fef3c7)"} },
+      React.createElement("div", { style:{display:"flex",alignItems:"center",gap:8,marginBottom:6} },
+        React.createElement("span", { style:{background:"#f59e0b",color:"#fff",fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:6} }, "問", idx+1),
+        React.createElement("span", { style:{fontSize:12,fontWeight:700,color:diffColor(ex.diff)} }, diffLabel(ex.diff))
+      ),
+      React.createElement("p", { style:{margin:0,fontSize:13.5,lineHeight:1.8,color:"#92400e",whiteSpace:"pre-line"} }, ex.q)
+    ),
+    React.createElement("div", { style:{padding:"0 16px 12px"} }, React.createElement(Code, {code:ex.code,hl:true})),
+    React.createElement("div", { style:{borderTop:"1px dashed #fcd34d",padding:"10px 16px"} },
+      React.createElement("button", { onClick:()=>setShow(!show), style:{background:show?"#22c55e":"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",border:"none",borderRadius:8,padding:"8px 20px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%"} }, show?"🙈 解答を隠す":"👀 解答例を見る"),
+      show && React.createElement("div", { style:{marginTop:10} },
+        React.createElement("div", { style:{fontSize:11,fontWeight:700,color:"#166534",letterSpacing:1,marginBottom:4} }, "✅ 解答例"),
+        React.createElement(Code, {code:ex.answer})
+      )
+    )
+  );
+}
+function Section({ section, idx }) {
+  const [open, setOpen] = useState(false);
+  return React.createElement("div", { style:{borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",background:"#fff"} },
+    React.createElement("button", { onClick:()=>setOpen(!open), style:{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px 16px",border:"none",background:"#fafafa",cursor:"pointer",textAlign:"left",fontSize:14,fontWeight:700,color:"#1e1b4b"} },
+      React.createElement("span", { style:{flexShrink:0,width:24,height:24,borderRadius:6,background:"#6366f1",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800} }, idx+1),
+      React.createElement("span", { style:{flex:1} }, section.title),
+      React.createElement("span", { style:{fontSize:18,color:"#9ca3af",transform:open?"rotate(90deg)":"rotate(0)"} }, "›")
+    ),
+    open && React.createElement("div", { style:{padding:"12px 16px 16px"} },
+      section.body && React.createElement("p", { style:{margin:"0 0 8px",fontSize:13.5,lineHeight:1.85,color:"#374151",whiteSpace:"pre-line"} }, section.body),
+      section.table && React.createElement(DataTable, {data:section.table}),
+      section.afterTable && React.createElement("p", { style:{margin:"8px 0",fontSize:13.5,lineHeight:1.85,color:"#374151",whiteSpace:"pre-line"} }, section.afterTable),
+      section.code && React.createElement(Code, {code:section.code}),
+      section.afterCode && React.createElement("p", { style:{margin:"10px 0 0",fontSize:13,lineHeight:1.8,color:"#555",whiteSpace:"pre-line",background:"#f9fafb",padding:"10px 14px",borderRadius:8,border:"1px solid #e5e7eb"} }, section.afterCode)
+    )
+  );
+}
+function App() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exercises = EX[chapter.id] || [];
+  return React.createElement("div", { style:{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Noto Sans JP',sans-serif"} },
+    React.createElement("div", { style:{maxWidth:1100,margin:"0 auto",padding:"20px 14px"} },
+      React.createElement("div", { style:{background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",borderRadius:16,padding:"24px 20px",marginBottom:16,position:"relative",overflow:"hidden"} },
+        React.createElement("div", { style:{position:"absolute",top:-30,right:-10,fontSize:140,opacity:0.05} }, "C"),
+        React.createElement("div", { style:{fontSize:11,fontWeight:700,color:"#a5b4fc",textTransform:"uppercase",letterSpacing:2,marginBottom:4} }, "C言語 初級コース"),
+        React.createElement("h1", { style:{margin:0,fontSize:22,fontWeight:900,color:"#fff"} }, "タスク管理CLIアプリ構築"),
+        React.createElement("p", { style:{margin:"6px 0 0",fontSize:12.5,color:"#c4b5fd"} }, "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問"),
+        React.createElement("p", { style:{margin:"10px 0 0",fontSize:12,color:"#ddd6fe",lineHeight:1.8} }, "タスク管理CLIアプリを段階的に構築しながら、動的メモリ・リンクリスト・ファイルI/O・関数ポインタ・分割コンパイルを実践的に習得します。完成時には「add/list/done」で操作できるCLIツールが手元に残ります。"),
+        React.createElement("div", { style:{marginTop:14,display:"flex",gap:3} },
+          chapters.map((_,i) => React.createElement("div", { key:i, onClick:()=>{setCh(i);setMenuOpen(false);}, style:{flex:1,height:5,borderRadius:3,background:i<=ch?"#818cf8":"rgba(255,255,255,0.15)",cursor:"pointer"} }))
+        )
+      ),
+      React.createElement("div", { style:{marginBottom:14} },
+        React.createElement("button", { onClick:()=>setMenuOpen(!menuOpen), style:{width:"100%",padding:"10px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",fontSize:14,fontWeight:700,color:"#1e1b4b",cursor:"pointer",display:"flex",justifyContent:"space-between"} },
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", { style:{fontSize:12,color:"#9ca3af"} }, menuOpen?"▲":"▼")
+        ),
+        menuOpen && React.createElement("div", { style:{marginTop:4,border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden",background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.08)"} },
+          chapters.map((c,i) => React.createElement("button", { key:c.id, onClick:()=>{setCh(i);setMenuOpen(false);}, style:{width:"100%",padding:"10px 16px",border:"none",borderBottom:i<chapters.length-1?"1px solid #f3f4f6":"none",background:i===ch?"#eef2ff":"#fff",fontSize:13,fontWeight:i===ch?700:500,color:i===ch?"#4338ca":"#374151",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10} },
+            React.createElement("span", { style:{width:22,height:22,borderRadius:"50%",background:i===ch?"#6366f1":"#e5e7eb",color:i===ch?"#fff":"#6b7280",fontWeight:800,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0} }, c.num),
+            React.createElement("span", { style:{flex:1} }, c.title),
+            EX[c.id] && React.createElement("span", { style:{fontSize:11,color:"#f59e0b",fontWeight:700} }, EX[c.id].length, "問")
+          ))
+        )
+      ),
+      React.createElement("div", { style:{display:"flex",alignItems:"center",gap:10,marginBottom:12} },
+        React.createElement("span", { style:{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",fontWeight:900,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"} }, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", { style:{fontWeight:800,fontSize:18,color:"#1e1b4b"} }, chapter.title),
+          React.createElement("div", { style:{fontSize:12,color:"#6b7280"} }, "目安: ", chapter.est, exercises.length>0?` ・ 演習${exercises.length}問`:"")
+        )
+      ),
+      chapter.goal && React.createElement("div", { style:{background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",border:"1px solid #c7d2fe",borderLeft:"4px solid #6366f1",borderRadius:10,padding:"12px 16px",marginBottom:14} },
+        React.createElement("div", { style:{fontSize:11,fontWeight:800,color:"#4338ca",letterSpacing:1,marginBottom:6} }, "🎯 この章のゴール"),
+        React.createElement("div", { style:{fontSize:13.5,color:"#1e1b4b",lineHeight:1.8} }, chapter.goal)
+      ),
+      React.createElement("div", { style:{display:"flex",flexDirection:"column",gap:8} },
+        chapter.sections.map((sec,i) => React.createElement(Section, {key:ch+"-"+i,section:sec,idx:i}))
+      ),
+      exercises.length>0 && React.createElement("div", { style:{marginTop:20} },
+        React.createElement("div", { style:{display:"flex",alignItems:"center",gap:8,marginBottom:12} },
+          React.createElement("span", { style:{background:"#f59e0b",color:"#fff",fontWeight:800,fontSize:13,padding:"4px 14px",borderRadius:8} }, "🏋️ 演習問題"),
+          React.createElement("span", { style:{fontSize:13,color:"#92400e"} }, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex,i) => React.createElement(Exercise, {key:ch+"-"+i,ex:ex,idx:i}))
+      ),
+      React.createElement("div", { style:{display:"flex",justifyContent:"space-between",marginTop:20,gap:10} },
+        ch>0 ? React.createElement("button", { onClick:()=>{setCh(ch-1);window.scrollTo(0,0);}, style:{flex:1,padding:"12px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",cursor:"pointer",fontWeight:600,fontSize:13,color:"#6b7280"} }, "← Ch.", chapters[ch-1].num)
+             : React.createElement("div", {style:{flex:1}}),
+        ch<chapters.length-1 ? React.createElement("button", { onClick:()=>{setCh(ch+1);window.scrollTo(0,0);}, style:{flex:1,padding:"12px 16px",border:"none",borderRadius:10,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff"} }, "Ch.", chapters[ch+1].num, " →")
+                              : React.createElement("a", { href:"../index.html", style:{flex:1,padding:"12px 16px",borderRadius:10,background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none"} }, "🎉 コース完了！")
+      ),
+      React.createElement("p", { style:{textAlign:"center",fontSize:11,color:"#9ca3af",marginTop:20} }, "C17 準拠 · gcc 13.x 基準 · 2026年4月時点")
+    )
+  );
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+  </script>
+</body>
+</html>

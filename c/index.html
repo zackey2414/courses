@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C言語 入門コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのC言語入門コース。全10章・30問の演習付き。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const T = {
+  overview: {
+    h: ["項目", "Python", "C言語"],
+    r: [
+      ["実行方式", "インタプリタ（逐次実行）", "コンパイル→機械語バイナリ"],
+      ["型システム", "動的型付け（実行時に決まる）", "静的型付け（コンパイル時に決まる）"],
+      ["メモリ管理", "GCが自動回収", "プログラマが手動で管理"],
+      ["速度", "比較的遅い", "最速クラス"],
+      ["用途", "スクリプト・AI・Web", "OS・組み込み・ゲームエンジン・言語処理系"],
+      ["抽象度", "高い（書きやすい）", "低い（ハードウェアに近い）"]
+    ]
+  },
+  types: {
+    h: ["型名", "バイト数", "値の範囲", "Pythonとの対応"],
+    r: [
+      ["char", "1", "-128 〜 127", "int（小さな整数 / 文字コード）"],
+      ["unsigned char", "1", "0 〜 255", "int（バイト値）"],
+      ["int", "4（多くの環境）", "-2^31 〜 2^31-1", "int"],
+      ["unsigned int", "4", "0 〜 2^32-1", "int（非負）"],
+      ["long", "4 or 8", "環境依存", "int"],
+      ["long long", "8", "-2^63 〜 2^63-1", "int（大きな整数）"],
+      ["float", "4", "約±3.4×10^38（精度7桁）", "float"],
+      ["double", "8", "約±1.8×10^308（精度15桁）", "float"],
+      ["_Bool / bool", "1", "0 または 1", "bool"]
+    ],
+    cap: "sizeof(型名) で実際のバイト数を確認できる。環境依存を避けるには <stdint.h> の int32_t, uint64_t 等を使う。"
+  },
+  operators: {
+    h: ["分類", "演算子", "例", "備考"],
+    r: [
+      ["算術", "+ - * / %", "10 / 3 → 3", "整数同士の / は切り捨て（Pythonの // 相当）"],
+      ["比較", "== != < > <= >=", "a == b", "結果は int（1=真, 0=偽）"],
+      ["論理", "&& || !", "a && b", "PythonのandはC言語では&&"],
+      ["ビット", "& | ^ ~ << >>", "a << 2", "ビット演算。Pythonと同じ記号"],
+      ["代入", "= += -= *= /= %=", "x += 1", "複合代入。Pythonと同じ"],
+      ["インクリメント", "++ --", "i++", "i+=1 の短縮。Pythonにはない"],
+      ["三項", "? :", "a>b ? a : b", "Pythonのa if条件 else bに相当"]
+    ]
+  },
+  printf: {
+    h: ["書式指定子", "対応する型", "例"],
+    r: [
+      ["%d", "int", "printf(\"%d\", 42) → 42"],
+      ["%ld", "long", "printf(\"%ld\", 1000000L)"],
+      ["%lld", "long long", "printf(\"%lld\", 9999999999LL)"],
+      ["%f", "float / double", "printf(\"%.2f\", 3.14) → 3.14"],
+      ["%e", "double（指数表記）", "printf(\"%e\", 0.001) → 1.000000e-03"],
+      ["%c", "char（文字）", "printf(\"%c\", 65) → A"],
+      ["%s", "char*（文字列）", "printf(\"%s\", \"hello\")"],
+      ["%p", "ポインタ（アドレス）", "printf(\"%p\", ptr)"],
+      ["%%", "リテラルの%", "printf(\"100%%\") → 100%"]
+    ]
+  },
+  scope: {
+    h: ["種類", "宣言場所", "有効範囲", "寿命"],
+    r: [
+      ["ローカル変数", "関数・ブロック内", "そのブロック内のみ", "ブロックを抜けると消える"],
+      ["グローバル変数", "関数の外", "プログラム全体", "プログラム終了まで"],
+      ["static局所変数", "関数内（static付き）", "関数内のみ", "プログラム終了まで（値を保持）"],
+      ["関数の仮引数", "関数定義", "関数内のみ", "関数終了まで"]
+    ]
+  },
+  control: {
+    h: ["構文", "C言語", "Python相当"],
+    r: [
+      ["if", "if (条件) { ... } else { ... }", "if 条件: ... else: ..."],
+      ["for", "for (初期化; 条件; 更新) { ... }", "for i in range(...):"],
+      ["while", "while (条件) { ... }", "while 条件:"],
+      ["do-while", "do { ... } while (条件);", "なし（1回は必ず実行）"],
+      ["switch", "switch (値) { case n: ... }", "match文（Python 3.10+）"],
+      ["break", "break;", "break"],
+      ["continue", "continue;", "continue"]
+    ]
+  },
+  pointerBasic: {
+    h: ["操作", "記法", "意味"],
+    r: [
+      ["アドレス取得", "&変数名", "変数が置かれているメモリアドレスを取得"],
+      ["ポインタ宣言", "型名 *変数名", "アドレスを格納するポインタ変数を宣言"],
+      ["間接参照（デリファレンス）", "*ポインタ", "ポインタが指す先の値を読み書き"],
+      ["NULL（無効なポインタ）", "NULL / 0", "どこも指さない安全な初期値"]
+    ]
+  },
+  struct: {
+    h: ["項目", "Python class", "C struct"],
+    r: [
+      ["定義", "class 名前:", "struct 名前 { ... };"],
+      ["フィールド", "self.x = ... で動的追加可", "型と名前を事前宣言（必須）"],
+      ["メソッド", "def method(self):", "なし（関数を別途定義する）"],
+      ["継承", "あり", "なし"],
+      ["メモリ", "ヒープ上（辞書的）", "フィールドが連続配置（高速）"],
+      ["コピー", "参照コピー（同じオブジェクト）", "値コピー（全フィールドをコピー）"]
+    ]
+  }
+};
+
+const EX = {
+  ch1: [
+    {
+      diff: 1,
+      q: "以下のPythonコードと同じ出力をするC言語プログラムを書いてください。\n\n【使う知識】#include <stdio.h>, main関数, printf",
+      code: `# Python
+print("Hello, C!")
+print("C言語へようこそ")`,
+      answer: `#include <stdio.h>
+
+int main(void) {
+    printf("Hello, C!\\n");
+    printf("C言語へようこそ\\n");
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "コンパイルして実行するまでの手順を確認してください。\nhello.c を作成し、gcc でコンパイルして ./a.out を実行してみましょう。\n\n【使う知識】gcc コマンド, ./a.out の実行",
+      code: `# ターミナルでの操作
+# 1. hello.c を作成
+# 2. コンパイル
+gcc hello.c
+# 3. 実行
+./a.out`,
+      answer: `// hello.c
+#include <stdio.h>
+
+int main(void) {
+    printf("Hello, C!\\n");
+    return 0;
+}
+
+// コンパイルと実行:
+// gcc hello.c -o hello
+// ./hello`
+    },
+    {
+      diff: 2,
+      q: "int と double の変数を宣言し、計算結果を表示してください。\n・整数: a=10, b=3 → 商と余りを表示\n・小数: x=3.14 → 2倍した値を表示\n\n【使う知識】変数宣言, printf の %d と %f",
+      code: `#include <stdio.h>
+int main(void) {
+    // ここに書いてください
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+int main(void) {
+    int a = 10, b = 3;
+    printf("商: %d\\n", a / b);
+    printf("余り: %d\\n", a % b);
+    double x = 3.14;
+    printf("2倍: %f\\n", x * 2);
+    return 0;
+}`
+    }
+  ],
+  ch2: [
+    {
+      diff: 1,
+      q: "char, int, double の変数を宣言して表示してください。\n・文字 'A', 整数 100, 小数 2.718\n\n【使う知識】型宣言, printf の %c %d %f",
+      code: `#include <stdio.h>
+int main(void) {
+    // 3種類の変数を宣言して表示
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+int main(void) {
+    char c = 'A';
+    int n = 100;
+    double d = 2.718;
+    printf("%c\\n", c);
+    printf("%d\\n", n);
+    printf("%f\\n", d);
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "整数の切り捨て除算と浮動小数点除算の違いを確認してください。\n10 ÷ 3 を int同士と double同士で計算して比較。\n\n【使う知識】int, double, キャスト (double)",
+      code: `#include <stdio.h>
+int main(void) {
+    int a = 10, b = 3;
+    // int同士の除算
+    // double同士の除算（キャスト使用）
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+int main(void) {
+    int a = 10, b = 3;
+    printf("int: %d\\n", a / b);         // 3（切り捨て）
+    printf("double: %f\\n", (double)a / b); // 3.333...
+    return 0;
+}`
+    },
+    {
+      diff: 3,
+      q: "sizeof 演算子で各型のバイト数を表示してください。\nchar, int, long, long long, float, double のサイズを全て表示。\n\n【使う知識】sizeof 演算子, %zu（size_t用書式指定子）",
+      code: `#include <stdio.h>
+int main(void) {
+    // 各型のsizeofを表示
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+int main(void) {
+    printf("char: %zu bytes\\n", sizeof(char));
+    printf("int: %zu bytes\\n", sizeof(int));
+    printf("long: %zu bytes\\n", sizeof(long));
+    printf("long long: %zu bytes\\n", sizeof(long long));
+    printf("float: %zu bytes\\n", sizeof(float));
+    printf("double: %zu bytes\\n", sizeof(double));
+    return 0;
+}`
+    }
+  ],
+  ch3: [
+    {
+      diff: 1,
+      q: "1から10までの整数を for ループで表示してください。\n\n【使う知識】for文, printf, %d",
+      code: `#include <stdio.h>
+int main(void) {
+    // for で 1〜10 を表示
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+int main(void) {
+    for (int i = 1; i <= 10; i++) {
+        printf("%d\\n", i);
+    }
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "FizzBuzz（1〜30）を書いてください。\n3の倍数→Fizz, 5の倍数→Buzz, 両方→FizzBuzz, その他→数値\n\n【使う知識】for文, if/else if/else, % 演算子",
+      code: `#include <stdio.h>
+int main(void) {
+    for (int i = 1; i <= 30; i++) {
+        // FizzBuzz条件
+    }
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+int main(void) {
+    for (int i = 1; i <= 30; i++) {
+        if (i % 15 == 0)      printf("FizzBuzz\\n");
+        else if (i % 3 == 0)  printf("Fizz\\n");
+        else if (i % 5 == 0)  printf("Buzz\\n");
+        else                  printf("%d\\n", i);
+    }
+    return 0;
+}`
+    },
+    {
+      diff: 3,
+      q: "九九の表を2重ループで出力してください。\n各行を「1 2 3 4 5 6 7 8 9」形式で表示（タブ区切り）。\n\n【使う知識】ネストしたfor文, printf の書式（%2d や \\t）",
+      code: `#include <stdio.h>
+int main(void) {
+    // 2重ループで九九表
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+int main(void) {
+    for (int i = 1; i <= 9; i++) {
+        for (int j = 1; j <= 9; j++) {
+            printf("%3d", i * j);
+        }
+        printf("\\n");
+    }
+    return 0;
+}`
+    }
+  ],
+  ch4: [
+    {
+      diff: 1,
+      q: "2つの int を受け取り、大きい方を返す関数 max2 を書いてください。\nmain() から呼び出して結果を表示。\n\n【使う知識】関数定義, 戻り値型, return",
+      code: `#include <stdio.h>
+
+// max2 を定義
+
+int main(void) {
+    printf("%d\\n", max2(3, 7));
+    printf("%d\\n", max2(10, 2));
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+int max2(int a, int b) {
+    return a > b ? a : b;
+}
+
+int main(void) {
+    printf("%d\\n", max2(3, 7));   // 7
+    printf("%d\\n", max2(10, 2));  // 10
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "再帰関数でフィボナッチ数列の第n項を求めてください。\nfib(0)=0, fib(1)=1, fib(n)=fib(n-1)+fib(n-2)\nmain()でfib(0)〜fib(10)を表示。\n\n【使う知識】再帰関数, 関数のプロトタイプ宣言",
+      code: `#include <stdio.h>
+
+int fib(int n) {
+    // 再帰で実装
+}
+
+int main(void) {
+    for (int i = 0; i <= 10; i++)
+        printf("fib(%d) = %d\\n", i, fib(i));
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+int fib(int n) {
+    if (n <= 1) return n;
+    return fib(n - 1) + fib(n - 2);
+}
+
+int main(void) {
+    for (int i = 0; i <= 10; i++)
+        printf("fib(%d) = %d\\n", i, fib(i));
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "整数nを受け取り、1からnまでの合計を返す関数 sum_to を書いてください。\nローカル変数 total を使い、forループで計算。\n\n【使う知識】関数, ローカル変数, for",
+      code: `#include <stdio.h>
+
+int sum_to(int n) {
+    // ローカル変数でfor計算
+}
+
+int main(void) {
+    printf("%d\\n", sum_to(10));  // 55
+    printf("%d\\n", sum_to(100)); // 5050
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+int sum_to(int n) {
+    int total = 0;
+    for (int i = 1; i <= n; i++)
+        total += i;
+    return total;
+}
+
+int main(void) {
+    printf("%d\\n", sum_to(10));
+    printf("%d\\n", sum_to(100));
+    return 0;
+}`
+    }
+  ],
+  ch5: [
+    {
+      diff: 1,
+      q: "int配列 {5, 2, 8, 1, 9, 3} の要素を全て表示し、合計と最大値を求めてください。\n\n【使う知識】配列宣言, forループ, 配列アクセス",
+      code: `#include <stdio.h>
+int main(void) {
+    int arr[] = {5, 2, 8, 1, 9, 3};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    // 全表示・合計・最大値を求める
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+int main(void) {
+    int arr[] = {5, 2, 8, 1, 9, 3};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    int sum = 0, max = arr[0];
+    for (int i = 0; i < n; i++) {
+        printf("%d ", arr[i]);
+        sum += arr[i];
+        if (arr[i] > max) max = arr[i];
+    }
+    printf("\\n合計: %d, 最大: %d\\n", sum, max);
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "バブルソートで int 配列を昇順に並べ替えてください。\n{64, 34, 25, 12, 22, 11, 90} をソートして表示。\n\n【使う知識】2重ループ, 要素の交換（temp変数）",
+      code: `#include <stdio.h>
+int main(void) {
+    int arr[] = {64, 34, 25, 12, 22, 11, 90};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    // バブルソート実装
+    // 結果表示
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+int main(void) {
+    int arr[] = {64, 34, 25, 12, 22, 11, 90};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - i - 1; j++) {
+            if (arr[j] > arr[j + 1]) {
+                int tmp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = tmp;
+            }
+        }
+    }
+    for (int i = 0; i < n; i++)
+        printf("%d ", arr[i]);
+    printf("\\n");
+    return 0;
+}`
+    },
+    {
+      diff: 3,
+      q: "2次元配列で3x3行列の積を計算してください。\nA={{1,2,3},{4,5,6},{7,8,9}}, B={{9,8,7},{6,5,4},{3,2,1}} の積を表示。\n\n【使う知識】2次元配列, 3重ループ",
+      code: `#include <stdio.h>
+int main(void) {
+    int A[3][3] = {{1,2,3},{4,5,6},{7,8,9}};
+    int B[3][3] = {{9,8,7},{6,5,4},{3,2,1}};
+    int C[3][3] = {0};
+    // 行列積を計算して表示
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+int main(void) {
+    int A[3][3] = {{1,2,3},{4,5,6},{7,8,9}};
+    int B[3][3] = {{9,8,7},{6,5,4},{3,2,1}};
+    int C[3][3] = {0};
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+            for (int k = 0; k < 3; k++)
+                C[i][j] += A[i][k] * B[k][j];
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++)
+            printf("%4d", C[i][j]);
+        printf("\\n");
+    }
+    return 0;
+}`
+    }
+  ],
+  ch6: [
+    {
+      diff: 1,
+      q: "ポインタを使って int 変数の値を2倍にする関数 double_it を書いてください。\nmain()で x=5 を渡し、呼び出し後に x が 10 になることを確認。\n\n【使う知識】ポインタ渡し (&x), 間接参照 (*p)",
+      code: `#include <stdio.h>
+
+void double_it(int *p) {
+    // *p を使って値を2倍に
+}
+
+int main(void) {
+    int x = 5;
+    double_it(&x);
+    printf("x = %d\\n", x);  // 10
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+void double_it(int *p) {
+    *p = *p * 2;
+}
+
+int main(void) {
+    int x = 5;
+    double_it(&x);
+    printf("x = %d\\n", x);  // 10
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "ポインタを使って2つの変数を交換する swap 関数を書いてください。\nmain()で a=3, b=7 を交換し、結果を表示。\n\n【使う知識】ポインタ渡し, 間接参照, 一時変数",
+      code: `#include <stdio.h>
+
+void swap(int *a, int *b) {
+    // ポインタ経由で値を交換
+}
+
+int main(void) {
+    int a = 3, b = 7;
+    swap(&a, &b);
+    printf("a=%d, b=%d\\n", a, b);  // a=7, b=3
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+void swap(int *a, int *b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+int main(void) {
+    int a = 3, b = 7;
+    swap(&a, &b);
+    printf("a=%d, b=%d\\n", a, b);
+    return 0;
+}`
+    },
+    {
+      diff: 3,
+      q: "配列をポインタで受け取り、全要素の平均値を返す avg 関数を書いてください。\n{10, 20, 30, 40, 50} の平均を計算して表示。\n\n【使う知識】配列とポインタの等価性, 関数引数として配列渡し",
+      code: `#include <stdio.h>
+
+double avg(int *arr, int n) {
+    // ポインタで配列を受け取り平均を計算
+}
+
+int main(void) {
+    int data[] = {10, 20, 30, 40, 50};
+    printf("平均: %.1f\\n", avg(data, 5));  // 30.0
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+double avg(int *arr, int n) {
+    int sum = 0;
+    for (int i = 0; i < n; i++)
+        sum += arr[i];
+    return (double)sum / n;
+}
+
+int main(void) {
+    int data[] = {10, 20, 30, 40, 50};
+    printf("平均: %.1f\\n", avg(data, 5));
+    return 0;
+}`
+    }
+  ],
+  ch7: [
+    {
+      diff: 1,
+      q: "構造体 Point を定義し、2点間の距離を計算してください。\n・Point: x, y（double型）\n・distance(p1, p2) 関数を実装（sqrt を使用）\n\n【使う知識】struct定義, typedef, <math.h>のsqrt",
+      code: `#include <stdio.h>
+#include <math.h>
+
+typedef struct { double x, y; } Point;
+
+double distance(Point a, Point b) {
+    // ユークリッド距離を計算
+}
+
+int main(void) {
+    Point p1 = {0.0, 0.0}, p2 = {3.0, 4.0};
+    printf("距離: %.2f\\n", distance(p1, p2));  // 5.00
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <math.h>
+
+typedef struct { double x, y; } Point;
+
+double distance(Point a, Point b) {
+    double dx = a.x - b.x, dy = a.y - b.y;
+    return sqrt(dx*dx + dy*dy);
+}
+
+int main(void) {
+    Point p1 = {0.0, 0.0}, p2 = {3.0, 4.0};
+    printf("距離: %.2f\\n", distance(p1, p2));
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "Student 構造体の配列を作り、点数の最高・最低・平均を表示してください。\n・Student: name[32](char), score(int)\n・3名分のデータで確認\n\n【使う知識】struct配列, メンバアクセス, ループ",
+      code: `#include <stdio.h>
+
+typedef struct {
+    char name[32];
+    int score;
+} Student;
+
+int main(void) {
+    Student students[] = {
+        {"Alice", 85}, {"Bob", 72}, {"Charlie", 91}
+    };
+    int n = 3;
+    // 最高・最低・平均を計算して表示
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+typedef struct {
+    char name[32];
+    int score;
+} Student;
+
+int main(void) {
+    Student s[] = {{"Alice",85},{"Bob",72},{"Charlie",91}};
+    int n = 3, sum = 0, max = s[0].score, min = s[0].score;
+    for (int i = 0; i < n; i++) {
+        sum += s[i].score;
+        if (s[i].score > max) max = s[i].score;
+        if (s[i].score < min) min = s[i].score;
+    }
+    printf("最高: %d, 最低: %d, 平均: %.1f\\n", max, min, (double)sum/n);
+    return 0;
+}`
+    }
+  ],
+  ch8: [
+    {
+      diff: 1,
+      q: "ファイル \"output.txt\" に1から5の数値を書き込み、\nその後読み直して画面に表示してください。\n\n【使う知識】fopen, fprintf, fclose, fscanf",
+      code: `#include <stdio.h>
+
+int main(void) {
+    // 書き込み
+    FILE *fp = fopen("output.txt", "w");
+    // 1〜5を書き込む
+    fclose(fp);
+
+    // 読み込み
+    fp = fopen("output.txt", "r");
+    // 読んで表示
+    fclose(fp);
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+int main(void) {
+    FILE *fp = fopen("output.txt", "w");
+    for (int i = 1; i <= 5; i++)
+        fprintf(fp, "%d\\n", i);
+    fclose(fp);
+
+    fp = fopen("output.txt", "r");
+    int x;
+    while (fscanf(fp, "%d", &x) == 1)
+        printf("%d\\n", x);
+    fclose(fp);
+    return 0;
+}`
+    },
+    {
+      diff: 2,
+      q: "標準入力から名前と点数を3人分読み込み、\n平均以上の学生だけ表示してください（fgets + sscanf を使う）。\n\n【使う知識】fgets, sscanf, 配列, 条件分岐",
+      code: `#include <stdio.h>
+
+int main(void) {
+    char buf[256];
+    char names[3][32];
+    int scores[3];
+    // 3人分読み込み
+    // 平均計算
+    // 平均以上を表示
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+int main(void) {
+    char names[3][32]; int scores[3];
+    for (int i = 0; i < 3; i++) {
+        fgets(names[i], 32, stdin);
+        scanf("%d", &scores[i]);
+        getchar();
+    }
+    double avg = 0;
+    for (int i = 0; i < 3; i++) avg += scores[i];
+    avg /= 3;
+    for (int i = 0; i < 3; i++)
+        if (scores[i] >= avg)
+            printf("%s: %d\\n", names[i], scores[i]);
+    return 0;
+}`
+    }
+  ],
+  ch9: [
+    {
+      diff: 1,
+      q: "#define で円周率 PI を定義し、半径 r を受け取って面積と円周を返すプログラムを書いてください。\nまた関数プロトタイプ宣言の書き方も確認してください。\n\n【使う知識】#define, プロトタイプ宣言, <math.h>",
+      code: `#include <stdio.h>
+#include <math.h>
+
+#define PI 3.14159265358979
+
+// プロトタイプ宣言（先に宣言）
+double circle_area(double r);
+double circle_perimeter(double r);
+
+int main(void) {
+    double r = 5.0;
+    printf("面積: %.4f\\n", circle_area(r));
+    printf("円周: %.4f\\n", circle_perimeter(r));
+    return 0;
+}
+
+// 実装
+double circle_area(double r) { /* ... */ }
+double circle_perimeter(double r) { /* ... */ }`,
+      answer: `#include <stdio.h>
+#include <math.h>
+
+#define PI 3.14159265358979
+
+double circle_area(double r);
+double circle_perimeter(double r);
+
+int main(void) {
+    double r = 5.0;
+    printf("面積: %.4f\\n", circle_area(r));
+    printf("円周: %.4f\\n", circle_perimeter(r));
+    return 0;
+}
+
+double circle_area(double r) { return PI * r * r; }
+double circle_perimeter(double r) { return 2 * PI * r; }`
+    },
+    {
+      diff: 2,
+      q: "文字列操作ライブラリ <string.h> を使って以下を確認してください。\n・strlen で長さを取得\n・strcpy でコピー\n・strcat で連結\n・strcmp で比較\n\n【使う知識】<string.h>の主要関数",
+      code: `#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char s1[64] = "Hello";
+    char s2[64] = "World";
+    // strlen, strcpy, strcat, strcmp を試す
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char s1[64] = "Hello", s2[64] = "World";
+    printf("長さ: %zu\\n", strlen(s1));
+    char s3[64]; strcpy(s3, s1);
+    printf("コピー: %s\\n", s3);
+    strcat(s1, " "); strcat(s1, s2);
+    printf("連結: %s\\n", s1);
+    printf("比較: %d\\n", strcmp("abc", "abd")); // 負の数
+    return 0;
+}`
+    }
+  ],
+  ch10: [
+    {
+      diff: 2,
+      q: "今まで学んだ知識を使って、成績管理プログラムを書いてください。\n・Student構造体（名前、国語、数学、英語の点数）\n・合計・平均・ランク（A/B/C）を計算して表示\n・3名分のデータで動作確認\n\n【使う知識】struct, 関数, 配列, 条件分岐",
+      code: `#include <stdio.h>
+
+typedef struct {
+    char name[32];
+    int kokugo, sugaku, eigo;
+} Student;
+
+char get_rank(double avg) { /* 80以上A, 60以上B, それ以外C */ }
+void print_student(Student s) { /* 名前・合計・平均・ランクを表示 */ }
+
+int main(void) {
+    Student students[] = {
+        {"Alice", 85, 92, 78},
+        {"Bob", 60, 55, 70},
+        {"Charlie", 95, 88, 91}
+    };
+    // 各学生の情報を表示
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+
+typedef struct {
+    char name[32]; int kokugo, sugaku, eigo;
+} Student;
+
+char get_rank(double avg) {
+    if (avg >= 80) return 'A';
+    if (avg >= 60) return 'B';
+    return 'C';
+}
+
+void print_student(Student s) {
+    int total = s.kokugo + s.sugaku + s.eigo;
+    double avg = (double)total / 3;
+    printf("%s: 合計%d 平均%.1f ランク%c\\n",
+           s.name, total, avg, get_rank(avg));
+}
+
+int main(void) {
+    Student ss[] = {
+        {"Alice",85,92,78}, {"Bob",60,55,70}, {"Charlie",95,88,91}
+    };
+    for (int i = 0; i < 3; i++) print_student(ss[i]);
+    return 0;
+}`
+    },
+    {
+      diff: 3,
+      q: "リンクリスト（単方向）を実装してください。\n・Node構造体: value(int), next(*Node)\n・push_front, print_list, free_list 関数を実装\n・malloc と free を使う\n\n【使う知識】struct, ポインタ, malloc, free",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node {
+    int value;
+    struct Node *next;
+} Node;
+
+Node* push_front(Node *head, int val) { /* ... */ }
+void print_list(Node *head) { /* ... */ }
+void free_list(Node *head) { /* ... */ }
+
+int main(void) {
+    Node *head = NULL;
+    head = push_front(head, 3);
+    head = push_front(head, 2);
+    head = push_front(head, 1);
+    print_list(head);  // 1 -> 2 -> 3 -> NULL
+    free_list(head);
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node { int value; struct Node *next; } Node;
+
+Node* push_front(Node *head, int val) {
+    Node *n = (Node*)malloc(sizeof(Node));
+    n->value = val; n->next = head;
+    return n;
+}
+
+void print_list(Node *head) {
+    for (Node *p = head; p; p = p->next)
+        printf("%d -> ", p->value);
+    printf("NULL\\n");
+}
+
+void free_list(Node *head) {
+    while (head) { Node *tmp = head->next; free(head); head = tmp; }
+}
+
+int main(void) {
+    Node *head = NULL;
+    head = push_front(head, 3);
+    head = push_front(head, 2);
+    head = push_front(head, 1);
+    print_list(head);
+    free_list(head);
+    return 0;
+}`
+    }
+  ]
+};
+
+const chapters = [
+  {
+    id: "ch1", num: 1, title: "はじめに — C言語の全体像", est: "20分",
+    goal: "C言語がなぜ今でも重要なのかを「OSや組み込み機器の根幹を支えているから」という観点で説明できる。コンパイルから実行までの流れを把握し、最初の Hello, C! を自分の手でビルド・実行できる状態になる。",
+    sections: [
+      {
+        title: "C言語とは何か",
+        body: "C言語は1972年にベル研究所で開発された言語で、半世紀以上たった今でも世界で最も広く使われているプログラミング言語の一つです。LinuxやmacOSのカーネル、Python処理系そのもの、組み込みマイコンのファームウェア、データベースエンジンなど、コンピュータの「土台」を支えるソフトウェアのほとんどはCで書かれています。\n\nPythonを知っている人からすると、Cは「不便で低レベルな言語」に見えるかもしれませんが、その「低レベルさ」こそがCの強みです。ハードウェアに近いコードを書けるため、GCのポーズがなく、メモリを精密に制御でき、実行速度が最速クラスになります。Pythonの拡張モジュール（NumPyなど）もCで書かれており、CをマスターすることはPythonの内部を理解することにも直結します。",
+        table: T.overview,
+        afterTable: "重要な違い: Pythonはコードを書いてすぐ実行できますが、Cはまずコンパイル（機械語への翻訳）が必要です。コンパイルエラーは実行前に発生するため、型の不一致やスペルミスはプログラムを動かす前に検出されます。"
+      },
+      {
+        title: "コンパイルから実行まで",
+        body: "Pythonでは python script.py と書けばすぐ動きますが、Cでは「ソースコード → コンパイル → バイナリ → 実行」という工程を踏みます。この工程には複数のフェーズが含まれます：プリプロセッサ（#include などの展開）→ コンパイル（C→アセンブリ）→ アセンブル（アセンブリ→オブジェクトファイル）→ リンク（複数ファイルの結合→実行可能バイナリ）。\n\n普段は gcc コマンド一発でこれらを全部やってくれるので意識しなくてよいのですが、エラーメッセージを読むときに「どの段階で起きたエラーか」がわかると原因の特定が速くなります。",
+        code: `# ファイル: hello.c を作成してからコンパイル
+
+gcc hello.c           # デフォルトで a.out というバイナリが生成される
+./a.out               # 実行
+
+gcc hello.c -o hello  # 出力ファイル名を指定
+./hello               # 実行
+
+gcc -Wall -Wextra hello.c -o hello  # 警告を全て有効化（推奨）`,
+        afterCode: "ポイント: -Wall -Wextra オプションは「よくある危険なコード」を警告してくれます。初心者のうちから必ず付ける習慣にしましょう。コンパイルが通っても警告があるコードは潜在的なバグを抱えています。"
+      },
+      {
+        title: "最初のプログラム",
+        body: "C言語の「Hello, World!」は構造的に多くの情報を含んでいます。Python の print(\"hello\") と比べると冗長に見えますが、各要素には明確な意味があります。\n\n#include <stdio.h> はPythonの import に相当し、標準入出力ライブラリを取り込みます。int main(void) はプログラムの開始点（エントリポイント）で、OSがプログラムを実行するときにこの関数が呼ばれます。return 0 はOSに「正常終了」を伝える整数値で、0が成功、それ以外が失敗を意味します。",
+        code: `#include <stdio.h>
+
+int main(void) {
+    printf("Hello, C!\\n");
+    return 0;
+}`,
+        afterCode: "\\n は改行コードです。Pythonのprintは自動で改行しますが、C のprintfは明示しないと改行されません。これは「Cはプログラマが制御を持つ」という設計思想の表れです。"
+      }
+    ]
+  },
+  {
+    id: "ch2", num: 2, title: "変数と型 — 静的型付けの世界", est: "35分",
+    goal: "C言語の基本型（char, int, double など）の意味とバイト数を把握し、適切な型を選べるようになる。printf の書式指定子を型に合わせて使い分けられること、そして「型が違うと暗黙変換で意図しない結果になる」ことを理解するのがゴール。",
+    sections: [
+      {
+        title: "静的型付けと動的型付け",
+        body: "Pythonでは x = 42 と書けば x はint型になり、後から x = 'hello' と書き換えればstr型になります。型は実行時に動的に決まります。Cでは変数を使う前に「この変数は何型か」を宣言しなければならず、一度宣言した型は変えられません。これを静的型付けといいます。\n\n静的型付けの利点は「コンパイル時に型の不一致を検出できる」ことです。int n = 'hello'; と書けばコンパイルエラーになり、実行前に問題がわかります。また、型が確定しているので機械語レベルで最適化しやすく、実行速度が向上します。",
+        table: T.types,
+        afterTable: "int のサイズが「4バイト（多くの環境）」と曖昧なのはC言語の歴史的な事情です。移植性を保証したい場合は <stdint.h> の int32_t（必ず32ビット）や uint64_t（符号なし64ビット）を使います。"
+      },
+      {
+        title: "変数の宣言と初期化",
+        body: "C言語では変数を使う前に必ず宣言します。宣言だけして初期化しない場合、変数には「ゴミ値」（直前にそのメモリ番地に入っていたランダムな値）が入ります。これはPythonにはない概念で、初心者が最もハマるバグの原因の一つです。\n\n原則として、宣言と同時に初期化する習慣をつけましょう。int n = 0; や double x = 0.0; のように、とりあえず安全な初期値を設定しておくことでゴミ値バグを防げます。",
+        code: `#include <stdio.h>
+
+int main(void) {
+    // 宣言と同時に初期化（推奨）
+    int age = 25;
+    double pi = 3.14159;
+    char grade = 'A';
+
+    // 複数同時宣言
+    int x = 0, y = 0, z = 0;
+
+    // 定数（変更不可）
+    const double G = 9.80665;
+
+    printf("age=%d, pi=%f, grade=%c\\n", age, pi, grade);
+    return 0;
+}`,
+        afterCode: "const 修飾子を付けると変数を定数として扱えます。プログラム中で変更すべきでない値（重力加速度、配列サイズなど）には const を付ける習慣をつけると、意図しない書き換えをコンパイラが検出してくれます。"
+      },
+      {
+        title: "printf の書式指定子",
+        body: "Pythonのf文字列（f\"値は{x}です\"）に相当するのがC言語の書式指定子です。printf(\"値は%dです\", x) のように、フォーマット文字列の中に %d のようなプレースホルダーを埋め込みます。\n\n書式指定子は型と一対一対応しており、型を間違えると（例：double 型を %d で表示する）コンパイラが警告を出し、実行時に不正な値が表示されます。型に対応した正しい書式指定子を使うことが重要です。",
+        table: T.printf,
+        afterCode: "幅・精度の指定: %8d は8文字幅（右寄せ）、%-8d は左寄せ、%.3f は小数点以下3桁。printf(\"%8.2f\", 3.14) → \"    3.14\" のように整形できます。"
+      },
+      {
+        title: "型変換とキャスト",
+        body: "C言語では異なる型同士で演算すると自動的に型変換（暗黙変換）が起きます。int と double を足すと結果は double になります。しかし「精度が下がる方向」の変換（double → int など）は警告なしに起きてしまい、小数部が切り捨てられます。\n\n意図的に型を変換したいときは (型名)値 というキャスト構文を使います。10 / 3 は int 同士なので 3（切り捨て）ですが、(double)10 / 3 は 3.333... になります。Pythonの整数除算（//）がデフォルトで、浮動小数点除算には明示的なキャストが必要、と覚えましょう。",
+        code: `#include <stdio.h>
+
+int main(void) {
+    int a = 10, b = 3;
+
+    // 整数同士の除算（切り捨て）
+    printf("10/3 = %d\\n", a / b);        // 3
+
+    // キャストで浮動小数点除算
+    printf("10/3.0 = %f\\n", (double)a / b);  // 3.333...
+
+    // 暗黙変換の罠
+    double x = 3.99;
+    int n = x;  // 3になる（切り捨て、警告が出ることも）
+    printf("int(%f) = %d\\n", x, n);
+    return 0;
+}`,
+        afterCode: "ポイント: (int)3.99 は 3 になります。「四捨五入」ではなく「ゼロ方向への切り捨て」です。四捨五入が必要なら <math.h> の round() を使います。"
+      }
+    ]
+  },
+  {
+    id: "ch3", num: 3, title: "制御構文 — if, for, while, switch", est: "30分",
+    goal: "C言語の制御構文（if/else, for, while, do-while, switch）をPythonと対比しながら習得する。ブレースによるブロック構造、セミコロンの役割、switch文のfall-throughという「Pythonにない概念」を正しく理解するのがゴール。",
+    sections: [
+      {
+        title: "if / else 文",
+        body: "Cの if 文はPythonと論理は同じですが、構文が異なります。条件は必ずカッコ ()  で囲み、実行するコードはブレース {} で囲みます。インデントは見やすさのためのものであり、Pythonと違ってブロックの範囲は {} によって決まります。\n\nよくある罠として「= と == の混同」があります。if (x = 5) と書くと「x に5を代入してその値（5、つまり真）を条件にする」という意味になり、コンパイルエラーにはならず（警告は出ます）、常に真になるバグになります。",
+        code: `#include <stdio.h>
+
+int main(void) {
+    int x = 42;
+
+    if (x > 0) {
+        printf("正の数\\n");
+    } else if (x < 0) {
+        printf("負の数\\n");
+    } else {
+        printf("ゼロ\\n");
+    }
+
+    // 1行でも{}を省略しないことを推奨
+    if (x > 100) printf("100超\\n");  // 可だが危険
+
+    return 0;
+}`,
+        afterCode: "ポイント: 1行しかない場合でも {} を省略しないことを強く推奨します。後でコードを追加したとき、ブロック範囲の誤解でバグが生まれるのを防ぎます。"
+      },
+      {
+        title: "for / while ループ",
+        body: "Cの for 文は「初期化; 条件; 更新」の3つの部分から成ります。Pythonの for i in range(0, 10) に対応するのが for (int i = 0; i < 10; i++) です。各部分は省略可能で、for(;;) と書けば無限ループになります。\n\nwhile はPythonとほぼ同じです。do-while はCにあってPythonにない構文で、ループ本体を「必ず1回は実行する」保証があります。メニュー表示など「入力を受け取ってから判断する」パターンでよく使います。",
+        table: T.control,
+        code: `#include <stdio.h>
+
+int main(void) {
+    // for: Python の range(0,5) 相当
+    for (int i = 0; i < 5; i++) {
+        printf("i=%d\\n", i);
+    }
+
+    // while
+    int n = 1;
+    while (n <= 10) { n *= 2; }
+    printf("n=%d\\n", n);  // 16
+
+    // do-while（必ず1回実行）
+    int x;
+    do {
+        printf("1〜10を入力: ");
+        scanf("%d", &x);
+    } while (x < 1 || x > 10);
+    return 0;
+}`,
+        afterCode: "break と continue は Python と同じ動作です。多重ループを一気に抜けたい場合は goto が使われることもありますが、乱用は可読性を下げるため、フラグ変数や関数分割で代替することが多いです。"
+      },
+      {
+        title: "switch 文",
+        body: "switch 文は整数値（または整数に変換できる型）を複数の case と照合する構文です。Pythonの match 文（3.10+）に相当しますが、大きな違いとして「fall-through（フォールスルー）」があります。case の末尾に break を書かないと次の case に処理が流れ落ちます。\n\nこの挙動は意図的に利用することもありますが（複数のケースで同じ処理をする場合）、うっかり break を忘れると意図しない動作になります。C言語を触り始めの頃に最もハマるポイントの一つです。",
+        code: `#include <stdio.h>
+
+int main(void) {
+    int day = 3;
+    switch (day) {
+        case 1: printf("月曜\\n"); break;
+        case 2: printf("火曜\\n"); break;
+        case 3: printf("水曜\\n"); break;
+        case 4: printf("木曜\\n"); break;
+        case 5: printf("金曜\\n"); break;
+        case 6: case 7:            // fall-through を意図的に使用
+            printf("週末\\n"); break;
+        default: printf("不正\\n");
+    }
+    return 0;
+}`,
+        afterCode: "ポイント: case に使えるのは整数定数（リテラル、定数変数）のみです。文字列や浮動小数点では使えません。文字 'A' は整数値（65）なので case 'A': のように書けます。"
+      }
+    ]
+  },
+  {
+    id: "ch4", num: 4, title: "関数 — 処理の部品化", est: "35分",
+    goal: "C言語の関数定義の構文（戻り値型・関数名・仮引数リスト）を書けるようになる。プロトタイプ宣言の必要性と役割を理解し、値渡しによって引数がコピーされることを把握する。再帰関数も含め、関数を使ってプログラムを適切に分割できる状態がゴール。",
+    sections: [
+      {
+        title: "関数の定義と呼び出し",
+        body: "Cの関数はPythonの def に相当しますが、「戻り値の型」を最初に書く必要があります。void は「何も返さない」という意味で、Pythonの関数が return を書かないこと（None を返すこと）に相当します。\n\n重要な点は「値渡し（pass by value）」です。Cの関数に変数を渡すと、その値がコピーされて仮引数に入ります。関数内で仮引数を書き換えても、呼び出し元の変数は変わりません。Pythonでもint や str は同様ですが、リストは参照が渡されるため挙動が異なります。",
+        code: `#include <stdio.h>
+
+// 戻り値型 関数名(引数型 引数名, ...) { ... }
+int add(int a, int b) {
+    return a + b;
+}
+
+void greet(void) {        // 引数なし、戻り値なし
+    printf("こんにちは\\n");
+}
+
+int main(void) {
+    int result = add(3, 5);
+    printf("3+5=%d\\n", result);  // 8
+    greet();
+    return 0;
+}`,
+        afterCode: "Pythonとの大きな違い: C の関数は「宣言した型」しか返せません。複数の値を返したいときは、構造体（後述）を返すか、ポインタを使って引数経由で返します。"
+      },
+      {
+        title: "プロトタイプ宣言",
+        body: "C言語はファイルを上から順に読むため、関数を使う前にその関数が存在することをコンパイラに教える必要があります。これがプロトタイプ宣言（前方宣言）です。Python では def で定義した関数はどこからでも呼べますが、Cでは「定義よりも前で呼び出す」にはプロトタイプが必要です。\n\n慣用的には、ヘッダファイル（.h）にプロトタイプを書き、ソースファイル（.c）に実装を書きます。単一ファイルの小さなプログラムでは、main() より前に全関数の実装を置くか、先頭にプロトタイプをまとめて書くのが一般的です。",
+        code: `#include <stdio.h>
+
+// プロトタイプ宣言（セミコロンで終わる）
+int square(int n);
+double average(int a, int b);
+
+int main(void) {
+    printf("%d\\n", square(5));       // プロトタイプがあるので呼べる
+    printf("%.1f\\n", average(3, 7));
+    return 0;
+}
+
+// 実装（mainの後でもOK）
+int square(int n) { return n * n; }
+double average(int a, int b) { return (double)(a + b) / 2; }`,
+        afterCode: "ポイント: プロトタイプと実装の型が食い違っているとコンパイルエラーになります。これはバグを未然に防ぐ安全装置です。引数名はプロトタイプでは省略可能ですが（int square(int);）、可読性のために書いておくのが推奨です。"
+      },
+      {
+        title: "変数のスコープと寿命",
+        body: "Cの変数は「宣言した場所」によってスコープ（有効範囲）と寿命が決まります。関数の中で宣言した変数はその関数が終わると消え、関数の外で宣言したグローバル変数はプログラム全体から見えます。\n\nstatic を付けたローカル変数は「スコープはそのブロック内だが、寿命はプログラム終了まで」という特殊な挙動になります。関数が呼ばれるたびに値を保持し続ける変数（カウンタなど）に使います。グローバル変数は便利に見えますが、どこからでも書き換えられるためバグの温床になりやすく、使用は最小限にすべきです。",
+        table: T.scope,
+        code: `#include <stdio.h>
+
+int global = 0;  // グローバル変数
+
+void count(void) {
+    static int s = 0;  // static局所変数：値を保持
+    int local = 0;     // 普通のローカル変数：毎回リセット
+    s++; local++; global++;
+    printf("static=%d, local=%d, global=%d\\n", s, local, global);
+}
+
+int main(void) {
+    count();  // static=1, local=1, global=1
+    count();  // static=2, local=1, global=2
+    count();  // static=3, local=1, global=3
+    return 0;
+}`,
+        afterCode: "local は毎回1にリセットされ、static は前回の値を保持していることに注目。これを活用するとコールカウントや状態管理などに使えます。"
+      }
+    ]
+  },
+  {
+    id: "ch5", num: 5, title: "配列と文字列", est: "40分",
+    goal: "C言語の配列が「固定サイズで連続したメモリ領域」であることを理解し、宣言・初期化・アクセスを自在に行えるようになる。文字列が「char配列でヌル文字\\0で終端される」という仕組みを把握し、文字列操作の基本を習得するのがゴール。",
+    sections: [
+      {
+        title: "配列の基本",
+        body: "C言語の配列はPythonのリストと見た目が似ていますが、本質的に異なります。C の配列は「同じ型の要素を連続したメモリに並べたもの」で、サイズは宣言時に固定されます（可変長にはできません）。Python のリストは動的にサイズが変わり、異なる型を混在できますが、C ではそれは不可能です。\n\n配列のインデックスは0から始まり、末尾は n-1 です。存在しない範囲（例：長さ5の配列の arr[10]）にアクセスしてもコンパイルエラーにはならず、実行時にランダムなメモリを読み書きする「未定義動作」になります。これはC最大の危険の一つです。",
+        code: `#include <stdio.h>
+
+int main(void) {
+    int arr[5] = {10, 20, 30, 40, 50};  // 宣言と初期化
+
+    // 要素アクセス
+    printf("arr[0]=%d, arr[4]=%d\\n", arr[0], arr[4]);
+
+    // ループでアクセス
+    for (int i = 0; i < 5; i++)
+        printf("%d ", arr[i]);
+    printf("\\n");
+
+    // sizeof で配列全体のバイト数を取得
+    int n = sizeof(arr) / sizeof(arr[0]);  // 要素数
+    printf("要素数: %d\\n", n);
+    return 0;
+}`,
+        afterCode: "sizeof(arr) / sizeof(arr[0]) は配列の要素数を安全に取得する定番の書き方です。ただし配列をポインタとして受け取った関数の中では使えません（後述）。"
+      },
+      {
+        title: "文字列とchar配列",
+        body: "C言語には「string型」が存在しません。文字列は char 型の配列として表現され、末尾に必ずヌル文字（'\\0'、値は0）を持ちます。例えば \"Hello\" は h, e, l, l, o, \\0 の6バイトで保存されます。\n\nPythonの文字列操作（+, len(), find() など）に相当するものはCでは <string.h> ライブラリの関数として提供されています。文字列の長さは strlen()、コピーは strcpy()、連結は strcat()、比較は strcmp() を使います。Python と違い、C の文字列は = で直接代入できず（配列はアドレスだから）、strcpy を使う必要があります。",
+        code: `#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char s1[32] = "Hello";       // 32バイトの配列
+    char s2[] = "World";         // サイズは自動（6バイト）
+    char s3[64];
+
+    printf("長さ: %zu\\n", strlen(s1));  // 5（\\0を除く）
+
+    strcpy(s3, s1);              // s3 = s1 のコピー
+    strcat(s3, " ");             // s3 に " " を連結
+    strcat(s3, s2);              // s3 に s2 を連結
+    printf("%s\\n", s3);         // Hello World
+
+    // 比較（== では比較できない！）
+    if (strcmp(s1, "Hello") == 0)
+        printf("一致\\n");
+    return 0;
+}`,
+        afterCode: "注意: if (s1 == \"Hello\") は文字列の内容を比較しません。ポインタ（アドレス）を比較するため常に偽になります。文字列比較には必ず strcmp() を使ってください。"
+      },
+      {
+        title: "多次元配列",
+        body: "Cでは2次元・3次元の配列も宣言できます。int matrix[3][4] は3行4列の行列です。メモリ上では行優先（row-major order）で、matrix[0][0], matrix[0][1], ..., matrix[0][3], matrix[1][0], ... と連続して並びます。\n\nPythonでは [[0]*4 for _ in range(3)] のように内包表記でネストしたリストを作りますが、Cでは int matrix[3][4] = {0}; で全要素0に初期化できます。多次元配列を関数に渡すときは列数（内側の次元）を宣言する必要があります。",
+        code: `#include <stdio.h>
+
+int main(void) {
+    // 2次元配列（3行4列）
+    int mat[3][4] = {
+        {1,  2,  3,  4},
+        {5,  6,  7,  8},
+        {9, 10, 11, 12}
+    };
+
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 4; j++)
+            printf("%3d", mat[i][j]);
+        printf("\\n");
+    }
+    return 0;
+}`,
+        afterCode: "ポイント: 初期化子 {0} だけで全要素を0にできます（int mat[3][4] = {0};）。これは便利なC言語の仕様で、一部を初期化すると残りは自動的に0になります。"
+      }
+    ]
+  },
+  {
+    id: "ch6", num: 6, title: "ポインタ入門 — アドレスと間接参照", est: "50分",
+    goal: "ポインタがメモリ上のアドレスを格納する変数であることを理解し、& でアドレスを取得し * で間接参照する操作を自分の手で書けるようになる。ポインタ渡しによって関数から複数の値を「返す」テクニックを習得し、配列とポインタの関係を把握するのがゴール。",
+    sections: [
+      {
+        title: "メモリとアドレスの概念",
+        body: "プログラムが使うデータはすべてメモリ（RAM）上のどこかに置かれています。メモリは番地（アドレス）で管理され、変数にはそれぞれアドレスが割り当てられます。Pythonではこの仕組みをほぼ意識しませんが、C言語ではアドレスを直接扱えます。\n\n& 演算子は変数のアドレスを取得します。printf(\"%p\", &x) と書くと x のアドレスが16進数で表示されます。ポインタ変数（int *p）はこのアドレスを格納できる変数です。「p が指す先の値」は *p（間接参照・デリファレンス）で読み書きできます。",
+        table: T.pointerBasic,
+        code: `#include <stdio.h>
+
+int main(void) {
+    int x = 42;
+    int *p = &x;      // p は x のアドレスを保持
+
+    printf("x の値: %d\\n", x);
+    printf("x のアドレス: %p\\n", (void*)&x);
+    printf("p の値（=x のアドレス）: %p\\n", (void*)p);
+    printf("p が指す先の値: %d\\n", *p);  // 42
+
+    *p = 100;          // p が指す先（= x）に書き込む
+    printf("変更後の x: %d\\n", x);       // 100
+    return 0;
+}`,
+        afterCode: "ポイント: p = &x と *p = 100 を混同しないようにしましょう。前者は「p にアドレスを代入」、後者は「p が指す先の値を変更」です。* の意味が宣言と式で異なることに注意。"
+      },
+      {
+        title: "ポインタ渡しと参照渡し",
+        body: "Cは基本的に「値渡し」なので、関数に変数を渡してもコピーが渡され、元の変数は変わりません。しかしポインタ（アドレス）を渡せば、関数内から元の変数を書き換えられます。これが「参照渡し」の代替手段です。\n\nPythonではリストや辞書は参照が渡されるため関数内での変更が反映されますが、int や str は値渡しと同じ挙動です。Cでは型に関わらず「アドレスを渡せば参照渡し相当になる」という一貫した仕組みです。",
+        code: `#include <stdio.h>
+
+void increment(int *p) {   // アドレスを受け取る
+    (*p)++;                // 間接参照して値を増やす
+}
+
+void swap(int *a, int *b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+int main(void) {
+    int x = 5;
+    increment(&x);         // アドレスを渡す
+    printf("x=%d\\n", x);   // 6
+
+    int a = 10, b = 20;
+    swap(&a, &b);
+    printf("a=%d, b=%d\\n", a, b);  // 20, 10
+    return 0;
+}`,
+        afterCode: "Cの標準ライブラリ関数の多くがポインタ引数を使います。scanf(\"%d\", &x) の &x がまさにこれで、「入力した値を x に書き込むためにアドレスを渡す」という意味です。"
+      },
+      {
+        title: "配列とポインタ",
+        body: "C言語の配列とポインタは深く関係しています。配列名（例: arr）は「配列の先頭要素のアドレス」として扱われます。つまり arr と &arr[0] は同じ値です。\n\n関数に配列を渡すとき、実際には先頭アドレスのポインタが渡されます（コピーは起きない）。そのため関数内で arr[i] = ... と書くと呼び出し元の配列が書き換わります。また、配列のインデックスアクセス arr[i] はポインタ演算 *(arr + i) と完全に等価です。",
+        code: `#include <stdio.h>
+
+// 配列を受け取る2つの等価な書き方
+void fill(int arr[], int n, int val) {    // arr[] と書いても
+    for (int i = 0; i < n; i++)
+        arr[i] = val;
+}
+void fill2(int *arr, int n, int val) {   // *arr でも同じ意味
+    for (int i = 0; i < n; i++)
+        *(arr + i) = val;  // arr[i] と等価
+}
+
+int main(void) {
+    int a[5];
+    fill(a, 5, 0);   // a のアドレスが渡される
+    for (int i = 0; i < 5; i++) printf("%d ", a[i]);
+    printf("\\n");    // 0 0 0 0 0
+    return 0;
+}`,
+        afterCode: "注意: 関数の中で sizeof(arr) を使っても配列全体のサイズは取得できません（ポインタのサイズ、多くの場合8バイトが返る）。要素数は別途引数として渡す必要があります。"
+      }
+    ]
+  },
+  {
+    id: "ch7", num: 7, title: "構造体 — データをまとめる", est: "35分",
+    goal: "struct を使って複数のフィールドをひとまとめにできる。typedef で型に別名を付ける書き方を習得し、構造体を関数に渡す方法（値渡しとポインタ渡し）の違いを理解する。「Pythonのclassがないならどうするのか」という疑問に答えられる状態がゴール。",
+    sections: [
+      {
+        title: "struct の定義と使い方",
+        body: "Python でデータをまとめたいときは class を使いますが、C言語には（初期の仕様では）クラスがありません。代わりに struct（構造体）を使います。struct はフィールド（メンバ変数）の集合で、メソッドは持てません。処理は別途関数として定義して、構造体を引数に渡す形で書きます。\n\nPythonのclassと比べてCのstructが「速い」理由はメモリ配置にあります。struct のフィールドはメモリ上で連続配置されるため、キャッシュ効率が高く、アクセスが高速です。Python のオブジェクトはヒープ上の辞書として管理されるため、アクセスのたびにハッシュ検索が走ります。",
+        table: T.struct,
+        code: `#include <stdio.h>
+
+// 方法1: struct タグを使う
+struct Point {
+    double x;
+    double y;
+};
+
+// 方法2: typedef で別名をつける（こちらが一般的）
+typedef struct {
+    int year, month, day;
+} Date;
+
+int main(void) {
+    struct Point p1 = {1.0, 2.0};   // 方法1: struct Point
+    Date d = {2026, 4, 1};           // 方法2: Date だけで OK
+
+    printf("座標: (%.1f, %.1f)\\n", p1.x, p1.y);
+    printf("日付: %04d-%02d-%02d\\n", d.year, d.month, d.day);
+    return 0;
+}`,
+        afterCode: "typedef struct { ... } 型名; というパターンが現代Cでは最もよく使われます。struct キーワードを毎回書かなくて済む書き方です。"
+      },
+      {
+        title: "構造体と関数",
+        body: "構造体を関数に渡す方法は2つあります。値渡し（全フィールドをコピー）とポインタ渡し（アドレスのみを渡す）です。小さな構造体なら値渡しでも問題ありませんが、大きな構造体をループで大量に渡すときはポインタ渡しの方がメモリ効率がよいです。\n\nポインタ渡しの場合、メンバアクセスには -> 演算子を使います。(*p).x と p->x は等価ですが、-> の方が簡潔なため慣例的に使われます。関数内から元の構造体を書き換えたい場合もポインタ渡しが必要です。",
+        code: `#include <stdio.h>
+#include <math.h>
+
+typedef struct { double x, y; } Vec2;
+
+// 値渡し: 元を変えない処理
+double magnitude(Vec2 v) {
+    return sqrt(v.x*v.x + v.y*v.y);
+}
+
+// ポインタ渡し: 元を変える処理
+void normalize(Vec2 *v) {
+    double m = sqrt(v->x*v->x + v->y*v->y);
+    v->x /= m;
+    v->y /= m;
+}
+
+int main(void) {
+    Vec2 v = {3.0, 4.0};
+    printf("大きさ: %.2f\\n", magnitude(v));  // 5.00
+    normalize(&v);
+    printf("正規化: (%.2f, %.2f)\\n", v.x, v.y);  // (0.60, 0.80)
+    return 0;
+}`,
+        afterCode: "ポイント: v->x は (*v).x の省略形。p->member のアロー演算子はC言語で最もよく使う構文の一つです。構造体のポインタを受け取る関数を書くときは必ず ->  を使います。"
+      }
+    ]
+  },
+  {
+    id: "ch8", num: 8, title: "ファイル入出力", est: "25分",
+    goal: "fopen/fclose でファイルを開閉し、fprintf/fscanf や fgets でファイルにデータを読み書きできるようになる。ファイル操作でのエラーチェック（fopen がNULLを返す場合）の重要性を理解するのがゴール。",
+    sections: [
+      {
+        title: "ファイルの開閉と基本操作",
+        body: "C言語のファイル操作はPythonの open() / close() に相当しますが、FILE* という型のポインタを通じて行います。fopen(ファイル名, モード) でファイルを開き、必ず fclose() で閉じます。Pythonの with 文に相当するのは、C言語にはありません（C11以降は自動クリーンアップ属性がありますが一般的ではない）。\n\nfopen が失敗すると NULL を返します。ファイルが存在しない、権限がないなどのエラーがありえるため、必ず NULL チェックをする習慣が重要です。エラーチェックを省くとNULLポインタへのアクセスでプログラムがクラッシュします。",
+        code: `#include <stdio.h>
+
+int main(void) {
+    // 書き込みモードで開く
+    FILE *fp = fopen("data.txt", "w");
+    if (fp == NULL) {           // 必ずエラーチェック！
+        perror("ファイルを開けない");
+        return 1;
+    }
+    fprintf(fp, "名前: Alice\\n");
+    fprintf(fp, "点数: %d\\n", 95);
+    fclose(fp);
+
+    // 読み取りモードで開く
+    fp = fopen("data.txt", "r");
+    if (fp == NULL) { perror("読み取りエラー"); return 1; }
+
+    char line[256];
+    while (fgets(line, sizeof(line), fp) != NULL)
+        printf("%s", line);    // 改行はfgetsが含む
+    fclose(fp);
+    return 0;
+}`,
+        afterCode: "モード一覧: \"r\"（読取）, \"w\"（書込・上書き）, \"a\"（追記）, \"rb\"\"wb\"（バイナリモード）。\"w\" は既存ファイルを空にするので注意。追記なら \"a\" を使います。"
+      },
+      {
+        title: "標準入力と scanf",
+        body: "scanf はキーボード（標準入力）から値を読み取る関数です。printf の逆版と考えると理解しやすいですが、引数に「変数のアドレス」を渡す点が重要です。scanf(\"%d\", &x) の &x を忘れると未定義動作になります。\n\nPythonの input() と比べると、scanf は型を明示的に指定する必要があり、バッファオーバーフローの危険もあります（%s は長さ制限がない）。安全な文字列読み取りには fgets(buf, sizeof(buf), stdin) を使うことが推奨されています。",
+        code: `#include <stdio.h>
+
+int main(void) {
+    int age;
+    double height;
+    char name[64];
+
+    printf("名前: ");
+    fgets(name, sizeof(name), stdin);  // 安全な文字列読み取り
+
+    printf("年齢: ");
+    scanf("%d", &age);                 // &を忘れずに
+
+    printf("身長(cm): ");
+    scanf("%lf", &height);             // doubleは %lf
+
+    printf("名前=%s年齢=%d, 身長=%.1fcm\\n", name, age, height);
+    return 0;
+}`,
+        afterCode: "scanf の戻り値は「成功した変換の数」です。scanf(\"%d %d\", &a, &b) == 2 のようにチェックすると、入力が期待通りだったか確認できます。"
+      }
+    ]
+  },
+  {
+    id: "ch9", num: 9, title: "プリプロセッサと標準ライブラリ", est: "25min",
+    goal: "#define / #include / #ifdef などのプリプロセッサ指令の役割を理解し、C言語の主要な標準ライブラリ（stdio, string, math, stdlib）を使いこなせるようになる。複数ファイルに分割する構成の基礎も把握するのがゴール。",
+    sections: [
+      {
+        title: "プリプロセッサ",
+        body: "コンパイルの前段階で動くのがプリプロセッサです。# から始まる行はプリプロセッサへの命令（プリプロセッサ指令）で、コンパイラが見る前に処理されます。\n\n#include は指定したファイルの内容をそこに展開します（Pythonのimportとは仕組みが全く違い、単純なテキスト置換です）。#define はマクロ（テキスト置換ルール）を定義します。#ifdef / #ifndef は条件コンパイルで、プラットフォームや設定によってコードを切り替えるときに使います。",
+        code: `#include <stdio.h>
+
+#define MAX_SIZE 100        // 定数マクロ
+#define SQUARE(x) ((x)*(x)) // 関数マクロ（カッコ必須）
+#define DEBUG 1
+
+int main(void) {
+    int arr[MAX_SIZE];
+    printf("SQUARE(5) = %d\\n", SQUARE(5));   // 25
+    printf("SQUARE(2+3) = %d\\n", SQUARE(2+3)); // 25（カッコがあるので正しい）
+
+#ifdef DEBUG
+    printf("[DEBUG] デバッグビルド\\n");
+#endif
+
+    return 0;
+}`,
+        afterCode: "関数マクロの引数は必ずカッコで囲みましょう。SQUARE(x) を (x)*(x) でなく x*x と書くと、SQUARE(2+3) が 2+3*2+3=11 になってしまいます。"
+      },
+      {
+        title: "主要な標準ライブラリ",
+        body: "C言語の標準ライブラリはヘッダをインクルードすることで使えます。Pythonのimportと似た操作ですが、実際にはヘッダファイルの宣言をインクルードし、リンク時にコンパイル済みライブラリと結合します。\n\n最も使う標準ライブラリは stdio.h（入出力）、string.h（文字列操作）、math.h（数学関数）、stdlib.h（メモリ管理・乱数・変換）、time.h（時刻）です。数学関数を使う際は gccのリンクオプション -lm が必要です（gcc prog.c -o prog -lm）。",
+        code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+
+int main(void) {
+    // stdlib.h: 乱数
+    srand((unsigned)time(NULL));
+    printf("乱数: %d\\n", rand() % 100);
+
+    // stdlib.h: 数値変換
+    int n = atoi("123");
+    double d = atof("3.14");
+    printf("%d, %f\\n", n, d);
+
+    // math.h: 数学関数（コンパイル時に -lm が必要）
+    printf("sqrt(2)=%.6f\\n", sqrt(2.0));
+    printf("pow(2,10)=%.0f\\n", pow(2.0, 10.0));
+    printf("floor(3.7)=%.0f\\n", floor(3.7));
+
+    return 0;
+}`,
+        afterCode: "stdlib.h の malloc / free はメモリを動的に確保・解放する最重要関数です。「初級」コースで詳しく扱います。"
+      }
+    ]
+  },
+  {
+    id: "ch10", num: 10, title: "総合演習 — 入門のまとめ", est: "40分",
+    goal: "入門で学んだ全要素（型・制御構文・関数・配列・ポインタ・構造体・ファイルI/O・標準ライブラリ）を総動員して、Cプログラムを設計・実装できることを確認する。エラーへの対処と、「なぜそう書くか」を説明できる状態になれば入門コース完了。",
+    sections: [
+      {
+        title: "総合演習の進め方",
+        body: "ここまでで学んだ内容は、C言語プログラミングの土台になるものばかりです。演習問題は難易度順に並んでいます。まずは解答を見ずに自力で解いてみましょう。詰まったら該当章に戻り復習してください。\n\nC言語のプログラムを書くときの基本サイクルは：(1) ロジックを考える (2) コードを書く (3) -Wall -Wextra でコンパイルして警告を消す (4) 実行してテストする、です。警告を0にした上で動作することを目標にしましょう。",
+        afterCode: "C言語習得の次のステップ: ポインタと動的メモリ確保（malloc/free）の深掘り、データ構造（リンクリスト・スタック・ツリー）の実装、ファイルを分割したプロジェクト管理（Makefile）へと進みましょう。初級コースではこれらを体系的に扱います。"
+      }
+    ]
+  }
+];
+
+/* ─── UI Components ─── */
+function DataTable({ data }) {
+  return React.createElement("div", {
+    style: { overflowX:"auto", margin:"12px 0", borderRadius:10, border:"1px solid #d1d5db", background:"#fff" }
+  }, React.createElement("table", {
+    style: { width:"100%", borderCollapse:"separate", borderSpacing:0, fontSize:13 }
+  }, React.createElement("thead", null, React.createElement("tr", null,
+    data.h.map((h, i) => React.createElement("th", {
+      key: i,
+      style: { background:"linear-gradient(180deg,#eef2ff,#e0e7ff)", color:"#312e81", fontWeight:800, fontSize:12.5, padding:"10px 14px", textAlign:"left", borderBottom:"2px solid #a5b4fc", borderRight: i < data.h.length-1 ? "1px solid #c7d2fe" : "none" }
+    }, h))
+  )), React.createElement("tbody", null,
+    data.r.map((row, ri) => React.createElement("tr", { key: ri },
+      row.map((cell, ci) => React.createElement("td", {
+        key: ci,
+        style: { padding:"9px 14px", borderBottom: ri < data.r.length-1 ? "1px solid #e5e7eb" : "none", borderRight: ci < row.length-1 ? "1px solid #f3f4f6" : "none", color: ci===0 ? "#1e1b4b" : "#374151", fontWeight: ci===0 ? 700 : 400, fontSize:13, lineHeight:1.65, verticalAlign:"top", whiteSpace:"pre-line", background: ri%2===0 ? "#fff" : "#f9fafb" }
+      }, cell))
+    ))
+  )), data.cap && React.createElement("div", {
+    style: { padding:"8px 14px", fontSize:12, color:"#6b7280", borderTop:"1px solid #e5e7eb", background:"#f9fafb" }
+  }, data.cap));
+}
+
+function Code({ code, hl }) {
+  return React.createElement("pre", {
+    style: { background: hl ? "#1a1a2e" : "#0d0d1a", color:"#d0d0f0", padding:"14px 16px", borderRadius:10, fontSize:12, lineHeight:1.65, overflowX:"auto", margin:"8px 0 0", fontFamily:"'JetBrains Mono','Fira Code',monospace", border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)", whiteSpace:"pre-wrap", wordBreak:"break-word" }
+  }, React.createElement("code", null, code));
+}
+
+const diffLabel = d => d===1 ? "⭐ 基本" : d===2 ? "⭐⭐ 応用" : "⭐⭐⭐ 発展";
+const diffColor = d => d===1 ? "#16a34a" : d===2 ? "#d97706" : "#dc2626";
+
+function Exercise({ ex, idx }) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: { borderRadius:12, border:"2px solid #f59e0b", overflow:"hidden", background:"#fff", marginBottom:8 }
+  },
+    React.createElement("div", { style: { padding:"12px 16px", background:"linear-gradient(135deg,#fffbeb,#fef3c7)" } },
+      React.createElement("div", { style: { display:"flex", alignItems:"center", gap:8, marginBottom:6 } },
+        React.createElement("span", { style: { background:"#f59e0b", color:"#fff", fontSize:11, fontWeight:800, padding:"3px 10px", borderRadius:6 } }, "問", idx+1),
+        React.createElement("span", { style: { fontSize:12, fontWeight:700, color: diffColor(ex.diff) } }, diffLabel(ex.diff))
+      ),
+      React.createElement("p", { style: { margin:0, fontSize:13.5, lineHeight:1.8, color:"#92400e", whiteSpace:"pre-line" } }, ex.q)
+    ),
+    React.createElement("div", { style: { padding:"0 16px 12px" } }, React.createElement(Code, { code: ex.code, hl: true })),
+    React.createElement("div", { style: { borderTop:"1px dashed #fcd34d", padding:"10px 16px" } },
+      React.createElement("button", {
+        onClick: () => setShowAnswer(!showAnswer),
+        style: { background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)", color:"#fff", border:"none", borderRadius:8, padding:"8px 20px", fontSize:13, fontWeight:700, cursor:"pointer", width:"100%" }
+      }, showAnswer ? "🙈 解答を隠す" : "👀 解答例を見る"),
+      showAnswer && React.createElement("div", { style: { marginTop:10 } },
+        React.createElement("div", { style: { fontSize:11, fontWeight:700, color:"#166534", textTransform:"uppercase", letterSpacing:1, marginBottom:4 } }, "✅ 解答例"),
+        React.createElement(Code, { code: ex.answer })
+      )
+    )
+  );
+}
+
+function Section({ section, idx, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: { borderRadius:12, border:"1px solid #e5e7eb", overflow:"hidden", background:"#fff" }
+  },
+    React.createElement("button", {
+      onClick: () => setOpen(!open),
+      style: { width:"100%", display:"flex", alignItems:"center", gap:10, padding:"12px 16px", border:"none", background:"#fafafa", cursor:"pointer", textAlign:"left", fontSize:14, fontWeight:700, color:"#1e1b4b" }
+    },
+      React.createElement("span", { style: { flexShrink:0, width:24, height:24, borderRadius:6, background:"#6366f1", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800 } }, idx+1),
+      React.createElement("span", { style: { flex:1 } }, section.title),
+      React.createElement("span", { style: { fontSize:18, color:"#9ca3af", transition:"transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0)" } }, "›")
+    ),
+    open && React.createElement("div", { style: { padding:"12px 16px 16px" } },
+      section.body && React.createElement("p", { style: { margin:"0 0 8px", fontSize:13.5, lineHeight:1.85, color:"#374151", whiteSpace:"pre-line" } }, section.body),
+      section.table && React.createElement(DataTable, { data: section.table }),
+      section.afterTable && React.createElement("p", { style: { margin:"8px 0", fontSize:13.5, lineHeight:1.85, color:"#374151", whiteSpace:"pre-line" } }, section.afterTable),
+      section.code && React.createElement(Code, { code: section.code }),
+      section.afterCode && React.createElement("p", { style: { margin:"10px 0 0", fontSize:13, lineHeight:1.8, color:"#555", whiteSpace:"pre-line", background:"#f9fafb", padding:"10px 14px", borderRadius:8, border:"1px solid #e5e7eb" } }, section.afterCode)
+    )
+  );
+}
+
+function CCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exercises = EX[chapter.id] || [];
+  return React.createElement("div", {
+    style: { minHeight:"100vh", background:"#f8f7f4", fontFamily:"'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif" }
+  },
+    React.createElement("div", { style: { maxWidth:1100, margin:"0 auto", padding:"20px 14px" } },
+      React.createElement("div", {
+        style: { background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)", borderRadius:16, padding:"24px 20px", marginBottom:16, position:"relative", overflow:"hidden" }
+      },
+        React.createElement("div", { style: { position:"absolute", top:-30, right:-10, fontSize:140, opacity:0.05 } }, "C"),
+        React.createElement("div", { style: { fontSize:11, fontWeight:700, color:"#a5b4fc", textTransform:"uppercase", letterSpacing:2, marginBottom:4 } }, "Python開発者のための"),
+        React.createElement("h1", { style: { margin:0, fontSize:22, fontWeight:900, color:"#fff" } }, "C言語 入門コース"),
+        React.createElement("p", { style: { margin:"6px 0 0", fontSize:12.5, color:"#c4b5fd" } },
+          "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問 ・ 難易度⭐〜⭐⭐⭐"
+        ),
+        React.createElement("p", { style: { margin:"10px 0 0", fontSize:12, color:"#ddd6fe", lineHeight:1.8 } },
+          "Pythonとの対比を軸にC言語の基礎を学びます。静的型付け・手動メモリ管理・ポインタ・構造体など、Cの核心概念を習得し、「なぜPythonはCより遅いのか」「なぜNumPyはCで書かれているのか」を自分の言葉で説明できるようになることがゴールです。C17仕様・gcc基準。"
+        ),
+        React.createElement("div", { style: { marginTop:14, display:"flex", gap:3 } },
+          chapters.map((_, i) => React.createElement("div", {
+            key: i, onClick: () => { setCh(i); setMenuOpen(false); },
+            style: { flex:1, height:5, borderRadius:3, background: i<=ch ? "#818cf8" : "rgba(255,255,255,0.15)", cursor:"pointer" }
+          }))
+        )
+      ),
+      React.createElement("div", { style: { marginBottom:14 } },
+        React.createElement("button", {
+          onClick: () => setMenuOpen(!menuOpen),
+          style: { width:"100%", padding:"10px 16px", border:"1px solid #d1d5db", borderRadius:10, background:"#fff", fontSize:14, fontWeight:700, color:"#1e1b4b", cursor:"pointer", display:"flex", justifyContent:"space-between" }
+        },
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", { style: { fontSize:12, color:"#9ca3af" } }, menuOpen ? "▲" : "▼")
+        ),
+        menuOpen && React.createElement("div", {
+          style: { marginTop:4, border:"1px solid #e5e7eb", borderRadius:10, overflow:"hidden", background:"#fff", boxShadow:"0 4px 20px rgba(0,0,0,0.08)" }
+        },
+          chapters.map((c, i) => React.createElement("button", {
+            key: c.id, onClick: () => { setCh(i); setMenuOpen(false); },
+            style: { width:"100%", padding:"10px 16px", border:"none", borderBottom: i < chapters.length-1 ? "1px solid #f3f4f6" : "none", background: i===ch ? "#eef2ff" : "#fff", fontSize:13, fontWeight: i===ch ? 700 : 500, color: i===ch ? "#4338ca" : "#374151", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:10 }
+          },
+            React.createElement("span", { style: { width:22, height:22, borderRadius:"50%", background: i===ch ? "#6366f1" : "#e5e7eb", color: i===ch ? "#fff" : "#6b7280", fontWeight:800, fontSize:11, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 } }, c.num),
+            React.createElement("span", { style: { flex:1 } }, c.title),
+            EX[c.id] && React.createElement("span", { style: { fontSize:11, color:"#f59e0b", fontWeight:700 } }, EX[c.id].length, "問")
+          ))
+        )
+      ),
+      React.createElement("div", { style: { display:"flex", alignItems:"center", gap:10, marginBottom:12 } },
+        React.createElement("span", { style: { width:36, height:36, borderRadius:"50%", background:"linear-gradient(135deg,#6366f1,#8b5cf6)", color:"#fff", fontWeight:900, fontSize:16, display:"flex", alignItems:"center", justifyContent:"center" } }, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontWeight:800, fontSize:18, color:"#1e1b4b" } }, chapter.title),
+          React.createElement("div", { style: { fontSize:12, color:"#6b7280" } }, "目安: ", chapter.est, exercises.length > 0 ? ` ・ 演習${exercises.length}問` : "")
+        )
+      ),
+      chapter.goal && React.createElement("div", {
+        style: { background:"linear-gradient(135deg,#eef2ff,#f5f3ff)", border:"1px solid #c7d2fe", borderLeft:"4px solid #6366f1", borderRadius:10, padding:"12px 16px", marginBottom:14 }
+      },
+        React.createElement("div", { style: { fontSize:11, fontWeight:800, color:"#4338ca", letterSpacing:1, marginBottom:6 } }, "🎯 この章のゴール"),
+        React.createElement("div", { style: { fontSize:13.5, color:"#1e1b4b", lineHeight:1.8, whiteSpace:"pre-line" } }, chapter.goal)
+      ),
+      React.createElement("div", { style: { display:"flex", flexDirection:"column", gap:8 } },
+        chapter.sections.map((sec, i) => React.createElement(Section, { key: ch+"-"+i, section: sec, idx: i, defaultOpen: false }))
+      ),
+      exercises.length > 0 && React.createElement("div", { style: { marginTop:20 } },
+        React.createElement("div", { style: { display:"flex", alignItems:"center", gap:8, marginBottom:12 } },
+          React.createElement("span", { style: { background:"#f59e0b", color:"#fff", fontWeight:800, fontSize:13, padding:"4px 14px", borderRadius:8 } }, "🏋️ 演習問題"),
+          React.createElement("span", { style: { fontSize:13, color:"#92400e" } }, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex, i) => React.createElement(Exercise, { key: ch+"-"+i, ex: ex, idx: i }))
+      ),
+      React.createElement("div", { style: { display:"flex", justifyContent:"space-between", marginTop:20, gap:10 } },
+        ch > 0
+          ? React.createElement("button", {
+              onClick: () => { setCh(ch-1); window.scrollTo(0,0); },
+              style: { flex:1, padding:"12px 16px", border:"1px solid #d1d5db", borderRadius:10, background:"#fff", cursor:"pointer", fontWeight:600, fontSize:13, color:"#6b7280" }
+            }, "← Ch.", chapters[ch-1].num)
+          : React.createElement("div", { style: { flex:1 } }),
+        ch < chapters.length-1
+          ? React.createElement("button", {
+              onClick: () => { setCh(ch+1); window.scrollTo(0,0); },
+              style: { flex:1, padding:"12px 16px", border:"none", borderRadius:10, background:"linear-gradient(135deg,#6366f1,#8b5cf6)", cursor:"pointer", fontWeight:700, fontSize:13, color:"#fff" }
+            }, "Ch.", chapters[ch+1].num, " →")
+          : React.createElement("a", {
+              href: "../index.html",
+              style: { flex:1, padding:"12px 16px", borderRadius:10, background:"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontWeight:700, fontSize:13, textAlign:"center", textDecoration:"none" }
+            }, "🎉 コース完了！")
+      ),
+      React.createElement("p", { style: { textAlign:"center", fontSize:11, color:"#9ca3af", marginTop:20 } },
+        "C17 (ISO/IEC 9899:2018) 準拠 · gcc 13.x 基準 · 2026年4月時点"
+      )
+    )
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(CCourse));
+  </script>
+</body>
+</html>

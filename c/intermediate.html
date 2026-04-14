@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C言語 中級コース — ポインタ・データ構造・システムプログラミング</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    .site-header { position:fixed;top:0;left:0;right:0;z-index:100;height:56px;display:flex;align-items:center;padding:0 20px;background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);border-bottom:1px solid #e5e7eb; }
+    .site-header a.home-link { display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#1e1b4b;font-weight:800;font-size:15px;padding:6px 12px;border-radius:10px;transition:background 0.15s; }
+    .site-header a.home-link:hover { background:#eef2ff; }
+    .site-header .logo-mark { width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px; }
+    .site-header .logo-text small { display:block;font-size:10px;font-weight:500;color:#6b7280; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const T = {
+  pointerAdv: {
+    h: ["操作", "構文", "説明"],
+    r: [
+      ["ポインタ配列", "int *arr[5]", "5個のintポインタを持つ配列"],
+      ["配列へのポインタ", "int (*arr)[5]", "5要素のint配列へのポインタ"],
+      ["ポインタのポインタ", "int **pp", "ポインタのアドレスを格納"],
+      ["関数ポインタ配列", "void (*fns[3])(int)", "3個の関数ポインタを持つ配列"],
+      ["constポインタ", "const int *p", "ポインタが指す先を変更不可"],
+      ["ポインタ自体のconst", "int * const p", "ポインタ自体を変更不可"],
+      ["両方const", "const int * const p", "指す先もポインタも変更不可"]
+    ]
+  },
+  bitsizes: {
+    h: ["型", "サイズ", "範囲", "用途"],
+    r: [
+      ["uint8_t", "1バイト", "0〜255", "バイト処理、プロトコル"],
+      ["int16_t", "2バイト", "-32768〜32767", "音声サンプル"],
+      ["uint32_t", "4バイト", "0〜4G", "IPアドレス、フラグ"],
+      ["int64_t", "8バイト", "±9.2×10^18", "大きな整数、タイムスタンプ"],
+      ["size_t", "4or8バイト", "0〜max", "サイズ・インデックス（符号なし）"],
+      ["ptrdiff_t", "4or8バイト", "±max", "ポインタ間の差（符号あり）"],
+      ["intptr_t", "4or8バイト", "アドレス幅", "ポインタを整数として格納"]
+    ]
+  },
+  treeOps: {
+    h: ["操作", "計算量（平均）", "計算量（最悪）"],
+    r: [
+      ["探索", "O(log n)", "O(n)（木が偏った場合）"],
+      ["挿入", "O(log n)", "O(n)"],
+      ["削除", "O(log n)", "O(n)"],
+      ["最小値", "O(log n)", "O(n)"],
+      ["最大値", "O(log n)", "O(n)"],
+      ["中順巡回（ソート済み取得）", "O(n)", "O(n)"]
+    ]
+  },
+  bitOps: {
+    h: ["操作", "コード", "説明"],
+    r: [
+      ["フラグをセット", "flags |= (1 << n)", "ビットnを1にする"],
+      ["フラグをクリア", "flags &= ~(1 << n)", "ビットnを0にする"],
+      ["フラグをトグル", "flags ^= (1 << n)", "ビットnを反転"],
+      ["フラグを確認", "flags & (1 << n)", "ビットnが1かどうか"],
+      ["2のべき乗判定", "n & (n-1) == 0", "nが2のべき乗ならtrue（n>0前提）"],
+      ["下位ビットのみ", "n & (-n)", "最下位の1ビットだけ残す"]
+    ]
+  },
+  concurrency: {
+    h: ["概念", "説明", "問題"],
+    r: [
+      ["レース条件", "複数スレッドが共有データに同時アクセス", "データの破壊・不整合"],
+      ["デッドロック", "2つのスレッドが互いのロックを待ち続ける", "プログラムが停止"],
+      ["ミューテックス", "1スレッドだけがロックを取得できる排他制御", "オーバーヘッドあり"],
+      ["セマフォ", "n個のスレッドまで許可する一般化排他制御", "使い方を誤ると複雑"],
+      ["アトミック操作", "分割不可能な操作（割り込み不可）", "限定的な用途にしか使えない"]
+    ]
+  }
+};
+
+const EX = {
+  ch1: [
+    {
+      diff: 2,
+      q: "ポインタのポインタ（int **）を使って、文字列配列を関数に渡してソートしてください。\n・sort_strings(char **strs, int n) を実装\n・qsortとstrcmpを使用\n\n【使う知識】char **, ポインタ配列, qsort, strcmp",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void sort_strings(char **strs, int n);
+
+int main(void) {
+    char *words[] = {"banana","apple","cherry","date"};
+    int n = 4;
+    sort_strings(words, n);
+    for (int i = 0; i < n; i++) printf("%s\\n", words[i]);
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int cmp_str(const void *a, const void *b) {
+    return strcmp(*(const char**)a, *(const char**)b);
+}
+
+void sort_strings(char **strs, int n) {
+    qsort(strs, n, sizeof(char*), cmp_str);
+}
+
+int main(void) {
+    char *words[] = {"banana","apple","cherry","date"};
+    sort_strings(words, 4);
+    for (int i = 0; i < 4; i++) printf("%s\\n", words[i]);
+    return 0;
+}`
+    },
+    {
+      diff: 3,
+      q: "2次元配列を動的確保してください（int の n×m 行列）。\n・rows個のポインタ配列を確保、各行にcols個のintを確保\n・行列積を計算（2x3 × 3x2）\n・最後に全て free\n\n【使う知識】int **, malloc, for, free",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+
+int** alloc_matrix(int rows, int cols);
+void free_matrix(int **m, int rows);
+void print_matrix(int **m, int rows, int cols);
+
+int main(void) {
+    // A: 2x3, B: 3x2 の積 C: 2x2 を計算
+    int a_data[2][3] = {{1,2,3},{4,5,6}};
+    int b_data[3][2] = {{7,8},{9,10},{11,12}};
+    // 動的確保して計算
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+
+int** alloc_matrix(int rows, int cols) {
+    int **m = (int**)malloc(rows * sizeof(int*));
+    for (int i = 0; i < rows; i++)
+        m[i] = (int*)calloc(cols, sizeof(int));
+    return m;
+}
+void free_matrix(int **m, int rows) {
+    for (int i = 0; i < rows; i++) free(m[i]);
+    free(m);
+}
+void print_matrix(int **m, int rows, int cols) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) printf("%4d", m[i][j]);
+        printf("\\n");
+    }
+}
+int main(void) {
+    int ar=2,ac=3,br=3,bc=2;
+    int a[2][3]={{1,2,3},{4,5,6}}, b[3][2]={{7,8},{9,10},{11,12}};
+    int **c = alloc_matrix(ar,bc);
+    for(int i=0;i<ar;i++) for(int j=0;j<bc;j++) for(int k=0;k<ac;k++)
+        c[i][j]+=a[i][k]*b[k][j];
+    print_matrix(c,ar,bc); free_matrix(c,ar);
+    return 0;
+}`
+    }
+  ],
+  ch2: [
+    {
+      diff: 2,
+      q: "二分探索木（BST）の insert と search を実装してください。\n・Node: value, left, right\n・insert: 再帰で適切な位置に挿入\n・search: 値を探してNode*を返す（なければNULL）\n\n【使う知識】struct, ポインタ, 再帰, malloc",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node {
+    int value;
+    struct Node *left, *right;
+} Node;
+
+Node* new_node(int val);
+Node* insert(Node *root, int val);
+Node* search(Node *root, int val);
+void inorder(Node *root);
+void free_tree(Node *root);
+
+int main(void) {
+    Node *root = NULL;
+    int vals[] = {5,3,7,1,4,6,8};
+    for (int i = 0; i < 7; i++) root = insert(root, vals[i]);
+    inorder(root); printf("\\n");   // 1 3 4 5 6 7 8
+    printf("search(4): %s\\n", search(root,4)?"found":"not found");
+    free_tree(root);
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node { int value; struct Node *left, *right; } Node;
+
+Node* new_node(int val) {
+    Node *n = (Node*)malloc(sizeof(Node));
+    n->value=val; n->left=n->right=NULL; return n;
+}
+Node* insert(Node *root, int val) {
+    if (!root) return new_node(val);
+    if (val < root->value) root->left = insert(root->left, val);
+    else if (val > root->value) root->right = insert(root->right, val);
+    return root;
+}
+Node* search(Node *root, int val) {
+    if (!root || root->value==val) return root;
+    return val < root->value ? search(root->left,val) : search(root->right,val);
+}
+void inorder(Node *root) {
+    if (!root) return;
+    inorder(root->left); printf("%d ", root->value); inorder(root->right);
+}
+void free_tree(Node *root) {
+    if (!root) return;
+    free_tree(root->left); free_tree(root->right); free(root);
+}
+int main(void) {
+    Node *root=NULL;
+    int v[]={5,3,7,1,4,6,8};
+    for(int i=0;i<7;i++) root=insert(root,v[i]);
+    inorder(root); printf("\\n");
+    printf("search(4): %s\\n", search(root,4)?"found":"not found");
+    free_tree(root); return 0;
+}`
+    }
+  ],
+  ch3: [
+    {
+      diff: 2,
+      q: "ビット操作でRGBカラー値をパックしてください。\n・RGB (r, g, b) 各8ビット → 1つのuint32_tに格納\n・0xRRGGBB 形式\n・pack_rgb(r,g,b) と unpack_rgb(color,*r,*g,*b) を実装\n\n【使う知識】ビットシフト, OR, AND, uint32_t",
+      code: `#include <stdio.h>
+#include <stdint.h>
+
+uint32_t pack_rgb(uint8_t r, uint8_t g, uint8_t b);
+void unpack_rgb(uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b);
+
+int main(void) {
+    uint32_t c = pack_rgb(255, 128, 0);
+    printf("packed: 0x%06X\\n", c);    // 0xFF8000
+    uint8_t r, g, b;
+    unpack_rgb(c, &r, &g, &b);
+    printf("R=%d G=%d B=%d\\n", r, g, b); // 255 128 0
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdint.h>
+
+uint32_t pack_rgb(uint8_t r, uint8_t g, uint8_t b) {
+    return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
+}
+void unpack_rgb(uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b) {
+    *r = (color >> 16) & 0xFF;
+    *g = (color >>  8) & 0xFF;
+    *b =  color        & 0xFF;
+}
+int main(void) {
+    uint32_t c = pack_rgb(255, 128, 0);
+    printf("packed: 0x%06X\\n", c);
+    uint8_t r, g, b; unpack_rgb(c, &r, &g, &b);
+    printf("R=%d G=%d B=%d\\n", r, g, b);
+    return 0;
+}`
+    }
+  ],
+  ch4: [
+    {
+      diff: 2,
+      q: "汎用ハッシュマップ（オープンアドレス法）を実装してください。\n・キー: 文字列(char*), 値: int\n・hm_set(map, key, val), hm_get(map, key, *val) → bool\n・FNVハッシュ関数を使用\n\n【使う知識】ハッシュ関数, オープンアドレス法, 線形探索",
+      code: `#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define HM_SIZE 64
+
+typedef struct { char key[64]; int value; int used; } Entry;
+typedef struct { Entry entries[HM_SIZE]; } HashMap;
+
+void hm_init(HashMap *m);
+void hm_set(HashMap *m, const char *key, int val);
+int  hm_get(HashMap *m, const char *key, int *val);
+
+int main(void) {
+    HashMap m; hm_init(&m);
+    hm_set(&m, "apple", 100);
+    hm_set(&m, "banana", 200);
+    int v;
+    if (hm_get(&m, "apple", &v)) printf("apple=%d\\n", v);
+    if (!hm_get(&m, "cherry", &v)) printf("cherry: not found\\n");
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define HM_SIZE 64
+typedef struct { char key[64]; int value; int used; } Entry;
+typedef struct { Entry entries[HM_SIZE]; } HashMap;
+
+static unsigned fnv_hash(const char *s) {
+    unsigned h = 2166136261u;
+    for (; *s; s++) h = (h ^ (unsigned char)*s) * 16777619u;
+    return h % HM_SIZE;
+}
+void hm_init(HashMap *m) { memset(m, 0, sizeof(*m)); }
+void hm_set(HashMap *m, const char *key, int val) {
+    unsigned idx = fnv_hash(key);
+    for (int i = 0; i < HM_SIZE; i++) {
+        Entry *e = &m->entries[(idx+i) % HM_SIZE];
+        if (!e->used || strcmp(e->key,key)==0) {
+            strncpy(e->key,key,63); e->value=val; e->used=1; return;
+        }
+    }
+}
+int hm_get(HashMap *m, const char *key, int *val) {
+    unsigned idx = fnv_hash(key);
+    for (int i = 0; i < HM_SIZE; i++) {
+        Entry *e = &m->entries[(idx+i) % HM_SIZE];
+        if (!e->used) return 0;
+        if (strcmp(e->key,key)==0) { *val=e->value; return 1; }
+    }
+    return 0;
+}
+int main(void) {
+    HashMap m; hm_init(&m);
+    hm_set(&m,"apple",100); hm_set(&m,"banana",200);
+    int v;
+    if(hm_get(&m,"apple",&v)) printf("apple=%d\\n",v);
+    if(!hm_get(&m,"cherry",&v)) printf("cherry: not found\\n");
+    return 0;
+}`
+    }
+  ],
+  ch5: [
+    {
+      diff: 2,
+      q: "POSIX の fork/exec を使って子プロセスを起動してください。\n・fork() で子プロセスを作成\n・子: execl(\"/bin/ls\", \"ls\", \"-l\", NULL) を実行\n・親: waitpid で子の終了を待つ\n\n【使う知識】fork, execl, waitpid（Linux/macOS）",
+      code: `#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    pid_t pid = fork();
+    if (pid < 0) { perror("fork"); return 1; }
+    if (pid == 0) {
+        // 子プロセス: ls -l を実行
+    } else {
+        // 親プロセス: 子を待つ
+    }
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+    pid_t pid = fork();
+    if (pid < 0) { perror("fork"); return 1; }
+    if (pid == 0) {
+        execl("/bin/ls", "ls", "-l", NULL);
+        perror("execl"); return 1; // ここに到達したらエラー
+    } else {
+        int status;
+        waitpid(pid, &status, 0);
+        printf("子プロセス終了: status=%d\\n", WEXITSTATUS(status));
+    }
+    return 0;
+}`
+    }
+  ],
+  ch6: [
+    {
+      diff: 2,
+      q: "pthread でマルチスレッドの計算を実装してください。\n・1〜1000000 の合計を4スレッドで分割計算\n・各スレッドが担当範囲の合計を計算\n・メインスレッドで集計\n\n【使う知識】pthread_create, pthread_join, スレッド引数",
+      code: `#include <stdio.h>
+#include <pthread.h>
+
+#define N_THREADS 4
+#define TOTAL 1000000
+
+typedef struct { long start, end, result; } Range;
+
+void* sum_range(void *arg);
+
+int main(void) {
+    pthread_t threads[N_THREADS];
+    Range ranges[N_THREADS];
+    long chunk = TOTAL / N_THREADS;
+    for (int i = 0; i < N_THREADS; i++) {
+        ranges[i].start = i * chunk + 1;
+        ranges[i].end   = (i == N_THREADS-1) ? TOTAL : (i+1)*chunk;
+        pthread_create(&threads[i], NULL, sum_range, &ranges[i]);
+    }
+    long total = 0;
+    for (int i = 0; i < N_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+        total += ranges[i].result;
+    }
+    printf("合計: %ld\\n", total);  // 500000500000
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <pthread.h>
+
+#define N_THREADS 4
+#define TOTAL 1000000
+
+typedef struct { long start, end, result; } Range;
+
+void* sum_range(void *arg) {
+    Range *r = (Range*)arg;
+    r->result = 0;
+    for (long i = r->start; i <= r->end; i++) r->result += i;
+    return NULL;
+}
+
+int main(void) {
+    pthread_t threads[N_THREADS]; Range ranges[N_THREADS];
+    long chunk = TOTAL / N_THREADS;
+    for (int i = 0; i < N_THREADS; i++) {
+        ranges[i].start = i*chunk+1;
+        ranges[i].end = (i==N_THREADS-1)?TOTAL:(i+1)*chunk;
+        pthread_create(&threads[i],NULL,sum_range,&ranges[i]);
+    }
+    long total = 0;
+    for (int i = 0; i < N_THREADS; i++) {
+        pthread_join(threads[i],NULL); total+=ranges[i].result;
+    }
+    printf("合計: %ld\\n", total); return 0;
+}
+// コンパイル: gcc -Wall -pthread prog.c -o prog`
+    }
+  ],
+  ch7: [
+    {
+      diff: 2,
+      q: "TCPサーバーを実装してください。\n・ポート8080で待ち受け\n・接続してきたクライアントのメッセージを受け取りエコーバック\n・Ctrl+C で終了\n\n【使う知識】socket, bind, listen, accept, send/recv（Linux/macOS）",
+      code: `#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define PORT 8080
+#define BUF_SIZE 1024
+
+int main(void) {
+    // 1. ソケット作成
+    // 2. bind してポート紐付け
+    // 3. listen
+    // 4. accept ループ
+    // 5. recv → echo send
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define PORT 8080
+#define BUF 1024
+
+int main(void) {
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1; setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {AF_INET, htons(PORT), {INADDR_ANY}};
+    bind(srv, (struct sockaddr*)&addr, sizeof(addr));
+    listen(srv, 5);
+    printf("Listening on port %d...\\n", PORT);
+    while (1) {
+        int cli = accept(srv, NULL, NULL);
+        char buf[BUF]; int n = recv(cli, buf, BUF-1, 0);
+        if (n > 0) { buf[n]=0; printf("recv: %s", buf); send(cli, buf, n, 0); }
+        close(cli);
+    }
+    close(srv); return 0;
+}`
+    }
+  ],
+  ch8: [
+    {
+      diff: 2,
+      q: "valgrind を使ってメモリリークを検出してください。\n以下のコードには3つのメモリバグがあります。特定して修正してください。\n1. メモリリーク, 2. バッファオーバーフロー, 3. 二重free\n\n【使う知識】valgrind, デバッグ, メモリ安全",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void) {
+    // バグ1: メモリリーク
+    int *p = (int*)malloc(10 * sizeof(int));
+    p[0] = 42;
+    // freeし忘れ
+
+    // バグ2: バッファオーバーフロー
+    char *buf = (char*)malloc(5);
+    strcpy(buf, "HelloWorld"); // 5バイトに10文字は入らない
+    free(buf);
+
+    // バグ3: 二重free
+    int *q = (int*)malloc(sizeof(int));
+    *q = 99;
+    free(q);
+    free(q); // 二重解放！
+
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void) {
+    // 修正1: freeを追加
+    int *p = (int*)malloc(10 * sizeof(int));
+    p[0] = 42;
+    free(p);  // ← 追加
+
+    // 修正2: バッファを十分大きく確保
+    char *buf = (char*)malloc(11);  // "HelloWorld\\0" で11バイト必要
+    strcpy(buf, "HelloWorld");
+    free(buf);
+
+    // 修正3: 二重freeを除去
+    int *q = (int*)malloc(sizeof(int));
+    *q = 99;
+    free(q);
+    q = NULL;  // ← NULLにして二重freeを防ぐ
+
+    return 0;
+}
+// valgrindで確認: valgrind --leak-check=full ./prog`
+    }
+  ],
+  ch9: [
+    {
+      diff: 2,
+      q: "Cでジェネリックなスタックを実装してください（void* を使用）。\n・push(stack, void* data, size_t size): データをコピーして追加\n・pop(stack, void* out): データを取り出す\n・int, double, 文字列を同じスタックで扱えるようにする\n\n【使う知識】void*, memcpy, 動的確保",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define STACK_CAP 32
+
+typedef struct {
+    void  *items[STACK_CAP];
+    size_t sizes[STACK_CAP];
+    int    top;
+} GenStack;
+
+void gs_init(GenStack *s);
+void gs_push(GenStack *s, const void *data, size_t size);
+int  gs_pop(GenStack *s, void *out, size_t *size);
+void gs_free(GenStack *s);
+
+int main(void) {
+    GenStack s; gs_init(&s);
+    int n = 42;    gs_push(&s, &n, sizeof(int));
+    double d = 3.14; gs_push(&s, &d, sizeof(double));
+    // pop して表示
+    gs_free(&s); return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define STACK_CAP 32
+typedef struct { void *items[STACK_CAP]; size_t sizes[STACK_CAP]; int top; } GenStack;
+
+void gs_init(GenStack *s) { s->top = -1; }
+void gs_push(GenStack *s, const void *data, size_t size) {
+    if (s->top >= STACK_CAP-1) return;
+    s->items[++s->top] = malloc(size);
+    memcpy(s->items[s->top], data, size);
+    s->sizes[s->top] = size;
+}
+int gs_pop(GenStack *s, void *out, size_t *size) {
+    if (s->top < 0) return 0;
+    *size = s->sizes[s->top];
+    memcpy(out, s->items[s->top], *size);
+    free(s->items[s->top--]);
+    return 1;
+}
+void gs_free(GenStack *s) { while(s->top>=0) free(s->items[s->top--]); }
+
+int main(void) {
+    GenStack s; gs_init(&s);
+    int n=42; double d=3.14;
+    gs_push(&s,&n,sizeof(int)); gs_push(&s,&d,sizeof(double));
+    double od; size_t sz; gs_pop(&s,&od,&sz); printf("double: %f\\n",od);
+    int oi; gs_pop(&s,&oi,&sz); printf("int: %d\\n",oi);
+    gs_free(&s); return 0;
+}`
+    }
+  ],
+  ch10: [
+    {
+      diff: 3,
+      q: "簡単なJSONライクなパーサーを実装してください。\n以下の形式をパースして値を取得できるようにする:\n{\"name\":\"Alice\",\"age\":30,\"active\":true}\n・get_string(json, key, buf), get_int(json, key) を実装\n\n【使う知識】文字列操作, strstr, sscanf, 状態機械",
+      code: `#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+// JSONライク文字列からキーの値を取得
+int get_string(const char *json, const char *key, char *buf, int buflen);
+int get_int(const char *json, const char *key);
+
+int main(void) {
+    const char *json = "{\"name\":\"Alice\",\"age\":30,\"score\":95}";
+    char name[32];
+    if (get_string(json, "name", name, sizeof(name)))
+        printf("name: %s\\n", name);
+    printf("age: %d\\n", get_int(json, "age"));
+    printf("score: %d\\n", get_int(json, "score"));
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+int get_string(const char *json, const char *key, char *buf, int buflen) {
+    char pat[80]; snprintf(pat, sizeof(pat), "\\\"%s\\\":\\\"", key);
+    const char *p = strstr(json, pat);
+    if (!p) return 0;
+    p += strlen(pat);
+    int i = 0;
+    while (*p && *p != '"' && i < buflen-1) buf[i++] = *p++;
+    buf[i] = 0; return 1;
+}
+
+int get_int(const char *json, const char *key) {
+    char pat[80]; snprintf(pat, sizeof(pat), "\\\"%s\\\":", key);
+    const char *p = strstr(json, pat);
+    if (!p) return 0;
+    p += strlen(pat);
+    return atoi(p);
+}
+
+int main(void) {
+    const char *json = "{\"name\":\"Alice\",\"age\":30,\"score\":95}";
+    char name[32];
+    if (get_string(json,"name",name,sizeof(name))) printf("name: %s\\n",name);
+    printf("age: %d\\n", get_int(json,"age"));
+    printf("score: %d\\n", get_int(json,"score"));
+    return 0;
+}`
+    }
+  ],
+  ch11: [
+    {
+      diff: 3,
+      q: "GCCの最適化フラグと実行速度の関係を調べてください。\n以下のベンチマーク（1000万回のループ計算）を\n-O0, -O1, -O2, -O3 でコンパイルして実行時間を比較してください。\n\n【使う知識】clock(), CLOCKS_PER_SEC, gccの最適化フラグ",
+      code: `#include <stdio.h>
+#include <time.h>
+#include <math.h>
+
+int main(void) {
+    clock_t start = clock();
+    double sum = 0.0;
+    for (long i = 0; i < 10000000; i++)
+        sum += sqrt((double)i);
+    clock_t end = clock();
+    printf("sum=%.2f, time=%.3fs\\n", sum,
+           (double)(end-start)/CLOCKS_PER_SEC);
+    return 0;
+}
+// gcc -O0 bench.c -o bench0 -lm && time ./bench0
+// gcc -O2 bench.c -o bench2 -lm && time ./bench2
+// gcc -O3 bench.c -o bench3 -lm && time ./bench3`,
+      answer: `// このコードのまま各最適化レベルでコンパイルして比較
+// 期待される結果（環境依存）:
+// -O0: 約 0.3〜0.5秒（最適化なし）
+// -O1: 約 0.1〜0.2秒
+// -O2: 約 0.05〜0.1秒
+// -O3: さらに速い（ベクトル化などが効く）
+
+// -O2 以降ではループのunrolling, inlining, vectorizationが行われる
+// -O3 は積極的な最適化だが、稀にバグを生むことがある
+// 本番では -O2 -march=native が多く使われる
+
+// gcc -O2 -march=native bench.c -o bench -lm
+// -march=native: 実行マシンのCPU命令セットに合わせて最適化`
+    }
+  ],
+  ch12: [
+    {
+      diff: 3,
+      q: "簡単なメモリプールアロケータを実装してください。\n・固定サイズブロック（32バイト）のプールを確保\n・pool_alloc() でブロックを取得、pool_free() で返却\n・フリーリストで空きブロックを管理\n\n【使う知識】フリーリスト, メモリ管理, union の活用",
+      code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define BLOCK_SIZE 32
+#define POOL_CAPACITY 16
+
+typedef struct Block { struct Block *next; char data[BLOCK_SIZE]; } Block;
+typedef struct { Block *free_list; unsigned char pool[POOL_CAPACITY][sizeof(Block)]; int init; } MemPool;
+
+void pool_init(MemPool *p);
+void* pool_alloc(MemPool *p);
+void pool_free(MemPool *p, void *ptr);
+
+int main(void) {
+    MemPool pool; pool_init(&pool);
+    void *a = pool_alloc(&pool);
+    void *b = pool_alloc(&pool);
+    strcpy((char*)a, "Hello");
+    strcpy((char*)b, "World");
+    printf("%s %s\\n", (char*)a, (char*)b);
+    pool_free(&pool, a);
+    void *c = pool_alloc(&pool); // a のブロックが再利用される
+    printf("reused: %p == %p: %d\\n", a, c, a==c);
+    return 0;
+}`,
+      answer: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define BLOCK_SIZE 32
+#define POOL_CAP 16
+
+typedef union { void *next; char data[BLOCK_SIZE]; } Block;
+
+typedef struct {
+    Block pool[POOL_CAP];
+    Block *free_list;
+} MemPool;
+
+void pool_init(MemPool *p) {
+    for (int i = 0; i < POOL_CAP-1; i++)
+        p->pool[i].next = &p->pool[i+1];
+    p->pool[POOL_CAP-1].next = NULL;
+    p->free_list = &p->pool[0];
+}
+void* pool_alloc(MemPool *p) {
+    if (!p->free_list) return NULL;
+    Block *b = p->free_list;
+    p->free_list = (Block*)b->next;
+    return b->data;
+}
+void pool_free(MemPool *p, void *ptr) {
+    Block *b = (Block*)((char*)ptr - offsetof(Block, data));
+    b->next = p->free_list; p->free_list = b;
+}
+int main(void) {
+    MemPool pool; pool_init(&pool);
+    char *a = pool_alloc(&pool);
+    char *b = pool_alloc(&pool);
+    strcpy(a,"Hello"); strcpy(b,"World");
+    printf("%s %s\\n", a, b);
+    pool_free(&pool, a);
+    char *c = pool_alloc(&pool);
+    printf("reused: %d\\n", a==c);
+    return 0;
+}`
+    }
+  ]
+};
+
+const chapters = [
+  { id:"ch1", num:1, title:"ポインタ詳説 — 多段・配列・const", est:"50分",
+    goal:"ポインタのポインタ（char**）、ポインタ配列と配列へのポインタの違い、const修飾子の組み合わせを正しく読み書きできるようになる。2次元配列の動的確保も実装できることがゴール。",
+    sections:[
+      { title:"多段ポインタの実用", body:"char** は「char* の配列の先頭アドレス」として使われます。main(int argc, char *argv[]) の argv がまさにこれで、文字列の配列を表します。Python の sys.argv に相当しますが、型が明示的です。\n\n多段ポインタは「ポインタの配列」と「配列へのポインタ」の2つの用途で使われます。int *arr[5]（5個のintポインタ配列）と int (*arr)[5]（5要素int配列へのポインタ）は全く異なります。優先順位（[] > *）を覚えることが重要です。", table:T.pointerAdv, afterTable:"読み方のコツ: 変数名から右に読んで[]や*を消化し、左に戻って*を消化します。例: int (*arr)[5] → arrは配列（5つの要素）へのポインタ → その型はint。"},
+      { title:"constとポインタ", body:"const int *p（ポインタが指す先が変更不可）と int * const p（ポインタ自体が変更不可）は意味が全く異なります。東から西へ読む（right-to-left rule）と整理しやすいです。\n\nconst char * の引数は「呼び出し元の文字列を変更しません」という約束を型で表現します。strcpy(char *dst, const char *src) の src がこれで、「srcは読むだけ、dstには書く」と一目で分かります。", code:`#include <stdio.h>\n\nint main(void) {\n    int x = 10, y = 20;\n\n    const int *p1 = &x;  // 指す先が変更不可\n    // *p1 = 99;         // ❌ コンパイルエラー\n    p1 = &y;             // ✅ ポインタ自体は変えられる\n\n    int * const p2 = &x; // ポインタ自体が変更不可\n    *p2 = 99;            // ✅ 指す先は変えられる\n    // p2 = &y;          // ❌ コンパイルエラー\n\n    const int * const p3 = &x; // 両方変更不可\n    return 0;\n}`, afterCode:"関数の引数に const をつけることで「この関数は引数を変更しない」という契約をAPIとして公開できます。ライブラリ設計では徹底することが重要です。"}
+    ]
+  },
+  { id:"ch2", num:2, title:"木構造 — 二分探索木・ヒープ", est:"60分",
+    goal:"二分探索木（BST）の挿入・探索・削除・巡回を再帰関数で実装できる。ヒープの概念を理解し、優先度付きキューをヒープで実装できることがゴール。",
+    sections:[
+      { title:"二分探索木（BST）の基本", body:"二分探索木は各ノードについて「左の子 < 自分 < 右の子」という不変条件を保つ木構造です。この性質のおかげで探索・挿入・削除が平均O(log n)で行えます。\n\nPythonのdict（ハッシュマップ）は同じ操作が平均O(1)ですが、BSTは「ソート済みの順序でデータを取り出せる」という追加の性質を持ちます。中順巡回（左→自分→右）でソート済みの順序が得られます。", table:T.treeOps, afterTable:"最悪O(n)になるのは、データがソート済みの順で挿入された場合です。この「木の偏り」を防ぐためにAVL木や赤黒木が存在します。STL の map は赤黒木ベースです。"},
+      { title:"ヒープと優先度付きキュー", body:"ヒープは「親 >= 子」（最大ヒープ）または「親 <= 子」（最小ヒープ）という条件を保つ完全二分木です。最大値（または最小値）をO(1)で取得でき、挿入・削除はO(log n)です。\n\n配列で実装できるのがヒープの強みです。i番目のノードの左の子は 2i+1、右の子は 2i+2、親は (i-1)/2 という計算でアドレスが求まります。Pythonの heapq モジュールがまさにこれを使っています。", code:`// ヒープの配列表現\n//        0\n//       / \\\n//      1   2\n//     / \\ / \\\n//    3  4 5  6\n// 親: (i-1)/2, 左子: 2i+1, 右子: 2i+2\n\n// 最小ヒープの挿入\nvoid heap_push(int heap[], int *size, int val) {\n    heap[(*size)++] = val;\n    int i = *size - 1;\n    while (i > 0) {\n        int parent = (i-1)/2;\n        if (heap[parent] <= heap[i]) break;\n        int tmp = heap[parent]; heap[parent] = heap[i]; heap[i] = tmp;\n        i = parent;     // sift up\n    }\n}`, afterCode:"Pythonの heapq.heappush / heapq.heappop がこの操作に対応します。C++ の std::priority_queue も内部はヒープです。"}
+    ]
+  },
+  { id:"ch3", num:3, title:"ビット操作と固定幅整数型", est:"40分",
+    goal:"ビット演算（AND/OR/XOR/シフト）でフラグ管理・パッキング・マスク処理を実装できる。<stdint.h>の固定幅型を使って移植性のあるコードを書けるようになるのがゴール。",
+    sections:[
+      { title:"ビット演算の実用", body:"ビット演算はハードウェア制御・プロトコル実装・パフォーマンスチューニングで多用されます。Pythonでも同じ演算子（&, |, ^, <<, >>）が使えますが、Cでは型サイズが明示的なため予測可能です。\n\n最もよく使うパターンはビットフラグです。1つの整数の各ビットをON/OFFのフラグとして扱うことで、複数の論理値をコンパクトに格納できます。ネットワークパケットのヘッダや、Linuxのファイルパーミション（0644など）がこの形式です。", table:T.bitOps, code:`#include <stdio.h>\n#include <stdint.h>\n\n#define FLAG_READ    (1 << 0)  // 0001\n#define FLAG_WRITE   (1 << 1)  // 0010\n#define FLAG_EXEC    (1 << 2)  // 0100\n\nint main(void) {\n    uint8_t perms = 0;\n    perms |= FLAG_READ | FLAG_WRITE;   // 読み書き許可\n    printf("read=%d, write=%d, exec=%d\\n",\n           !!(perms & FLAG_READ),\n           !!(perms & FLAG_WRITE),\n           !!(perms & FLAG_EXEC));     // 1 1 0\n    perms &= ~FLAG_WRITE;              // 書き込み禁止\n    printf("write=%d\\n", !!(perms & FLAG_WRITE)); // 0\n    return 0;\n}`, afterCode:"!! (double negation) は0以外の値を1に正規化する慣用句です。(perms & FLAG_READ) は FLAG_READ と同じ値（0x01）になりますが、!! で確実に 0 か 1 になります。"},
+      { title:"固定幅整数型", body:"int のサイズは環境によって異なります（16, 32, 64ビット）。組み込みシステム・ネットワーク・ファイル形式など、バイト数が重要な場面では <stdint.h> の固定幅型を使います。\n\nint32_t（必ず32ビット符号あり整数）、uint8_t（必ず8ビット符号なし）のように「幅とsigned/unsignedが明確な型」を使うことで、異なる環境でも同じバイナリ表現になります。", table:T.bitsizes, afterTable:"size_t は配列サイズやループカウンタに使います。sizeof() の戻り値も size_t です。ssize_t は size_t の符号あり版で、エラー時に -1 を返す read/write の戻り値に使います。"}
+    ]
+  },
+  { id:"ch4", num:4, title:"ハッシュマップの実装", est:"50分",
+    goal:"ハッシュ関数・衝突解決（チェーン法・オープンアドレス法）の仕組みを理解し、文字列キー→整数値のハッシュマップをCで実装できるようになるのがゴール。",
+    sections:[
+      { title:"ハッシュマップの仕組み", body:"Pythonのdictは内部的にハッシュマップです。キーをハッシュ関数に通して整数インデックスに変換し、配列の該当位置に値を格納します。これにより平均O(1)の探索・挿入・削除が実現されています。\n\n衝突（異なるキーが同じインデックスになること）の解決法は主に2つです。チェーン法（各スロットにリンクリストを持ち、衝突したものを繋ぐ）とオープンアドレス法（衝突したら別のスロットを探す）です。Pythonのdictはオープンアドレス法に近い実装です。", code:`// FNV-1a ハッシュ関数（高速・分布が良い）\nstatic unsigned fnv_hash(const char *s, int size) {\n    unsigned h = 2166136261u;  // FNV offset basis\n    for (; *s; s++)\n        h = (h ^ (unsigned char)*s) * 16777619u;  // FNV prime\n    return h % (unsigned)size;\n}`, afterCode:"FNV（Fowler–Noll–Vo）ハッシュはシンプルで高速なため、C言語のハッシュマップ実装でよく使われます。暗号学的安全性は不要で速度が優先な用途に向いています。"},
+      { title:"オープンアドレス法の実装", body:"オープンアドレス法では、衝突したとき次のスロット（線形探索）や別の計算（二重ハッシュ）でスロットを探します。削除は「削除マーク」を使う必要があります（空スロットと削除済みスロットを区別するため）。\n\nPythonの dict が容量の2/3を超えると再ハッシュ（全要素を大きな配列に移動）するのと同様に、Cの実装でもロードファクター（使用率）を監視して適切なタイミングでリサイズします。", code:`// 簡易ハッシュマップの全体像\n#define CAPACITY 64\n#define DELETED  ((const char*)-1)  // 削除マーカー\n\ntypedef struct {\n    const char *key;\n    int         value;\n} Slot;\n\ntypedef struct {\n    Slot  slots[CAPACITY];\n    int   count;\n} HashMap;`, afterCode:"ポイント: DELETED マーカーを使わないと「削除後に後続の要素が探索不可能になる」問題が起きます。これは線形探索の連続性が壊れるためです。"}
+    ]
+  },
+  { id:"ch5", num:5, title:"プロセスとシグナル（POSIX）", est:"45分",
+    goal:"fork/exec/waitpid でプロセスを生成・待機できる。シグナル（SIGTERM, SIGINT）の送受信と signal/sigaction でのハンドラ設定を理解するのがゴール。",
+    sections:[
+      { title:"プロセスの生成", body:"Unixシステムでプロセスを生成するのは fork() です。fork() を呼ぶと、呼び出しプロセスのほぼ完全なコピーが作られ、2つのプロセスが同じコードの続きから実行されます。戻り値で親（子のPIDが返る）と子（0が返る）を区別します。\n\nPythonの subprocess.Popen が内部でこれを使っています。exec系関数は現在のプロセスイメージを別のプログラムで置き換えます。fork+execの組み合わせで「別のプログラムを子プロセスとして実行する」という最もポータブルなパターンになります。", code:`#include <unistd.h>\n#include <sys/wait.h>\n#include <stdio.h>\n\nint main(void) {\n    pid_t pid = fork();\n    if (pid == 0) {\n        // 子プロセス\n        printf("子: PID=%d, 親PID=%d\\n", getpid(), getppid());\n        _exit(0);  // exitの代わりに_exitを使う（バッファをflushしない）\n    } else {\n        // 親プロセス\n        printf("親: PID=%d, 子PID=%d\\n", getpid(), pid);\n        int status;\n        waitpid(pid, &status, 0);  // 子の終了を待つ\n        printf("子の終了コード: %d\\n", WEXITSTATUS(status));\n    }\n    return 0;\n}`, afterCode:"fork の後、子は親のメモリをコピー・オン・ライト（CoW）で共有します。どちらかが書き込みを行った時点で実際のコピーが発生します。このためforkは「メモリをまるごとコピーするから遅い」というのは現代では正確ではありません。"}
+    ]
+  },
+  { id:"ch6", num:6, title:"マルチスレッド — pthreads", est:"50分",
+    goal:"pthread_create/pthread_join でスレッドを生成・同期できる。mutex（pthread_mutex）で共有データを保護し、デッドロックとレース条件を理解・回避できるようになるのがゴール。",
+    sections:[
+      { title:"スレッドとプロセスの違い", body:"プロセスは独立したメモリ空間を持ちますが、スレッドは同じプロセス内のメモリを共有します。Pythonのthreadingモジュールが使うのと同じ概念ですが、CのGIL（Global Interpreter Lock）はなく、本当の並列実行が可能です。\n\nスレッドは生成コストが低く、データ共有が容易な反面、共有データへの同時アクセスに注意が必要です。排他制御（ミューテックス）を正しく使わないとレース条件やデータ破壊が発生します。", table:T.concurrency, afterTable:"デッドロックを避けるには: (1) ロックを常に同じ順序で取得する、(2) ロックを保持している間は他のロックを取得しない、(3) タイムアウト付きのロックを使う、といったパターンがあります。"},
+      { title:"mutexによる排他制御", body:"pthread_mutex_t（ミューテックス）はロック機構で、lock/unlockの間に「1スレッドだけ実行可能」なクリティカルセクションを作ります。Pythonの threading.Lock() に対応します。\n\nミューテックスの使用で注意すべきは「ロック中に長い処理をしない」ことです。ロック中は他のスレッドが待機させられるため、パフォーマンスへの影響が大きくなります。クリティカルセクションはできるだけ短くするのが原則です。", code:`#include <pthread.h>\n#include <stdio.h>\n\nstatic long counter = 0;\nstatic pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;\n\nvoid* increment(void *n) {\n    long count = *(long*)n;\n    for (long i = 0; i < count; i++) {\n        pthread_mutex_lock(&mu);   // ロック取得\n        counter++;                 // クリティカルセクション\n        pthread_mutex_unlock(&mu); // ロック解放\n    }\n    return NULL;\n}\n\n// コンパイル: gcc -Wall -pthread prog.c -o prog`, afterCode:"ミューテックスなしでcounterをインクリメントすると、複数スレッドが読み取り→加算→書き込みを同時に行い、一部のインクリメントが失われます（レース条件）。-fsanitize=thread（ThreadSanitizer）でレース条件を動的に検出できます。"}
+    ]
+  },
+  { id:"ch7", num:7, title:"ネットワークプログラミング基礎", est:"50分",
+    goal:"POSIX ソケットAPI（socket/bind/listen/accept/connect/send/recv）でTCP通信を実装できる。エコーサーバーとクライアントを書けるようになるのがゴール。",
+    sections:[
+      { title:"ソケットの基本概念", body:"ソケットはネットワーク通信のエンドポイントです。ファイルディスクリプタと同じように整数値で扱われ、read/write の代わりに send/recv を使います。PythonのsocketモジュールはこのPOSIX APIを薄くラップしたものです。\n\nTCPサーバーの流れ: socket()→bind()→listen()→accept()→recv()/send()→close() です。TCPクライアントの流れ: socket()→connect()→send()/recv()→close() です。", code:`// TCPサーバーの骨格\nint srv = socket(AF_INET, SOCK_STREAM, 0);\n\nstruct sockaddr_in addr = {\n    .sin_family = AF_INET,\n    .sin_port   = htons(8080),\n    .sin_addr   = {INADDR_ANY}\n};\nbind(srv, (struct sockaddr*)&addr, sizeof(addr));\nlisten(srv, SOMAXCONN);\n\nint cli = accept(srv, NULL, NULL);  // ブロックして待機\nchar buf[1024]; int n = recv(cli, buf, sizeof(buf)-1, 0);\nbuf[n] = 0;\nprintf("受信: %s\\n", buf);\nsend(cli, buf, n, 0);  // エコーバック\nclose(cli); close(srv);`, afterCode:"htons()（host-to-network short）はバイトオーダーをネットワーク標準（ビッグエンディアン）に変換します。異なるCPUアーキテクチャ間でも正しく通信するために必要です。"}
+    ]
+  },
+  { id:"ch8", num:8, title:"デバッグとメモリ安全", est:"40分",
+    goal:"gdbの基本的なデバッグ操作（ブレークポイント・ステップ実行・変数表示）を使いこなせる。valgrindでメモリリーク・境界外アクセスを検出・修正できるようになるのがゴール。",
+    sections:[
+      { title:"gdbでのデバッグ", body:"Pythonにはpdbという対話型デバッガがありますが、Cではgdb（GNU Debugger）を使います。-g フラグでコンパイルするとデバッグ情報が含まれ、gdb でソースを参照しながらデバッグできます。\n\ngdbの基本コマンドを覚えるだけで、printf デバッグより格段に効率的なバグ調査ができます。特にセグメンテーション違反（segfault）の原因特定に威力を発揮します。", code:`# コンパイル（デバッグ情報付き）\ngcc -g -Wall -o prog prog.c\n\n# gdb起動\ngdb ./prog\n\n# よく使うコマンド:\n(gdb) run              # プログラム実行\n(gdb) break main       # main にブレークポイント\n(gdb) break 42         # 42行目にブレークポイント\n(gdb) next             # 次の行へ（関数を飛ばす）\n(gdb) step             # 次の行へ（関数内に入る）\n(gdb) print x          # 変数 x の値を表示\n(gdb) backtrace        # コールスタックを表示\n(gdb) continue         # 次のブレークポイントまで実行\n(gdb) quit             # 終了`, afterCode:"segfaultのデバッグ手順: (1) -g でコンパイル (2) gdb ./prog で起動 (3) run で実行 (4) クラッシュしたら backtrace でコールスタック確認 (5) 問題の行にbreakしてステップ実行。"},
+      { title:"valgrindによるメモリチェック", body:"valgrindはメモリエラー（リーク・境界外アクセス・未初期化変数の使用・二重free）を動的に検出するツールです。Pythonには同様の問題はGCが多くを防いでくれますが、Cではプログラマの責任です。\n\n--leak-check=full オプションで全メモリリークの詳細を報告します。AddressSanitizer（-fsanitize=address）はvalgrindよりも高速で、CI環境での自動検出に向いています。", code:`# valgrindでメモリチェック\nvalgrind --leak-check=full --show-leak-kinds=all ./prog\n\n# AddressSanitizerでチェック（GCC/Clang）\ngcc -g -fsanitize=address -o prog prog.c\n./prog   # エラー発生時に詳細を表示\n\n# よく見るvalgrindエラー:\n# "Invalid read of size 4" → 境界外読み取り\n# "definitely lost: N bytes" → メモリリーク\n# "Invalid free()" → 二重free`, afterCode:"CIパイプラインでは -fsanitize=address,undefined を組み合わせると、アドレスエラーと未定義動作を両方検出できます。"}
+    ]
+  },
+  { id:"ch9", num:9, title:"汎用プログラミング — void*とジェネリクス", est:"40分",
+    goal:"void*を使った型消去パターンで「型を問わない」汎用データ構造・関数を実装できる。マクロやfunction-like macroでCにおける簡易ジェネリクスを実現できるのがゴール。",
+    sections:[
+      { title:"void* による型消去", body:"Cには言語レベルのジェネリクス（C++のテンプレートやRustのジェネリクスに相当するもの）がありません。代わりに void*（型なしポインタ）を使って「どんな型でも受け取れる関数」を作ります。qsort はその典型例です。\n\nトレードオフは「コンパイル時の型安全性が失われる」ことです。void* は任意の型に暗黙変換できてしまうため、誤った型を渡してもコンパイルエラーにならず、実行時に壊れた結果になります。型キャストを正確に行うことが重要です。", code:`// void* を使ったソート済み検索（bsearch）\n#include <stdio.h>\n#include <stdlib.h>\n\nint cmp_int(const void *a, const void *b) {\n    return *(const int*)a - *(const int*)b;\n}\n\nint main(void) {\n    int arr[] = {1,3,5,7,9,11,13};\n    int key = 7, n = 7;\n    qsort(arr, n, sizeof(int), cmp_int);\n    int *found = (int*)bsearch(&key, arr, n, sizeof(int), cmp_int);\n    printf("%s\\n", found ? "found" : "not found");  // found\n    return 0;\n}`, afterCode:"bsearch は標準ライブラリのバイナリサーチです。qsort でソート済みの配列に対して使います。Pythonのbisectモジュールに対応します。"}
+    ]
+  },
+  { id:"ch10", num:10, title:"文字列処理とパーサー実装", est:"45分",
+    goal:"C言語での文字列処理（strstr, strtok, sprintf, sscanf）を使いこなせる。状態機械を使って簡易パーサーを実装できるようになるのがゴール。",
+    sections:[
+      { title:"文字列操作の深掘り", body:"Pythonの豊富な文字列メソッド（split, find, replace, format）に対応するC言語の関数を覚えておきましょう。Pythonと違い、Cの文字列操作はすべて関数呼び出しで、元の文字列は変更されない（新しいバッファに書く）ことが多いです。\n\nstrtok はPythonの split に近い機能ですが、元の文字列を破壊的に変更する点が大きく異なります。スレッドセーフな版として strtok_r（POSIXのみ）があります。", code:`#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    // strtok: 分割（破壊的）\n    char s[] = "Alice,Bob,Charlie";\n    char *tok = strtok(s, ",");\n    while (tok) {\n        printf("token: %s\\n", tok);\n        tok = strtok(NULL, ",");  // 2回目以降はNULL\n    }\n\n    // snprintf: 安全なフォーマット\n    char buf[64];\n    snprintf(buf, sizeof(buf), "Hello, %s! You are %d.", "Alice", 30);\n    printf("%s\\n", buf);\n\n    // strstr: 部分文字列検索\n    const char *text = "Hello, World!";\n    const char *p = strstr(text, "World");\n    printf("Found at offset: %ld\\n", p - text);  // 7\n    return 0;\n}`, afterCode:"sprintf は出力バッファのオーバーフローを防げないため、常に snprintf を使います。Pythonの f文字列に最も近いのが snprintf で、最大バイト数を指定できます。"}
+    ]
+  },
+  { id:"ch11", num:11, title:"パフォーマンスとコンパイラ最適化", est:"45分",
+    goal:"コンパイラの最適化フラグ（-O0〜-O3）の効果を理解し、clock()でベンチマークを計測できる。キャッシュ効率・インライン展開・ループアンローリングなどの最適化技法の基礎を把握するのがゴール。",
+    sections:[
+      { title:"コンパイラ最適化の種類", body:"GCCは -O フラグで最適化レベルを指定します。-O0（なし）から -O3（積極的）まであり、それぞれ異なる最適化が有効になります。一般的には -O2 が「速度と安全性のバランスがよい」として本番環境で使われます。\n\nコンパイラが行う主な最適化: インライン展開（小さな関数の呼び出しをそのまま展開）、不変コードのループ外移動（ループ内で変わらない計算を外に出す）、ベクトル化（ループをSIMD命令で高速化）、デッドコード除去（決して実行されないコードを除去）。", code:`// -O2以降の最適化が効く例\n// コンパイル: gcc -O2 -march=native prog.c -o prog\n\n// インライン展開: static inline を使ってコンパイラを促す\nstatic inline int fast_min(int a, int b) {\n    return a < b ? a : b;  // 関数呼び出しなしに展開される可能性\n}\n\n// restrict: このポインタが指すデータは他のポインタと重ならない（エイリアシング最適化）\nvoid add_arrays(float * restrict dst, const float * restrict src, int n) {\n    for (int i = 0; i < n; i++)\n        dst[i] += src[i];  // ベクトル化しやすくなる\n}`, afterCode:"-march=native は実行マシンのCPUに合わせた命令セット（AVX2など）を使います。配布バイナリには使わないでください（古いCPUで動かない可能性があります）。"}
+    ]
+  },
+  { id:"ch12", num:12, title:"メモリアロケータとシステム設計", est:"60分",
+    goal:"カスタムメモリアロケータ（プールアロケータ・スラブアロケータ）の設計と実装ができる。malloc/freeのオーバーヘッドを減らす場面とトレードオフを理解するのがゴール。",
+    sections:[
+      { title:"カスタムアロケータが必要な場面", body:"malloc/freeはシステムコール（brk/mmap）を呼ぶ可能性があり、汎用性ゆえに隠れたコストがあります。高頻度に同じサイズのオブジェクトを確保・解放するアプリケーション（ゲームエンジン・データベース）では、専用のカスタムアロケータで劇的な性能改善が得られます。\n\nプールアロケータは「同じサイズのオブジェクト専用」のアロケータで、フリーリストで空きブロックを管理します。alloc/freeがO(1)で、フラグメンテーションも起きません。Linuxカーネルのslabアロケータが同じ考え方です。", code:`// プールアロケータの核心: フリーリスト\n// 解放されたブロックは空きリストに繋がれる\n// ↓ allocated  ↓ freed  ↓ allocated  ↓ freed\n// [data       ][next→  ][data       ][next→NULL]\n//                  ↑\n//              free_list が指す\n\n// 確保: free_list の先頭を返してリストを縮める\n// 解放: ブロックをfree_listの先頭に追加`, afterCode:"スタックアロケータ（線形アロケータ）はさらにシンプルで、単調増加するポインタでメモリを管理し、一括解放（reset）のみ行います。ゲームの1フレーム分のデータ確保などに使われます。"}
+    ]
+  }
+];
+
+function DataTable({ data }) {
+  return React.createElement("div", { style:{overflowX:"auto",margin:"12px 0",borderRadius:10,border:"1px solid #d1d5db",background:"#fff"} },
+    React.createElement("table", { style:{width:"100%",borderCollapse:"separate",borderSpacing:0,fontSize:13} },
+      React.createElement("thead", null, React.createElement("tr", null,
+        data.h.map((h,i) => React.createElement("th", {key:i, style:{background:"linear-gradient(180deg,#eef2ff,#e0e7ff)",color:"#312e81",fontWeight:800,fontSize:12.5,padding:"10px 14px",textAlign:"left",borderBottom:"2px solid #a5b4fc",borderRight:i<data.h.length-1?"1px solid #c7d2fe":"none"}}, h))
+      )),
+      React.createElement("tbody", null, data.r.map((row,ri) => React.createElement("tr", {key:ri},
+        row.map((cell,ci) => React.createElement("td", {key:ci, style:{padding:"9px 14px",borderBottom:ri<data.r.length-1?"1px solid #e5e7eb":"none",borderRight:ci<row.length-1?"1px solid #f3f4f6":"none",color:ci===0?"#1e1b4b":"#374151",fontWeight:ci===0?700:400,fontSize:13,lineHeight:1.65,verticalAlign:"top",whiteSpace:"pre-line",background:ri%2===0?"#fff":"#f9fafb"}}, cell))
+      )))
+    ),
+    data.cap && React.createElement("div", {style:{padding:"8px 14px",fontSize:12,color:"#6b7280",borderTop:"1px solid #e5e7eb",background:"#f9fafb"}}, data.cap)
+  );
+}
+function Code({ code, hl }) {
+  return React.createElement("pre", {style:{background:hl?"#1a1a2e":"#0d0d1a",color:"#d0d0f0",padding:"14px 16px",borderRadius:10,fontSize:12,lineHeight:1.65,overflowX:"auto",margin:"8px 0 0",fontFamily:"'JetBrains Mono',monospace",border:hl?"2px solid #6366f1":"1px solid rgba(255,255,255,0.06)",whiteSpace:"pre-wrap",wordBreak:"break-word"}}, React.createElement("code", null, code));
+}
+const diffLabel = d => d===1?"⭐ 基本":d===2?"⭐⭐ 応用":"⭐⭐⭐ 発展";
+const diffColor = d => d===1?"#16a34a":d===2?"#d97706":"#dc2626";
+function Exercise({ ex, idx }) {
+  const [show, setShow] = useState(false);
+  return React.createElement("div", {style:{borderRadius:12,border:"2px solid #f59e0b",overflow:"hidden",background:"#fff",marginBottom:8}},
+    React.createElement("div", {style:{padding:"12px 16px",background:"linear-gradient(135deg,#fffbeb,#fef3c7)"}},
+      React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}},
+        React.createElement("span", {style:{background:"#f59e0b",color:"#fff",fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:6}}, "問", idx+1),
+        React.createElement("span", {style:{fontSize:12,fontWeight:700,color:diffColor(ex.diff)}}, diffLabel(ex.diff))
+      ),
+      React.createElement("p", {style:{margin:0,fontSize:13.5,lineHeight:1.8,color:"#92400e",whiteSpace:"pre-line"}}, ex.q)
+    ),
+    React.createElement("div", {style:{padding:"0 16px 12px"}}, React.createElement(Code, {code:ex.code,hl:true})),
+    React.createElement("div", {style:{borderTop:"1px dashed #fcd34d",padding:"10px 16px"}},
+      React.createElement("button", {onClick:()=>setShow(!show), style:{background:show?"#22c55e":"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",border:"none",borderRadius:8,padding:"8px 20px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%"}}, show?"🙈 解答を隠す":"👀 解答例を見る"),
+      show && React.createElement("div", {style:{marginTop:10}},
+        React.createElement("div", {style:{fontSize:11,fontWeight:700,color:"#166534",letterSpacing:1,marginBottom:4}}, "✅ 解答例"),
+        React.createElement(Code, {code:ex.answer})
+      )
+    )
+  );
+}
+function Section({ section, idx }) {
+  const [open, setOpen] = useState(false);
+  return React.createElement("div", {style:{borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",background:"#fff"}},
+    React.createElement("button", {onClick:()=>setOpen(!open), style:{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px 16px",border:"none",background:"#fafafa",cursor:"pointer",textAlign:"left",fontSize:14,fontWeight:700,color:"#1e1b4b"}},
+      React.createElement("span", {style:{flexShrink:0,width:24,height:24,borderRadius:6,background:"#6366f1",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800}}, idx+1),
+      React.createElement("span", {style:{flex:1}}, section.title),
+      React.createElement("span", {style:{fontSize:18,color:"#9ca3af",transform:open?"rotate(90deg)":"rotate(0)"}}, "›")
+    ),
+    open && React.createElement("div", {style:{padding:"12px 16px 16px"}},
+      section.body && React.createElement("p", {style:{margin:"0 0 8px",fontSize:13.5,lineHeight:1.85,color:"#374151",whiteSpace:"pre-line"}}, section.body),
+      section.table && React.createElement(DataTable, {data:section.table}),
+      section.afterTable && React.createElement("p", {style:{margin:"8px 0",fontSize:13.5,lineHeight:1.85,color:"#374151",whiteSpace:"pre-line"}}, section.afterTable),
+      section.code && React.createElement(Code, {code:section.code}),
+      section.afterCode && React.createElement("p", {style:{margin:"10px 0 0",fontSize:13,lineHeight:1.8,color:"#555",whiteSpace:"pre-line",background:"#f9fafb",padding:"10px 14px",borderRadius:8,border:"1px solid #e5e7eb"}}, section.afterCode)
+    )
+  );
+}
+function App() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exercises = EX[chapter.id] || [];
+  return React.createElement("div", {style:{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Noto Sans JP',sans-serif"}},
+    React.createElement("div", {style:{maxWidth:1100,margin:"0 auto",padding:"20px 14px"}},
+      React.createElement("div", {style:{background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",borderRadius:16,padding:"24px 20px",marginBottom:16,position:"relative",overflow:"hidden"}},
+        React.createElement("div", {style:{fontSize:11,fontWeight:700,color:"#a5b4fc",textTransform:"uppercase",letterSpacing:2,marginBottom:4}}, "C言語 中級コース"),
+        React.createElement("h1", {style:{margin:0,fontSize:22,fontWeight:900,color:"#fff"}}, "ポインタ・データ構造・システムプログラミング"),
+        React.createElement("p", {style:{margin:"6px 0 0",fontSize:12.5,color:"#c4b5fd"}}, "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問"),
+        React.createElement("p", {style:{margin:"10px 0 0",fontSize:12,color:"#ddd6fe",lineHeight:1.8}}, "多段ポインタ・木構造・ハッシュマップ・プロセス・スレッド・ネットワークプログラミングを習得します。C言語の「本当に難しい部分」を体系的に理解し、調べながらであれば実務レベルのコードを書けるようになることがゴールです。"),
+        React.createElement("div", {style:{marginTop:14,display:"flex",gap:3}},
+          chapters.map((_,i) => React.createElement("div", {key:i,onClick:()=>{setCh(i);setMenuOpen(false);},style:{flex:1,height:5,borderRadius:3,background:i<=ch?"#818cf8":"rgba(255,255,255,0.15)",cursor:"pointer"}}))
+        )
+      ),
+      React.createElement("div", {style:{marginBottom:14}},
+        React.createElement("button", {onClick:()=>setMenuOpen(!menuOpen), style:{width:"100%",padding:"10px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",fontSize:14,fontWeight:700,color:"#1e1b4b",cursor:"pointer",display:"flex",justifyContent:"space-between"}},
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", {style:{fontSize:12,color:"#9ca3af"}}, menuOpen?"▲":"▼")
+        ),
+        menuOpen && React.createElement("div", {style:{marginTop:4,border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden",background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}},
+          chapters.map((c,i) => React.createElement("button", {key:c.id,onClick:()=>{setCh(i);setMenuOpen(false);},style:{width:"100%",padding:"10px 16px",border:"none",borderBottom:i<chapters.length-1?"1px solid #f3f4f6":"none",background:i===ch?"#eef2ff":"#fff",fontSize:13,fontWeight:i===ch?700:500,color:i===ch?"#4338ca":"#374151",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10}},
+            React.createElement("span", {style:{width:22,height:22,borderRadius:"50%",background:i===ch?"#6366f1":"#e5e7eb",color:i===ch?"#fff":"#6b7280",fontWeight:800,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}, c.num),
+            React.createElement("span", {style:{flex:1}}, c.title),
+            EX[c.id] && React.createElement("span", {style:{fontSize:11,color:"#f59e0b",fontWeight:700}}, EX[c.id].length, "問")
+          ))
+        )
+      ),
+      React.createElement("div", {style:{display:"flex",alignItems:"center",gap:10,marginBottom:12}},
+        React.createElement("span", {style:{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",fontWeight:900,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", {style:{fontWeight:800,fontSize:18,color:"#1e1b4b"}}, chapter.title),
+          React.createElement("div", {style:{fontSize:12,color:"#6b7280"}}, "目安: ", chapter.est, exercises.length>0?` ・ 演習${exercises.length}問`:"")
+        )
+      ),
+      chapter.goal && React.createElement("div", {style:{background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",border:"1px solid #c7d2fe",borderLeft:"4px solid #6366f1",borderRadius:10,padding:"12px 16px",marginBottom:14}},
+        React.createElement("div", {style:{fontSize:11,fontWeight:800,color:"#4338ca",letterSpacing:1,marginBottom:6}}, "🎯 この章のゴール"),
+        React.createElement("div", {style:{fontSize:13.5,color:"#1e1b4b",lineHeight:1.8}}, chapter.goal)
+      ),
+      React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:8}},
+        chapter.sections.map((sec,i) => React.createElement(Section, {key:ch+"-"+i,section:sec,idx:i}))
+      ),
+      exercises.length>0 && React.createElement("div", {style:{marginTop:20}},
+        React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}},
+          React.createElement("span", {style:{background:"#f59e0b",color:"#fff",fontWeight:800,fontSize:13,padding:"4px 14px",borderRadius:8}}, "🏋️ 演習問題"),
+          React.createElement("span", {style:{fontSize:13,color:"#92400e"}}, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex,i) => React.createElement(Exercise, {key:ch+"-"+i,ex:ex,idx:i}))
+      ),
+      React.createElement("div", {style:{display:"flex",justifyContent:"space-between",marginTop:20,gap:10}},
+        ch>0 ? React.createElement("button", {onClick:()=>{setCh(ch-1);window.scrollTo(0,0);},style:{flex:1,padding:"12px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",cursor:"pointer",fontWeight:600,fontSize:13,color:"#6b7280"}}, "← Ch.", chapters[ch-1].num)
+             : React.createElement("div", {style:{flex:1}}),
+        ch<chapters.length-1 ? React.createElement("button", {onClick:()=>{setCh(ch+1);window.scrollTo(0,0);},style:{flex:1,padding:"12px 16px",border:"none",borderRadius:10,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff"}}, "Ch.", chapters[ch+1].num, " →")
+                              : React.createElement("a", {href:"../index.html",style:{flex:1,padding:"12px 16px",borderRadius:10,background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none"}}, "🎉 コース完了！")
+      ),
+      React.createElement("p", {style:{textAlign:"center",fontSize:11,color:"#9ca3af",marginTop:20}}, "C17 準拠 · gcc 13.x · POSIX.1-2017 · 2026年4月時点")
+    )
+  );
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+  </script>
+</body>
+</html>
