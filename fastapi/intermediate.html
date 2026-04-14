@@ -1,0 +1,1654 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FastAPI 中級コース — 本格的なAPI開発を学ぶ</title>
+  <meta name="description" content="Python開発者のためのFastAPI中級コース。認証・非同期DB・WebSocket・テストなど実務レベルのスキルを8章で習得。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+/* ── Table definitions ── */
+const T = {
+  modelConfig: {
+    h: ["設定キー", "型", "説明"],
+    r: [
+      ["str_strip_whitespace", "bool", "文字列の前後空白を自動除去"],
+      ["str_min_length", "int", "全str型フィールドに共通の最小長を設定"],
+      ["validate_default", "bool", "デフォルト値もバリデーション対象にする"],
+      ["use_enum_values", "bool", "Enumの.valueを自動的に格納"],
+      ["frozen", "bool", "モデルインスタンスをイミュータブルに"],
+      ["populate_by_name", "bool", "エイリアスとフィールド名の両方で初期化可能に"],
+      ["extra", "'allow'|'ignore'|'forbid'", "未定義フィールドの扱いを制御"]
+    ]
+  },
+  validatorModes: {
+    h: ["デコレータ", "実行タイミング", "用途"],
+    r: [
+      ["@field_validator('f', mode='before')", "型変換前", "文字列→数値など前処理"],
+      ["@field_validator('f', mode='after')", "型変換後（デフォルト）", "変換済み値への制約"],
+      ["@model_validator(mode='before')", "全フィールド変換前", "入力データ全体の変換"],
+      ["@model_validator(mode='after')", "全フィールド変換後", "フィールド間の整合性チェック"]
+    ]
+  },
+  jwtClaims: {
+    h: ["クレーム", "説明", "例"],
+    r: [
+      ["sub", "Subject（ユーザ識別子）", "\"user:42\""],
+      ["exp", "有効期限（UNIX時刻）", "1713100800"],
+      ["iat", "発行時刻", "1713014400"],
+      ["iss", "発行者", "\"my-api\""],
+      ["jti", "JWT固有ID（失効管理用）", "\"uuid4-string\""]
+    ]
+  },
+  rbacTable: {
+    h: ["ロール", "権限", "説明"],
+    r: [
+      ["guest", "read:public", "認証不要、公開リソースのみ"],
+      ["user", "read:own, write:own", "自分のリソースのみ操作可"],
+      ["moderator", "read:all, write:own, delete:public", "全読み取り＋限定削除"],
+      ["admin", "read:all, write:all, delete:all", "全権限"]
+    ]
+  },
+  asyncOps: {
+    h: ["操作", "同期版", "非同期版"],
+    r: [
+      ["DBセッション取得", "Session()", "AsyncSession()"],
+      ["クエリ実行", "session.execute()", "await session.execute()"],
+      ["コミット", "session.commit()", "await session.commit()"],
+      ["クローズ", "session.close()", "await session.close()"],
+      ["レコード取得", "session.get(Model, id)", "await session.get(Model, id)"]
+    ]
+  },
+  celeryConfig: {
+    h: ["設定項目", "説明", "例"],
+    r: [
+      ["broker_url", "メッセージブローカーURL", "redis://localhost:6379/0"],
+      ["result_backend", "タスク結果保存先", "redis://localhost:6379/1"],
+      ["task_serializer", "シリアライズ形式", "json"],
+      ["task_acks_late", "失敗時の再キュー", "True"],
+      ["worker_prefetch_multiplier", "先読みタスク数", "1（推奨）"]
+    ]
+  },
+  middlewareOrder: {
+    h: ["順序", "ミドルウェア", "処理"],
+    r: [
+      ["1（最外）", "RequestIDMiddleware", "X-Request-IDヘッダ付与"],
+      ["2", "GZipMiddleware", "レスポンス圧縮"],
+      ["3", "CORSMiddleware", "クロスオリジン制御"],
+      ["4（最内）", "アプリケーション本体", "ルーティング・ビジネスロジック"]
+    ]
+  },
+  wsVsSse: {
+    h: ["特性", "WebSocket", "SSE"],
+    r: [
+      ["通信方向", "双方向", "サーバ→クライアント（一方向）"],
+      ["プロトコル", "ws:// / wss://", "HTTP"],
+      ["ブラウザAPI", "WebSocket", "EventSource"],
+      ["再接続", "手動実装", "自動（ブラウザ側）"],
+      ["適用例", "チャット・ゲーム", "通知・ライブフィード"]
+    ]
+  },
+  testFixtures: {
+    h: ["フィクスチャ", "スコープ", "用途"],
+    r: [
+      ["engine", "session", "テスト用DBエンジン（1回作成）"],
+      ["db", "function", "各テストにクリーンなDBセッション"],
+      ["client", "function", "AsyncClient（依存性上書き済み）"],
+      ["auth_headers", "function", "JWTトークン付きAuthorizationヘッダ"]
+    ]
+  },
+  cacheStrategies: {
+    h: ["戦略", "説明", "適用例"],
+    r: [
+      ["Cache-Aside", "アプリがキャッシュを明示管理", "一般的なRead操作"],
+      ["Write-Through", "書き込み時にキャッシュも更新", "整合性重視のデータ"],
+      ["Write-Behind", "非同期にキャッシュをDB反映", "高速書き込み要件"],
+      ["ETag", "コンテンツハッシュで変更検知", "静的コンテンツ・一覧API"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 2,
+    q: "Pydantic v2 の @field_validator を使って、UserCreate モデルの password フィールドが「8文字以上、大文字・小文字・数字を各1文字以上含む」ことを検証してください。\n\nポイント: mode='after' での文字列バリデーション。",
+    code: `from pydantic import BaseModel, field_validator
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    # @field_validator でパスワード強度を検証`,
+    answer: `import re
+from pydantic import BaseModel, field_validator
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+    @field_validator('password', mode='after')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError('パスワードは8文字以上必要です')
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('大文字を1文字以上含めてください')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('小文字を1文字以上含めてください')
+        if not re.search(r'[0-9]', v):
+            raise ValueError('数字を1文字以上含めてください')
+        return v`
+  }, {
+    diff: 3,
+    q: "@model_validator を使って、DateRange モデルの start_date が end_date より前であることを検証し、さらに computed_field でその日数差（days）を計算するプロパティを追加してください。\n\nポイント: モデル間整合性チェックと computed_field の組み合わせ。",
+    code: `from datetime import date
+from pydantic import BaseModel, model_validator, computed_field
+
+class DateRange(BaseModel):
+    start_date: date
+    end_date: date
+    # start < end の検証と days の computed_field`,
+    answer: `from datetime import date
+from pydantic import BaseModel, model_validator, computed_field
+
+class DateRange(BaseModel):
+    start_date: date
+    end_date: date
+
+    @model_validator(mode='after')
+    def check_date_order(self) -> 'DateRange':
+        if self.start_date >= self.end_date:
+            raise ValueError('start_date は end_date より前である必要があります')
+        return self
+
+    @computed_field
+    @property
+    def days(self) -> int:
+        return (self.end_date - self.start_date).days`
+  }],
+  ch2: [{
+    diff: 2,
+    q: "OAuth2PasswordBearer と PyJWT を使って、アクセストークンを生成する create_access_token 関数と、トークンを検証して現在ユーザを返す get_current_user 依存関数を実装してください。\n\nポイント: JWTのエンコード・デコードと FastAPI の Depends 連携。",
+    code: `import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+
+SECRET_KEY = "your-secret-key"
+ALGORITHM = "HS256"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")`,
+    answer: `import jwt
+from datetime import datetime, timedelta, timezone
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+
+SECRET_KEY = "your-secret-key"
+ALGORITHM = "HS256"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+
+def create_access_token(sub: str, expires_min: int = 30) -> str:
+    payload = {
+        "sub": sub,
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=expires_min),
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    creds_exc = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="認証情報が無効です",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        sub: str = payload.get("sub")
+        if sub is None:
+            raise creds_exc
+        return sub
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="トークンの有効期限切れ")
+    except jwt.InvalidTokenError:
+        raise creds_exc`
+  }, {
+    diff: 3,
+    q: "RBAC（ロールベースアクセス制御）を実現するため、ユーザのロールを確認する require_role 依存関数ファクトリを実装してください。admin ロールのみアクセスできる /admin/stats エンドポイントに適用してください。\n\nポイント: 依存関数をクロージャで生成するパターン。",
+    code: `# require_role('admin') のように呼び出せる依存ファクトリを実装
+# UserInDB モデルには role: str フィールドがあると仮定`,
+    answer: `from fastapi import Depends, HTTPException, status
+
+# ユーザ取得（実際はDBから取得）
+async def get_current_user_with_role(
+    token: str = Depends(oauth2_scheme)
+):
+    # ... トークン検証後にDBからユーザ取得
+    return {"sub": "user@example.com", "role": "admin"}
+
+def require_role(*roles: str):
+    async def checker(
+        user=Depends(get_current_user_with_role)
+    ):
+        if user["role"] not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"ロール {roles} が必要です"
+            )
+        return user
+    return checker
+
+# 利用例
+@app.get("/admin/stats")
+async def admin_stats(
+    user=Depends(require_role("admin"))
+):
+    return {"stats": "...", "requested_by": user["sub"]}`
+  }],
+  ch3: [{
+    diff: 2,
+    q: "Repository パターンを使って、TodoRepository クラスを実装してください。AsyncSession を受け取り、get_by_id / get_all / create / delete メソッドを持つこと。\n\nポイント: データアクセス層の抽象化と async/await の正しい使い方。",
+    code: `from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+class TodoRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+    # get_by_id / get_all / create / delete を実装`,
+    answer: `from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.models.todo import Todo
+
+class TodoRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def get_by_id(self, todo_id: int) -> Todo | None:
+        return await self.session.get(Todo, todo_id)
+
+    async def get_all(self) -> list[Todo]:
+        result = await self.session.execute(select(Todo))
+        return list(result.scalars().all())
+
+    async def create(self, title: str, description: str | None) -> Todo:
+        todo = Todo(title=title, description=description)
+        self.session.add(todo)
+        await self.session.flush()
+        await self.session.refresh(todo)
+        return todo
+
+    async def delete(self, todo_id: int) -> bool:
+        todo = await self.get_by_id(todo_id)
+        if todo is None:
+            return False
+        await self.session.delete(todo)
+        return True`
+  }, {
+    diff: 3,
+    q: "User と Todo の 1対多リレーションを SQLAlchemy 2.0 スタイルで定義し、ユーザIDで絞り込んだ Todoリストを取得するクエリを書いてください。\n\nポイント: relationship の定義と selectinload によるN+1問題の回避。",
+    code: `# User → Todo の 1対多リレーション定義と
+# selectinload を使ったクエリを実装してください`,
+    answer: `from sqlalchemy import String, ForeignKey, select
+from sqlalchemy.orm import (
+    DeclarativeBase, Mapped, mapped_column, relationship
+)
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+class Base(DeclarativeBase): pass
+
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(50))
+    todos: Mapped[list["Todo"]] = relationship(
+        back_populates="owner", lazy="selectin"
+    )
+
+class Todo(Base):
+    __tablename__ = "todos"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(100))
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    owner: Mapped["User"] = relationship(back_populates="todos")
+
+async def get_user_todos(
+    user_id: int, session: AsyncSession
+) -> list[Todo]:
+    result = await session.execute(
+        select(Todo)
+        .where(Todo.owner_id == user_id)
+        .options(selectinload(Todo.owner))
+    )
+    return list(result.scalars().all())`
+  }],
+  ch4: [{
+    diff: 2,
+    q: "FastAPI の BackgroundTasks を使って、ユーザ登録後にウェルカムメール送信をバックグラウンドで実行するエンドポイントを実装してください。\n\nポイント: レスポンスを返してから非同期でタスクを実行する仕組み。",
+    code: `from fastapi import FastAPI, BackgroundTasks
+from pydantic import BaseModel
+
+app = FastAPI()
+
+def send_welcome_email(email: str): ...  # 実際のメール送信処理と仮定`,
+    answer: `from fastapi import FastAPI, BackgroundTasks
+from pydantic import BaseModel
+import time
+
+app = FastAPI()
+
+class UserRegister(BaseModel):
+    email: str
+    username: str
+
+def send_welcome_email(email: str, username: str):
+    # 実際はSMTPやSendGrid等を使う
+    time.sleep(2)  # メール送信の模擬
+    print(f"Welcome email sent to {email} for {username}")
+
+@app.post("/register", status_code=201)
+async def register_user(
+    body: UserRegister,
+    background_tasks: BackgroundTasks
+):
+    # DBへのユーザ保存処理（省略）
+    background_tasks.add_task(
+        send_welcome_email, body.email, body.username
+    )
+    return {"message": "登録完了。メールをご確認ください。"}`
+  }, {
+    diff: 3,
+    q: "asyncio.gather を使って、複数の外部APIを並列取得する関数を実装してください。3つのエンドポイント（/api/users, /api/posts, /api/comments）を並列取得し、結果をまとめて返すこと。\n\nポイント: 直列実行と並列実行の速度差の理解。",
+    code: `import asyncio
+import httpx
+
+BASE_URL = "https://jsonplaceholder.typicode.com"
+
+# 並列で3リソースを取得してまとめる関数を実装`,
+    answer: `import asyncio
+import httpx
+from fastapi import FastAPI
+
+app = FastAPI()
+BASE_URL = "https://jsonplaceholder.typicode.com"
+
+async def fetch(client: httpx.AsyncClient, url: str) -> dict:
+    response = await client.get(url)
+    response.raise_for_status()
+    return response.json()
+
+@app.get("/aggregate")
+async def aggregate():
+    async with httpx.AsyncClient(timeout=10) as client:
+        users, posts, comments = await asyncio.gather(
+            fetch(client, f"{BASE_URL}/users"),
+            fetch(client, f"{BASE_URL}/posts"),
+            fetch(client, f"{BASE_URL}/comments"),
+        )
+    return {
+        "users_count": len(users),
+        "posts_count": len(posts),
+        "comments_count": len(comments),
+    }`
+  }],
+  ch5: [{
+    diff: 2,
+    q: "すべてのリクエストに一意な X-Request-ID ヘッダを付与するカスタムミドルウェアを実装してください。リクエストに既にヘッダがある場合はそのまま使い、ない場合は UUID4 を生成すること。\n\nポイント: BaseHTTPMiddleware の基本実装パターン。",
+    code: `from fastapi import FastAPI, Request
+from starlette.middleware.base import BaseHTTPMiddleware
+import uuid
+
+app = FastAPI()
+# RequestIDMiddleware を実装して app に追加`,
+    answer: `from fastapi import FastAPI, Request
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+import uuid
+
+app = FastAPI()
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(
+        self, request: Request, call_next
+    ) -> Response:
+        request_id = request.headers.get(
+            "X-Request-ID", str(uuid.uuid4())
+        )
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+app.add_middleware(RequestIDMiddleware)`
+  }, {
+    diff: 2,
+    q: "lifespan コンテキストマネージャを使って、アプリ起動時にDB接続プールを初期化し、シャットダウン時にクリーンアップするコードを書いてください。\n\nポイント: FastAPI 0.95+ の lifespan パターン（@asynccontextmanager）。",
+    code: `from fastapi import FastAPI
+from contextlib import asynccontextmanager
+# startup で DB エンジン作成、shutdown でエンジン破棄`,
+    answer: `from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
+
+engine: AsyncEngine | None = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    global engine
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///./app.db", echo=True
+    )
+    print("DB engine initialized")
+    yield
+    # Shutdown
+    if engine:
+        await engine.dispose()
+    print("DB engine disposed")
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "db": engine is not None}`
+  }],
+  ch6: [{
+    diff: 2,
+    q: "WebSocket を使ったシンプルなエコーサーバを実装してください。クライアントからのメッセージをそのまま大文字にして返すこと。接続・切断時にログを出力すること。\n\nポイント: WebSocket の基本的なライフサイクル管理。",
+    code: `from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
+app = FastAPI()
+
+@app.websocket("/ws")
+async def websocket_echo(ws: WebSocket):
+    # 接続受け入れ→メッセージ受信→大文字にして返送`,
+    answer: `from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import logging
+
+app = FastAPI()
+logger = logging.getLogger(__name__)
+
+@app.websocket("/ws")
+async def websocket_echo(ws: WebSocket):
+    await ws.accept()
+    logger.info("Client connected")
+    try:
+        while True:
+            text = await ws.receive_text()
+            logger.info(f"Received: {text}")
+            await ws.send_text(text.upper())
+    except WebSocketDisconnect:
+        logger.info("Client disconnected")`
+  }, {
+    diff: 3,
+    q: "SSE（Server-Sent Events）を使って、サーバ時刻を1秒ごとにストリーミングする /events エンドポイントを実装してください。EventSourceResponse を使うこと。\n\nポイント: StreamingResponse を使ったSSEの実装。",
+    code: `from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+import asyncio, json
+from datetime import datetime, timezone
+
+app = FastAPI()
+# /events で SSE 形式の時刻ストリームを実装`,
+    answer: `from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+import asyncio, json
+from datetime import datetime, timezone
+
+app = FastAPI()
+
+async def time_event_generator():
+    while True:
+        now = datetime.now(timezone.utc).isoformat()
+        data = json.dumps({"time": now})
+        yield f"data: {data}\\n\\n"
+        await asyncio.sleep(1)
+
+@app.get("/events")
+async def sse_events():
+    return StreamingResponse(
+        time_event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+    )`
+  }],
+  ch7: [{
+    diff: 2,
+    q: "pytest-asyncio と httpx.AsyncClient を使って、POST /todos のエンドポイントを非同期テストしてください。テスト用SQLiteを使い、テストごとにDBをリセットすること。\n\nポイント: AsyncClient + app.dependency_overrides によるDB差し替え。",
+    code: `import pytest
+from httpx import AsyncClient, ASGITransport
+from app.main import app
+# テスト用DBエンジンと get_db のオーバーライドを実装`,
+    answer: `import pytest
+from httpx import AsyncClient, ASGITransport
+from sqlalchemy.ext.asyncio import (
+    create_async_engine, async_sessionmaker, AsyncSession
+)
+from app.main import app
+from app.db.session import get_db
+from app.models.base import Base
+
+TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+@pytest.fixture
+async def db_session():
+    engine = create_async_engine(TEST_DB_URL)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    session_factory = async_sessionmaker(engine, class_=AsyncSession)
+    async with session_factory() as session:
+        yield session
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
+
+@pytest.fixture
+async def client(db_session):
+    async def override_get_db():
+        yield db_session
+    app.dependency_overrides[get_db] = override_get_db
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+@pytest.mark.asyncio
+async def test_create_todo(client):
+    resp = await client.post("/todos", json={"title": "Test Todo"})
+    assert resp.status_code == 201
+    assert resp.json()["title"] == "Test Todo"`
+  }, {
+    diff: 2,
+    q: "pytest の monkeypatch を使って、外部メール送信関数をモックし、ユーザ登録時にメール送信が1回呼ばれることを確認するテストを書いてください。\n\nポイント: 副作用のある外部処理のモック化。",
+    code: `import pytest
+# send_welcome_email が正しく呼ばれるかテスト
+# monkeypatch または pytest-mock の mocker を使用`,
+    answer: `import pytest
+from unittest.mock import AsyncMock, patch
+from httpx import AsyncClient, ASGITransport
+from app.main import app
+
+@pytest.mark.asyncio
+async def test_register_sends_email():
+    with patch(
+        "app.routers.auth.send_welcome_email"
+    ) as mock_email:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test"
+        ) as client:
+            resp = await client.post("/register", json={
+                "email": "test@example.com",
+                "username": "testuser"
+            })
+        assert resp.status_code == 201
+        mock_email.assert_called_once_with(
+            "test@example.com", "testuser"
+        )`
+  }],
+  ch8: [{
+    diff: 2,
+    q: "fastapi-cache2 を使って、GET /items エンドポイントの結果を Redis に60秒キャッシュするコードを書いてください。lifespan でキャッシュを初期化すること。\n\nポイント: @cache デコレータによる宣言的キャッシュ。",
+    code: `from fastapi import FastAPI
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+from fastapi_cache.decorator import cache
+# lifespan で Redis 初期化、@cache(expire=60) をエンドポイントに付与`,
+    answer: `from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+from fastapi_cache.decorator import cache
+from redis import asyncio as aioredis
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    redis = aioredis.from_url("redis://localhost")
+    FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/items")
+@cache(expire=60)
+async def list_items():
+    # DBから取得する重い処理（初回のみ実行）
+    return [{"id": 1, "name": "item1"}, {"id": 2, "name": "item2"}]`
+  }, {
+    diff: 3,
+    q: "FastAPI の custom_openapi 関数を書き換えて、全エンドポイントに共通の X-Request-ID レスポンスヘッダの定義を追加してください。また API バージョン情報をタイトルに反映させること。\n\nポイント: OpenAPI スキーマのカスタマイズと openapi() メソッドのオーバーライド。",
+    code: `from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+
+app = FastAPI()
+
+# app.openapi を差し替えてカスタムスキーマを返す`,
+    answer: `from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+
+app = FastAPI()
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title="My API v2",
+        version="2.0.0",
+        description="カスタムOpenAPIスキーマのデモ",
+        routes=app.routes,
+    )
+    # 全パスに共通レスポンスヘッダを追加
+    for path_data in schema.get("paths", {}).values():
+        for operation in path_data.values():
+            operation.setdefault("parameters", [])
+            operation.setdefault("responses", {})
+            for resp in operation["responses"].values():
+                resp.setdefault("headers", {})
+                resp["headers"]["X-Request-ID"] = {
+                    "schema": {"type": "string"},
+                    "description": "一意なリクエストID"
+                }
+    app.openapi_schema = schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [
+  {
+    id: "ch1",
+    title: "Pydantic v2 深化",
+    est: "55分",
+    goal: "model_config でモデル挙動を制御し、@field_validator / @model_validator でフィールド間の複雑なバリデーションを実装できる。computed_field でモデルに計算プロパティを追加し、カスタム型を定義できる。",
+    sections: [
+      {
+        title: "model_config でモデル挙動を制御する",
+        body: "Pydantic v2 では、モデルの振る舞いをクラス変数 model_config に辞書（ConfigDict）を設定することで細かく制御できます。v1 の class Config: から大きく変わった点であり、型チェッカーとの親和性が向上しました。たとえば str_strip_whitespace=True を設定すると、全 str フィールドの入力値を自動的にトリミングしてくれるため、「タイトルに先頭スペースが入ってしまう」といったよくあるバグを防げます。\n\npopulate_by_name=True は、フィールドに alias を設定しつつ、元のフィールド名でも初期化できるようにします。外部APIのキャメルケースレスポンスをスネークケースで受け取るケースなどで重宝します。extra='forbid' は未定義フィールドを受け取った際に ValidationError を発生させるので、厳密なAPIでは積極的に使いましょう。",
+        table: "modelConfig",
+        afterTable: "frozen=True はモデルをイミュータブルにし、モデルインスタンスをdictのキーや setに入れることも可能になります。パフォーマンスが重要なユースケースや、データの意図しない変更を防ぎたい場合に有効です。",
+        code: `from pydantic import BaseModel, ConfigDict, Field
+
+class ArticleCreate(BaseModel):
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="forbid",
+        validate_default=True,
+    )
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=10)
+    tags: list[str] = Field(default_factory=list)
+
+# extra='forbid' の動作確認
+try:
+    a = ArticleCreate(
+        title="  Hello  ",
+        content="本文です" * 3,
+        unknown_field="oops"  # ValidationError!
+    )
+except Exception as e:
+    print(e)`
+      },
+      {
+        title: "@field_validator と @model_validator",
+        body: "単一フィールドに対するバリデーションには @field_validator を、複数フィールドの整合性チェックには @model_validator を使います。mode パラメータで「型変換前（before）」か「型変換後（after）」かを選べるのが v2 の強力な点です。before モードは文字列の正規化やデータ変換に使い、after モードは変換済みの型を活かした業務ロジック的な検証に使います。\n\n@model_validator(mode='after') は、全フィールドがバリデーション済みの状態でモデルインスタンスを受け取るため、self.field_a と self.field_b を比較するフィールド間制約を簡潔に書けます。たとえば「end_date は start_date より後でなければならない」といったビジネスルールです。",
+        table: "validatorModes",
+        afterTable: "@field_validator は @classmethod として定義する必要があります（v2 の仕様）。複数フィールドに同じバリデーションを適用したい場合は @field_validator('field_a', 'field_b') のようにフィールド名をカンマ区切りで並べられます。",
+        code: `from pydantic import BaseModel, field_validator, model_validator
+
+class EventCreate(BaseModel):
+    name: str
+    max_attendees: int
+    current_attendees: int = 0
+
+    @field_validator('name', mode='before')
+    @classmethod
+    def normalize_name(cls, v):
+        return v.strip().title()  # 「hello world」→「Hello World」
+
+    @model_validator(mode='after')
+    def check_attendees(self) -> 'EventCreate':
+        if self.current_attendees > self.max_attendees:
+            raise ValueError(
+                f'現参加者({self.current_attendees})が'
+                f'上限({self.max_attendees})を超えています'
+            )
+        return self`
+      },
+      {
+        title: "computed_field とカスタム型",
+        body: "computed_field デコレータを使うと、他のフィールドから計算される読み取り専用プロパティをモデルに追加できます。これは model_dump() や JSON シリアライズの結果にも含まれるため、レスポンスモデルに計算済みの値を自然に含められます。たとえば first_name + last_name から full_name を計算する、あるいは price * quantity から total_price を算出するといった用途です。\n\nカスタム型は Annotated と BeforeValidator/AfterValidator を組み合わせることで作成できます。プロジェクト全体で共通のバリデーションロジックを型として定義することで、DRY 原則を守りながら一貫性のあるデータモデルを構築できます。",
+        code: `from pydantic import BaseModel, computed_field
+from pydantic.functional_validators import BeforeValidator
+from typing import Annotated
+
+# カスタム型: 常に小文字に変換されるメールアドレス型
+LowerEmail = Annotated[str, BeforeValidator(str.lower)]
+
+class UserProfile(BaseModel):
+    first_name: str
+    last_name: str
+    email: LowerEmail
+
+    @computed_field
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
+
+    @computed_field
+    @property
+    def display(self) -> str:
+        return f"{self.full_name} <{self.email}>"
+
+u = UserProfile(
+    first_name="Taro", last_name="Yamada",
+    email="TARO@EXAMPLE.COM"
+)
+print(u.full_name)  # Taro Yamada
+print(u.email)      # taro@example.com（自動小文字化）
+print(u.model_dump())  # computed_field も含まれる`
+      }
+    ],
+    exercises: EX.ch1
+  },
+  {
+    id: "ch2",
+    title: "認証・認可（JWT + OAuth2）",
+    est: "60分",
+    goal: "OAuth2PasswordBearer と PyJWT を組み合わせてアクセストークンの発行・検証を実装できる。Depends を使ったロールベースアクセス制御（RBAC）で、エンドポイントへのアクセスを柔軟に制限できる。",
+    sections: [
+      {
+        title: "OAuth2 + JWT 認証の仕組みと実装",
+        body: "FastAPI の OAuth2PasswordBearer は、Authorization: Bearer <token> ヘッダからトークンを取り出す依存関数を自動生成します。これ自体はトークンの検証は行わないので、PyJWT などで検証するコードを自分で書く必要があります。JWT（JSON Web Token）はヘッダ・ペイロード・署名の3部構成で、署名があるため改ざん検知が可能ですが、それ自体は暗号化されていないため機密情報をペイロードに入れてはいけません。\n\nトークンの有効期限（exp クレーム）を適切に設定することが重要です。アクセストークンは15〜30分、リフレッシュトークンは7〜30日が一般的です。失効したトークンを無効化したい場合は jti クレームと Redis を使ったブロックリストを組み合わせます。",
+        table: "jwtClaims",
+        afterTable: "SECRET_KEY は環境変数で管理し、絶対にコードにハードコードしないでください。本番環境では openssl rand -hex 32 のような強力なランダム文字列を使いましょう。",
+        code: `import jwt
+from datetime import datetime, timedelta, timezone
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+
+SECRET_KEY = "change-me-in-production"
+ALGORITHM = "HS256"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+
+def create_access_token(sub: str, minutes: int = 30) -> str:
+    return jwt.encode(
+        {
+            "sub": sub,
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=minutes),
+            "iat": datetime.now(timezone.utc),
+        },
+        SECRET_KEY, algorithm=ALGORITHM
+    )
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload["sub"]
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, detail="トークン期限切れ")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, detail="無効なトークン")`
+      },
+      {
+        title: "ロールベースアクセス制御（RBAC）",
+        body: "認証（誰であるか）と認可（何ができるか）は別の概念です。FastAPI では Depends を入れ子にすることで、認証済みユーザのロールを確認する認可層を実装できます。依存関数ファクトリ（クロージャで依存関数を生成する関数）を使うと、require_role('admin') や require_role('user', 'moderator') のように宣言的に権限チェックを書けます。\n\nより本格的なシステムでは、ロールにパーミッション（権限）を紐付け、エンドポイントでパーミッションを確認する方式にします。これにより、ロールの定義を変更するだけでアクセス制御を変更できる柔軟なシステムが構築できます。",
+        table: "rbacTable",
+        afterTable: "セキュリティの観点から、401（Unauthorized、認証が必要）と403（Forbidden、権限が不足）を正しく使い分けることが重要です。未ログインユーザには401、ログイン済みだが権限がない場合は403を返します。",
+        code: `from fastapi import FastAPI, Depends, HTTPException, status
+
+app = FastAPI()
+
+def require_role(*roles: str):
+    """許可ロールのセットを受け取り、依存関数を返すファクトリ"""
+    async def checker(current_user=Depends(get_current_user_with_role)):
+        if current_user["role"] not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"このエンドポイントには {roles} ロールが必要です"
+            )
+        return current_user
+    return checker
+
+@app.get("/admin/users")
+async def list_users(user=Depends(require_role("admin"))):
+    return {"admin": user["sub"], "users": []}
+
+@app.get("/dashboard")
+async def dashboard(
+    user=Depends(require_role("user", "moderator", "admin"))
+):
+    return {"welcome": user["sub"]}`
+      }
+    ],
+    exercises: EX.ch2
+  },
+  {
+    id: "ch3",
+    title: "SQLAlchemy 非同期",
+    est: "60分",
+    goal: "AsyncSession を使った非同期DBアクセスを実装できる。Repository パターンでデータアクセス層を分離し、テスタビリティを高められる。Alembic のマイグレーションを管理し、リレーションを持つモデルを N+1 問題なく取得できる。",
+    sections: [
+      {
+        title: "AsyncSession と非同期エンジン",
+        body: "FastAPI は ASGI ベースの非同期フレームワークであるため、DBアクセスも非同期にしないとイベントループをブロックしてしまいます。SQLAlchemy 1.4+ からは非同期エンジン（create_async_engine）と非同期セッション（AsyncSession）がサポートされています。接続文字列には aiosqlite（SQLite）や asyncpg（PostgreSQL）などの非同期ドライバを指定します。\n\nセッションのライフサイクルは yield を使った依存関数で管理するのがベストプラクティスです。try/yield/except パターンにより、例外発生時は自動的にロールバックされ、正常終了時はコミットされます。expire_on_commit=False はリレーションを持つオブジェクトをコミット後に再ロードせずに使い続けるために設定します。",
+        table: "asyncOps",
+        afterTable: "echo=True を設定すると実行された SQL がコンソールに出力されます。開発時は便利ですが、本番環境では False に設定してください。",
+        code: `from sqlalchemy.ext.asyncio import (
+    create_async_engine, async_sessionmaker, AsyncSession
+)
+from typing import AsyncGenerator
+
+DATABASE_URL = "sqlite+aiosqlite:///./app.db"
+# PostgreSQL の場合: "postgresql+asyncpg://user:pass@host/db"
+
+engine = create_async_engine(DATABASE_URL, echo=True)
+AsyncSessionLocal = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise`
+      },
+      {
+        title: "Repository パターンとリレーション",
+        body: "Repository パターンは、データアクセスロジックをビジネスロジックから分離する設計パターンです。ルーター層はリポジトリのメソッドを呼ぶだけでよく、SQLAlchemy の詳細を知る必要がなくなります。テスト時にリポジトリをモックにすり替えることも容易です。FastAPI では Depends でリポジトリを注入するか、セッションを注入してルーター内でリポジトリを生成するかのどちらかが主流です。\n\nリレーションを持つモデルを取得する場合、デフォルトの lazy loading はセッションが閉じた後にアクセスしようとすると MissingGreenlet エラーになります。非同期コンテキストでは selectinload や joinedload を明示的に指定することで、必要なデータを一度のクエリで取得できます（N+1問題の回避）。",
+        table: "asyncOps",
+        afterTable: "selectinload は IN 句を使った追加クエリでリレーションをまとめてロードします。多対一の場合は joinedload の方が効率的なことが多いです。どちらが最適かはデータ量とユースケースによって変わるため、実際に EXPLAIN ANALYZE で確認する習慣をつけましょう。",
+        code: `from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+
+class TodoRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def get_by_id(self, todo_id: int):
+        return await self.session.get(Todo, todo_id)
+
+    async def get_by_user(self, user_id: int) -> list:
+        result = await self.session.execute(
+            select(Todo)
+            .where(Todo.owner_id == user_id)
+            .options(selectinload(Todo.tags))  # N+1回避
+            .order_by(Todo.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def create(self, data: dict) -> Todo:
+        todo = Todo(**data)
+        self.session.add(todo)
+        await self.session.flush()  # IDを確定させる
+        await self.session.refresh(todo)
+        return todo`
+      }
+    ],
+    exercises: EX.ch3
+  },
+  {
+    id: "ch4",
+    title: "非同期処理と背景タスク",
+    est: "55分",
+    goal: "BackgroundTasks でレスポンス後の非同期処理を実装できる。asyncio.gather で複数の非同期処理を並列実行できる。Celery と Redis を組み合わせたタスクキューを設計し、長時間処理をワーカープロセスに委譲できる。",
+    sections: [
+      {
+        title: "BackgroundTasks と asyncio.gather",
+        body: "FastAPI の BackgroundTasks は、HTTPレスポンスを返した後に非同期でタスクを実行する仕組みです。メール送信・ログ書き込み・キャッシュの更新など、レスポンスタイムに影響させたくない副作用的な処理に最適です。ただし、BackgroundTasks はアプリプロセス内で実行されるため、プロセスが終了するとタスクも消えてしまいます。信頼性が求められる処理には Celery などのタスクキューを使います。\n\nasyncio.gather は複数の非同期コルーチンを並列に実行し、全て完了するまで待機します。直列に await を並べると合計時間 = 各処理の合計になりますが、gather を使うと合計時間 ≈ 最も遅い処理の時間になります。外部APIを複数呼び出すときや、独立したDBクエリを同時に実行するときに効果的です。",
+        code: `import asyncio
+import httpx
+from fastapi import FastAPI, BackgroundTasks
+
+app = FastAPI()
+
+async def notify_slack(message: str):
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            "https://hooks.slack.com/...",
+            json={"text": message}
+        )
+
+@app.post("/orders")
+async def create_order(
+    background_tasks: BackgroundTasks,
+    order: dict
+):
+    # 注文をDB保存（省略）
+    background_tasks.add_task(
+        notify_slack, f"新規注文: {order}"
+    )
+    return {"status": "accepted"}  # Slack通知を待たずに返す
+
+# asyncio.gather の例
+@app.get("/dashboard")
+async def dashboard():
+    async with httpx.AsyncClient() as client:
+        # 3リクエストを並列実行（直列より高速）
+        user_data, stats, notifications = await asyncio.gather(
+            client.get("/api/me"),
+            client.get("/api/stats"),
+            client.get("/api/notifications"),
+        )
+    return {"user": user_data.json(), "stats": stats.json()}`
+      },
+      {
+        title: "Celery + Redis によるタスクキュー",
+        body: "BackgroundTasks は同一プロセス内での軽量な非同期処理に向いていますが、数分〜数時間かかる処理や、失敗時のリトライが必要な処理には Celery のようなタスクキューが適しています。Celery は Redis や RabbitMQ をブローカーとして使い、ワーカープロセスにタスクを分散処理させます。FastAPI アプリはタスクを Redis にエンキューするだけで、実際の処理はワーカーが担当するため、アプリのレスポンスタイムを維持できます。\n\nタスクの実行状況はタスクIDで追跡でき、/tasks/{task_id} エンドポイントで進捗を返すポーリング型か、WebSocket で完了を通知するプッシュ型の設計にするのが一般的です。",
+        table: "celeryConfig",
+        afterTable: "task_acks_late=True はタスク処理完了後にブローカーへ確認を送るため、ワーカーがクラッシュしてもタスクが失われません。ただし冪等でないタスクでは重複実行に注意してください。",
+        code: `# celery_app.py
+from celery import Celery
+
+celery = Celery(
+    "tasks",
+    broker="redis://localhost:6379/0",
+    backend="redis://localhost:6379/1",
+)
+celery.conf.update(
+    task_serializer="json",
+    task_acks_late=True,
+    worker_prefetch_multiplier=1,
+)
+
+@celery.task(bind=True, max_retries=3)
+def send_report(self, user_id: int):
+    try:
+        # 重い処理（例: CSVレポート生成・メール送信）
+        _generate_and_send(user_id)
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60)
+
+# FastAPI からタスクをエンキュー
+@app.post("/reports")
+async def request_report(user_id: int):
+    task = send_report.delay(user_id)
+    return {"task_id": task.id, "status": "queued"}
+
+@app.get("/tasks/{task_id}")
+async def task_status(task_id: str):
+    from celery.result import AsyncResult
+    result = AsyncResult(task_id, app=celery)
+    return {"status": result.status, "result": result.result}`
+      }
+    ],
+    exercises: EX.ch4
+  },
+  {
+    id: "ch5",
+    title: "ミドルウェアとライフサイクル",
+    est: "50分",
+    goal: "BaseHTTPMiddleware を使ったカスタムミドルウェアを実装できる。lifespan コンテキストマネージャで起動・終了処理を管理できる。ミドルウェアスタックの順序を理解し、適切な処理を適切な層に配置できる。",
+    sections: [
+      {
+        title: "カスタムミドルウェアの実装",
+        body: "ミドルウェアはリクエストが処理される前後に横断的な処理を挿入する仕組みです。認証・ロギング・レート制限・圧縮など、エンドポイント固有でない「アプリ全体の関心事」を一箇所に集約できます。FastAPI では Starlette の BaseHTTPMiddleware を継承する方法と、ASGI 仕様に準拠した純粋なクラスを書く方法の2通りがあります。BaseHTTPMiddleware は手軽ですが、ストリーミングレスポンスに対応するには低レベルなアプローチが必要な場合があります。\n\nミドルウェアは add_middleware() で追加した逆順に実行されます。つまり最後に追加したミドルウェアが最初に実行されます。リクエストIDを付与するミドルウェアは最外層に置き、そのIDをログに含めることで分散トレーシングの基盤を作れます。",
+        table: "middlewareOrder",
+        afterTable: "GZipMiddleware は Starlette に標準搭載されています。minimum_size パラメータで圧縮を適用する最小バイト数を設定できます（デフォルト500バイト）。小さなレスポンスはオーバーヘッドの方が大きいため圧縮しない方が良いです。",
+        code: `from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+import uuid, logging, time
+
+logger = logging.getLogger(__name__)
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        req_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration = (time.perf_counter() - start) * 1000
+        response.headers["X-Request-ID"] = req_id
+        logger.info(
+            f"{request.method} {request.url.path} "
+            f"{response.status_code} {duration:.1f}ms [{req_id}]"
+        )
+        return response
+
+app = FastAPI()
+app.add_middleware(GZipMiddleware, minimum_size=500)
+app.add_middleware(CORSMiddleware, allow_origins=["*"],
+                   allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(RequestIDMiddleware)  # 最外層で実行`
+      },
+      {
+        title: "lifespan によるアプリライフサイクル管理",
+        body: "FastAPI 0.95 から推奨されている lifespan コンテキストマネージャは、アプリの起動（startup）と終了（shutdown）処理を一箇所に書ける仕組みです。以前の @app.on_event('startup') / @app.on_event('shutdown') イベントハンドラより可読性が高く、テスト時のセットアップ・ティアダウンとも自然に統合できます。\n\nlifespan では、DB接続プールの初期化・Redis クライアントの生成・ML モデルのロードなど、アプリ全体で共有するリソースを起動時に準備し、yield 後のシャットダウン処理で確実にクリーンアップします。app.state にリソースを格納することで、エンドポイントや依存関数からアクセスできます。",
+        code: `from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+from sqlalchemy.ext.asyncio import create_async_engine
+import httpx
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # === Startup ===
+    app.state.db_engine = create_async_engine(
+        "sqlite+aiosqlite:///./app.db"
+    )
+    app.state.http_client = httpx.AsyncClient(timeout=10)
+    print("✓ Resources initialized")
+    yield
+    # === Shutdown ===
+    await app.state.db_engine.dispose()
+    await app.state.http_client.aclose()
+    print("✓ Resources cleaned up")
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/status")
+async def status(request: Request):
+    # app.state からリソースにアクセス
+    return {
+        "db_engine": str(request.app.state.db_engine.url),
+        "status": "running"
+    }`
+      }
+    ],
+    exercises: EX.ch5
+  },
+  {
+    id: "ch6",
+    title: "WebSocket と SSE",
+    est: "55分",
+    goal: "WebSocket エンドポイントを実装し、ConnectionManager で複数クライアントへのブロードキャストを管理できる。SSE を使ったサーバからクライアントへのリアルタイム通知を実装できる。両者の違いを理解し、ユースケースに応じて使い分けられる。",
+    sections: [
+      {
+        title: "WebSocket と ConnectionManager",
+        body: "WebSocket は HTTP のアップグレードハンドシェイクを経て確立される全二重通信チャネルです。FastAPI は @app.websocket() デコレータでシンプルに WebSocket エンドポイントを定義できます。接続の管理（接続リストへの追加・削除・ブロードキャスト）は、ConnectionManager クラスにまとめるのが定番パターンです。\n\n注意点として、FastAPI アプリが複数プロセスで動く場合（本番環境のマルチワーカー構成）は、各ワーカーが独自の接続リストを持つため、あるワーカーに接続したクライアントに別ワーカーからメッセージを送れません。この場合は Redis Pub/Sub を使って、メッセージをワーカー間でブロードキャストする必要があります。",
+        table: "wsVsSse",
+        afterTable: "WebSocket の切断検知は receive_text() や receive_bytes() が WebSocketDisconnect 例外を送出することで行います。try/finally ブロックで ConnectionManager からの削除を確実に行いましょう。",
+        code: `from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from typing import list as List
+
+app = FastAPI()
+
+class ConnectionManager:
+    def __init__(self):
+        self.active: list[WebSocket] = []
+
+    async def connect(self, ws: WebSocket):
+        await ws.accept()
+        self.active.append(ws)
+
+    def disconnect(self, ws: WebSocket):
+        self.active.remove(ws)
+
+    async def broadcast(self, msg: str):
+        for ws in self.active:
+            await ws.send_text(msg)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/chat")
+async def chat(ws: WebSocket):
+    await manager.connect(ws)
+    try:
+        while True:
+            text = await ws.receive_text()
+            await manager.broadcast(f"Message: {text}")
+    except WebSocketDisconnect:
+        manager.disconnect(ws)
+        await manager.broadcast("A user disconnected")`
+      },
+      {
+        title: "Server-Sent Events（SSE）",
+        body: "SSE はサーバからクライアントへの一方向のリアルタイム通信です。通常の HTTP 接続を使い、text/event-stream コンテンツタイプで継続的にデータを送り続けます。ブラウザ側は EventSource API で簡単に受信でき、接続が切れた場合に自動再接続する機能も標準装備です。WebSocket ほどの柔軟性はありませんが、実装がシンプルで HTTP インフラとの相性が良い点が魅力です。\n\nSStE イベントの形式は data: <内容>\\n\\n のプレーンテキストです。event: で名前付きイベント、id: で最後のイベントIDを指定でき、切断・再接続時に id を使って続きから受信できます。大量の接続を維持する場合は、asyncio.sleep でポーリングをするよりも Redis Pub/Sub で実際にイベントが発生したときのみ送信する設計にしましょう。",
+        code: `from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
+import asyncio, json
+from datetime import datetime, timezone
+
+app = FastAPI()
+
+async def event_generator(request: Request):
+    event_id = 0
+    while True:
+        # クライアントが切断していれば終了
+        if await request.is_disconnected():
+            break
+        event_id += 1
+        data = json.dumps({
+            "id": event_id,
+            "time": datetime.now(timezone.utc).isoformat(),
+        })
+        yield f"id: {event_id}\\ndata: {data}\\n\\n"
+        await asyncio.sleep(2)
+
+@app.get("/stream")
+async def sse_stream(request: Request):
+    return StreamingResponse(
+        event_generator(request),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache",
+                 "X-Accel-Buffering": "no"},
+    )`
+      }
+    ],
+    exercises: EX.ch6
+  },
+  {
+    id: "ch7",
+    title: "テスト戦略",
+    est: "55分",
+    goal: "pytest-asyncio と httpx.AsyncClient を使った非同期 API テストを書ける。テスト用 DB とフィクスチャを設計し、各テストを独立・再現可能にできる。外部依存をモックで差し替え、ビジネスロジックを単独でテストできる。",
+    sections: [
+      {
+        title: "非同期テストの設定と AsyncClient",
+        body: "FastAPI は ASGI アプリであるため、テストクライアントも非同期に対応する必要があります。httpx.AsyncClient に ASGITransport を渡すことで、実際の HTTP サーバを起動せずにアプリに直接リクエストを送れます。pytest-asyncio を使い、テスト関数に @pytest.mark.asyncio を付けることで async def テストが書けます。\n\npyproject.toml に asyncio_mode = \"auto\" を設定すると、全ての async def テストに自動的に @pytest.mark.asyncio が適用されます。テスト用 DB は SQLite in-memory（sqlite+aiosqlite:///:memory:）を使うと高速で、テストごとに create_all / drop_all することで完全に独立したテストが書けます。app.dependency_overrides を使って本番の get_db をテスト用セッションに差し替えるのが基本パターンです。",
+        table: "testFixtures",
+        afterTable: "conftest.py にフィクスチャを定義すると、同じディレクトリ以下の全テストから自動的に利用できます。フィクスチャのスコープ（function/class/module/session）を適切に設定してテストの速度と独立性のバランスをとりましょう。",
+        code: `# conftest.py
+import pytest
+from httpx import AsyncClient, ASGITransport
+from sqlalchemy.ext.asyncio import (
+    create_async_engine, async_sessionmaker, AsyncSession
+)
+from app.main import app
+from app.db.session import get_db
+from app.models.base import Base
+
+@pytest.fixture(scope="function")
+async def db():
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, class_=AsyncSession)
+    async with factory() as session:
+        yield session
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
+
+@pytest.fixture
+async def client(db):
+    app.dependency_overrides[get_db] = lambda: db
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test"
+    ) as c:
+        yield c
+    app.dependency_overrides.clear()`
+      },
+      {
+        title: "モックと依存性の差し替え",
+        body: "テストの目的はビジネスロジックの正しさを確認することです。外部サービス（メール・Slack・外部API）の呼び出しは実際には行わず、モックで差し替えることでテストを高速・安定・再現可能にします。Python 標準の unittest.mock.patch や pytest-mock の mocker.patch が便利です。\n\nFastAPI の dependency_overrides はモックの強力な武器です。特定の依存関数を別の関数に差し替えられるため、認証を常に成功させるダミーの get_current_user に置き換えてエンドポイントのロジックだけをテストする、といったことが簡単にできます。テスト後は必ず dependency_overrides.clear() を呼んで、テスト間の汚染を防ぎましょう。",
+        code: `# test_todos.py
+import pytest
+from unittest.mock import patch, AsyncMock
+
+@pytest.mark.asyncio
+async def test_create_todo(client):
+    resp = await client.post(
+        "/todos",
+        json={"title": "Buy milk", "is_done": False},
+        headers={"Authorization": "Bearer testtoken"}
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["title"] == "Buy milk"
+
+@pytest.mark.asyncio
+async def test_get_nonexistent_todo(client):
+    resp = await client.get("/todos/99999")
+    assert resp.status_code == 404
+
+@pytest.mark.asyncio
+async def test_email_sent_on_register(client):
+    with patch(
+        "app.routers.users.send_welcome_email",
+        new_callable=AsyncMock
+    ) as mock_mail:
+        resp = await client.post(
+            "/users/register",
+            json={"email": "a@b.com", "username": "alice", "password": "Secret1"}
+        )
+    assert resp.status_code == 201
+    mock_mail.assert_awaited_once()`
+      }
+    ],
+    exercises: EX.ch7
+  },
+  {
+    id: "ch8",
+    title: "キャッシュと OpenAPI",
+    est: "50分",
+    goal: "fastapi-cache2 を使って Redis キャッシュを宣言的に設定できる。ETag によるクライアントサイドキャッシュを実装できる。OpenAPI スキーマをカスタマイズし、API クライアントの自動生成に活用できる。",
+    sections: [
+      {
+        title: "Redis キャッシュと ETag",
+        body: "APIのパフォーマンスボトルネックの多くは DB クエリです。読み取り頻度が高く更新頻度が低いデータ（商品一覧・マスタデータなど）は、Redis にキャッシュすることでDBの負荷を大幅に下げられます。fastapi-cache2 は @cache(expire=秒) デコレータでエンドポイントの結果を自動的に Redis に保存・取得する仕組みを提供します。\n\nETag はレスポンスのコンテンツのハッシュをヘッダに付与し、クライアントが次回リクエスト時に If-None-Match ヘッダでそのハッシュを送ることで、コンテンツが変わっていなければ 304 Not Modified を返す仕組みです。帯域節約とクライアントのキャッシュ活用の両方に効果があります。",
+        table: "cacheStrategies",
+        afterTable: "キャッシュの無効化戦略も重要です。データが更新されたタイミングで FastAPICache.clear() や特定のキャッシュキーを削除する処理を追加しないと、古いデータがキャッシュに残り続けます。TTL（有効期限）との組み合わせで設計しましょう。",
+        code: `from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, Response
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+from fastapi_cache.decorator import cache
+from redis import asyncio as aioredis
+import hashlib, json
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    redis = aioredis.from_url("redis://localhost:6379")
+    FastAPICache.init(RedisBackend(redis), prefix="api-cache")
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/products")
+@cache(expire=300)  # 5分キャッシュ
+async def list_products():
+    # DBクエリは初回のみ実行される
+    return [{"id": 1, "name": "Widget", "price": 1000}]
+
+@app.get("/articles/{article_id}")
+async def get_article(article_id: int, response: Response):
+    data = {"id": article_id, "title": "Sample Article"}
+    # ETag を生成して付与
+    etag = hashlib.md5(json.dumps(data).encode()).hexdigest()
+    response.headers["ETag"] = f'"{etag}"'
+    return data`
+      },
+      {
+        title: "OpenAPI スキーマのカスタマイズ",
+        body: "FastAPI は OpenAPI スキーマを自動生成しますが、app.openapi() 関数を差し替えることで独自のカスタマイズが可能です。共通のレスポンスヘッダを全エンドポイントに追加する、セキュリティスキームを定義する、エンドポイントのタグを整理するといったことができます。カスタムスキーマは一度生成されると app.openapi_schema にキャッシュされるため、2回目以降のアクセスは高速です。\n\nOpenAPI スキーマを使った API クライアント自動生成は、openapi-generator や speakeasy などのツールで実現できます。TypeScript・Python・Go など多くの言語向けのクライアントを生成でき、型安全な API 呼び出しが可能になります。スキーマに examples や description を充実させることで、生成されるクライアントの品質も向上します。",
+        code: `from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+
+app = FastAPI()
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title="My Service API",
+        version="2.0.0",
+        description="本番環境向け FastAPI サービス",
+        routes=app.routes,
+    )
+    # Bearer 認証をスキーマに追加
+    schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+    }
+    # 全エンドポイントにデフォルトのセキュリティを適用
+    for path in schema.get("paths", {}).values():
+        for op in path.values():
+            if isinstance(op, dict):
+                op.setdefault("security", [{"BearerAuth": []}])
+    app.openapi_schema = schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi`
+      }
+    ],
+    exercises: EX.ch8
+  }
+];
+
+/* ── UI Components ── */
+function DataTable({ tableKey }) {
+  const t = T[tableKey];
+  if (!t) return null;
+  return React.createElement("div", { style: { overflowX: "auto", margin: "16px 0" } },
+    React.createElement("table", {
+      style: {
+        width: "100%", borderCollapse: "collapse", fontSize: "13px",
+        background: "#fff", borderRadius: "8px", overflow: "hidden",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.07)"
+      }
+    },
+      React.createElement("thead", null,
+        React.createElement("tr", { style: { background: "linear-gradient(90deg,#6366f1,#8b5cf6)", color: "#fff" } },
+          t.h.map((h, i) => React.createElement("th", {
+            key: i,
+            style: { padding: "10px 14px", textAlign: "left", fontWeight: 700, fontSize: "12px", letterSpacing: "0.5px" }
+          }, h))
+        )
+      ),
+      React.createElement("tbody", null,
+        t.r.map((row, ri) =>
+          React.createElement("tr", {
+            key: ri,
+            style: { background: ri % 2 === 0 ? "#fafafa" : "#fff", borderBottom: "1px solid #f0f0f0" }
+          },
+            row.map((cell, ci) => React.createElement("td", {
+              key: ci,
+              style: { padding: "9px 14px", fontFamily: ci === 0 ? "'JetBrains Mono', monospace" : "inherit", fontSize: ci === 0 ? "12px" : "13px" }
+            }, cell))
+          )
+        )
+      )
+    )
+  );
+}
+
+function Code({ code }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+  return React.createElement("div", {
+    style: { position: "relative", margin: "16px 0", borderRadius: "10px", overflow: "hidden", background: "#1e1b4b" }
+  },
+    React.createElement("button", {
+      onClick: copy,
+      style: {
+        position: "absolute", top: "10px", right: "10px",
+        background: copied ? "#22c55e" : "rgba(255,255,255,0.15)",
+        color: "#fff", border: "none", borderRadius: "6px",
+        padding: "4px 10px", fontSize: "11px", cursor: "pointer", zIndex: 2
+      }
+    }, copied ? "✓ Copied" : "Copy"),
+    React.createElement("pre", {
+      style: {
+        margin: 0, padding: "18px 20px", overflowX: "auto",
+        fontFamily: "'JetBrains Mono', monospace", fontSize: "12.5px",
+        lineHeight: 1.7, color: "#e0e7ff"
+      }
+    }, React.createElement("code", null, code))
+  );
+}
+
+function Exercise({ ex, chId }) {
+  const [open, setOpen] = useState(false);
+  const stars = "⭐".repeat(ex.diff);
+  return React.createElement("div", {
+    style: {
+      border: "1px solid #e9d5ff", borderRadius: "12px",
+      marginBottom: "16px", background: "#fdf4ff", overflow: "hidden"
+    }
+  },
+    React.createElement("div", { style: { padding: "16px 20px" } },
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" } },
+        React.createElement("div", { style: { flex: 1 } },
+          React.createElement("div", { style: { fontSize: "13px", color: "#7c3aed", fontWeight: 700, marginBottom: "6px" } }, stars),
+          React.createElement("pre", {
+            style: {
+              whiteSpace: "pre-wrap", fontSize: "13.5px", lineHeight: 1.7,
+              color: "#374151", fontFamily: "'Noto Sans JP', sans-serif", margin: 0
+            }
+          }, ex.q)
+        )
+      ),
+      ex.code && React.createElement(Code, { code: ex.code })
+    ),
+    React.createElement("div", { style: { borderTop: "1px solid #e9d5ff" } },
+      React.createElement("button", {
+        onClick: () => setOpen(!open),
+        style: {
+          width: "100%", padding: "12px 20px", background: "none",
+          border: "none", textAlign: "left", cursor: "pointer",
+          color: "#7c3aed", fontWeight: 600, fontSize: "13px",
+          display: "flex", alignItems: "center", gap: "6px"
+        }
+      }, open ? "▼ 解答を閉じる" : "▶ 解答を見る"),
+      open && React.createElement("div", { style: { padding: "0 20px 16px" } },
+        React.createElement(Code, { code: ex.answer })
+      )
+    )
+  );
+}
+
+function Section({ sec, chId }) {
+  const [open, setOpen] = useState(false);
+  return React.createElement("div", {
+    style: {
+      border: "1px solid #e5e7eb", borderRadius: "12px",
+      marginBottom: "12px", background: "#fff", overflow: "hidden"
+    }
+  },
+    React.createElement("button", {
+      onClick: () => setOpen(!open),
+      style: {
+        width: "100%", padding: "16px 20px", background: "none",
+        border: "none", textAlign: "left", cursor: "pointer",
+        display: "flex", justifyContent: "space-between", alignItems: "center"
+      }
+    },
+      React.createElement("span", { style: { fontWeight: 700, fontSize: "15px", color: "#1e1b4b" } }, sec.title),
+      React.createElement("span", { style: { color: "#6366f1", fontSize: "18px" } }, open ? "−" : "+")
+    ),
+    open && React.createElement("div", { style: { padding: "0 20px 20px", borderTop: "1px solid #f3f4f6" } },
+      sec.body && sec.body.split("\n\n").map((p, i) =>
+        React.createElement("p", {
+          key: i,
+          style: { fontSize: "14px", lineHeight: 1.85, color: "#374151", marginTop: "14px" }
+        }, p)
+      ),
+      sec.table && React.createElement(DataTable, { tableKey: sec.table }),
+      sec.afterTable && React.createElement("p", {
+        style: {
+          fontSize: "13.5px", lineHeight: 1.8, color: "#4b5563",
+          background: "#f0fdf4", borderLeft: "3px solid #22c55e",
+          padding: "10px 14px", borderRadius: "0 8px 8px 0", marginTop: "12px"
+        }
+      }, sec.afterTable),
+      sec.code && React.createElement(Code, { code: sec.code }),
+      sec.afterCode && React.createElement("p", {
+        style: {
+          fontSize: "13.5px", lineHeight: 1.8, color: "#4b5563",
+          background: "#eff6ff", borderLeft: "3px solid #3b82f6",
+          padding: "10px 14px", borderRadius: "0 8px 8px 0", marginTop: "12px"
+        }
+      }, sec.afterCode)
+    )
+  );
+}
+
+/* ── Main App ── */
+function FastAPIIntermediateCourse() {
+  const [chIdx, setChIdx] = useState(0);
+  const ch = chapters[chIdx];
+  const totalChapters = chapters.length;
+  const totalExercises = Object.values(EX).reduce((s, arr) => s + arr.length, 0);
+
+  const goTo = (i) => {
+    setChIdx(i);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return React.createElement("div", { style: { background: "linear-gradient(135deg,#f5f3ff 0%,#ede9fe 50%,#ddd6fe 100%)", minHeight: "100vh" } },
+    React.createElement("div", { style: { padding: "40px 20px 80px" } },
+
+      /* Hero */
+      React.createElement("div", {
+        style: {
+          textAlign: "center", marginBottom: "48px", padding: "52px 24px",
+          background: "linear-gradient(135deg,#6366f1,#8b5cf6,#a855f7)",
+          borderRadius: "24px", color: "#fff", boxShadow: "0 20px 60px rgba(99,102,241,0.35)"
+        }
+      },
+        React.createElement("div", {
+          style: {
+            display: "inline-flex", alignItems: "center", gap: "8px",
+            background: "rgba(255,255,255,0.2)", borderRadius: "20px",
+            padding: "6px 16px", fontSize: "13px", fontWeight: 600, marginBottom: "20px"
+          }
+        }, "🐍 FastAPI 中級コース"),
+        React.createElement("h1", {
+          style: { fontSize: "clamp(26px,5vw,42px)", fontWeight: 900, marginBottom: "16px", letterSpacing: "-0.02em" }
+        }, "本格的な FastAPI 開発"),
+        React.createElement("p", {
+          style: { fontSize: "clamp(14px,2vw,17px)", opacity: 0.92, maxWidth: "680px", margin: "0 auto 28px", lineHeight: 1.75 }
+        }, "認証・非同期DB・バックグラウンドタスク・WebSocket・テスト戦略・キャッシュまで、実務レベルのFastAPI開発スキルを体系的に習得します。Pydantic v2 の高度な使い方から OpenAPI カスタマイズまで、プロダクション品質のAPIを自信を持って構築できるようになることがゴールです。"),
+        React.createElement("div", { style: { display: "flex", gap: "24px", justifyContent: "center", flexWrap: "wrap" } },
+          [
+            ["📚", `${totalChapters} 章`],
+            ["🏋️", `${totalExercises} 演習`],
+            ["⏱️", "約 7.5 時間"]
+          ].map(([icon, label]) =>
+            React.createElement("div", {
+              key: label,
+              style: {
+                background: "rgba(255,255,255,0.18)", borderRadius: "12px",
+                padding: "12px 22px", fontWeight: 700, fontSize: "15px"
+              }
+            }, `${icon} ${label}`)
+          )
+        )
+      ),
+
+      /* Chapter nav */
+      React.createElement("div", {
+        style: { display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "32px", justifyContent: "center" }
+      },
+        chapters.map((c, i) =>
+          React.createElement("button", {
+            key: c.id,
+            onClick: () => goTo(i),
+            style: {
+              padding: "8px 16px", borderRadius: "20px", border: "none",
+              cursor: "pointer", fontWeight: 600, fontSize: "13px",
+              background: i === chIdx ? "linear-gradient(90deg,#6366f1,#8b5cf6)" : "rgba(255,255,255,0.7)",
+              color: i === chIdx ? "#fff" : "#6b7280",
+              boxShadow: i === chIdx ? "0 4px 12px rgba(99,102,241,0.3)" : "none",
+              transition: "all 0.15s"
+            }
+          }, `${i + 1}. ${c.title}`)
+        )
+      ),
+
+      /* Chapter card */
+      React.createElement("div", { style: { background: "rgba(255,255,255,0.85)", borderRadius: "20px", padding: "32px", boxShadow: "0 8px 32px rgba(99,102,241,0.1)", marginBottom: "32px" } },
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "20px" } },
+          React.createElement("div", null,
+            React.createElement("div", { style: { fontSize: "12px", color: "#8b5cf6", fontWeight: 700, letterSpacing: "1px", marginBottom: "6px" } }, `第 ${chIdx + 1} 章`),
+            React.createElement("h2", { style: { fontSize: "clamp(20px,3vw,28px)", fontWeight: 900, color: "#1e1b4b" } }, ch.title)
+          ),
+          React.createElement("div", {
+            style: {
+              background: "linear-gradient(90deg,#6366f1,#8b5cf6)",
+              color: "#fff", borderRadius: "10px", padding: "8px 16px",
+              fontSize: "13px", fontWeight: 700
+            }
+          }, `⏱ 推定 ${ch.est}`)
+        ),
+
+        /* Chapter goal */
+        React.createElement("div", {
+          style: {
+            background: "linear-gradient(135deg,#ede9fe,#fdf4ff)",
+            border: "2px solid #c4b5fd", borderRadius: "12px",
+            padding: "16px 20px", marginBottom: "28px"
+          }
+        },
+          React.createElement("div", { style: { fontSize: "13px", fontWeight: 800, color: "#7c3aed", marginBottom: "6px" } }, "🎯 この章のゴール"),
+          React.createElement("p", { style: { fontSize: "14px", lineHeight: 1.8, color: "#4b5563" } }, ch.goal)
+        ),
+
+        /* Sections */
+        React.createElement("div", { style: { marginBottom: "32px" } },
+          ch.sections.map((sec, i) =>
+            React.createElement(Section, { key: `${ch.id}-sec-${i}`, sec, chId: ch.id })
+          )
+        ),
+
+        /* Exercises */
+        React.createElement("div", null,
+          React.createElement("h3", { style: { fontSize: "18px", fontWeight: 800, color: "#1e1b4b", marginBottom: "16px" } }, "演習問題"),
+          ch.exercises.map((ex, i) =>
+            React.createElement(Exercise, { key: `${ch.id}-ex-${i}`, ex, chId: ch.id })
+          )
+        )
+      ),
+
+      /* Navigation */
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", gap: "12px" } },
+        chIdx > 0
+          ? React.createElement("button", {
+              onClick: () => goTo(chIdx - 1),
+              style: {
+                padding: "12px 24px", borderRadius: "12px", border: "2px solid #c4b5fd",
+                background: "#fff", color: "#6366f1", fontWeight: 700,
+                cursor: "pointer", fontSize: "14px"
+              }
+            }, `← 第${chIdx} 章: ${chapters[chIdx - 1].title}`)
+          : React.createElement("div", null),
+        chIdx < totalChapters - 1
+          ? React.createElement("button", {
+              onClick: () => goTo(chIdx + 1),
+              style: {
+                padding: "12px 24px", borderRadius: "12px", border: "none",
+                background: "linear-gradient(90deg,#6366f1,#8b5cf6)",
+                color: "#fff", fontWeight: 700, cursor: "pointer",
+                fontSize: "14px", boxShadow: "0 4px 12px rgba(99,102,241,0.3)"
+              }
+            }, `第${chIdx + 2} 章: ${chapters[chIdx + 1].title} →`)
+          : React.createElement("a", {
+              href: "../index.html",
+              style: {
+                padding: "12px 28px", borderRadius: "12px",
+                background: "linear-gradient(90deg,#f59e0b,#f97316)",
+                color: "#fff", fontWeight: 800, textDecoration: "none",
+                fontSize: "14px", boxShadow: "0 4px 12px rgba(245,158,11,0.3)"
+              }
+            }, "🎉 コース完了 — ホームへ")
+      ),
+
+      /* Footer */
+      React.createElement("div", {
+        style: { textAlign: "center", marginTop: "48px", fontSize: "12px", color: "#9ca3af" }
+      }, "fastapi.tiangolo.com ・ FastAPI 0.115 / Pydantic v2 時点")
+    )
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(FastAPIIntermediateCourse));
+  </script>
+</body>
+</html>
