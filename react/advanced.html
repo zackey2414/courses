@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>React 上級コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのReact上級コース。全8章・16問の演習付き。FiberアーキテクチャからカスタムレンダラーまでReactの内部構造を深く学びます。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  fiberFields: {
+    h: ["フィールド", "型", "説明"],
+    r: [
+      ["type", "string | Function", "HTML タグ名またはコンポーネント関数"],
+      ["key", "string | null", "リストの識別子"],
+      ["stateNode", "any", "DOM ノードまたはクラスインスタンス"],
+      ["child", "Fiber | null", "最初の子 Fiber"],
+      ["sibling", "Fiber | null", "次の兄弟 Fiber"],
+      ["return", "Fiber | null", "親 Fiber"],
+      ["pendingProps", "any", "次のレンダリングの props"],
+      ["memoizedProps", "any", "前回レンダリング時の props"],
+      ["memoizedState", "any", "フックのリンクドリスト"],
+      ["lanes", "Lanes", "優先度を表すビットマスク"]
+    ]
+  },
+  priorityLanes: {
+    h: ["Lane", "優先度", "用途"],
+    r: [
+      ["SyncLane", "最高", "ユーザー入力（click/input）"],
+      ["InputContinuousLane", "高", "スクロール・ドラッグなど連続入力"],
+      ["DefaultLane", "中", "通常の setState・useEffect"],
+      ["TransitionLane", "低", "startTransition でマーク"],
+      ["IdleLane", "最低", "画面外コンテンツの事前レンダリング"]
+    ]
+  },
+  compilerVsManual: {
+    h: ["項目", "React Compiler（自動）", "手動（useMemo/useCallback）"],
+    r: [
+      ["適用範囲", "全コンポーネント・フックを解析", "開発者が明示した箇所のみ"],
+      ["メンテコスト", "ほぼゼロ", "依存配列の管理が必要"],
+      ["ミスのリスク", "コンパイラが正確に判断", "依存漏れでバグになりやすい"],
+      ["デバッグ", "React DevTools で可視化", "手動で Profiler 確認"],
+      ["制約", "純粋な関数が前提", "制約なし（副作用OKだが非推奨）"]
+    ]
+  },
+  suspensePatterns: {
+    h: ["パターン", "コンポーネント/フック", "説明"],
+    r: [
+      ["データ取得の遅延", "Suspense + use()", "Promise が解決するまでフォールバック表示"],
+      ["遅延ロード", "Suspense + lazy()", "コードスプリットしたコンポーネントを非同期ロード"],
+      ["エラー境界", "ErrorBoundary", "子ツリーの throw をキャッチしてフォールバック表示"],
+      ["並行取得", "Promise.all + use()", "複数のデータを同時取得"],
+      ["プログレッシブ", "ネストした Suspense", "外→内の順に段階的に表示"]
+    ]
+  },
+  reconcilerHostConfig: {
+    h: ["メソッド", "説明"],
+    r: [
+      ["createInstance", "ホスト環境のノードを作成（DOMなら createElement）"],
+      ["appendChildToContainer", "ルートコンテナに子を追加"],
+      ["appendChild", "親ノードに子ノードを追加"],
+      ["removeChild", "ノードを削除"],
+      ["commitUpdate", "props の変更をノードに反映"],
+      ["prepareForCommit", "commit phase 前の準備（例: DOM の測定）"],
+      ["resetAfterCommit", "commit phase 後のクリーンアップ"]
+    ]
+  },
+  ssrModes: {
+    h: ["API", "特徴", "用途"],
+    r: [
+      ["renderToString", "同期・ブロッキング", "シンプルな SSR（小規模）"],
+      ["renderToPipeableStream", "ストリーミング・Node.js", "本番 SSR（大規模）"],
+      ["renderToReadableStream", "ストリーミング・Web Streams", "Edge Runtime（Cloudflare Workers 等）"],
+      ["renderToStaticMarkup", "静的・インタラクションなし", "メール HTML・PDF 生成"]
+    ]
+  },
+  polyAs: {
+    h: ["使用例", "as プロップ", "レンダリング結果"],
+    r: [
+      ["<Button as='a' href='/'>", "a", "<a href='/'>ボタンのスタイル</a>"],
+      ["<Button as={Link} to='/'>", "React Router Link", "Routerリンクのスタイル"],
+      ["<Text as='h1'>", "h1", "<h1>テキストのスタイル</h1>"],
+      ["<Box as='section'>", "section", "<section>ボックスのスタイル</section>"]
+    ]
+  },
+  genericComponentPatterns: {
+    h: ["パターン", "説明", "用途"],
+    r: [
+      ["Generic Component", "型パラメータで props を汎用化", "リスト・フォーム・セレクタ"],
+      ["forwardRef with TypeScript", "ref の型を型安全に渡す", "入力コンポーネント・アニメーション"],
+      ["Discriminated Union Props", "条件に応じて必要な props が変わる", "モーダル・バリアント"],
+      ["satisfies 演算子", "型推論を保ちつつ型チェック", "設定オブジェクト・定数"]
+    ]
+  },
+  testingTools: {
+    h: ["ツール", "種別", "特徴"],
+    r: [
+      ["Playwright Component Testing", "コンポーネントE2E", "実ブラウザでコンポーネントを単体テスト"],
+      ["Storybook Interaction Testing", "インタラクション", "Story内でユーザー操作をテスト"],
+      ["Chromatic", "ビジュアルリグレッション", "スナップショット差分を自動検出・レビュー"],
+      ["axe-core / jest-axe", "アクセシビリティ", "WCAG 違反を自動検出"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 2,
+    q: "以下の React コンポーネントで、Counter をクリックしたとき Fiber がどのような順序で処理されるかを説明してください。\nrender phase と commit phase のそれぞれで何が起きるかを含めること。",
+    code: `function Counter() {
+  const [count, setCount] = React.useState(0);
+  return (
+    <div>
+      <p>{count}</p>
+      <button onClick={() => setCount(c => c + 1)}>+1</button>
+    </div>
+  );
+}`,
+    answer: `// render phase（純粋・中断可能）:
+// 1. setCount 呼び出しで Counter の Fiber に更新がスケジュール
+// 2. React は SyncLane で Counter の Fiber を作業開始
+// 3. Counter 関数を再実行 → 新しい React element ツリーを生成
+// 4. 新旧 Fiber を reconcile（diff）:
+//    - <div>: 同じ型 → 再利用
+//    - <p>: 同じ型 → テキストが "0"→"1" に変化（Update フラグ）
+//    - <button>: 同じ型 → 変化なし
+// 5. work-in-progress ツリーに Effect リストを構築
+
+// commit phase（同期・中断不可）:
+// 1. beforeMutation: DOM 読み取り（getSnapshotBeforeUpdate 相当）
+// 2. mutation: p.textContent = "1" を DOM に適用
+// 3. layout: useLayoutEffect の cleanup → setup を実行
+// 4. passive（非同期）: useEffect の cleanup → setup を実行
+// 5. work-in-progress ツリーを current ツリーに昇格（ポインタ交換）`
+  }, {
+    diff: 3,
+    q: "startTransition を使って、重い検索フィルタリングの UI をノンブロッキングにするコードを書いてください。\nユーザーの入力は即座に反映し、フィルタリング結果は Transition 優先度で更新すること。",
+    code: `// 10000件のリストをフィルタリングするコンポーネント
+// 入力ごとに全件スキャンするため重い
+import { useState } from 'react';
+
+const items = Array.from({ length: 10000 }, (_, i) => 'Item ' + i);
+
+function HeavyList({ query }: { query: string }) {
+  const filtered = items.filter(i => i.includes(query));
+  return <ul>{filtered.map(i => <li key={i}>{i}</li>)}</ul>;
+}
+
+export function SearchPage() {
+  const [q, setQ] = useState('');
+  // ここを改善してください
+  return (
+    <div>
+      <input value={q} onChange={e => setQ(e.target.value)} />
+      <HeavyList query={q} />
+    </div>
+  );
+}`,
+    answer: `import { useState, startTransition, useTransition } from 'react';
+
+const items = Array.from({ length: 10000 }, (_, i) => 'Item ' + i);
+
+function HeavyList({ query }: { query: string }) {
+  const filtered = items.filter(i => i.includes(query));
+  return <ul>{filtered.map(i => <li key={i}>{i}</li>)}</ul>;
+}
+
+export function SearchPage() {
+  const [inputValue, setInputValue] = useState('');
+  const [query, setQuery] = useState('');
+  const [isPending, startT] = useTransition();
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 入力値は SyncLane で即座に更新（ブロックしない）
+    setInputValue(e.target.value);
+    // フィルタリング用クエリは TransitionLane で更新（中断可能）
+    startT(() => setQuery(e.target.value));
+  };
+
+  return (
+    <div>
+      <input value={inputValue} onChange={handleChange} />
+      {isPending && <span>フィルタリング中...</span>}
+      <HeavyList query={query} />
+    </div>
+  );
+}`
+  }],
+  ch2: [{
+    diff: 1,
+    q: "React Compiler の eslint-plugin-react-compiler をプロジェクトに追加し、\nコンパイラが最適化できない（ルール違反）コードの例を2つ挙げて、修正版も示してください。",
+    code: `// 以下のコードのうち、React Compiler が最適化できない箇所はどこか？
+// 修正版も書くこと。
+
+// 例1
+function Component({ items }) {
+  const sorted = items;
+  sorted.sort(); // ← ?
+  return <ul>{sorted.map(i => <li key={i}>{i}</li>)}</ul>;
+}
+
+// 例2
+let outsideVar = 0;
+function Counter() {
+  outsideVar++; // ← ?
+  return <p>{outsideVar}</p>;
+}`,
+    answer: `// 例1の問題: 引数を直接 .sort() で破壊的変更している
+// → コンポーネントは純粋関数でなければならない（同じ入力 → 同じ出力）
+// 修正: スプレッドでコピーしてからソート
+function Component({ items }: { items: string[] }) {
+  const sorted = [...items].sort();
+  return <ul>{sorted.map(i => <li key={i}>{i}</li>)}</ul>;
+}
+
+// 例2の問題: モジュールスコープの変数を副作用として変更している
+// → render のたびに outsideVar が変わり、純粋性が壊れる
+// 修正: useState を使う
+function Counter() {
+  const [count, setCount] = React.useState(0);
+  return (
+    <div>
+      <p>{count}</p>
+      <button onClick={() => setCount(c => c + 1)}>+1</button>
+    </div>
+  );
+}
+
+// React Compiler セットアップ（babel.config.js）:
+// module.exports = {
+//   plugins: [['babel-plugin-react-compiler', {}]]
+// };`
+  }, {
+    diff: 2,
+    q: "React Compiler 導入前後でバンドルサイズと useMemo/useCallback の記述量がどう変わるかを説明し、\n導入後も手動メモ化が必要なケースを1つ挙げてください。",
+    code: `// 導入前（手動メモ化が必要だったコード）
+function UserList({ users, onSelect }) {
+  const sortedUsers = useMemo(
+    () => [...users].sort((a, b) => a.name.localeCompare(b.name)),
+    [users]
+  );
+  const handleSelect = useCallback(
+    (id: string) => onSelect(id),
+    [onSelect]
+  );
+  return (
+    <ul>
+      {sortedUsers.map(u => (
+        <li key={u.id} onClick={() => handleSelect(u.id)}>{u.name}</li>
+      ))}
+    </ul>
+  );
+}`,
+    answer: `// 導入後（コンパイラが自動で最適化）
+function UserList({ users, onSelect }: { users: User[]; onSelect: (id: string) => void }) {
+  // useMemo/useCallback を書かなくてよい
+  // コンパイラが自動でメモ化コードを挿入する
+  const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name));
+  return (
+    <ul>
+      {sortedUsers.map(u => (
+        <li key={u.id} onClick={() => onSelect(u.id)}>{u.name}</li>
+      ))}
+    </ul>
+  );
+}
+
+// 手動メモ化が依然として必要なケース:
+// 「外部ライブラリの参照同一性を要求する場合」
+// 例: react-virtualized の rowRenderer は毎回同じ参照を期待する
+// コンパイラはローカルスコープ内の最適化のみ行うため、
+// 外部 API との契約（referential equality の保証）は手動で行う必要がある。
+const rowRenderer = useCallback(({ index, key, style }) => (
+  <div key={key} style={style}>{items[index]}</div>
+), [items]);`
+  }],
+  ch3: [{
+    diff: 2,
+    q: "use() フックを使って、Promise を受け取るコンポーネントを作成してください。\nSuspense と ErrorBoundary と組み合わせて、ローディング・エラー・成功の3状態を適切に処理すること。",
+    code: `// React 19 の use() フックを使って以下を実装:
+// 1. fetchUser(id) が返す Promise を use() で読み取る UserCard
+// 2. Suspense で ローディング UI を提供
+// 3. ErrorBoundary でエラーをキャッチ
+
+async function fetchUser(id: string): Promise<{ name: string; email: string }> {
+  const res = await fetch('/api/users/' + id);
+  if (!res.ok) throw new Error('User not found');
+  return res.json();
+}`,
+    answer: `import { use, Suspense } from 'react';
+
+// use() は Suspense と統合: Promise が pending の間は throw する
+function UserCard({ promise }: { promise: Promise<{ name: string; email: string }> }) {
+  const user = use(promise); // pending → Suspense, reject → ErrorBoundary
+  return (
+    <div>
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+    </div>
+  );
+}
+
+// ErrorBoundary（クラスコンポーネントが必要）
+class ErrorBoundary extends React.Component<
+  { fallback: React.ReactNode; children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null };
+  static getDerivedStateFromError(e: Error) { return { error: e }; }
+  render() {
+    if (this.state.error) {
+      return <div>エラー: {this.state.error.message}</div>;
+    }
+    return this.props.children;
+  }
+}
+
+function App() {
+  const userPromise = fetchUser('42');
+  return (
+    <ErrorBoundary fallback={<p>読み込みに失敗しました</p>}>
+      <Suspense fallback={<p>読み込み中...</p>}>
+        <UserCard promise={userPromise} />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}`
+  }, {
+    diff: 3,
+    q: "React 19 の Server Functions（サーバアクション）を使って、フォーム送信を実装してください。\n'use server' ディレクティブ、useActionState フック、楽観的更新を含めること。",
+    code: `// Next.js 15 / React 19 環境を想定
+// Todo を追加する Server Function と、
+// それを使うクライアントコンポーネントを実装してください`,
+    answer: `// actions.ts（サーバ側）
+'use server';
+
+export async function addTodo(
+  prevState: { todos: string[]; error: string | null },
+  formData: FormData
+) {
+  const text = formData.get('text') as string;
+  if (!text?.trim()) return { ...prevState, error: '入力してください' };
+  // DB 保存など（省略）
+  await new Promise(r => setTimeout(r, 500)); // 擬似的な遅延
+  return { todos: [...prevState.todos, text.trim()], error: null };
+}
+
+// TodoForm.tsx（クライアント側）
+'use client';
+import { useActionState, useOptimistic } from 'react';
+import { addTodo } from './actions';
+
+const initialState = { todos: [] as string[], error: null as string | null };
+
+export function TodoForm() {
+  const [state, dispatch, isPending] = useActionState(addTodo, initialState);
+  const [optimisticTodos, addOptimistic] = useOptimistic(
+    state.todos,
+    (prev, text: string) => [...prev, text + ' (保存中...)']
+  );
+
+  return (
+    <form action={(fd) => { addOptimistic(fd.get('text') as string); dispatch(fd); }}>
+      <input name="text" placeholder="新しいTodo" />
+      <button type="submit" disabled={isPending}>追加</button>
+      {state.error && <p>{state.error}</p>}
+      <ul>{optimisticTodos.map((t, i) => <li key={i}>{t}</li>)}</ul>
+    </form>
+  );
+}`
+  }],
+  ch4: [{
+    diff: 2,
+    q: "react-reconciler を使って、コンソールに出力するだけのカスタムレンダラーを実装してください。\ncreateInstance と appendChild を中心に、最小限の hostConfig を実装すること。",
+    code: `// npm install react-reconciler
+// 以下の hostConfig を完成させてください
+import Reconciler from 'react-reconciler';
+
+const hostConfig = {
+  // createInstance: ホスト環境のノードを作成
+  // appendChild: 子を親に追加
+  // ... 他のメソッド
+};
+
+const renderer = Reconciler(hostConfig);`,
+    answer: `import Reconciler from 'react-reconciler';
+import { DefaultEventPriority } from 'react-reconciler/constants';
+
+// コンソールに文字列を出力するだけのカスタムレンダラー
+type Instance = { type: string; props: Record<string, unknown>; children: Instance[] };
+type Container = { children: Instance[] };
+
+const hostConfig: Reconciler.HostConfig<
+  string, Record<string, unknown>, Container, Instance,
+  string, unknown, unknown, unknown, null, unknown, unknown, unknown, unknown
+> = {
+  createInstance(type, props) {
+    const instance: Instance = { type, props, children: [] };
+    console.log('[create]', type, props);
+    return instance;
+  },
+  createTextInstance(text) {
+    console.log('[text]', text);
+    return text;
+  },
+  appendChildToContainer(container, child) { container.children.push(child as Instance); },
+  appendChild(parent, child) { (parent as Instance).children.push(child as Instance); },
+  appendInitialChild(parent, child) { (parent as Instance).children.push(child as Instance); },
+  removeChild(parent, child) {
+    const p = parent as Instance;
+    p.children = p.children.filter(c => c !== child);
+  },
+  commitUpdate(instance, _updatePayload, _type, _prev, next) {
+    console.log('[update]', (instance as Instance).type, next);
+    Object.assign((instance as Instance).props, next);
+  },
+  finalizeInitialChildren: () => false,
+  prepareUpdate: () => ({}),
+  shouldSetTextContent: () => false,
+  getRootHostContext: () => null,
+  getChildHostContext: (ctx) => ctx,
+  getPublicInstance: (i) => i,
+  prepareForCommit: () => null,
+  resetAfterCommit: () => {},
+  getCurrentEventPriority: () => DefaultEventPriority,
+  getInstanceFromNode: () => null,
+  beforeActiveInstanceBlur: () => {},
+  afterActiveInstanceBlur: () => {},
+  prepareScopeUpdate: () => {},
+  getInstanceFromScope: () => null,
+  detachDeletedInstance: () => {},
+  supportsMutation: true,
+  supportsPersistence: false,
+  supportsHydration: false,
+  isPrimaryRenderer: true,
+  scheduleTimeout: setTimeout,
+  cancelTimeout: clearTimeout,
+  noTimeout: -1,
+};
+
+const renderer = Reconciler(hostConfig);
+const container: Container = { children: [] };
+const root = renderer.createContainer(container, 0, null, false, null, '', {}, null);
+
+// 使い方:
+// renderer.updateContainer(React.createElement('div', {}, 'Hello'), root, null, null);
+// console.log(JSON.stringify(container, null, 2));`
+  }, {
+    diff: 3,
+    q: "React Three Fiber のしくみを説明し、カスタムレンダラーが Three.js のシーングラフをどのように操作するかを示すコード例を書いてください。",
+    code: `// React Three Fiber を使って回転するボックスを描画するコード
+// @react-three/fiber の Canvas と useFrame を使用`,
+    answer: `// React Three Fiber の仕組み:
+// 1. react-reconciler の hostConfig で THREE.Mesh などを createInstance で生成
+// 2. <mesh /> という JSX が THREE.Mesh の new をラップ
+// 3. props の変更が THREE オブジェクトのプロパティに自動的に反映される
+// 4. useFrame は requestAnimationFrame ループ内でコールバックを実行
+
+import { Canvas, useFrame } from '@react-three/fiber';
+import { useRef } from 'react';
+import * as THREE from 'three';
+
+function RotatingBox() {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  // アニメーションループ: react-reconciler の commit とは独立
+  useFrame((_state, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.x += delta;
+      meshRef.current.rotation.y += delta * 0.5;
+    }
+  });
+
+  return (
+    // <mesh> は THREE.Mesh を作成、<boxGeometry> は THREE.BoxGeometry を作成
+    // react-three-fiber の hostConfig.createInstance が new THREE[type]() を呼ぶ
+    <mesh ref={meshRef}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="hotpink" />
+    </mesh>
+  );
+}
+
+export function Scene() {
+  return (
+    <Canvas>
+      <ambientLight intensity={0.5} />
+      <pointLight position={[10, 10, 10]} />
+      <RotatingBox />
+    </Canvas>
+  );
+}
+
+// カスタムレンダラーとの関係:
+// Canvas の内部では ReactDOM ではなく R3F のカスタムレンダラーが動作。
+// <mesh> → hostConfig.createInstance('mesh', props) → new THREE.Mesh()
+// props 変更 → hostConfig.commitUpdate → mesh.position.set(...) など`
+  }],
+  ch5: [{
+    diff: 2,
+    q: "renderToPipeableStream を使ってシンプルな SSR サーバを実装してください。\nStreaming SSR の利点と、Selective Hydration が何を解決するかを説明すること。",
+    code: `// Node.js + Express での SSR サーバ
+// renderToPipeableStream を使って
+// 段階的にHTMLをストリーミングする実装`,
+    answer: `import express from 'express';
+import { renderToPipeableStream } from 'react-dom/server';
+import { createElement } from 'react';
+import App from './App';
+
+const app = express();
+
+app.get('*', (req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+
+  const { pipe, abort } = renderToPipeableStream(
+    createElement(App),
+    {
+      // ブラウザ側の JS バンドル
+      bootstrapScripts: ['/client.js'],
+
+      // 最初のシェル（Suspense の外側）が準備できたら配信開始
+      onShellReady() {
+        res.statusCode = 200;
+        pipe(res); // Node.js の Stream にパイプ
+      },
+
+      // Suspense の中身が解決するたびに追加の HTML チャンクが送信される
+      // → TTFB（最初のバイト到達）が短縮される
+      onError(err) {
+        console.error(err);
+        res.statusCode = 500;
+      },
+    }
+  );
+
+  // タイムアウト時に中断
+  setTimeout(() => abort(), 10000);
+});
+
+// Streaming SSR の利点:
+// - 最初の HTML 断片をすぐに送信 → TTFB 短縮
+// - ユーザーは全データ揃う前にページを見始められる
+// - サーバのメモリ効率向上（全 HTML をバッファしない）
+
+// Selective Hydration が解決すること:
+// - 従来の SSR: 全コンポーネントの hydration が完了するまでインタラクション不可
+// - Selective Hydration: ユーザーがクリックした部分を優先して hydration
+// - Suspense 境界ごとに独立して hydrate → 重い部分が軽い部分を妨げない
+app.listen(3000);`
+  }, {
+    diff: 3,
+    q: "Next.js の Partial Prerendering (PPR) の概念を説明し、静的シェルと動的コンテンツを組み合わせたページの実装例を示してください。",
+    code: `// next.config.js で experimental.ppr: true を有効化した状態で
+// 商品詳細ページを PPR で実装してください
+// - 商品情報（静的）: ビルド時に生成
+// - ユーザー固有コンテンツ（動的）: リクエスト時に生成`,
+    answer: `// next.config.js
+// module.exports = { experimental: { ppr: true } };
+
+// app/products/[id]/page.tsx
+import { Suspense } from 'react';
+
+// 静的部分: ビルド時に生成（CDN でキャッシュ可能）
+async function ProductInfo({ id }: { id: string }) {
+  const product = await fetch('https://api.example.com/products/' + id, {
+    next: { revalidate: 3600 } // ISR: 1時間ごとに再生成
+  }).then(r => r.json());
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>{product.description}</p>
+      <p>¥{product.price.toLocaleString()}</p>
+    </div>
+  );
+}
+
+// 動的部分: リクエストごとに生成（cookies/headers に依存）
+async function UserSpecificContent({ productId }: { productId: string }) {
+  const { cookies } = await import('next/headers');
+  const token = cookies().get('token')?.value;
+  // ユーザーのカート状態や在庫をリクエスト時に取得
+  const inventory = await fetch('https://api.example.com/inventory/' + productId, {
+    headers: { Authorization: 'Bearer ' + token },
+    cache: 'no-store' // キャッシュしない（動的）
+  }).then(r => r.json());
+  return <p>在庫: {inventory.count}個</p>;
+}
+
+// PPR: 静的シェルを先に配信し、動的コンテンツを Suspense で遅延
+export default function ProductPage({ params }: { params: { id: string } }) {
+  return (
+    <div>
+      {/* 静的: ビルド時に HTML として埋め込まれる */}
+      <ProductInfo id={params.id} />
+      {/* 動的: ストリーミングで後から流し込む */}
+      <Suspense fallback={<p>在庫確認中...</p>}>
+        <UserSpecificContent productId={params.id} />
+      </Suspense>
+    </div>
+  );
+}`
+  }],
+  ch6: [{
+    diff: 2,
+    q: "Polymorphic Component（as プロップ）パターンを TypeScript で型安全に実装してください。\n<Button as='a'> とした場合に href が必須になるなど、as の型に応じて props が変わることを保証すること。",
+    code: `// Box コンポーネントを型安全な Polymorphic Component として実装
+// <Box as="button"> → button の props が使える
+// <Box as="a"> → href など a タグの props が使える
+// デフォルトは div`,
+    answer: `import React from 'react';
+
+// ポリモーフィックコンポーネントの型定義
+type AsProp<C extends React.ElementType> = { as?: C };
+
+type PropsToOmit<C extends React.ElementType, P> = keyof (AsProp<C> & P);
+
+type PolymorphicComponentProp<
+  C extends React.ElementType,
+  Props = Record<string, never>
+> = React.PropsWithChildren<Props & AsProp<C>> &
+  Omit<React.ComponentPropsWithoutRef<C>, PropsToOmit<C, Props>>;
+
+type PolymorphicComponentPropWithRef<
+  C extends React.ElementType,
+  Props = Record<string, never>
+> = PolymorphicComponentProp<C, Props> & { ref?: React.ComponentPropsWithRef<C>['ref'] };
+
+// Box コンポーネント固有の props
+type BoxOwnProps = { color?: 'primary' | 'secondary' };
+
+type BoxProps<C extends React.ElementType> = PolymorphicComponentPropWithRef<C, BoxOwnProps>;
+
+function Box<C extends React.ElementType = 'div'>({
+  as,
+  color,
+  children,
+  ...rest
+}: BoxProps<C>) {
+  const Component = as || 'div';
+  const style = { color: color === 'primary' ? '#6366f1' : undefined };
+  return React.createElement(Component, { style, ...rest }, children);
+}
+
+// 使用例:
+// <Box>デフォルト div</Box>
+// <Box as="button" onClick={...}>ボタン</Box>
+// <Box as="a" href="/home">リンク（href が型チェックされる）</Box>
+// <Box as="a">← href がないので TypeScript が警告（任意属性のため警告止まり）</Box>`
+  }, {
+    diff: 2,
+    q: "Radix UI の Slot コンポーネントのしくみを説明し、asChild パターンを再現した簡易実装を書いてください。",
+    code: `// Radix UI の asChild:
+// <Button asChild><a href="/home">ホーム</a></Button>
+// → a タグに Button のスタイル・イベントをマージ
+// これを可能にする Slot コンポーネントを実装してください`,
+    answer: `import React from 'react';
+
+// Slot: children の要素に自身の props をマージして返す
+function Slot({ children, ...props }: React.HTMLAttributes<HTMLElement> & { children?: React.ReactNode }) {
+  if (!React.isValidElement(children)) return null;
+
+  // children の props と Slot の props をマージ
+  // onClick などのイベントハンドラは両方呼ばれるように合成
+  const mergedProps = mergeProps(props, children.props);
+  return React.cloneElement(children, mergedProps);
+}
+
+function mergeProps(
+  slotProps: Record<string, unknown>,
+  childProps: Record<string, unknown>
+): Record<string, unknown> {
+  const merged = { ...childProps };
+  for (const key in slotProps) {
+    const sp = slotProps[key];
+    const cp = childProps[key];
+    if (typeof sp === 'function' && typeof cp === 'function') {
+      // イベントハンドラは両方実行
+      merged[key] = (...args: unknown[]) => { sp(...args); cp(...args); };
+    } else {
+      // それ以外は Slot 側を優先
+      merged[key] = sp ?? cp;
+    }
+  }
+  return merged;
+}
+
+// asChild 対応ボタン
+function Button({ asChild, children, ...props }:
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }) {
+  const style = { background: '#6366f1', color: '#fff', padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer' };
+  if (asChild) {
+    return React.createElement(Slot, { style, ...props }, children);
+  }
+  return React.createElement('button', { style, ...props }, children);
+}
+
+// 使い方:
+// <Button asChild><a href="/home">ホームへ</a></Button>
+// → <a href="/home" style={buttonStyle}>ホームへ</a> が生成される`
+  }],
+  ch7: [{
+    diff: 2,
+    q: "Generic コンポーネントを TypeScript で実装してください。\n任意の型のリストを受け取り、selectedId と onSelect を持つ Select コンポーネントを作成すること。",
+    code: `// 任意の型 T のリストを表示・選択できるコンポーネント
+// T は id: string と label: string を持つことを制約とする
+// 使用例:
+// <Select items={users} selectedId={id} onSelect={setId} />
+// <Select items={products} selectedId={id} onSelect={setId} />`,
+    answer: `import React from 'react';
+
+// ベース型制約
+interface HasIdAndLabel { id: string; label: string; }
+
+// Generic コンポーネントの型定義
+interface SelectProps<T extends HasIdAndLabel> {
+  items: T[];
+  selectedId: string | null;
+  onSelect: (item: T) => void;
+  renderItem?: (item: T) => React.ReactNode;
+}
+
+// 関数宣言形式で Generic コンポーネントを定義
+function Select<T extends HasIdAndLabel>({
+  items,
+  selectedId,
+  onSelect,
+  renderItem,
+}: SelectProps<T>) {
+  return (
+    <ul style={{ listStyle: 'none', padding: 0 }}>
+      {items.map(item => (
+        <li
+          key={item.id}
+          onClick={() => onSelect(item)}
+          style={{
+            padding: '8px 12px',
+            cursor: 'pointer',
+            background: item.id === selectedId ? '#eef2ff' : '#fff',
+            fontWeight: item.id === selectedId ? 700 : 400,
+            borderRadius: 6,
+          }}
+        >
+          {renderItem ? renderItem(item) : item.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// 使用例（型安全）:
+interface User extends HasIdAndLabel { email: string; }
+
+const users: User[] = [
+  { id: '1', label: '田中太郎', email: 'tanaka@example.com' },
+  { id: '2', label: '鈴木花子', email: 'suzuki@example.com' },
+];
+
+function App() {
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  return (
+    <Select
+      items={users}
+      selectedId={selectedId}
+      onSelect={(u) => setSelectedId(u.id)} // u は User 型として推論される
+      renderItem={(u) => <span>{u.label} — {u.email}</span>}
+    />
+  );
+}`
+  }, {
+    diff: 3,
+    q: "Discriminated Union Props を使って、モーダルコンポーネントの props を設計してください。\n確認ダイアログ型と情報表示型で必要な props が異なるケースを実装すること。",
+    code: `// Modal コンポーネントに以下の2つのバリアントを実装:
+// 1. confirm: onConfirm, onCancel, confirmText が必須
+// 2. info: onClose が必須、confirmText は不要
+// バリアント間で誤った props を渡したときに型エラーになること`,
+    answer: `import React from 'react';
+
+// Discriminated Union で props を定義
+type ConfirmModalProps = {
+  variant: 'confirm';
+  title: string;
+  message: string;
+  confirmText: string;
+  cancelText?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
+type InfoModalProps = {
+  variant: 'info';
+  title: string;
+  message: string;
+  onClose: () => void;
+  // confirmText や onConfirm は存在しない
+};
+
+type ModalProps = ConfirmModalProps | InfoModalProps;
+
+function Modal(props: ModalProps) {
+  const overlayStyle: React.CSSProperties = {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
+  const boxStyle: React.CSSProperties = {
+    background: '#fff', borderRadius: 12, padding: 24,
+    minWidth: 320, maxWidth: 480,
+  };
+
+  return (
+    <div style={overlayStyle}>
+      <div style={boxStyle}>
+        <h2 style={{ marginBottom: 8 }}>{props.title}</h2>
+        <p style={{ marginBottom: 16, color: '#374151' }}>{props.message}</p>
+        {props.variant === 'confirm' ? (
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button onClick={props.onCancel}>{props.cancelText ?? 'キャンセル'}</button>
+            <button onClick={props.onConfirm}
+              style={{ background: '#6366f1', color: '#fff', border: 'none',
+                padding: '8px 16px', borderRadius: 8 }}>
+              {props.confirmText}
+            </button>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'right' }}>
+            <button onClick={props.onClose}>閉じる</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 使用例:
+// <Modal variant="confirm" title="削除確認" message="本当に削除しますか？"
+//   confirmText="削除" onConfirm={handleDelete} onCancel={handleCancel} />
+// <Modal variant="info" title="完了" message="保存しました" onClose={handleClose} />
+// <Modal variant="info" onConfirm={...} />  ← 型エラー: variant="info" に onConfirm は不要`
+  }],
+  ch8: [{
+    diff: 2,
+    q: "Playwright Component Testing を使って、Counterコンポーネントのインタラクションテストを書いてください。\nボタンクリック後のカウント増加と、スナップショットテストを含めること。",
+    code: `// playwright/ct.config.ts と
+// src/Counter.test.tsx を実装してください
+// Counter コンポーネント:
+// - 初期値 0 を表示
+// - + ボタンでカウントを増加
+// - - ボタンでカウントを減少（0未満にならない）`,
+    answer: `// playwright/ct.config.ts
+import { defineConfig } from '@playwright/experimental-ct-react';
+export default defineConfig({
+  testDir: './src',
+  use: {
+    ctPort: 3100,
+    ctViteConfig: { plugins: [] },
+  },
+});
+
+// src/Counter.tsx
+import { useState } from 'react';
+export function Counter({ initial = 0 }: { initial?: number }) {
+  const [count, setCount] = useState(initial);
+  return (
+    <div>
+      <button aria-label="decrement" onClick={() => setCount(c => Math.max(0, c - 1))}>-</button>
+      <span data-testid="count">{count}</span>
+      <button aria-label="increment" onClick={() => setCount(c => c + 1)}>+</button>
+    </div>
+  );
+}
+
+// src/Counter.test.tsx
+import { test, expect } from '@playwright/experimental-ct-react';
+import { Counter } from './Counter';
+
+test('初期値が表示される', async ({ mount }) => {
+  const component = await mount(<Counter initial={5} />);
+  await expect(component.getByTestId('count')).toHaveText('5');
+});
+
+test('+ボタンでカウントが増加する', async ({ mount }) => {
+  const component = await mount(<Counter />);
+  await component.getByLabel('increment').click();
+  await component.getByLabel('increment').click();
+  await expect(component.getByTestId('count')).toHaveText('2');
+});
+
+test('0未満にならない', async ({ mount }) => {
+  const component = await mount(<Counter initial={0} />);
+  await component.getByLabel('decrement').click();
+  await expect(component.getByTestId('count')).toHaveText('0');
+});
+
+test('スナップショットテスト', async ({ mount }) => {
+  const component = await mount(<Counter initial={3} />);
+  await expect(component).toHaveScreenshot('counter-initial.png');
+});`
+  }, {
+    diff: 3,
+    q: "jest-axe を使ったアクセシビリティテストを実装してください。\naria-label の欠如やコントラスト比不足を検出するテストを含め、修正版のコンポーネントも示すこと。",
+    code: `// アクセシビリティ違反のあるコンポーネント
+function BadForm() {
+  return (
+    <form>
+      <input type="text" placeholder="名前を入力" />
+      <button style={{ color: '#aaa', background: '#bbb' }}>送信</button>
+      <img src="/logo.png" />
+    </form>
+  );
+}`,
+    answer: `import { render } from '@testing-library/react';
+import { axe, toHaveNoViolations } from 'jest-axe';
+expect.extend(toHaveNoViolations);
+
+// 違反のあるコンポーネント（テストが FAIL する）
+function BadForm() {
+  return (
+    <form>
+      {/* 違反1: input に対応するラベルがない */}
+      <input type="text" placeholder="名前を入力" />
+      {/* 違反2: コントラスト比が WCAG AA 基準 (4.5:1) を下回る */}
+      <button style={{ color: '#aaa', background: '#bbb' }}>送信</button>
+      {/* 違反3: img に alt 属性がない */}
+      <img src="/logo.png" />
+    </form>
+  );
+}
+
+// アクセシビリティテスト（BadForm は失敗する）
+test('BadForm はアクセシビリティ違反がある', async () => {
+  const { container } = render(<BadForm />);
+  const results = await axe(container);
+  expect(results).not.toHaveNoViolations(); // 違反があることを確認
+  console.log(results.violations.map(v => v.description));
+});
+
+// 修正版コンポーネント
+function GoodForm() {
+  return (
+    <form>
+      {/* 修正1: label で input と紐づけ */}
+      <label htmlFor="name">名前</label>
+      <input id="name" type="text" placeholder="名前を入力" />
+      {/* 修正2: 十分なコントラスト比（白背景 + 濃い色） */}
+      <button style={{ color: '#fff', background: '#4338ca' }}>送信</button>
+      {/* 修正3: alt 属性を追加 */}
+      <img src="/logo.png" alt="サービスロゴ" />
+    </form>
+  );
+}
+
+// 修正版テスト（PASS する）
+test('GoodForm はアクセシビリティ違反がない', async () => {
+  const { container } = render(<GoodForm />);
+  const results = await axe(container);
+  expect(results).toHaveNoViolations();
+});`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "Reactの内部構造（Fiber）",
+  est: "65分",
+  goal: "React の Fiber アーキテクチャが何のために存在するかを理解し、render phase と commit phase の違い、優先度ベースのスケジューリング（Lanes）の概念を説明できるようになること。reconciliation アルゴリズムが Fiber ツリーをどう走査するかを把握し、startTransition を使って UI のレスポンシブ性を改善できる状態がゴール。",
+  sections: [{
+    title: "Fiber アーキテクチャとは",
+    body: "React 16 で書き直された Fiber アーキテクチャは、以前の再帰的な reconciler（Stack reconciler）を非同期・中断可能な形に置き換えたものです。Stack reconciler では一度レンダリングを始めると完了するまで JavaScript スレッドを占有してしまい、ユーザー入力やアニメーションがブロックされる問題がありました。Fiber はこれを解決するために「作業を細かいチャンク（Fiber ノード）に分割し、優先度に応じて中断・再開・破棄できる」設計を採用しています。\n\nFiber ノードはコンポーネントツリーの各要素に対応する JavaScript オブジェクトで、仮想 DOM の実体です。React は常に2本の Fiber ツリーを管理します。current ツリー（現在画面に映っている状態）と work-in-progress ツリー（次のレンダリングを計算中の状態）です。Python でいえば、git の working tree と staged area の関係に似ています。作業が完了した瞬間にポインタを交換することで、atomic なUI更新を実現しています。",
+    table: T.fiberFields,
+    afterTable: "ポイント: Fiber ノードはシングルリンクドリストの構造を持ちます。child（最初の子）、sibling（次の兄弟）、return（親）の3つのポインタで全ノードを走査できます。React DevTools の「Components」タブで Fiber の状態をリアルタイムに確認できます。"
+  }, {
+    title: "render phase と commit phase",
+    body: "React の更新処理は2つのフェーズに分かれます。render phase（reconciliation）はコンポーネント関数を実行して新しい Fiber ツリーを構築し、前後の差分（Effect リスト）を計算する段階です。この段階は純粋であることが求められ、中断・再開・破棄が可能です。Strict Mode が開発時に effect を2回実行するのも、render phase の冪等性を検証するためです。\n\ncommit phase は算出した Effect リストを実際の DOM に適用する段階で、同期的かつ中断不可です。3つのサブフェーズがあり、before mutation（DOM 変更前の読み取り）→ mutation（DOM の実際の変更）→ layout（useLayoutEffect の実行）の順で行われます。useEffect は commit phase の後、非同期で実行されます。Python の ORM で言えば、render phase がクエリの構築で、commit phase がトランザクション内での実行に相当します。",
+    code: `// render phase と commit phase の違いを確認するコード
+function Example() {
+  // render phase（再実行される可能性あり）
+  console.log('render phase: コンポーネント関数実行');
+
+  React.useEffect(() => {
+    // commit phase 後（非同期）
+    console.log('useEffect: DOM 更新後（非同期）');
+    return () => console.log('useEffect cleanup');
+  });
+
+  React.useLayoutEffect(() => {
+    // commit phase 中（同期）
+    console.log('useLayoutEffect: DOM 更新直後（同期）');
+    return () => console.log('useLayoutEffect cleanup');
+  });
+
+  return <div>Example</div>;
+}`,
+    afterCode: "ポイント: useLayoutEffect は commit phase の mutation の直後、ブラウザが画面を描画する前に実行されます。DOM のサイズ測定（getBoundingClientRect）やスクロール位置の調整はここで行い、ちらつきを防ぎます。通常の副作用はパフォーマンスのため useEffect を使いましょう。"
+  }, {
+    title: "優先度レーン（Priority Lanes）",
+    body: "React は複数の更新が同時に発生した場合、優先度（Lane）に基づいてどれを先に処理するかを決定します。Lanes はビットマスクで表現されており、複数の Lane を論理 OR で組み合わせることができます。これにより「このバッチの更新にはどの Lane が含まれているか」を効率的に判定できます。\n\nstartTransition で囲んだ更新は TransitionLane に割り当てられ、SyncLane（クリック等のユーザー入力）より低い優先度で処理されます。重いリストのフィルタリングを startTransition で包むと、ユーザーが入力している間はフィルタリング結果の計算が中断され、入力の応答性が保たれます。Python のasyncio で高優先度のタスクが低優先度のタスクをプリエンプトするイメージに近いですが、React の場合はシングルスレッドで協調的に動作します。",
+    table: T.priorityLanes,
+    afterTable: "ポイント: React DevTools の Profiler タブで「Timeline」ビューを見ると、各更新がどの Lane で処理されたかを色分けで確認できます。パフォーマンス問題の調査に非常に役立ちます。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "React コンパイラ",
+  est: "60分",
+  goal: "React Compiler が自動メモ化をどのように実現するかを理解し、useMemo/useCallback が不要になる理由と、コンパイラが最適化できない純粋性違反のパターンを識別できるようになること。既存プロジェクトへの段階的導入と、コンパイラのデバッグ手法を習得することがゴール。",
+  sections: [{
+    title: "React Compiler とは",
+    body: "React Compiler（旧称 React Forget）は、React コンポーネントとフックのコードを静的解析し、自動的にメモ化コードを挿入するコンパイラです。これまで開発者が手動で書いていた useMemo や useCallback を、コンパイラが最適なタイミングで自動的に挿入するようになります。React 19 と同時にオープンソースとして公開されました。\n\nコンパイラが動作する前提条件は「React のルールに従っていること」です。特に重要なのは純粋性（同じ入力には同じ出力）と、props/state/context 以外の外部値を render 中に変更しないことです。これらのルールを守っているコードは、コンパイラが確実に最適化できます。Python の型ヒントと同様に、ルールを守ることでツールの恩恵を最大限に受けられます。",
+    table: T.compilerVsManual,
+    afterTable: "ポイント: React Compiler の導入は段階的に行えます。まず eslint-plugin-react-compiler でルール違反を検出・修正し、その後 babel-plugin-react-compiler を追加します。一部のコンポーネントだけ opt-in する場合は 'use memo' ディレクティブを使います。"
+  }, {
+    title: "コンパイラの制約とデバッグ",
+    body: "React Compiler が最適化できない主なパターンは「純粋性の違反」です。props を直接変更する（ミューテーション）、モジュールスコープの変数を render 中に変更する、Date.now() や Math.random() を依存なしで使う、などが代表例です。これらは Python で言えば、純粋関数の中でグローバル変数を書き換えるようなコードに相当します。\n\nコンパイラがどのようにコードを最適化したかは、React DevTools の「Memo（✓）」バッジで確認できます。最適化されたコンポーネントにはバッジが表示されます。コンパイラが最適化を諦めた箇所（bailout）は、eslint-plugin-react-compiler の警告として表示されます。コンパイラを使うことで、かえって最適化の「なぜ」を理解しやすくなる面もあります。",
+    code: `// babel.config.js（React Compiler の設定）
+module.exports = {
+  plugins: [
+    ['babel-plugin-react-compiler', {
+      // 特定ファイルだけ有効化（段階的導入）
+      sources: (filename) => filename.includes('/src/components/'),
+      // 厳格モード（最適化できないとエラー）
+      // compilationMode: 'strict',
+    }],
+  ],
+};
+
+// 最適化されるコード（純粋）
+function PureComponent({ items }: { items: string[] }) {
+  // コンパイラが自動で useMemo 相当のコードを挿入
+  const sorted = [...items].sort();
+  return <ul>{sorted.map(i => <li key={i}>{i}</li>)}</ul>;
+}
+
+// 最適化されないコード（純粋性違反）
+function ImpureComponent({ items }: { items: string[] }) {
+  items.sort(); // ← props を直接変更！コンパイラがbailout
+  return <ul>{items.map(i => <li key={i}>{i}</li>)}</ul>;
+}`,
+    afterCode: "ポイント: React Compiler は Babel プラグインとして動作するため、Vite + SWC 環境では現在未対応です（2025年時点）。Vite + Babel プラグインを使う設定が必要です。将来的には SWC プラグインも提供予定です。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "Concurrent Mode詳細",
+  est: "60分",
+  goal: "Suspense の設計思想と use() フックの動作原理を理解し、ErrorBoundary と組み合わせた堅牢なデータフェッチパターンを実装できるようになること。React 19 の Server Functions（サーバアクション）の仕組みを把握し、useActionState と useOptimistic を使ったフォームを実装できる状態がゴール。",
+  sections: [{
+    title: "Suspense 設計と use() フック",
+    body: "Suspense は「準備できていないコンポーネントをフォールバック UI に差し替える」仕組みです。React 18 まではコードスプリット（lazy()）でのみ使えましたが、React 19 で導入された use() フックにより、任意の Promise を Suspense と統合できるようになりました。use() に Promise を渡すと、pending の間は Suspense の fallback が表示され、reject されると ErrorBoundary がキャッチします。\n\nuse() フックの特徴は、if 文や ループの中でも呼べることです（通常のフックと異なり、フックのルールが部分的に緩和されています）。これは Context を条件付きで読む場合などに有用です。データフェッチとUIの表示ロジックが分離できるため、コンポーネントは「データが来たら何を表示するか」だけに集中できます。",
+    table: T.suspensePatterns,
+    afterTable: "ポイント: Suspense は「ウォーターフォール問題」を解決します。複数のデータ取得を Suspense の外で Promise.all として並列実行し、それぞれを use() で読むことで、すべてのデータを並列取得しながら UI は段階的に表示できます。"
+  }, {
+    title: "React 19 の Server Functions",
+    body: "React 19 の Server Functions（サーバアクション）は、クライアントコンポーネントからサーバ上の関数を直接呼び出す仕組みです。従来は「クライアント → API Route → サーバロジック」という経路が必要でしたが、'use server' ディレクティブで関数をサーバアクションとしてマークすると、React がシリアライゼーション・デシリアライゼーションを自動で処理します。\n\nuseActionState はサーバアクションの状態（ローディング・エラー・前回の返り値）を管理するフックです。フォームの action に渡すと、送信時に自動的にサーバアクションが呼ばれます。useOptimistic はサーバの応答を待たずに UI を先行更新し、失敗時に自動ロールバックするフックです。Python の Django でビューと ORM が密結合しているように、Server Functions はフロントエンドとバックエンドのコロケーション（同じファイルに書く）を可能にします。",
+    code: `// React 19 の useOptimistic の使い方
+import { useOptimistic } from 'react';
+
+function LikeButton({ postId, initialLikes }: { postId: string; initialLikes: number }) {
+  const [optimisticLikes, addOptimisticLike] = useOptimistic(
+    initialLikes,
+    (current, _increment: 1) => current + 1
+  );
+
+  async function handleLike() {
+    // 即座にUIを更新（楽観的）
+    addOptimisticLike(1);
+    // サーバ側で実際に更新
+    await likePost(postId); // Server Function
+    // 成功 → 楽観的更新が確定
+    // 失敗 → 自動的に initialLikes に戻る
+  }
+
+  return (
+    <button onClick={handleLike}>
+      ❤️ {optimisticLikes}
+    </button>
+  );
+}`,
+    afterCode: "ポイント: Server Functions はシリアライズ可能な型しかやり取りできません（関数・クラスインスタンス・DOM要素は不可）。また、'use server' は Next.js / React Server Components 環境が必要で、クライアントだけの React では使えません。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "カスタムレンダラー",
+  est: "60分",
+  goal: "react-reconciler パッケージを使ってカスタムレンダラーを実装できる最低限の知識を習得し、React Three Fiber や Ink（ターミナルUI）がどのようにして React のレンダリングモデルをブラウザ DOM 以外の環境に持ち込んでいるかを説明できるようになること。",
+  sections: [{
+    title: "react-reconciler と hostConfig",
+    body: "react-reconciler は React のコア（Fiber アーキテクチャ・reconciliation・hooks）を使いつつ、実際の「ノード作成」「DOM 操作」に相当する部分をカスタマイズするためのパッケージです。ReactDOM は react-reconciler に「DOM を操作する hostConfig」を渡したレンダラーであり、React Native は「ネイティブコンポーネントを操作する hostConfig」を渡したレンダラーです。\n\nhostConfig は約20のメソッドで構成されており、最低限 createInstance（ノード作成）、appendChild（ノード追加）、commitUpdate（props 更新）などを実装する必要があります。Python で言えば、ABCクラス（抽象基底クラス）を継承して抽象メソッドを実装するイメージです。これにより、React の宣言的UIの恩恵（状態管理・hooks・reconciliation）をあらゆる環境で活用できます。",
+    table: T.reconcilerHostConfig,
+    afterTable: "ポイント: カスタムレンダラーを作成する場合、isPrimaryRenderer: false に設定することで、ReactDOM と同じページで共存できます。React Three Fiber の Canvas 内部では R3F のレンダラーが動き、Canvas 外では ReactDOM が動くのはこの設定のおかげです。"
+  }, {
+    title: "React Three Fiber のしくみ",
+    body: "React Three Fiber (R3F) は Three.js の WebGL レンダラーを React のプログラミングモデルで操作するライブラリです。<mesh> という JSX が Three.js の new THREE.Mesh() を自動的に呼び出し、props の変更が mesh.position.set() のような Three.js の API 呼び出しに変換されます。これにより、Three.js のシーングラフを React のコンポーネントツリーとして宣言的に管理できます。\n\nuseFrame フックは requestAnimationFrame ループに統合されており、毎フレーム呼ばれるコールバックで 3D オブジェクトのアニメーションを記述できます。React のレンダリングサイクルとは独立しているため、アニメーションで setState を使う必要がなく、パフォーマンスが高くなります。Python の pygame のゲームループを React コンポーネントとして書けるようになるイメージです。",
+    code: `// R3F のカスタムレンダラーがどう動くか（概念）
+// @react-three/fiber の内部実装の簡略版
+
+const threeHostConfig = {
+  createInstance(type: string, props: Record<string, unknown>) {
+    // 'mesh' → new THREE.Mesh()
+    // 'boxGeometry' → new THREE.BoxGeometry()
+    const ThreeClass = (THREE as Record<string, unknown>)[
+      type.charAt(0).toUpperCase() + type.slice(1)
+    ] as new (...args: unknown[]) => unknown;
+    const instance = props.args
+      ? new ThreeClass(...(props.args as unknown[]))
+      : new ThreeClass();
+    // position, rotation などの props を適用
+    applyProps(instance, props);
+    return instance;
+  },
+  appendChild(parent: unknown, child: unknown) {
+    if ((parent as THREE.Object3D).isObject3D) {
+      (parent as THREE.Object3D).add(child as THREE.Object3D);
+    }
+  },
+  commitUpdate(instance: unknown, _: unknown, __: string, ___: unknown, props: unknown) {
+    applyProps(instance, props as Record<string, unknown>);
+  },
+  // ... 他のメソッド
+};`,
+    afterCode: "ポイント: R3F はレンダリングを WebGL の requestAnimationFrame ループに合わせているため、React の reconciliation は毎フレームではなく state/props 変更時のみ発生します。Three.js のオブジェクトへの直接操作（useFrame 内の ref 経由）は React を経由しないためコストがゼロです。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "ストリーミングSSRとISR",
+  est: "60分",
+  goal: "renderToPipeableStream を使ったストリーミング SSR の実装原理を理解し、Selective Hydration が解決する問題を説明できるようになること。Next.js の PPR（Partial Prerendering）で静的コンテンツと動的コンテンツを組み合わせる設計を実践できる状態がゴール。",
+  sections: [{
+    title: "ストリーミングSSR の仕組み",
+    body: "従来の renderToString は全コンポーネントの HTML 生成が完了するまでサーバが応答しないため、データ取得が遅いページでは TTFB（最初のバイト到達時間）が非常に長くなります。renderToPipeableStream はこれを解決し、準備できた部分から順にHTMLのチャンクをブラウザに送信します。Suspense 境界がストリーミングの区切りとなり、境界の外側（シェル）が完成した時点でブラウザへの配信を開始し、Suspense の中身は準備できたものから追加のHTMLチャンクとして流し込まれます。\n\nSelective Hydration は Suspense と組み合わさることで真価を発揮します。従来の Hydration はHTMLツリー全体を一度に処理するため、重いコンポーネントがあるとインタラクション開始まで時間がかかりました。Selective Hydration では Suspense 境界ごとに独立して Hydration を行い、ユーザーがクリックした要素を優先的に処理します。",
+    table: T.ssrModes,
+    afterTable: "ポイント: renderToReadableStream は Web Streams API ベースで、Cloudflare Workers や Deno など Node.js 以外の環境での SSR に対応しています。Edge Runtime でのレンダリングにより、ユーザーに地理的に近い場所から HTML を配信できます。"
+  }, {
+    title: "Next.js PPR と ISR",
+    body: "ISR（Incremental Static Regeneration）は、ビルド時に静的生成したページをバックグラウンドで定期的に再生成する仕組みです。next: { revalidate: N } を fetch オプションに渡すと、N秒ごとにキャッシュを更新します。ほぼ静的だが少し遅れてもいいコンテンツ（商品一覧、ブログ記事）に最適で、Python の Django でいえば memcached + celery による定期キャッシュ更新に相当します。\n\nPPR（Partial Prerendering）は Next.js 15 で導入された実験的機能で、1つのページの中で「ビルド時に静的生成する部分」と「リクエスト時に動的生成する部分」を Suspense で混在させることができます。静的シェルはCDNから即座に配信され、動的コンテンツはストリーミングで後から流れてくるため、TTFB と動的コンテンツの鮮度を両立できます。",
+    code: `// Next.js のキャッシュ戦略の使い分け
+async function getData() {
+  // 完全静的（ビルド時のみ取得）
+  const staticData = await fetch('/api/config', {
+    cache: 'force-cache',
+  });
+
+  // ISR（1時間ごとに再生成）
+  const semiStaticData = await fetch('/api/products', {
+    next: { revalidate: 3600 },
+  });
+
+  // 動的（毎リクエストで取得）
+  const dynamicData = await fetch('/api/user', {
+    cache: 'no-store',
+  });
+
+  // タグベース再検証（on-demand ISR）
+  const taggedData = await fetch('/api/posts', {
+    next: { tags: ['posts'] },
+  });
+  // revalidateTag('posts') を呼ぶと即座にキャッシュ削除
+}`,
+    afterCode: "ポイント: Next.js 15 ではデフォルトで fetch キャッシュが無効（cache: 'no-store'）になりました。明示的に cache: 'force-cache' や revalidate を指定しないと毎回サーバでデータを取得します。パフォーマンスのためにキャッシュ戦略を明示することが重要です。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "コンポーネントライブラリ設計",
+  est: "55分",
+  goal: "Polymorphic Component（as プロップ）パターンを TypeScript で型安全に実装できるようになること。Radix UI の asChild パターンと Slot コンポーネントのしくみを理解し、スタイルとセマンティクスを分離した再利用性の高いコンポーネントライブラリを設計できる状態がゴール。",
+  sections: [{
+    title: "Polymorphic Component（asプロップ）",
+    body: "コンポーネントライブラリでよくある要求に「ボタンのスタイルをリンクに適用したい」というものがあります。単純に <a> を使うと href が必要、<button> を使うとルーターと連携しにくい、という問題が生じます。Polymorphic Component は as プロップを受け取ることで「どの HTML タグ（または React コンポーネント）としてレンダリングするか」を外部から指定できる設計パターンです。\n\nTypeScript で型安全に実装するには、as の型に応じて残りの props の型が変わるジェネリクスが必要です。React.ComponentPropsWithoutRef<C> を使うと、C が 'button' なら button の props、'a' なら a の props（href など）が自動的に追加されます。Python のジェネリクスや TypeVar に相当する概念で、型情報を失わずに汎用的なコンポーネントを作れます。",
+    table: T.polyAs,
+    afterTable: "ポイント: Polymorphic Component は便利ですが、型定義が複雑になります。Radix UI が採用している「asChild」パターン（次節）はより単純な代替案です。shadcn/ui はこの asChild パターンを広く採用しており、スタイルレイヤーとセマンティクスレイヤーの分離を実現しています。"
+  }, {
+    title: "デザイントークン連携",
+    body: "デザイントークンは色・スペーシング・タイポグラフィなどのデザイン値を名前付きの変数として管理する仕組みです。CSS カスタムプロパティ（変数）とコンポーネントライブラリを連携させることで、テーマ切り替えやブランドカスタマイズを実現します。Tailwind CSS の extend やCSS-in-JS の theme オブジェクトがこれに相当します。\n\nReact では CSS カスタムプロパティを style プロップで渡すか、ThemeProvider コンテキストでトークンを提供するパターンが一般的です。shadcn/ui は CSS 変数ベースのトークンを Radix UI コンポーネントに適用しており、テーマのカスタマイズが CSS 変数の上書きだけで完結します。Python の Django テンプレートのコンテキスト変数に近いですが、実行時ではなくスタイル定義レベルで機能します。",
+    code: `/* デザイントークンを CSS 変数で定義 */
+:root {
+  --color-primary: #6366f1;
+  --color-primary-hover: #4338ca;
+  --radius-base: 8px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+}
+
+/* ダークモード切り替え */
+[data-theme="dark"] {
+  --color-primary: #818cf8;
+  --color-primary-hover: #6366f1;
+}`,
+    afterCode: "ポイント: CSS 変数ベースのトークンはランタイムで切り替え可能（JavaScript 不要）なため、テーマ切り替えが最も高速です。一方、TypeScript の satisfies 演算子でトークンオブジェクトを定義すると、型チェック付きでトークン名を補完できます（Ch.7 で詳しく解説）。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "型安全なReact設計",
+  est: "55分",
+  goal: "Generic コンポーネント・forwardRef with TypeScript・Discriminated Union Props・satisfies 演算子を使いこなし、コンパイル時に誤った props 指定を防ぐ型安全なコンポーネントを設計できるようになること。TypeScript の型推論を最大限に活用しつつ、過剰な型注釈を避けるバランスを習得することがゴール。",
+  sections: [{
+    title: "Generic コンポーネントと forwardRef",
+    body: "Generic コンポーネントは TypeScript の型パラメータをコンポーネントに適用したもので、「任意の型のデータを扱えるが型安全を保つ」コンポーネントを作れます。セレクト・オートコンプリート・テーブルなど、データの型が外部から変わるコンポーネントに有用です。Python の Generic クラスに相当し、型情報を失わずに汎用的な処理を記述できます。\n\nforwardRef は親コンポーネントから子コンポーネントの DOM ノードに ref でアクセスするための API です。React 19 では forwardRef が不要になり、ref を通常の props として受け取れるようになりました（ref as a prop）。既存の React 18 コードでは forwardRef + TypeScript でジェネリクスを組み合わせる型定義が複雑になりがちですが、React 19 以降はシンプルに書けます。",
+    table: T.genericComponentPatterns,
+    afterTable: "ポイント: React 19 では <input ref={myRef} /> のように ref が通常の props になりました。forwardRef でラップする必要がなくなり、Generic コンポーネントの型定義が大幅にシンプルになります。新規プロジェクトでは React 19 の書き方を採用しましょう。"
+  }, {
+    title: "satisfies 演算子と型安全な定数",
+    body: "TypeScript 4.9 で導入された satisfies 演算子は、「型チェックは行うが型を広げない」という特性を持ちます。as 型アサーションは型チェックをスキップするリスクがあり、明示的な型注釈は型を広げてしまい推論情報が失われますが、satisfies はその中間です。コンポーネントライブラリのバリアント定義やルート定義など、「型制約を満たしつつ詳細な型推論を保ちたい」場面で力を発揮します。\n\n具体的には、テーマトークンのオブジェクトや API エンドポイントのマップを satisfies で定義すると、文字列リテラル型として推論されながら、型制約（全てのトークンが string であること）も保証できます。Python の TypedDict に近い概念で、辞書の値を型で制約しつつ具体的な値を保持します。",
+    code: `// satisfies の使い方
+type ColorToken = string;
+type DesignTokens = {
+  colors: Record<string, ColorToken>;
+  spacing: Record<string, string>;
+};
+
+// satisfies: 型チェックしつつ具体的な型推論を保持
+const tokens = {
+  colors: {
+    primary: '#6366f1',
+    danger: '#ef4444',
+  },
+  spacing: {
+    sm: '8px',
+    md: '16px',
+  },
+} satisfies DesignTokens;
+
+// tokens.colors.primary は string（✓）ではなく '#6366f1'（リテラル型）として推論される
+type PrimaryColor = typeof tokens.colors.primary; // '#6366f1'
+
+// as の場合（推論情報が失われる）
+const tokensAs = { colors: { primary: '#6366f1' } } as DesignTokens;
+type PrimaryColorAs = typeof tokensAs.colors.primary; // string（詳細情報なし）`,
+    afterCode: "ポイント: satisfies は React コンポーネントのバリアント定義にも有効です。const variants = { primary: { bg: '#6366f1', color: '#fff' } } satisfies Record<string, CSSProperties> のように書くと、バリアント名の補完が効きつつ CSSProperties の型チェックも受けられます。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "テスト戦略の深化",
+  est: "55分",
+  goal: "Playwright Component Testing でブラウザ環境のコンポーネントテストを書けるようになること。Storybook Interaction Testing と Chromatic を組み合わせたビジュアルリグレッション防止のワークフローを構築し、axe-core でアクセシビリティ自動チェックを CI に組み込める状態がゴール。",
+  sections: [{
+    title: "Playwright Component Testing",
+    body: "Testing Library + jsdom は軽量で高速ですが、ブラウザの実際の動作（CSS スタイル、スクロール、ビューポート）を完全には再現できません。Playwright Component Testing は実際の Chromium/Firefox/Safari 上でコンポーネントを単体テストするため、jsdom では検出できないバグを発見できます。例えば CSS による表示/非表示の切り替え、ホバー状態のスタイル、アニメーションの完了待機などが正確にテストできます。\n\n技術的には Playwright が Vite 開発サーバと連携してコンポーネントをブラウザにマウントし、Playwright の通常の page オブジェクトと同様の API でテストを記述できます。Python の Selenium と pytest の組み合わせに近いですが、コンポーネントだけを独立してテストできるのが大きな違いです。",
+    table: T.testingTools,
+    afterTable: "ポイント: Playwright Component Testing は実ブラウザで動くため jsdom より遅いですが、1コンポーネントあたり数百ミリ秒程度です。E2E テストよりはるかに速く、コンポーネントの本質的な動作を検証できます。重要な UI コンポーネントには Playwright CT、ユーティリティ関数には Vitest を使い分けるのが実用的です。"
+  }, {
+    title: "Storybook と Chromatic",
+    body: "Storybook は UI コンポーネントをカタログ化するツールで、コンポーネントを単体で開発・確認できる環境を提供します。Storybook 7 以降の Interaction Testing は、Story 内に play 関数を書くことで、ユーザー操作（クリック・入力）をシミュレートしてアサーションを実行できます。Vitest と統合でき、CI で自動実行されます。\n\nChromatic は Storybook と連携したビジュアルリグレッションテストサービスです。PR ごとに各 Story のスクリーンショットを撮影して前回と比較し、ピクセル単位の差分があればレビュアーに通知します。意図しないスタイル変更（CSSの変更が別コンポーネントに波及するなど）をプルリクエスト段階で検出できるため、デザインの品質が保ちやすくなります。Python でいえば、Selenium Screenshotting + perceptualdiff ツールに相当しますが、ワークフローが大幅に簡略化されています。",
+    code: `// Button.stories.tsx（Storybook + Interaction Testing）
+import type { Meta, StoryObj } from '@storybook/react';
+import { userEvent, within, expect } from '@storybook/test';
+import { Button } from './Button';
+
+const meta: Meta<typeof Button> = {
+  component: Button,
+  title: 'UI/Button',
+};
+export default meta;
+
+type Story = StoryObj<typeof Button>;
+
+export const Default: Story = {
+  args: { children: 'クリック' },
+};
+
+export const ClickInteraction: Story = {
+  args: { children: 'カウント: 0' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole('button');
+    await userEvent.click(button);
+    // Chromatic はここでスクリーンショットを撮る
+    await expect(button).toHaveTextContent('カウント: 1');
+  },
+};`,
+    afterCode: "コース完了後に習得できる状態: Fiber の内部動作・React Compiler・Concurrent Mode・カスタムレンダラー・ストリーミング SSR・コンポーネントライブラリ設計・型安全な React・高度なテスト戦略を体系的に理解しています。OSS への貢献や、社内コンポーネントライブラリの設計・実装を主導できる水準です。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+function DataTable({
+  data
+}) {
+  return React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      margin: "12px 0",
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#fff"
+    }
+  }, React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      fontSize: 13
+    }
+  }, React.createElement("thead", null, React.createElement("tr", null, data.h.map((h, i) => React.createElement("th", {
+    key: i,
+    style: {
+      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
+      color: "#312e81",
+      fontWeight: 800,
+      fontSize: 12.5,
+      padding: "10px 14px",
+      textAlign: "left",
+      borderBottom: "2px solid #a5b4fc",
+      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
+    }
+  }, h)))), React.createElement("tbody", null, data.r.map((row, ri) => React.createElement("tr", {
+    key: ri
+  }, row.map((cell, ci) => React.createElement("td", {
+    key: ci,
+    style: {
+      padding: "9px 14px",
+      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
+      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
+      color: ci === 0 ? "#1e1b4b" : "#374151",
+      fontWeight: ci === 0 ? 700 : 400,
+      fontSize: 13,
+      lineHeight: 1.65,
+      verticalAlign: "top",
+      whiteSpace: "pre-line",
+      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
+    }
+  }, cell)))))), data.cap && React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      fontSize: 12,
+      color: "#6b7280",
+      borderTop: "1px solid #e5e7eb",
+      background: "#f9fafb"
+    }
+  }, data.cap));
+}
+function Code({
+  code,
+  hl
+}) {
+  return React.createElement("pre", {
+    style: {
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color: "#d0d0f0",
+      padding: "14px 16px",
+      borderRadius: 10,
+      fontSize: 12,
+      lineHeight: 1.65,
+      overflowX: "auto",
+      margin: "8px 0 0",
+      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+const diffLabel = d => d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55";
+const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
+function Exercise({
+  ex,
+  idx
+}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "2px solid #f59e0b",
+      overflow: "hidden",
+      background: "#fff",
+      marginBottom: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 10px",
+      borderRadius: 6
+    }
+  }, "\u554F", idx + 1), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: diffColor(ex.diff)
+    }
+  }, diffLabel(ex.diff))), React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      lineHeight: 1.8,
+      color: "#92400e",
+      whiteSpace: "pre-line"
+    }
+  }, ex.q)), React.createElement("div", {
+    style: {
+      padding: "0 16px 12px"
+    }
+  }, React.createElement(Code, {
+    code: ex.code,
+    hl: true
+  })), React.createElement("div", {
+    style: {
+      borderTop: "1px dashed #fcd34d",
+      padding: "10px 16px"
+    }
+  }, React.createElement("button", {
+    onClick: () => setShowAnswer(!showAnswer),
+    style: {
+      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#166534",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 4
+    }
+  }, "\u2705 \u89E3\u7B54\u4F8B"), React.createElement(Code, {
+    code: ex.answer
+  }))));
+}
+function Section({
+  section,
+  idx,
+  defaultOpen
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      overflow: "hidden",
+      background: "#fff"
+    }
+  }, React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 16px",
+      border: "none",
+      background: "#fafafa",
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b"
+    }
+  }, React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      background: "#6366f1",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800
+    }
+  }, idx + 1), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, section.title), React.createElement("span", {
+    style: {
+      fontSize: 18,
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      transform: open ? "rotate(90deg)" : "rotate(0)"
+    }
+  }, "\u203A")), open && React.createElement("div", {
+    style: {
+      padding: "12px 16px 16px"
+    }
+  }, section.body && React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.body), section.table && React.createElement(DataTable, {
+    data: section.table
+  }), section.afterTable && React.createElement("p", {
+    style: {
+      margin: "8px 0",
+      fontSize: 13.5,
+      lineHeight: 1.85,
+      color: "#374151",
+      whiteSpace: "pre-line"
+    }
+  }, section.afterTable), section.code && React.createElement(Code, {
+    code: section.code
+  }), section.afterCode && React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      lineHeight: 1.8,
+      color: "#555",
+      whiteSpace: "pre-line",
+      background: "#f9fafb",
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb"
+    }
+  }, section.afterCode)));
+}
+
+/* ─── Main App ─── */
+function ReactAdvancedCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+  return React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#f8f7f4",
+      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
+    }
+  }, React.createElement("div", {
+    style: {
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "20px 14px"
+    }
+  }, React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+      borderRadius: 16,
+      padding: "24px 20px",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -30,
+      right: -10,
+      fontSize: 140,
+      opacity: 0.05
+    }
+  }, "\u269B\uFE0F"), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#a5b4fc",
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginBottom: 4
+    }
+  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), React.createElement("h1", {
+    style: {
+      margin: 0,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#fff"
+    }
+  }, "React \u4E0A\u7D1A\u30B3\u30FC\u30B9"), React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12.5,
+      color: "#c4b5fd"
+    }
+  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u2B50\u301C\u2B50\u2B50\u2B50"), React.createElement("p", {
+    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
+  }, "Fiber \u30A2\u30FC\u30AD\u30C6\u30AF\u30C1\u30E3\u30FB React Compiler \u30FB Concurrent Mode \u30FB\u30AB\u30B9\u30BF\u30E0\u30EC\u30F3\u30C0\u30E9\u30FC\u30FB\u30B9\u30C8\u30EA\u30FC\u30DF\u30F3\u30B0 SSR \u30FB\u30B3\u30F3\u30DD\u30FC\u30CD\u30F3\u30C8\u30E9\u30A4\u30D6\u30E9\u30EA\u8A2D\u8A08\u30FB\u578B\u5B89\u5168\u306A React \u8A2D\u8A08\u30FB\u9AD8\u5EA6\u306A\u30C6\u30B9\u30C8\u6226\u7565\u307E\u3067\u3001React \u306E\u5185\u90E8\u69CB\u9020\u3092\u6DF1\u304F\u7406\u89E3\u3057\u3001OSS\u3084\u30E9\u30A4\u30D6\u30E9\u30EA\u8A2D\u8A08\u3092\u4E3B\u5C0E\u3067\u304D\u308B\u30EC\u30D9\u30EB\u3092\u76EE\u6307\u3057\u307E\u3059\u3002"), React.createElement("div", {
+    style: {
+      marginTop: 14,
+      display: "flex",
+      gap: 3
+    }
+  }, chapters.map((_, i) => React.createElement("div", {
+    key: i,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
+      cursor: "pointer"
+    }
+  })))), React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("button", {
+    onClick: () => setMenuOpen(!menuOpen),
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1e1b4b",
+      cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9ca3af"
+    }
+  }, menuOpen ? "\u25B2" : "\u25BC")), menuOpen && React.createElement("div", {
+    style: {
+      marginTop: 4,
+      border: "1px solid #e5e7eb",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "#fff",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+    }
+  }, chapters.map((c, i) => React.createElement("button", {
+    key: c.id,
+    onClick: () => {
+      setCh(i);
+      setMenuOpen(false);
+    },
+    style: {
+      width: "100%",
+      padding: "10px 16px",
+      border: "none",
+      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
+      background: i === ch ? "#eef2ff" : "#fff",
+      fontSize: 13,
+      fontWeight: i === ch ? 700 : 500,
+      color: i === ch ? "#4338ca" : "#374151",
+      cursor: "pointer",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: i === ch ? "#6366f1" : "#e5e7eb",
+      color: i === ch ? "#fff" : "#6b7280",
+      fontWeight: 800,
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.num), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, c.title), EX[c.id] && React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#f59e0b",
+      fontWeight: 700
+    }
+  }, EX[c.id].length, "\u554F"))))), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, chapter.num), React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "#1e1b4b"
+    }
+  }, chapter.title), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6b7280"
+    }
+  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? " \u30FB \u6F14\u7FD2" + exercises.length + "\u554F" : ""))), chapter.goal && React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
+      border: "1px solid #c7d2fe",
+      borderLeft: "4px solid #6366f1",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
+  }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"), React.createElement("div", {
+    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
+  }, chapter.goal)), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, chapter.sections.map((sec, i) => React.createElement(Section, {
+    key: ch + "-" + i,
+    section: sec,
+    idx: i,
+    defaultOpen: false
+  }))), exercises.length > 0 && React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      padding: "4px 14px",
+      borderRadius: 8
+    }
+  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => React.createElement(Exercise, {
+    key: ch + "-" + i,
+    ex: ex,
+    idx: i
+  }))), React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 20,
+      gap: 10
+    }
+  }, ch > 0 ? React.createElement("button", {
+    onClick: () => {
+      setCh(ch - 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "1px solid #d1d5db",
+      borderRadius: 10,
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#6b7280"
+    }
+  }, "\u2190 Ch.", chapters[ch - 1].num) : React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), ch < chapters.length - 1 ? React.createElement("button", {
+    onClick: () => {
+      setCh(ch + 1);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      border: "none",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#fff"
+    }
+  }, "Ch.", chapters[ch + 1].num, " \u2192") : React.createElement("a", {
+    href: "../index.html",
+    style: {
+      flex: 1,
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "linear-gradient(135deg,#22c55e,#16a34a)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 13,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: "#9ca3af",
+      marginTop: 20
+    }
+  }, "react.dev \u30FB React 19 \u6642\u70B9")));
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(ReactAdvancedCourse));
+  </script>
+</body>
+</html>
