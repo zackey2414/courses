@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JavaScript 中級コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのJavaScript中級コース。全8章・16問の演習付き。非同期・クロージャ・プロトタイプ・関数型・テスト・ビルドツールを習得。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const {
+  useState
+} = React;
+
+/* ── Table definitions ── */
+const T = {
+  promiseMethods: {
+    h: ["メソッド", "挙動", "Python対応"],
+    r: [
+      ["Promise.all(arr)", "全て成功したら結果配列。1つでも失敗すれば即reject。", "asyncio.gather(*coros)"],
+      ["Promise.allSettled(arr)", "全てが完了（成功/失敗問わず）するまで待つ。", "asyncio.gather(*coros, return_exceptions=True)"],
+      ["Promise.race(arr)", "最初に決着した1つの結果を返す。", "asyncio.wait(coros, return_when=FIRST_COMPLETED)"],
+      ["Promise.any(arr)", "最初に成功した1つを返す。全失敗でAggregateError。", "（直接対応なし）"],
+      ["Promise.resolve(v)", "値をwrapしたPromiseを返す。", "asyncio.coroutine でのラップ"],
+      ["Promise.reject(e)", "失敗したPromiseを返す。", "raise e in coroutine"]
+    ]
+  },
+  closurePatterns: {
+    h: ["パターン", "説明", "用途"],
+    r: [
+      ["カウンタ", "外部変数を閉じ込めてプライベート状態を作る", "IDジェネレータ、統計収集"],
+      ["モジュールパターン", "IIFE + クロージャで public/private を分離", "ES Modules以前の名前空間管理"],
+      ["メモ化", "計算結果をクロージャ内のMapにキャッシュ", "フィボナッチ、API結果キャッシュ"],
+      ["カリー化", "引数を1つずつ受け取る関数列に変換", "部分適用、関数合成"],
+      ["イベントハンドラ", "ループ変数を閉じ込めてイベントに引き渡す", "DOM生成、ループ内リスナー"]
+    ]
+  },
+  protoVsClass: {
+    h: ["観点", "プロトタイプ直接操作", "class構文"],
+    r: [
+      ["記述量", "多い（Object.create, prototype.method=...）", "少ない（classブロック内に集約）"],
+      ["継承", "Object.create(Base.prototype)", "extends キーワード"],
+      ["静的メソッド", "Cls.method = function(){}", "static method(){}"],
+      ["プライベート", "慣習的に_プレフィックス", "#フィールド（ES2022+）"],
+      ["本質", "プロトタイプチェーン", "同じプロトタイプチェーン（シュガー）"]
+    ]
+  },
+  iterProtocol: {
+    h: ["インターフェース", "必要なもの", "説明"],
+    r: [
+      ["Iterable", "Symbol.iteratorメソッド", "for...ofで使えるオブジェクト"],
+      ["Iterator", "next()メソッド", "{value, done}を返すオブジェクト"],
+      ["Generator", "function* と yield", "IterableかつIteratorを自動実装"],
+      ["AsyncIterator", "非同期next()", "for await...ofで使える"],
+      ["AsyncGenerator", "async function* と yield", "非同期版ジェネレータ"]
+    ]
+  },
+  moduleCompare: {
+    h: ["特徴", "CommonJS (CJS)", "ES Modules (ESM)"],
+    r: [
+      ["構文", "require / module.exports", "import / export"],
+      ["解析タイミング", "実行時（動的）", "パース時（静的）"],
+      ["Tree Shaking", "不可", "バンドラが不要コードを除去"],
+      ["トップレベルawait", "不可", "可（ESM限定）"],
+      ["循環依存", "部分的に動作", "より厳密"],
+      ["ブラウザ対応", "不可（バンドル必要）", "ネイティブ対応"]
+    ]
+  },
+  fpConcepts: {
+    h: ["概念", "説明", "Python対応"],
+    r: [
+      ["純粋関数", "同じ入力→同じ出力、副作用なし", "通常の関数（副作用排除）"],
+      ["不変性", "データを変更せず新しい値を返す", "frozenset, tuple"],
+      ["高階関数", "関数を引数や戻り値にする", "map/filter/reduce, functools"],
+      ["カリー化", "多引数関数を1引数関数の連鎖に変換", "functools.partial"],
+      ["合成(compose)", "f(g(x)) を作る関数合成", "functools.reduce でのパイプ"]
+    ]
+  },
+  testTypes: {
+    h: ["種別", "説明", "Vitest API"],
+    r: [
+      ["モック", "依存モジュール全体を差し替える", "vi.mock('module')"],
+      ["スタブ", "特定の関数の戻り値を固定する", "vi.fn().mockReturnValue(v)"],
+      ["スパイ", "実際の実装を使いつつ呼び出しを記録", "vi.spyOn(obj, 'method')"],
+      ["フェイク", "本物に似せた軽量な実装", "vi.useFakeTimers()"],
+      ["スナップショット", "出力を保存して差分を検出", "expect(x).toMatchSnapshot()"]
+    ]
+  },
+  buildTools: {
+    h: ["ツール", "役割", "Python対応"],
+    r: [
+      ["Vite", "開発サーバ + バンドラ（Rollupベース）", "uvicorn + webpack相当"],
+      ["ESLint", "静的解析・コードルール適用", "flake8 / pylint"],
+      ["Prettier", "コードフォーマッタ（議論の余地なし）", "black / ruff format"],
+      ["TypeScript", "静的型付けのJS上位互換言語", "型アノテーション付きPython(mypy)"],
+      ["Rollup", "ライブラリ向け軽量バンドラ", "（直接対応なし）"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 2,
+    q: "以下の3つのAPIコール（模擬）を Promise.all / Promise.allSettled / Promise.race で実行し、それぞれの挙動の違いをコンソールで確認してください。\n2番目のAPIは必ず失敗するようにしてください。",
+    code: `const api1 = () => new Promise(res => setTimeout(() => res('ユーザ情報'), 100));
+const api2 = () => new Promise((_, rej) => setTimeout(() => rej(new Error('認証エラー')), 50));
+const api3 = () => new Promise(res => setTimeout(() => res('在庫情報'), 200));
+
+// Promise.all / allSettled / race を試してください`,
+    answer: `const api1 = () => new Promise(res => setTimeout(() => res('ユーザ情報'), 100));
+const api2 = () => new Promise((_, rej) => setTimeout(() => rej(new Error('認証エラー')), 50));
+const api3 = () => new Promise(res => setTimeout(() => res('在庫情報'), 200));
+
+// Promise.all: 1つでも失敗すれば即reject
+try {
+  const results = await Promise.all([api1(), api2(), api3()]);
+  console.log('all:', results);
+} catch (e) {
+  console.error('all 失敗:', e.message); // → 認証エラー
+}
+
+// Promise.allSettled: 全て完了してから結果を受け取る
+const settled = await Promise.allSettled([api1(), api2(), api3()]);
+settled.forEach(r => {
+  if (r.status === 'fulfilled') console.log('成功:', r.value);
+  else console.error('失敗:', r.reason.message);
+});
+
+// Promise.race: 最初に完了したものを受け取る（api2が50msで最速）
+try {
+  const first = await Promise.race([api1(), api2(), api3()]);
+  console.log('race 勝者:', first);
+} catch (e) {
+  console.error('race 失敗:', e.message); // api2が最速なのでreject
+}`
+  }, {
+    diff: 2,
+    q: "async/await でエラーハンドリングを行う fetchWithRetry 関数を実装してください。\n・最大3回リトライ（指数バックオフ: 100ms, 200ms, 400ms）\n・3回全て失敗したら最後のエラーをthrow",
+    code: `// fetch のモック（50%の確率で失敗）
+const mockFetch = (url) => new Promise((res, rej) =>
+  setTimeout(() => Math.random() > 0.5
+    ? res({ data: url })
+    : rej(new Error('Network Error')), 50)
+);
+
+async function fetchWithRetry(url, maxRetries = 3) {
+  // 実装してください
+}`,
+    answer: `const mockFetch = (url) => new Promise((res, rej) =>
+  setTimeout(() => Math.random() > 0.5
+    ? res({ data: url })
+    : rej(new Error('Network Error')), 50)
+);
+
+async function fetchWithRetry(url, maxRetries = 3) {
+  let lastError;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const result = await mockFetch(url);
+      console.log(\`成功 (試行\${i + 1}回目)\`);
+      return result;
+    } catch (err) {
+      lastError = err;
+      const delay = 100 * Math.pow(2, i); // 100, 200, 400ms
+      console.log(\`失敗 (試行\${i + 1}回目), \${delay}ms後にリトライ\`);
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+  throw lastError;
+}
+
+// 使用例
+try {
+  const result = await fetchWithRetry('https://api.example.com/data');
+  console.log('最終結果:', result);
+} catch (e) {
+  console.error('全リトライ失敗:', e.message);
+}`
+  }],
+  ch2: [{
+    diff: 2,
+    q: "クロージャを使ってメモ化（memoize）関数を汎用的に実装してください。\n引数が同じなら計算をスキップしてキャッシュ値を返すこと。\nfibonacci(40) をメモ化有無で速度比較してください。",
+    code: `function memoize(fn) {
+  // クロージャで cache を閉じ込めて実装
+}
+
+function fibonacci(n) {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+const memoFib = memoize(fibonacci);`,
+    answer: `function memoize(fn) {
+  const cache = new Map(); // クロージャ内に閉じ込める
+  return function(...args) {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
+    const result = fn.apply(this, args);
+    cache.set(key, result);
+    return result;
+  };
+}
+
+// 再帰呼び出し自体をメモ化するには関数を上書き
+let fibonacci = memoize(function(n) {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
+});
+
+// 速度比較
+console.time('memoized');
+console.log(fibonacci(40)); // 102334155
+console.timeEnd('memoized'); // 数ms
+
+// Pythonのfunctools.lru_cacheと同じ考え方`
+  }, {
+    diff: 2,
+    q: "カリー化（currying）関数を実装し、multiply(2)(3) のように1引数ずつ渡せるようにしてください。\nさらに curry(add)(1)(2)(3) のように任意引数長の関数にも対応した汎用 curry を実装してください。",
+    code: `// 2引数カリー化の例
+const multiply = // カリー化された乗算
+
+// 汎用カリー化
+function curry(fn) {
+  // 任意引数長に対応した実装
+}
+
+function add(a, b, c) { return a + b + c; }
+const curriedAdd = curry(add);`,
+    answer: `// 2引数のカリー化
+const multiply = (a) => (b) => a * b;
+const double = multiply(2);
+console.log(double(5));  // 10
+console.log(multiply(3)(4));  // 12
+
+// 汎用カリー化（クロージャで引数を蓄積）
+function curry(fn) {
+  return function curried(...args) {
+    if (args.length >= fn.length) {
+      // 必要な引数が揃ったら実行
+      return fn.apply(this, args);
+    }
+    // まだ足りないので新しい関数を返す（引数を閉じ込める）
+    return function(...moreArgs) {
+      return curried.apply(this, args.concat(moreArgs));
+    };
+  };
+}
+
+function add(a, b, c) { return a + b + c; }
+const curriedAdd = curry(add);
+
+console.log(curriedAdd(1)(2)(3));   // 6
+console.log(curriedAdd(1, 2)(3));   // 6
+console.log(curriedAdd(1)(2, 3));   // 6
+console.log(curriedAdd(1, 2, 3));   // 6
+
+// Pythonのfunctools.partialと近いが、カリー化はより柔軟`
+  }],
+  ch3: [{
+    diff: 2,
+    q: "Animal クラスを基底として、Dog と Cat を継承で作ってください。\n・Animal: name, speak()（サブクラスで実装）\n・Dog: speak()→「ワン！」、fetch(item)メソッド追加\n・Cat: speak()→「ニャン」、purr()メソッド追加\n・プライベートフィールド #energy を Animal に持たせ、行動でエネルギーを消費させてください。",
+    code: `class Animal {
+  // #energy プライベートフィールド
+  // speak() はサブクラスで実装（抽象メソッド相当）
+}
+
+class Dog extends Animal {
+  // fetch(item) メソッドを追加
+}
+
+class Cat extends Animal {
+  // purr() メソッドを追加
+}`,
+    answer: `class Animal {
+  #energy;
+
+  constructor(name, energy = 100) {
+    this.name = name;
+    this.#energy = energy;
+  }
+
+  speak() {
+    throw new Error(\`\${this.constructor.name} は speak() を実装してください\`);
+  }
+
+  get energy() { return this.#energy; }
+
+  #consume(amount) {
+    this.#energy = Math.max(0, this.#energy - amount);
+  }
+
+  rest() {
+    this.#energy = Math.min(100, this.#energy + 20);
+    console.log(\`\${this.name} が休憩。エネルギー: \${this.#energy}\`);
+  }
+
+  _act(label, cost) {
+    this.#consume(cost);
+    console.log(\`\${label} (エネルギー残: \${this.#energy})\`);
+  }
+}
+
+class Dog extends Animal {
+  speak() { this._act(\`\${this.name}: ワン！\`, 5); }
+  fetch(item) { this._act(\`\${this.name} が \${item} を持ってきた！\`, 15); }
+}
+
+class Cat extends Animal {
+  speak() { this._act(\`\${this.name}: ニャン\`, 3); }
+  purr() { this._act(\`\${this.name} がゴロゴロ...\`, 1); }
+}
+
+const dog = new Dog('ポチ');
+dog.speak();    // ポチ: ワン！
+dog.fetch('ボール');
+const cat = new Cat('タマ');
+cat.speak();
+cat.purr();
+console.log(cat.energy); // 96`
+  }, {
+    diff: 3,
+    q: "Mixin パターンを使って、Serializable（toJSON/fromJSON）と Validatable（validate）の機能を複数クラスに横断的に付与してください。",
+    code: `// Serializable Mixin
+const Serializable = (Base) => class extends Base {
+  // toJSON(), static fromJSON() を実装
+};
+
+// Validatable Mixin
+const Validatable = (Base) => class extends Base {
+  // validate() を実装（サブクラスでルールを定義）
+};
+
+class User extends Serializable(Validatable(class {})) {
+  // name, email フィールドを持ち、validateを実装
+}`,
+    answer: `const Serializable = (Base) => class extends Base {
+  toJSON() {
+    return JSON.stringify(this);
+  }
+  static fromJSON(json) {
+    const data = JSON.parse(json);
+    const instance = new this();
+    return Object.assign(instance, data);
+  }
+};
+
+const Validatable = (Base) => class extends Base {
+  validate() {
+    const rules = this.validationRules?.() ?? [];
+    const errors = rules
+      .filter(({ check }) => !check(this))
+      .map(({ message }) => message);
+    if (errors.length > 0) throw new Error(errors.join(', '));
+    return true;
+  }
+};
+
+class User extends Serializable(Validatable(class {})) {
+  constructor(name, email) {
+    super();
+    this.name = name;
+    this.email = email;
+  }
+  validationRules() {
+    return [
+      { check: u => u.name?.length > 0, message: '名前は必須' },
+      { check: u => u.email?.includes('@'), message: '正しいメールアドレスを入力' }
+    ];
+  }
+}
+
+const u = new User('太郎', 'taro@example.com');
+u.validate(); // OK
+const json = u.toJSON();
+console.log(json);
+
+const u2 = new User('', 'invalid');
+try { u2.validate(); } catch(e) { console.error(e.message); }`
+  }],
+  ch4: [{
+    diff: 2,
+    q: "カスタムイテラブルを実装してください。\nRange クラスを作り、for...of で範囲内の数値を列挙できるようにしてください。\nPython の range() と同じ感覚で使えること。",
+    code: `class Range {
+  constructor(start, end, step = 1) {
+    // start, end, step を保持
+  }
+  // Symbol.iterator を実装
+}
+
+// 使用例
+for (const n of new Range(1, 5)) {
+  console.log(n); // 1 2 3 4 5
+}
+console.log([...new Range(0, 10, 2)]); // [0,2,4,6,8,10]`,
+    answer: `class Range {
+  constructor(start, end, step = 1) {
+    this.start = start;
+    this.end = end;
+    this.step = step;
+  }
+
+  [Symbol.iterator]() {
+    let current = this.start;
+    const { end, step } = this;
+    return {
+      next() {
+        if (current <= end) {
+          const value = current;
+          current += step;
+          return { value, done: false };
+        }
+        return { value: undefined, done: true };
+      }
+    };
+  }
+}
+
+// Pythonのrange()と同じ使い方
+for (const n of new Range(1, 5)) {
+  console.log(n); // 1 2 3 4 5
+}
+console.log([...new Range(0, 10, 2)]); // [0,2,4,6,8,10]
+
+// 分割代入にも使える
+const [first, second] = new Range(10, 20, 5);
+console.log(first, second); // 10, 15`
+  }, {
+    diff: 3,
+    q: "ジェネレータ関数を使って無限フィボナッチ数列を生成するジェネレータを実装してください。\nさらに、任意の非同期データストリームを処理する AsyncGenerator も実装してください。",
+    code: `// 無限フィボナッチジェネレータ
+function* fibonacci() {
+  // 実装
+}
+
+// 最初の10個を取得
+// [0,1,1,2,3,5,8,13,21,34]
+
+// 非同期ジェネレータ（疑似APIページネーション）
+async function* fetchPages(totalPages) {
+  // 実装
+}`,
+    answer: `// 無限フィボナッチジェネレータ
+function* fibonacci() {
+  let [a, b] = [0, 1];
+  while (true) {
+    yield a;
+    [a, b] = [b, a + b];
+  }
+}
+
+// take ヘルパー（先頭n個だけ取る）
+function take(gen, n) {
+  const result = [];
+  for (const v of gen) {
+    result.push(v);
+    if (result.length >= n) break;
+  }
+  return result;
+}
+
+console.log(take(fibonacci(), 10));
+// [0,1,1,2,3,5,8,13,21,34]
+
+// 非同期ジェネレータ
+async function* fetchPages(totalPages) {
+  for (let page = 1; page <= totalPages; page++) {
+    // 実際はAPIを叩く
+    await new Promise(r => setTimeout(r, 50));
+    yield { page, items: [\`item-\${page}-1\`, \`item-\${page}-2\`] };
+  }
+}
+
+// for await...of で消費
+for await (const pageData of fetchPages(3)) {
+  console.log(\`ページ\${pageData.page}:\`, pageData.items);
+}
+// Pythonのasync for in gen と同じ`
+  }],
+  ch5: [{
+    diff: 2,
+    q: "ES Modules の動的インポートを使って、ルートに応じてページコンポーネントを遅延ロードするルータを実装してください。\nモジュールが存在しない場合は 404 コンポーネントを表示すること。",
+    code: `// pages/home.js, pages/about.js, pages/user.js を想定
+// それぞれ { render() } を export
+
+async function navigate(path) {
+  // 動的インポートでページを遅延ロード
+}
+
+await navigate('/home');
+await navigate('/about');
+await navigate('/not-found');`,
+    answer: `// pages/home.js
+// export function render() { console.log('ホームページ'); }
+
+// pages/about.js
+// export function render() { console.log('Aboutページ'); }
+
+const PAGE_MAP = {
+  '/home': () => import('./pages/home.js'),
+  '/about': () => import('./pages/about.js'),
+  '/user': () => import('./pages/user.js'),
+};
+
+async function navigate(path) {
+  const loader = PAGE_MAP[path];
+  if (!loader) {
+    // 404モジュールを動的ロード
+    const { render } = await import('./pages/404.js');
+    render();
+    return;
+  }
+  try {
+    const module = await loader(); // 初回のみダウンロード、2回目はキャッシュ
+    module.render();
+  } catch (e) {
+    console.error(\`ページのロードに失敗: \${e.message}\`);
+    const { render } = await import('./pages/error.js');
+    render();
+  }
+}
+
+// 使用例
+await navigate('/home');   // ホームページ
+await navigate('/about');  // Aboutページ
+await navigate('/admin');  // 404`
+  }, {
+    diff: 2,
+    q: "名前付きエクスポート・デフォルトエクスポート・再エクスポートを使って、ライブラリの公開APIを整理する index.js（バレルファイル）を作成してください。\nTree Shakingが効く形になっていることをコメントで説明してください。",
+    code: `// utils/string.js — 文字列ユーティリティ
+// utils/array.js  — 配列ユーティリティ
+// utils/index.js  — バレルファイル（まとめて再エクスポート）`,
+    answer: `// utils/string.js
+export function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+export function truncate(str, max) {
+  return str.length > max ? str.slice(0, max) + '...' : str;
+}
+export default capitalize; // default も提供
+
+// utils/array.js
+export function unique(arr) {
+  return [...new Set(arr)];
+}
+export function groupBy(arr, key) {
+  return arr.reduce((acc, item) => {
+    (acc[item[key]] ??= []).push(item);
+    return acc;
+  }, {});
+}
+
+// utils/index.js（バレルファイル）
+// Tree Shakingが効く：バンドラは使われた関数だけをバンドルする
+export { capitalize, truncate } from './string.js';
+export { unique, groupBy } from './array.js';
+export { default as cap } from './string.js'; // defaultをnamed化
+
+// 使う側
+import { unique, capitalize } from './utils/index.js';
+// → バンドラはtruncate/groupByを除外できる（Tree Shaking）
+console.log(unique([1,2,2,3]));     // [1,2,3]
+console.log(capitalize('hello'));   // Hello`
+  }],
+  ch6: [{
+    diff: 2,
+    q: "compose と pipe 関数を実装してください。\ncompose(f, g, h)(x) は f(g(h(x)))、pipe(f, g, h)(x) は h(g(f(x))) です。\nこれを使って文字列変換パイプラインを作ってください。",
+    code: `const compose = (...fns) => // 右から左に適用
+const pipe = (...fns) =>    // 左から右に適用
+
+// 文字列変換の部品
+const trim = s => s.trim();
+const lower = s => s.toLowerCase();
+const removeSpaces = s => s.replace(/\\s+/g, '-');
+const addPrefix = prefix => s => \`\${prefix}\${s}\`;
+
+// パイプラインを組み立てて slug を生成`,
+    answer: `// compose: 右から左（数学的関数合成の順）
+const compose = (...fns) => x => fns.reduceRight((v, fn) => fn(v), x);
+
+// pipe: 左から右（データが流れる順で読みやすい）
+const pipe = (...fns) => x => fns.reduce((v, fn) => fn(v), x);
+
+// 文字列変換の純粋関数たち（副作用なし）
+const trim = s => s.trim();
+const lower = s => s.toLowerCase();
+const removeSpaces = s => s.replace(/\\s+/g, '-');
+const addPrefix = prefix => s => \`\${prefix}\${s}\`;
+
+// pipeで左から右に読めるスラッグ生成器
+const toSlug = pipe(
+  trim,
+  lower,
+  removeSpaces,
+  addPrefix('blog-')
+);
+
+console.log(toSlug('  Hello World  '));  // blog-hello-world
+console.log(toSlug(' My First Post '));   // blog-my-first-post
+
+// composeは逆順（数学のf∘g表記と同じ）
+const toSlugCompose = compose(
+  addPrefix('blog-'),
+  removeSpaces,
+  lower,
+  trim
+);
+console.log(toSlugCompose('  Hello World  ')); // blog-hello-world
+
+// PythonのfunctoolsとJSの比較:
+// Python: functools.reduce(lambda f,g: lambda x: f(g(x)), fns)
+// JS: fns.reduceRight((v, fn) => fn(v), x)`
+  }, {
+    diff: 2,
+    q: "不変性（Immutability）を意識したTodo管理を実装してください。\n・Todoリストを直接変更せず、常に新しい配列/オブジェクトを返す関数群を作成\n・Object.freeze を使った深い凍結ユーティリティも実装する",
+    code: `// 純粋関数として Todo CRUD を実装
+// 引数の配列/オブジェクトは絶対に変更しないこと
+
+const addTodo = (todos, title) => // 新配列を返す
+const toggleTodo = (todos, id) => // 新配列を返す
+const removeTodo = (todos, id) =>  // 新配列を返す
+
+// deepFreeze ユーティリティ
+const deepFreeze = (obj) => // 再帰的にfreeze`,
+    answer: `// 純粋関数によるTodo操作（全て新しい値を返す）
+let nextId = 1;
+
+const addTodo = (todos, title) => [
+  ...todos,
+  { id: nextId++, title, done: false, createdAt: Date.now() }
+];
+
+const toggleTodo = (todos, id) =>
+  todos.map(todo =>
+    todo.id === id ? { ...todo, done: !todo.done } : todo
+  );
+
+const removeTodo = (todos, id) =>
+  todos.filter(todo => todo.id !== id);
+
+const updateTodo = (todos, id, patch) =>
+  todos.map(todo =>
+    todo.id === id ? { ...todo, ...patch } : todo
+  );
+
+// deepFreeze: オブジェクトを再帰的に凍結
+const deepFreeze = (obj) => {
+  Object.getOwnPropertyNames(obj).forEach(name => {
+    const value = obj[name];
+    if (typeof value === 'object' && value !== null) {
+      deepFreeze(value);
+    }
+  });
+  return Object.freeze(obj);
+};
+
+// 使用例（Reduxのreducerパターンと同じ思想）
+let todos = [];
+todos = addTodo(todos, '牛乳を買う');
+todos = addTodo(todos, '洗濯する');
+todos = toggleTodo(todos, 1);
+todos = removeTodo(todos, 2);
+console.log(todos);
+
+// Pythonのtupleやfrozensetに相当する不変性`
+  }],
+  ch7: [{
+    diff: 2,
+    q: "Vitest を使って、純粋関数ライブラリをテストしてください。\nvi.fn() でスパイを作り、関数が呼ばれた回数と引数を検証してください。",
+    code: `// utils.js
+export function processItems(items, callback) {
+  return items.map(callback);
+}
+
+// utils.test.js
+import { describe, it, expect, vi } from 'vitest';
+import { processItems } from './utils.js';
+
+describe('processItems', () => {
+  // callbackが各アイテムに対して1回ずつ呼ばれることを検証
+  // callbackの引数を検証
+});`,
+    answer: `// utils.js
+export function processItems(items, callback) {
+  return items.map(callback);
+}
+
+// utils.test.js
+import { describe, it, expect, vi } from 'vitest';
+import { processItems } from './utils.js';
+
+describe('processItems', () => {
+  it('各アイテムに対してcallbackを呼ぶ', () => {
+    const items = [1, 2, 3];
+    const spy = vi.fn(x => x * 2); // スパイ（実際に実行される）
+
+    const result = processItems(items, spy);
+
+    // 戻り値の検証
+    expect(result).toEqual([2, 4, 6]);
+
+    // 呼び出し回数の検証
+    expect(spy).toHaveBeenCalledTimes(3);
+
+    // 各呼び出しの引数を検証
+    expect(spy).toHaveBeenNthCalledWith(1, 1, 0, items);
+    expect(spy).toHaveBeenNthCalledWith(2, 2, 1, items);
+    expect(spy).toHaveBeenNthCalledWith(3, 3, 2, items);
+  });
+
+  it('空配列でcallbackは呼ばれない', () => {
+    const spy = vi.fn();
+    processItems([], spy);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+// 実行: npx vitest run`
+  }, {
+    diff: 3,
+    q: "vi.mock を使って外部モジュール（fetch）をモックし、\nAPIクライアント関数をテストしてください。\nネットワークエラーと正常ケースの両方をテストすること。",
+    code: `// api.js
+export async function getUser(id) {
+  const res = await fetch(\`/api/users/\${id}\`);
+  if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+  return res.json();
+}
+
+// api.test.js
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+// fetchをモックしてネットワーク通信なしにテスト`,
+    answer: `// api.test.js
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { getUser } from './api.js';
+
+// グローバルfetchをモック
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
+
+beforeEach(() => {
+  mockFetch.mockReset();
+});
+
+describe('getUser', () => {
+  it('正常時はユーザオブジェクトを返す', async () => {
+    const mockUser = { id: 1, name: '太郎' };
+
+    // fetch → res.json() の連鎖をモック
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(mockUser)
+    });
+
+    const user = await getUser(1);
+
+    expect(user).toEqual(mockUser);
+    expect(mockFetch).toHaveBeenCalledWith('/api/users/1');
+  });
+
+  it('HTTPエラー時は例外をthrowする', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404 });
+
+    await expect(getUser(999)).rejects.toThrow('HTTP 404');
+  });
+
+  it('ネットワークエラー時は例外を伝播する', async () => {
+    mockFetch.mockRejectedValue(new Error('Network Error'));
+
+    await expect(getUser(1)).rejects.toThrow('Network Error');
+  });
+});`
+  }],
+  ch8: [{
+    diff: 2,
+    q: "Vite プロジェクトのセットアップを行い、ESLint + Prettier を設定してください。\n以下の ESLint ルールを有効にすること:\n・no-unused-vars, no-console（warn）, eqeqeq\npackage.json に lint と format スクリプトを追加すること。",
+    code: `# Vite プロジェクト作成
+npm create vite@latest my-app -- --template vanilla
+
+# ESLint + Prettier のインストールと設定`,
+    answer: `# 1. Vite プロジェクト作成
+npm create vite@latest my-app -- --template vanilla
+cd my-app && npm install
+
+# 2. ESLint + Prettier のインストール
+npm install --save-dev eslint prettier eslint-config-prettier eslint-plugin-prettier @eslint/js
+
+# 3. eslint.config.js
+# import js from '@eslint/js';
+# import prettier from 'eslint-config-prettier';
+# export default [
+#   js.configs.recommended,
+#   prettier,
+#   {
+#     rules: {
+#       'no-unused-vars': 'error',
+#       'no-console': 'warn',
+#       'eqeqeq': ['error', 'always'],
+#     }
+#   }
+# ];
+
+# 4. .prettierrc
+# { "semi": true, "singleQuote": true, "tabWidth": 2, "printWidth": 100 }
+
+# 5. package.json scripts
+# "lint": "eslint src/",
+# "lint:fix": "eslint src/ --fix",
+# "format": "prettier --write src/",
+# "format:check": "prettier --check src/"
+
+# 6. 実行
+# npm run lint      → ルール違反を報告
+# npm run format    → コードを自動整形`
+  }, {
+    diff: 2,
+    q: "TypeScript の基礎を使って、Todoアプリの型定義ファイルを作成してください。\n・Todo, CreateTodoInput, UpdateTodoInput インターフェース\n・TodoStore クラスに型アノテーションを付与\n・ジェネリクスを使った Result<T, E> 型も定義してください。",
+    code: `// types.ts — 型定義
+// TodoStore.ts — 型安全なTodoStore
+
+interface Todo {
+  // id, title, done, createdAt を定義
+}
+
+// Result型（成功/失敗を型で表現）
+type Result<T, E = Error> = // ...`,
+    answer: `// types.ts
+interface Todo {
+  readonly id: number;
+  title: string;
+  done: boolean;
+  readonly createdAt: Date;
+}
+
+interface CreateTodoInput {
+  title: string;
+}
+
+interface UpdateTodoInput {
+  title?: string;
+  done?: boolean;
+}
+
+// Result型: 成功/失敗を型で表現（RustのResult<T,E>と同じ思想）
+type Result<T, E = Error> =
+  | { ok: true; value: T }
+  | { ok: false; error: E };
+
+// TodoStore.ts
+class TodoStore {
+  private todos: Todo[] = [];
+  private nextId: number = 1;
+
+  add(input: CreateTodoInput): Result<Todo> {
+    if (!input.title.trim()) {
+      return { ok: false, error: new Error('タイトルは必須') };
+    }
+    const todo: Todo = {
+      id: this.nextId++,
+      title: input.title.trim(),
+      done: false,
+      createdAt: new Date()
+    };
+    this.todos.push(todo);
+    return { ok: true, value: todo };
+  }
+
+  list(): readonly Todo[] { return this.todos; }
+
+  toggle(id: number): Result<Todo> {
+    const todo = this.todos.find(t => t.id === id);
+    if (!todo) return { ok: false, error: new Error(\`id=\${id} not found\`) };
+    todo.done = !todo.done;
+    return { ok: true, value: todo };
+  }
+}
+
+// 使用例
+const store = new TodoStore();
+const result = store.add({ title: '型安全なTodo' });
+if (result.ok) {
+  console.log(result.value.title); // TypeScriptが型を保証
+}`
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "非同期処理の深化",
+  est: "55分",
+  goal: "Promise.all / allSettled / race / any の使い分けを理解し、async/await でのエラーハンドリングを適切に行えるようになる。並行実行と逐次実行の使い分けを判断できるようになり、PythonのasyncioとEventLoopの違いを説明できる状態がゴール。",
+  sections: [{
+    title: "Promise コンビネータ — all / allSettled / race / any",
+    body: "JavaScript の非同期処理では、複数のPromiseを同時に扱うシーンが頻出します。「全てのAPIレスポンスを待つ」「最初に完了したものを使う」「全て試みてから成否を判断する」—それぞれに対応するのが Promise のコンビネータメソッドです。\n\nPython の asyncio.gather() は Promise.all に最も近いですが、JavaScript には gather に相当するものが4種類あります。Promise.all は一つでも失敗すると即座に reject するため、全て成功することが前提のケースで使います。Promise.allSettled は全てが決着するまで待ち、成功・失敗を問わず結果を収集するため、「できる限り多くのAPIを叩いて、成功したものだけを使う」ケースに向いています。",
+    table: T.promiseMethods,
+    afterTable: "Promise.any は全てが reject した場合に AggregateError を投げます。これは複数の CDN から同じリソースを取得し、最初に成功したものを使う「フォールバック」パターンでよく使われます。Promise.race との違いは、race は最初に決着した（成功でも失敗でも）ものを返す点です。"
+  }, {
+    title: "async/await のエラーハンドリングパターン",
+    body: "async/await を使うと非同期コードが同期的に見えますが、エラーハンドリングには注意が必要です。try/catch で囲まずに await すると、Promiseのrejectがキャッチされずに「UnhandledPromiseRejection」になります。Node.js 15以降ではこれがプロセスをクラッシュさせるため、実務では必ず適切なエラーハンドリングが必要です。\n\nPython の asyncio では try/except を使いますが、JavaScript の try/catch と同じ構造です。ただし、ループ内で複数のawaitを使う際は「どのawaitが失敗したのか」を把握する必要があり、必要に応じて個別にtry/catchを設けます。エラーを伝播させる場合は throw で再スローします。",
+    code: `// ❌ エラーをキャッチしていない
+async function bad() {
+  const data = await fetch('/api/data'); // rejectが伝播
+  return data.json();
+}
+
+// ✅ 個別にハンドリング
+async function good() {
+  let userData;
+  try {
+    userData = await fetchUser();
+  } catch (e) {
+    // ユーザ取得失敗時のフォールバック
+    userData = { name: '匿名', role: 'guest' };
+  }
+
+  // userData が確実に存在する状態でここに到達
+  const posts = await fetchPosts(userData.id);
+  return { user: userData, posts };
+}
+
+// Promise.allSettled でまとめてハンドリング
+async function fetchAll(ids) {
+  const results = await Promise.allSettled(
+    ids.map(id => fetchUser(id))
+  );
+  return results
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value);
+}`,
+    afterCode: "実務でよく使うパターン: Promise.allSettled で複数のAPIを叩き、成功したものだけを使う。一部のAPIが落ちていてもアプリ全体が止まらないように設計する「グレースフルデグレデーション」の基本です。"
+  }, {
+    title: "並行実行 vs 逐次実行",
+    body: "async/await を使うとき、最も多い性能上のミスは「並行できる処理を逐次実行してしまう」ことです。for ループの中で await すると、各処理が終わるのを待ってから次を始める逐次実行になります。一方、Promise.all に渡せば全て同時に開始できます。\n\nPython の asyncio も同じ問題を持っており、asyncio.gather() を使わずに await を連続で書くと逐次になります。独立した処理（互いに依存しないAPIコール等）は並行化すべきですが、前の結果が次に必要な場合（ユーザIDを取得してからそのユーザの投稿を取得する等）は逐次でなければなりません。",
+    code: `// ❌ 逐次実行（遅い）— 各await完了を待ってから次へ
+async function sequential(userIds) {
+  const users = [];
+  for (const id of userIds) {
+    users.push(await fetchUser(id)); // 1つずつ順番に
+  }
+  return users; // 全体で sum(各処理時間)
+}
+
+// ✅ 並行実行（速い）— 全て同時に開始
+async function parallel(userIds) {
+  const users = await Promise.all(
+    userIds.map(id => fetchUser(id)) // 全て同時に開始
+  );
+  return users; // 全体で max(各処理時間)
+}
+
+// ✅ 依存関係がある場合は逐次が正しい
+async function dependent(userId) {
+  const user = await fetchUser(userId);     // まずユーザを取得
+  const posts = await fetchPosts(user.id);  // 次にその人の投稿
+  return { user, posts };
+}`,
+    afterCode: "目安: 3つのAPIコールが各100ms かかる場合、逐次なら300ms、並行なら100ms で完了します。独立した複数の非同期処理は Promise.all でまとめるのが基本です。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "クロージャとスコープ",
+  est: "50分",
+  goal: "レキシカルスコープと実行コンテキストの仕組みを理解し、クロージャが「変数を閉じ込める」原理を説明できるようになる。メモ化・カリー化・モジュールパターンなどクロージャの実用パターンを実装できるようになることがゴール。",
+  sections: [{
+    title: "レキシカルスコープと実行コンテキスト",
+    body: "JavaScript のスコープはレキシカル（静的）スコープです。これは「関数がどこで定義されたか」によってスコープが決まる仕組みで、Python も同じ方式を採用しています。関数は定義された時点の外側スコープにある変数にアクセスできます。\n\nクロージャとは、関数が自分が定義されたレキシカルスコープへの参照を保持し続ける仕組みです。外側の関数が返った後も、内側の関数は外側の変数にアクセスし続けられます。Python で `def outer(): x = 1; def inner(): return x; return inner` のように書くのと完全に同じ概念です。この「状態をカプセル化する」性質がクロージャの最大の価値です。",
+    code: `function makeCounter(start = 0) {
+  let count = start; // クロージャに閉じ込められる変数
+
+  return {
+    increment() { return ++count; },
+    decrement() { return --count; },
+    value() { return count; },
+    reset() { count = start; }
+  };
+}
+
+const counter = makeCounter(10);
+console.log(counter.increment()); // 11
+console.log(counter.increment()); // 12
+console.log(counter.value());     // 12
+counter.reset();
+console.log(counter.value());     // 10
+
+// count は外から直接アクセスできない（真のプライベート状態）
+// console.log(counter.count); // undefined`,
+    afterCode: "Python では class を使ってプライベート状態を管理しますが、JavaScript ではクロージャで同じことが実現できます。class の #プライベートフィールド（ES2022）が登場する前は、このクロージャパターンがプライベート状態の主要な実装方法でした。"
+  }, {
+    title: "クロージャの実用パターン",
+    body: "クロージャは「関数ファクトリ」として活用できます。同じ構造を持ちながら一部の設定だけが異なる関数を動的に生成したいとき、クロージャを使えばコードの重複を避けられます。Python の functools.partial が最も近い概念ですが、クロージャはより柔軟です。\n\nもう一つの重要なパターンが「一度だけ実行」です。once(fn) という関数を作ると、fn を最初の呼び出しでのみ実行し、以降は同じ結果を返すようにできます。初期化処理やイベントリスナーの登録など、「何度呼ばれても1回しか実行したくない」ケースで役立ちます。",
+    table: T.closurePatterns,
+    afterTable: "メモ化はクロージャの代表的な応用です。純粋関数（同じ入力に対して常に同じ出力を返す関数）にだけ適用できます。副作用のある関数にメモ化を適用すると、副作用が2回目以降スキップされてバグになります。Pythonの @functools.lru_cache と同じ制約です。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "プロトタイプとクラス",
+  est: "50分",
+  goal: "プロトタイプチェーンの仕組みを理解し、class 構文がプロトタイプの上に成り立つ「シンタックスシュガー」であることを説明できる。継承・super・Mixin パターンを使いこなせるようになることがゴール。",
+  sections: [{
+    title: "プロトタイプチェーンの仕組み",
+    body: "JavaScript のオブジェクト指向はプロトタイプベースです。Python のクラスベースとは根本的に異なり、オブジェクトが「プロトタイプ」と呼ばれる別のオブジェクトへの参照を持ち、プロパティ探索時にその連鎖（プロトタイプチェーン）を辿ります。プロパティが見つからなければ、プロトタイプのプロトタイプへと辿り、Object.prototype に至ります。\n\nES6 の class 構文はこのプロトタイプチェーンを使いやすく書けるようにした「シンタックスシュガー」です。裏では new キーワードでオブジェクトを作り、prototype にメソッドを配置する同じ仕組みが動いています。Python の class とは見た目が似ていますが、動く仕組みが根本的に違うことを理解しておくと、JavaScript 特有の挙動（prototype chain、instanceof、Object.create）に惑わされなくなります。",
+    code: `// プロトタイプチェーンの直接操作（理解のために）
+function Animal(name) {
+  this.name = name;
+}
+Animal.prototype.speak = function() {
+  return \`\${this.name} が鳴く\`;
+};
+
+// class 構文（同じことをより分かりやすく書く）
+class AnimalClass {
+  constructor(name) { this.name = name; }
+  speak() { return \`\${this.name} が鳴く\`; }
+}
+
+// 実体は同じプロトタイプチェーン
+const a = new AnimalClass('イヌ');
+console.log(a.speak()); // a には speak プロパティはない
+// → a.__proto__（=AnimalClass.prototype）にあるspeakを使う
+console.log(Object.getPrototypeOf(a) === AnimalClass.prototype); // true`,
+    afterCode: "Object.getPrototypeOf(obj) でプロトタイプを取得できます。__proto__ プロパティも同じですが、標準では Object.getPrototypeOf() を使うのが推奨です。"
+  }, {
+    title: "class 構文、継承、Mixin",
+    body: "ES6 以降の class 構文は extends でサブクラスを作れます。Python の class Dog(Animal) に対応するのが class Dog extends Animal です。super() で親クラスのコンストラクタを、super.method() で親のメソッドを呼び出せる点も Python と同じです。\n\nJavaScript は単一継承（1つの親クラスしか持てない）ですが、Mixin パターンを使うと複数のクラスから機能を混ぜ込む多重継承的な挙動を実現できます。Mixin は「クラスを受け取り、新しいクラスを返す関数」として実装します。Python の多重継承（class C(A, B)）とは実装が異なりますが、目的は同じです。",
+    table: T.protoVsClass,
+    afterTable: "ES2022 で導入された # プライベートフィールドは、真のプライベートを実現します。クラス外からアクセスしようとすると SyntaxError になります。Python の name mangling（__prefix）が慣習的なプライベートなのに対し、JavaScript の # は言語レベルで強制されます。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "Iterator とジェネレータ",
+  est: "50分",
+  goal: "Iterable/Iterator プロトコルを理解し、Symbol.iterator を実装してカスタムイテラブルを作れるようになる。ジェネレータ関数（function*）と yield を使って遅延評価・無限シーケンス・非同期ジェネレータを実装できることがゴール。",
+  sections: [{
+    title: "Iterable / Iterator プロトコル",
+    body: "Python の for ループは __iter__ と __next__ を実装したオブジェクトで動きます。JavaScript の for...of も同じ仕組みで、Symbol.iterator メソッドと next() メソッドを持つオブジェクトで動作します。この取り決めを「Iterable/Iterator プロトコル」と呼びます。\n\n配列・文字列・Map・Set・NodeList などの組み込みオブジェクトはすでに Iterable です。自分で Symbol.iterator を実装すると、for...of やスプレッド構文（...）、分割代入（[a, b] = obj）でそのオブジェクトを使えるようになります。",
+    table: T.iterProtocol,
+    afterTable: "for...of は Symbol.iterator を使います。for...in は全く別の仕組みで、オブジェクトの enumerable なキー（プロトタイプチェーン含む）を列挙します。Pythonにはfor...inしかないため、JavaScriptの2種類のforループを混同しないよう注意してください。"
+  }, {
+    title: "ジェネレータ関数",
+    body: "ジェネレータは Iterable と Iterator を同時に実装したオブジェクトをシンプルに作れる仕組みです。function* キーワードで定義し、yield で値を「一時停止して返す」ことができます。Python の yield を使ったジェネレータと概念は全く同じです。\n\n最大の特徴は「遅延評価」です。next() が呼ばれるまで次の値を計算しないため、無限シーケンスをメモリ効率良く扱えます。Python で `def fib(): a,b=0,1; while True: yield a; a,b=b,a+b` と書くのと完全に同じ発想です。非同期ジェネレータ（async function*）を使えば、for await...of でページネーション付きAPIの結果を順次処理するなどの非同期ストリーム処理が書けます。",
+    code: `// ジェネレータの基本
+function* range(start, end, step = 1) {
+  for (let i = start; i <= end; i += step) {
+    yield i; // ここで一時停止、next()で再開
+  }
+}
+
+console.log([...range(1, 5)]);    // [1,2,3,4,5]
+console.log([...range(0, 10, 3)]); // [0,3,6,9]
+
+// Pythonとの比較
+// Python: def range_gen(s,e,step=1): ...yield i
+// JS:     function* range(s,e,step=1) { ...yield i }
+
+// ジェネレータは遅延評価 → 無限シーケンスでもOK
+function* naturals() {
+  let n = 0;
+  while (true) yield n++;
+}
+
+const gen = naturals();
+console.log(gen.next().value); // 0
+console.log(gen.next().value); // 1`,
+    afterCode: "yield* 式を使うと別のジェネレータに処理を委譲できます。yield* otherGen() と書くと、otherGen のすべての値を自分のジェネレータから yield するのと同等になります。Pythonの yield from と同じです。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "モジュールシステム",
+  est: "45分",
+  goal: "ES Modules の import/export/動的インポートを完全に使いこなし、CommonJS との違いを説明できるようになる。Tree Shaking の仕組みを理解し、バレルファイルやライブラリ公開のベストプラクティスを実装できることがゴール。",
+  sections: [{
+    title: "ES Modules — 静的解析と Tree Shaking",
+    body: "ES Modules（ESM）の最大の強みは「静的解析可能」であることです。import 文は必ずファイルのトップレベルに書かなければならず、if 文の中や関数内には書けません。この制約によって、バンドラ（Vite・Rollup・webpack）がコードを実行せずに依存グラフを解析し、実際に使われているコードだけをバンドルに含める「Tree Shaking」が実現できます。\n\nCommonJS の require() は動的なので `const lib = condition ? require('a') : require('b')` が書けますが、静的解析できないためバンドル最適化が難しくなります。Python の import 文もトップレベルに書くのが慣例ですが、実行時に遅延インポートする importlib.import_module() は Python での動的インポートに相当します。",
+    table: T.moduleCompare,
+    afterTable: "動的インポート import() は関数として呼び出し、Promiseを返します。コード分割（Code Splitting）やルートベースの遅延ロードに使います。Viteなどのバンドラは動的インポートを検出して、自動的に別チャンクに分割します。"
+  }, {
+    title: "名前付きエクスポートとデフォルトエクスポート",
+    body: "ESM には「named export」と「default export」の2種類があります。named export は export function foo() / export const bar = ... のように複数定義でき、import { foo, bar } from './module.js' で受け取ります。default export は1ファイルに1つだけで、import anything from './module.js' のように任意の名前で受け取れます。\n\nライブラリの設計では named export を中心にするのが推奨されています。named export は使う側が何を使っているか明示的になり、Tree Shaking も効きやすいからです。default export は React コンポーネントなど「このファイルの主役」1つだけを公開するときに使います。Python の __all__ でモジュールの公開APIを制限する発想に近いのが、named export で公開するものを明示するアプローチです。",
+    code: `// math.js — named export が中心
+export const PI = 3.14159;
+export function add(a, b) { return a + b; }
+export function subtract(a, b) { return a - b; }
+export default add; // おまけのdefault
+
+// 使う側
+import add, { PI, subtract } from './math.js';
+// ↑ named と default を同時にインポート
+
+// バレルファイル (index.js) — ライブラリの公開API入口
+export { add, subtract, PI } from './math.js';
+export { unique, groupBy } from './array.js';
+// → import { add, unique } from './mylib/index.js' で使える
+
+// 動的インポート
+const button = document.getElementById('load');
+button.onclick = async () => {
+  // クリックされたときだけモジュールをロード
+  const { heavyCalc } = await import('./heavy.js');
+  heavyCalc();
+};`,
+    afterCode: "「バレルファイル」はディレクトリの index.js として配置し、複数モジュールをまとめて re-export するファイルです。ライブラリの内部構造を外部に露出させずに済むメリットがありますが、巨大なバレルファイルはTree Shakingを妨げる場合があるため注意が必要です。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "関数型プログラミング",
+  est: "50分",
+  goal: "純粋関数・不変性・高階関数の考え方を理解し、副作用を適切に分離したコードを書けるようになる。compose/pipe による関数合成、カリー化・部分適用を実装し、Pythonのfunctoolsとの対応関係を把握することがゴール。",
+  sections: [{
+    title: "純粋関数と不変性",
+    body: "関数型プログラミング（FP）の中心的な考え方は「純粋関数」と「不変性」です。純粋関数は同じ入力に対して常に同じ出力を返し、外部の状態を変更しない（副作用がない）関数です。テストが簡単で、並行処理でも安全で、キャッシュ（メモ化）も効きます。\n\n不変性は「一度作ったデータを変更しない」原則です。配列を変更する代わりに新しい配列を返す、オブジェクトを変更する代わりにスプレッド構文（{...obj, key: newValue}）で新オブジェクトを作る、というスタイルです。Python の tuple や frozenset が不変データの例ですが、JavaScript では Object.freeze() や配列の非破壊メソッド（map/filter/reduce）を使います。Reactの状態管理やReduxが「状態を直接変更しない」設計になっているのも、この不変性の原則からきています。",
+    table: T.fpConcepts,
+    afterTable: "Array の破壊的メソッド（push/pop/sort/splice）と非破壊メソッド（map/filter/reduce/slice）の区別は重要です。FPスタイルでは非破壊メソッドを中心に使い、破壊的操作は必要最小限にとどめます。"
+  }, {
+    title: "高階関数と関数合成",
+    body: "高階関数は「関数を引数に取る」または「関数を返す」関数です。JavaScript の Array.prototype.map / filter / reduce は典型的な高階関数で、Python の map() / filter() / functools.reduce() に対応します。これらを組み合わせて宣言的なデータ変換パイプラインを書けます。\n\n関数合成（compose/pipe）はFPの強力な道具です。f(g(h(x))) のような入れ子構造を、pipe(h, g, f)(x) のように線形に書けるようにします。Unixのパイプ（ls | grep | sort）に似た発想で、データが左から右に流れる様子が分かりやすいのが pipe の利点です。Python では functools.reduce(lambda f,g: lambda x: f(g(x)), fns) で同じことができますが、JavaScriptでは reduce が配列のメソッドとして自然に書けます。",
+    code: `// 高階関数を使ったデータ変換パイプライン
+const users = [
+  { name: '太郎', age: 25, active: true },
+  { name: '花子', age: 17, active: false },
+  { name: '次郎', age: 30, active: true }
+];
+
+const result = users
+  .filter(u => u.active)          // アクティブユーザのみ
+  .filter(u => u.age >= 20)       // 成人のみ
+  .map(u => ({ ...u, label: \`\${u.name}(\${u.age})\` })) // 整形
+  .sort((a, b) => a.age - b.age); // 年齢順ソート
+
+// Pythonとの比較:
+// [{'label': ...} for u in users if u['active'] and u['age'] >= 20]
+// Python: list comprehension が読みやすいことも多い
+
+// reduce でオブジェクトを集計
+const ageSum = users.reduce((sum, u) => sum + u.age, 0);
+console.log(ageSum); // 72`,
+    afterCode: "JavaScript の reduce は Python の functools.reduce と同じですが、初期値（第2引数）を省略できる点が違います。空配列で初期値なしの reduce は TypeError になるため、常に初期値を渡す習慣をつけましょう。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "テスト",
+  est: "50分",
+  goal: "Vitest / Jest の基本的な使い方を理解し、テストを書く習慣を身に付ける。モック・スタブ・スパイの違いを説明し使い分けられるようになること。純粋関数・副作用のある関数それぞれの適切なテスト戦略を選択できることがゴール。",
+  sections: [{
+    title: "Vitest / Jest の基本構造",
+    body: "JavaScript のテストフレームワークとして長年使われてきた Jest と、Vite エコシステム向けに作られた Vitest があります。API はほぼ互換性があり、vitest は jest の置き換えとして使えます。どちらも Python の pytest に近い構造—describe でグループ化、it/test で個別テストケース、expect でアサーション—を持ちます。\n\nPython の pytest では `assert` 文を使いますが、JavaScript では `expect(actual).toBe(expected)` のように「期待値を先にラップしてからマッチャーを呼ぶ」スタイルです。Pytest のフィクスチャに相当するのが beforeEach / afterEach フックで、各テストの前後に実行されるセットアップ・クリーンアップ処理を書きます。",
+    code: `// counter.js
+export function counter(init = 0) {
+  let n = init;
+  return { inc: () => ++n, dec: () => --n, val: () => n };
+}
+
+// counter.test.js
+import { describe, it, expect, beforeEach } from 'vitest';
+import { counter } from './counter.js';
+
+describe('counter', () => {
+  let c;
+  beforeEach(() => { c = counter(0); }); // 各テスト前にリセット
+
+  it('初期値が正しい', () => {
+    expect(c.val()).toBe(0);
+  });
+
+  it('incで1増える', () => {
+    c.inc();
+    expect(c.val()).toBe(1);
+  });
+
+  it('初期値を指定できる', () => {
+    const c10 = counter(10);
+    expect(c10.val()).toBe(10);
+    expect(c10.dec()).toBe(9);
+  });
+});
+
+// 実行: npx vitest run
+//       npx vitest       ← watch mode（ファイル変更で自動再実行）`,
+    afterCode: "Vitest の watch モードは pytest の --watch に相当します。ファイルを保存するたびに関連テストが自動実行されるため、TDD（テスト駆動開発）との相性が抜群です。"
+  }, {
+    title: "モック・スタブ・スパイ",
+    body: "テストの難しさの多くは「外部依存」から来ます。データベース・API・ファイルシステムを使う関数をそのままテストすると、遅くなり環境依存にもなります。この問題を解決するのがモック・スタブ・スパイです。\n\nPython の pytest-mock の mocker.patch() に対応するのが Vitest の vi.mock() です。モジュール全体を差し替える vi.mock()、特定の関数だけ差し替える vi.fn()、実際の実装は使いつつ呼び出しを記録する vi.spyOn() と使い分けます。テストダブル（モック類の総称）は「本物と同じインターフェースを持つ偽物」であることが重要で、正しく設計すれば本番コードを変更せずにテストの信頼性を高められます。",
+    table: T.testTypes,
+    afterTable: "テストダブルの使いすぎには注意が必要です。モックが多すぎると「テストが通るがモックの設定が間違っているだけ」という状態になりやすいです。純粋関数はモック不要でテストできるので、コードを純粋関数中心に設計すると自然にテストしやすくなります。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "ツールチェーンとビルド",
+  est: "45分",
+  goal: "Vite を使って開発環境を素早くセットアップし、ESLint / Prettier でコード品質を自動管理できるようになる。TypeScript の型定義の基本を理解し、型安全なコードを書き始められる状態になることがゴール。",
+  sections: [{
+    title: "Vite — モダンなビルドツール",
+    body: "Vite（ヴィート）は Evan You（Vue.js の作者）が開発したビルドツールで、ESM の特性を活かした超高速な開発サーバと、Rollup ベースの本番ビルドを提供します。Python の Flask 開発サーバ + gunicorn 本番サーバの関係に近いですが、Vite はフロントエンド向けです。\n\n従来の webpack は起動時に全ファイルをバンドルしてから開発サーバを立ち上げていたため、プロジェクトが大きくなるほど起動が遅くなりました。Vite はブラウザのネイティブ ESM を使い、必要なファイルだけをオンデマンドで変換するため、プロジェクトサイズに関わらず起動が即座です。ファイル変更時のホットリロード（HMR）も高速で、開発体験が大幅に向上しています。",
+    code: `# Vite プロジェクト作成（フレームワーク別に選べる）
+npm create vite@latest my-app -- --template vanilla    # プレーンJS
+npm create vite@latest my-app -- --template react      # React
+npm create vite@latest my-app -- --template vanilla-ts # TypeScript
+
+cd my-app
+npm install
+npm run dev   # 開発サーバ起動（即座に立ち上がる）
+
+# vite.config.js（設定ファイル）
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  server: {
+    port: 5173,
+    proxy: {
+      // API を別サーバにプロキシ
+      '/api': 'http://localhost:3000'
+    }
+  },
+  build: {
+    outDir: 'dist',    // 本番ビルドの出力先
+    sourcemap: true    // ソースマップを生成
+  }
+});`,
+    afterCode: "npm run build で本番用ファイルが dist/ に生成されます。JS は minify・バンドルされ、Tree Shaking で使われていないコードが除去されます。生成物は静的ファイルなので、GitHub Pages・Vercel・Netlify に即デプロイできます。"
+  }, {
+    title: "TypeScript 基礎 — 型安全なJavaScript",
+    body: "TypeScript は JavaScript に静的型付けを追加した言語で、Python の型アノテーション + mypy の組み合わせに近いポジションです。.ts 拡張子のファイルに型注釈を書き、tsc（TypeScript コンパイラ）または Vite がコンパイルして .js に変換します。実行時は通常の JavaScript なので、Node.js や ブラウザで追加の設定なく動きます。\n\nTypeScript の最大のメリットは「コードを書きながら型エラーに気づける」ことです。Python では mypy を別途実行しなければ型エラーが分からないことが多いですが、TypeScript では VS Code などのエディタが即座にエラーを表示します。既存の JavaScript コードに段階的に型を追加できる（allowJs オプション）ため、既存プロジェクトへの導入も容易です。",
+    table: T.buildTools,
+    afterTable: "TypeScript の型システムは非常に表現力が高く、Discriminated Union（直和型）・Mapped Types・Template Literal Types など高度な型も書けます。まずは基本的な型アノテーションとインターフェース定義から始め、徐々に高度な機能を覚えていくのが効率的です。"
+  }]
+}];
+
+/* ── UI Components ── */
+function DataTable({ data }) {
+  if (!data) return null;
+  const { h, r } = data;
+  return React.createElement('div', { style: { overflowX: 'auto', margin: '16px 0' } },
+    React.createElement('table', {
+      style: {
+        width: '100%', borderCollapse: 'collapse', fontSize: '13px',
+        fontFamily: "'JetBrains Mono', monospace"
+      }
+    },
+      React.createElement('thead', null,
+        React.createElement('tr', null,
+          h.map((col, i) => React.createElement('th', {
+            key: i,
+            style: {
+              background: '#f3f0ff', color: '#4c1d95', padding: '8px 12px',
+              textAlign: 'left', borderBottom: '2px solid #ddd6fe',
+              fontWeight: 700, fontSize: '12px', whiteSpace: 'nowrap'
+            }
+          }, col))
+        )
+      ),
+      React.createElement('tbody', null,
+        r.map((row, ri) => React.createElement('tr', {
+          key: ri,
+          style: { background: ri % 2 === 0 ? '#fff' : '#faf5ff' }
+        },
+          row.map((cell, ci) => React.createElement('td', {
+            key: ci,
+            style: {
+              padding: '7px 12px', borderBottom: '1px solid #ede9fe',
+              verticalAlign: 'top', lineHeight: '1.5', fontSize: '12.5px'
+            }
+          }, cell))
+        ))
+      )
+    )
+  );
+}
+
+function Code({ code }) {
+  if (!code) return null;
+  return React.createElement('pre', {
+    style: {
+      background: '#1e1b4b', color: '#e0e7ff', padding: '16px 20px',
+      borderRadius: '10px', overflowX: 'auto', fontSize: '13px',
+      lineHeight: '1.65', margin: '16px 0',
+      fontFamily: "'JetBrains Mono', monospace"
+    }
+  }, React.createElement('code', null, code));
+}
+
+function Exercise({ ex, chId }) {
+  const [open, setOpen] = useState(false);
+  const stars = '⭐'.repeat(ex.diff);
+  return React.createElement('div', {
+    style: {
+      border: '1.5px solid #ddd6fe', borderRadius: '12px',
+      marginBottom: '16px', overflow: 'hidden'
+    }
+  },
+    React.createElement('div', {
+      style: {
+        background: '#f5f3ff', padding: '14px 18px',
+        display: 'flex', alignItems: 'center', gap: '10px'
+      }
+    },
+      React.createElement('span', {
+        style: { fontSize: '13px', color: '#7c3aed', fontWeight: 700 }
+      }, stars),
+      React.createElement('span', {
+        style: { fontSize: '14px', whiteSpace: 'pre-wrap', flex: 1 }
+      }, ex.q)
+    ),
+    React.createElement('div', { style: { padding: '0 18px 4px' } },
+      React.createElement(Code, { code: ex.code })
+    ),
+    React.createElement('div', { style: { padding: '0 18px 14px' } },
+      React.createElement('button', {
+        onClick: () => setOpen(o => !o),
+        style: {
+          background: open ? '#7c3aed' : '#ede9fe', color: open ? '#fff' : '#4c1d95',
+          border: 'none', borderRadius: '8px', padding: '7px 16px',
+          cursor: 'pointer', fontSize: '13px', fontWeight: 600, transition: 'all 0.15s'
+        }
+      }, open ? '▲ 回答を隠す' : '▼ 回答を見る'),
+      open && React.createElement(Code, { code: ex.answer })
+    )
+  );
+}
+
+function Section({ sec, chId }) {
+  const [open, setOpen] = useState(false);
+  return React.createElement('div', {
+    style: {
+      border: '1px solid #e5e7eb', borderRadius: '12px',
+      marginBottom: '10px', overflow: 'hidden'
+    }
+  },
+    React.createElement('button', {
+      onClick: () => setOpen(o => !o),
+      style: {
+        width: '100%', textAlign: 'left', background: open ? '#f5f3ff' : '#fff',
+        border: 'none', padding: '14px 20px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        cursor: 'pointer', fontSize: '15px', fontWeight: 700, color: '#1e1b4b',
+        transition: 'background 0.15s'
+      }
+    },
+      React.createElement('span', null, sec.title),
+      React.createElement('span', {
+        style: {
+          fontSize: '18px', color: '#7c3aed',
+          transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s'
+        }
+      }, '▾')
+    ),
+    open && React.createElement('div', { style: { padding: '6px 24px 20px' } },
+      React.createElement('p', {
+        style: {
+          fontSize: '14.5px', lineHeight: '1.85', color: '#374151',
+          whiteSpace: 'pre-wrap', margin: '12px 0'
+        }
+      }, sec.body),
+      sec.table && React.createElement(DataTable, { data: sec.table }),
+      sec.afterTable && React.createElement('p', {
+        style: {
+          fontSize: '13.5px', lineHeight: '1.8', color: '#6b7280',
+          background: '#faf5ff', borderLeft: '3px solid #8b5cf6',
+          padding: '10px 14px', borderRadius: '0 8px 8px 0', margin: '8px 0 16px'
+        }
+      }, sec.afterTable),
+      sec.code && React.createElement(Code, { code: sec.code }),
+      sec.afterCode && React.createElement('p', {
+        style: {
+          fontSize: '13.5px', lineHeight: '1.8', color: '#6b7280',
+          background: '#faf5ff', borderLeft: '3px solid #8b5cf6',
+          padding: '10px 14px', borderRadius: '0 8px 8px 0', margin: '8px 0'
+        }
+      }, sec.afterCode)
+    )
+  );
+}
+
+/* ── Main App ── */
+function JSIntermediateCourse() {
+  const [currentChIdx, setCurrentChIdx] = useState(0);
+  const ch = chapters[currentChIdx];
+  const exList = EX[ch.id] || [];
+  const isFirst = currentChIdx === 0;
+  const isLast = currentChIdx === chapters.length - 1;
+
+  return React.createElement('div', {
+    style: { background: 'linear-gradient(135deg,#f8f7ff 0%,#f3e8ff 100%)', minHeight: '100vh' }
+  },
+    /* Hero */
+    React.createElement('div', {
+      style: {
+        background: 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 50%,#9333ea 100%)',
+        color: '#fff', padding: '60px 20px 48px', textAlign: 'center'
+      }
+    },
+      React.createElement('div', { style: { maxWidth: 800, margin: '0 auto' } },
+        React.createElement('div', {
+          style: {
+            display: 'inline-block', background: 'rgba(255,255,255,0.2)',
+            borderRadius: '20px', padding: '4px 14px', fontSize: '12px',
+            fontWeight: 700, letterSpacing: '1px', marginBottom: '16px'
+          }
+        }, 'JavaScript 中級コース'),
+        React.createElement('h1', {
+          style: { fontSize: 'clamp(26px,5vw,44px)', fontWeight: 900, margin: '0 0 14px' }
+        }, 'JavaScript 中級'),
+        React.createElement('p', {
+          style: { fontSize: '15px', opacity: 0.9, lineHeight: 1.7, margin: '0 0 24px' }
+        }, '初級コースで Node.js と Express の基礎を身に付けた後、このコースでは JavaScript 言語そのものの深みを探求します。非同期処理の真髄・クロージャ・プロトタイプ・ジェネレータ・関数型プログラミング・テスト・ビルドツールを習得し、コードの「なぜ」を理解した上で設計できるエンジニアを目指します。Python との類似点・相違点を意識しながら学ぶことで、両言語の強みを使い分けられる実力を養います。'),
+        React.createElement('div', {
+          style: { display: 'flex', justifyContent: 'center', gap: '24px', flexWrap: 'wrap' }
+        },
+          [['📚', `${chapters.length} 章`], ['✏️', `${Object.values(EX).flat().length} 演習`], ['⏱', '約7時間']].map(([icon, label]) =>
+            React.createElement('div', {
+              key: label,
+              style: {
+                background: 'rgba(255,255,255,0.18)', borderRadius: '10px',
+                padding: '8px 20px', fontSize: '14px', fontWeight: 700
+              }
+            }, `${icon} ${label}`)
+          )
+        )
+      )
+    ),
+
+    /* Chapter Nav */
+    React.createElement('div', {
+      style: {
+        maxWidth: 1100, margin: '0 auto', padding: '24px 20px 0'
+      }
+    },
+      React.createElement('div', {
+        style: {
+          display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '24px'
+        }
+      },
+        chapters.map((c, i) => React.createElement('button', {
+          key: c.id,
+          onClick: () => setCurrentChIdx(i),
+          style: {
+            padding: '7px 14px', borderRadius: '20px', border: '1.5px solid',
+            borderColor: i === currentChIdx ? '#7c3aed' : '#ddd6fe',
+            background: i === currentChIdx ? '#7c3aed' : '#fff',
+            color: i === currentChIdx ? '#fff' : '#4c1d95',
+            cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+            transition: 'all 0.15s'
+          }
+        }, `${c.num}. ${c.title}`))
+      ),
+
+      /* Chapter Card */
+      React.createElement('div', {
+        style: {
+          background: '#fff', borderRadius: '16px',
+          boxShadow: '0 2px 20px rgba(99,102,241,0.08)', padding: '32px 28px', marginBottom: '24px'
+        }
+      },
+        React.createElement('div', {
+          style: { display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '20px' }
+        },
+          React.createElement('div', {
+            style: {
+              width: 44, height: 44, borderRadius: '12px', flexShrink: 0,
+              background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+              color: '#fff', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontWeight: 900, fontSize: '18px'
+            }
+          }, ch.num),
+          React.createElement('div', { style: { flex: 1 } },
+            React.createElement('h2', {
+              style: { fontSize: '22px', fontWeight: 800, color: '#1e1b4b', margin: '0 0 4px' }
+            }, ch.title),
+            React.createElement('span', {
+              style: {
+                fontSize: '12px', background: '#ede9fe', color: '#6d28d9',
+                borderRadius: '6px', padding: '2px 10px', fontWeight: 600
+              }
+            }, `⏱ ${ch.est}`)
+          )
+        ),
+
+        /* Goal Block */
+        React.createElement('div', {
+          style: {
+            background: 'linear-gradient(135deg,#f5f3ff,#ede9fe)',
+            border: '1.5px solid #c4b5fd', borderRadius: '12px',
+            padding: '14px 18px', marginBottom: '24px'
+          }
+        },
+          React.createElement('div', {
+            style: { fontSize: '12px', fontWeight: 800, color: '#5b21b6', marginBottom: '6px' }
+          }, '🎯 この章のゴール'),
+          React.createElement('p', {
+            style: { fontSize: '14px', lineHeight: '1.75', color: '#3b1b8e', margin: 0 }
+          }, ch.goal)
+        ),
+
+        /* Sections */
+        ch.sections.map((sec, si) =>
+          React.createElement(Section, { key: `${ch.id}-s${si}`, sec, chId: ch.id })
+        ),
+
+        /* Exercises */
+        exList.length > 0 && React.createElement('div', { style: { marginTop: '28px' } },
+          React.createElement('h3', {
+            style: {
+              fontSize: '17px', fontWeight: 800, color: '#1e1b4b',
+              margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px'
+            }
+          }, '✏️ 演習問題'),
+          exList.map((ex, ei) =>
+            React.createElement(Exercise, { key: `${ch.id}-ex${ei}`, ex, chId: ch.id })
+          )
+        ),
+
+        /* Chapter Nav Buttons */
+        React.createElement('div', {
+          style: {
+            display: 'flex', justifyContent: 'space-between',
+            marginTop: '32px', gap: '12px'
+          }
+        },
+          React.createElement('button', {
+            onClick: () => { if (!isFirst) setCurrentChIdx(i => i - 1); },
+            disabled: isFirst,
+            style: {
+              padding: '10px 24px', borderRadius: '10px',
+              border: '1.5px solid #ddd6fe',
+              background: isFirst ? '#f5f3ff' : '#fff',
+              color: isFirst ? '#a78bfa' : '#4c1d95',
+              cursor: isFirst ? 'default' : 'pointer',
+              fontWeight: 600, fontSize: '14px', transition: 'all 0.15s'
+            }
+          }, '← 前の章'),
+          isLast
+            ? React.createElement('a', {
+                href: '../index.html',
+                style: {
+                  padding: '10px 24px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg,#6366f1,#7c3aed)',
+                  color: '#fff', textDecoration: 'none',
+                  fontWeight: 700, fontSize: '14px', display: 'inline-flex',
+                  alignItems: 'center', gap: '6px'
+                }
+              }, '🎓 コース完了 — ホームへ')
+            : React.createElement('button', {
+                onClick: () => setCurrentChIdx(i => i + 1),
+                style: {
+                  padding: '10px 24px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg,#6366f1,#7c3aed)',
+                  color: '#fff', border: 'none',
+                  cursor: 'pointer', fontWeight: 700, fontSize: '14px',
+                  transition: 'all 0.15s'
+                }
+              }, '次の章 →')
+        )
+      ),
+
+      /* Footer */
+      React.createElement('footer', {
+        style: {
+          textAlign: 'center', padding: '24px', fontSize: '12px', color: '#9ca3af'
+        }
+      }, 'developer.mozilla.org ・ ECMAScript 2024 時点')
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  React.createElement(JSIntermediateCourse)
+);
+  </script>
+</body>
+</html>
