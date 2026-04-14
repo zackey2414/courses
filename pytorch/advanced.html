@@ -1,0 +1,1614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PyTorch 上級コース</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
+    button { font-family: inherit; }
+    #root { min-height: 100vh; padding-top: 56px; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; padding: 0 20px;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .site-header a.home-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
+      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
+    }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px;
+    }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+const { useState } = React;
+
+const T = {
+  parallelTypes: { h:["手法","説明","メモリ効率","通信オーバーヘッド"], r:[
+    ["DataParallel (DP)","1GPUがパラメータ保持、他にコピー","低（全パラメータを複製）","中（gather/scatter）"],
+    ["DistributedDataParallel (DDP)","各GPUが完全なコピーを保持、勾配のみ同期","中（全コピー）","低（勾配AllReduce）"],
+    ["Tensor Parallel","1つの行列を複数GPUに分割","高","高（行列演算ごと）"],
+    ["Pipeline Parallel","モデルをレイヤー単位で分割","高","中（マイクロバッチ）"],
+    ["FSDP","パラメータ・勾配・最適化状態を全GPUに分散","最高","中（AllGather）"],
+  ], cap:"PyTorch モデル並列化手法の比較" },
+  loraComp: { h:["手法","学習パラメータ","メモリ","精度","用途"], r:[
+    ["Full Fine-tuning","100%（全パラメータ）","非常に大","最高","GPU豊富な場合"],
+    ["LoRA","~0.1〜1%","小","高","一般的な推奨"],
+    ["QLoRA","~0.1〜1%","最小（4bit量子化）","高","コンシューマGPU"],
+    ["Prefix Tuning","< 0.1%","小","中","プロンプト最適化"],
+    ["Adapter","~1〜3%","小","高","モジュラー学習"],
+  ], cap:"PEFTメソッド比較（LLMファインチューニング）" },
+  compileBackend: { h:["バックエンド","説明","最適な環境"], r:[
+    ["inductor（デフォルト）","TorchInductor経由でCPU/GPU向けTrilonコード生成","NVIDIA GPU全般"],
+    ["aot_eager","AOT Autogradのみ、JITなし","デバッグ・MPS"],
+    ["cudagraphs","CUDAグラフで繰り返しカーネルをキャプチャ","固定サイズバッチ"],
+    ["onnxrt","ONNX Runtime経由","CPU推論・クロスプラットフォーム"],
+  ], cap:"torch.compile バックエンド一覧" },
+  quantTypes: { h:["手法","ビット幅","精度低下","速度向上","対応ライブラリ"], r:[
+    ["FP32→FP16","16bit","ほぼなし","1.5〜2x","PyTorch amp"],
+    ["FP32→BF16","16bit","ほぼなし","1.5〜2x","PyTorch amp"],
+    ["Dynamic INT8","8bit","小","2〜3x","torch.quantization"],
+    ["Static INT8","8bit","小〜中","2〜4x","torch.quantization"],
+    ["GPTQ INT4","4bit","中","3〜5x","AutoGPTQ"],
+    ["NF4（QLoRA）","4bit（非線形）","小〜中","3〜5x","bitsandbytes"],
+  ], cap:"量子化手法の比較" },
+  ssmComp: { h:["モデル","種類","コンテキスト長","計算量","強み"], r:[
+    ["Transformer","Attention","制限あり（O(n²)）","O(n²)","並列学習・汎用性"],
+    ["Mamba（SSM）","状態空間モデル","原理的に無制限","O(n)","長系列・低メモリ"],
+    ["RWKV","RNN+Attention風","無制限","O(n)","推論効率"],
+    ["RetNet","Retention Mechanism","無制限","O(n)","並列+逐次両対応"],
+  ], cap:"次世代シーケンスモデルの比較" },
+};
+
+const EX = {
+ch1:[
+  {diff:2, q:"FSDPを使って大きなTransformerモデルを複数GPUに分散する基本的なセットアップコードを書け。auto_wrap_policyでTransformerLayerをラップせよ。",
+   code:`import torch
+import torch.distributed as dist
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+import torch.nn as nn
+import functools
+
+# TransformerLayerを定義
+class TransformerLayer(nn.Module):
+    def __init__(self, d_model=512):
+        super().__init__()
+        self.attn = nn.MultiheadAttention(d_model, 8, batch_first=True)
+        self.ff = nn.Sequential(nn.Linear(d_model, d_model*4), nn.ReLU(), nn.Linear(d_model*4, d_model))
+
+    def forward(self, x):
+        x2, _ = self.attn(x, x, x)
+        return self.ff(x + x2)
+
+# FSDPでラップするコードを完成させよ
+# dist.init_process_group(...)`,
+   answer:`import torch
+import torch.distributed as dist
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+import torch.nn as nn
+import functools
+
+class TransformerLayer(nn.Module):
+    def __init__(self, d_model=512):
+        super().__init__()
+        self.attn = nn.MultiheadAttention(d_model, 8, batch_first=True)
+        self.ff = nn.Sequential(nn.Linear(d_model, d_model*4), nn.ReLU(), nn.Linear(d_model*4, d_model))
+
+    def forward(self, x):
+        x2, _ = self.attn(x, x, x)
+        return self.ff(x + x2)
+
+class MyTransformer(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layers = nn.ModuleList([TransformerLayer() for _ in range(6)])
+        self.head = nn.Linear(512, 1000)
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
+        return self.head(x[:, 0])
+
+# マルチGPU環境でのFSDPセットアップ（疑似コード）
+# dist.init_process_group(backend="nccl")
+# rank = dist.get_rank()
+# torch.cuda.set_device(rank)
+
+wrap_policy = functools.partial(
+    transformer_auto_wrap_policy,
+    transformer_layer_cls={TransformerLayer}
+)
+
+model = MyTransformer()
+# FSDPでラップ（マルチGPU環境で実行）
+# model = FSDP(model, auto_wrap_policy=wrap_policy, device_id=rank)
+
+# シングルGPUでの動作確認
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
+x = torch.randn(2, 10, 512).to(device)
+out = model(x)
+print("Output shape:", out.shape)  # (2, 1000)
+print("Params:", sum(p.numel() for p in model.parameters()) / 1e6, "M")`},
+  {diff:3, q:"勾配チェックポイントを使ってメモリを節約する実装を行え。大きなMLPにcheckpoint_sequentialを適用し、通常の推論とメモリ使用量を比較せよ。",
+   code:`import torch
+import torch.nn as nn
+from torch.utils.checkpoint import checkpoint_sequential
+
+class BigMLP(nn.Module):
+    def __init__(self, layers=20, dim=2048):
+        super().__init__()
+        self.layers = nn.Sequential(*[
+            nn.Sequential(nn.Linear(dim, dim), nn.ReLU())
+            for _ in range(layers)
+        ])
+
+    def forward(self, x, use_checkpoint=False):
+        # use_checkpointがTrueならcheckpoint_sequentialを使う
+        pass`,
+   answer:`import torch
+import torch.nn as nn
+from torch.utils.checkpoint import checkpoint_sequential
+
+class BigMLP(nn.Module):
+    def __init__(self, layers=10, dim=1024):
+        super().__init__()
+        self.layers = nn.Sequential(*[
+            nn.Sequential(nn.Linear(dim, dim), nn.ReLU())
+            for _ in range(layers)
+        ])
+
+    def forward(self, x, use_checkpoint=False):
+        if use_checkpoint:
+            # セグメント数: 4分割でチェックポイント
+            return checkpoint_sequential(self.layers, segments=4, input=x)
+        return self.layers(x)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = BigMLP().to(device)
+x = torch.randn(32, 1024, requires_grad=True).to(device)
+
+# 通常のforward
+out1 = model(x, use_checkpoint=False)
+loss1 = out1.sum()
+loss1.backward()
+print("Normal forward OK, output shape:", out1.shape)
+
+# チェックポイントあり
+x2 = torch.randn(32, 1024, requires_grad=True).to(device)
+out2 = model(x2, use_checkpoint=True)
+loss2 = out2.sum()
+loss2.backward()
+print("Checkpoint forward OK, output shape:", out2.shape)
+# メモリ使用量はGPU環境でtorch.cuda.memory_allocated()で確認できる`},
+],
+ch2:[
+  {diff:2, q:"huggingface/peftライブラリを使ってLoRAをGPT-2に適用し、学習可能パラメータ数を全体の何%かを表示せよ。",
+   code:`# pip install peft transformers
+from transformers import GPT2LMHeadModel
+from peft import get_peft_model, LoraConfig, TaskType
+
+model = GPT2LMHeadModel.from_pretrained("gpt2")
+
+# LoRAConfig: rank=8, target_modules=["c_attn"]
+# get_peft_modelでラップ
+# trainable paramsの割合を計算`,
+   answer:`from transformers import GPT2LMHeadModel
+from peft import get_peft_model, LoraConfig, TaskType
+
+model = GPT2LMHeadModel.from_pretrained("gpt2")
+
+config = LoraConfig(
+    task_type=TaskType.CAUSAL_LM,
+    r=8,                        # LoRAランク
+    lora_alpha=16,              # スケーリング係数
+    target_modules=["c_attn"],  # 適用するモジュール
+    lora_dropout=0.1,
+    bias="none",
+)
+
+peft_model = get_peft_model(model, config)
+
+# 学習可能パラメータの確認
+trainable = sum(p.numel() for p in peft_model.parameters() if p.requires_grad)
+total     = sum(p.numel() for p in peft_model.parameters())
+print(f"Trainable: {trainable:,} / Total: {total:,}")
+print(f"Ratio: {100 * trainable / total:.2f}%")
+# → LoRAは全体の約0.1〜0.5%のみ学習する
+
+peft_model.print_trainable_parameters()`},
+  {diff:3, q:"LoRAの数学的動作を再現するミニ実装を書け。W0（フリーズ）にLoRA行列A・Bを追加し、forward時にW0 + α/r * B@Aを適用するカスタムLinear層を実装せよ。",
+   code:`import torch
+import torch.nn as nn
+
+class LoRALinear(nn.Module):
+    def __init__(self, in_features, out_features, r=4, alpha=8):
+        super().__init__()
+        # W0: フリーズされた元の重み
+        # A: (r, in_features) ランダム初期化
+        # B: (out_features, r) ゼロ初期化
+        pass
+
+    def forward(self, x):
+        # W0 @ x + (alpha/r) * B @ A @ x
+        pass`,
+   answer:`import torch
+import torch.nn as nn
+import math
+
+class LoRALinear(nn.Module):
+    def __init__(self, in_features, out_features, r=4, alpha=8):
+        super().__init__()
+        self.r = r
+        self.scale = alpha / r
+
+        # 元の重み（フリーズ）
+        self.W0 = nn.Parameter(torch.randn(out_features, in_features) * 0.01)
+        self.W0.requires_grad = False
+
+        # LoRA行列
+        self.A = nn.Parameter(torch.randn(r, in_features) / math.sqrt(in_features))
+        self.B = nn.Parameter(torch.zeros(out_features, r))
+
+    def forward(self, x):
+        # 元の出力 + LoRA補正
+        base = x @ self.W0.T
+        lora = x @ self.A.T @ self.B.T
+        return base + self.scale * lora
+
+# 動作確認
+layer = LoRALinear(64, 128, r=4, alpha=8)
+x = torch.randn(16, 64)
+out = layer(x)
+print("Output shape:", out.shape)  # (16, 128)
+
+# フリーズ確認
+frozen = [n for n, p in layer.named_parameters() if not p.requires_grad]
+trainable = [n for n, p in layer.named_parameters() if p.requires_grad]
+print("Frozen:", frozen)      # ['W0']
+print("Trainable:", trainable)  # ['A', 'B']`},
+],
+ch3:[
+  {diff:2, q:"torch.compileを使ってTransformerのforwardを最適化し、コンパイル前後の推論速度を比較せよ。warmupを考慮した正確な計測を行え。",
+   code:`import torch
+import torch.nn as nn
+import time
+
+model = nn.TransformerEncoder(
+    nn.TransformerEncoderLayer(d_model=512, nhead=8, batch_first=True),
+    num_layers=6
+).eval().to("cuda" if torch.cuda.is_available() else "cpu")
+
+x = torch.randn(8, 64, 512).to(next(model.parameters()).device)
+
+def benchmark(fn, x, n=20, warmup=5):
+    # warmupしてからn回計測
+    pass`,
+   answer:`import torch
+import torch.nn as nn
+import time
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+model = nn.TransformerEncoder(
+    nn.TransformerEncoderLayer(d_model=256, nhead=8, batch_first=True),
+    num_layers=4
+).eval().to(device)
+
+x = torch.randn(4, 32, 256).to(device)
+
+def benchmark(fn, x, n=20, warmup=5):
+    with torch.no_grad():
+        for _ in range(warmup):
+            fn(x)
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        for _ in range(n):
+            fn(x)
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+    return (time.perf_counter() - t0) / n * 1000  # ms
+
+eager_ms = benchmark(model, x)
+print(f"Eager: {eager_ms:.2f} ms")
+
+# torch.compile（PyTorch 2.x）
+compiled = torch.compile(model, backend="inductor")
+compile_ms = benchmark(compiled, x)
+print(f"Compiled: {compile_ms:.2f} ms")
+print(f"Speedup: {eager_ms/compile_ms:.2f}x")`},
+  {diff:3, q:"torch.compile の動作を torch._dynamo.explain() で調べ、グラフブレーク（graph break）が発生している箇所を特定せよ。Pythonのif分岐がある関数とない関数で比較せよ。",
+   code:`import torch
+
+def with_branch(x, flag):
+    x = x * 2
+    if flag:          # Pythonの動的分岐 → graph break
+        x = x + 1
+    return x.relu()
+
+def no_branch(x):
+    return (x * 2).relu()  # 静的グラフ → graph break なし
+
+# torch._dynamo.explainで解析`,
+   answer:`import torch
+
+def with_branch(x, flag):
+    x = x * 2
+    if flag:
+        x = x + 1
+    return x.relu()
+
+def no_branch(x):
+    return (x * 2).relu()
+
+x = torch.randn(4, 4)
+
+# explainでグラフ構造を解析
+exp1 = torch._dynamo.explain(with_branch)(x, True)
+print("=== with_branch ===")
+print(f"Graph count: {exp1.graph_count}")        # 複数になることがある
+print(f"Break reasons: {exp1.break_reasons}")
+
+exp2 = torch._dynamo.explain(no_branch)(x)
+print("\\n=== no_branch ===")
+print(f"Graph count: {exp2.graph_count}")        # 1つの完全なグラフ
+print(f"Break reasons: {exp2.break_reasons}")
+
+# 対策: torch.cond（PyTorch 2.1+）で動的分岐を静的に
+from torch._higher_order_ops.cond import cond
+# pred = flag.to(torch.bool)
+# result = cond(pred, true_fn, false_fn, [x])`},
+],
+ch4:[
+  {diff:2, q:"torch.utils.cpp_extensionを使ってCPU向けカスタムC++カーネルを作成し、Pythonから呼び出せ。relu_forward関数をC++で実装し、PyTorchのReLUと結果を比較せよ。",
+   code:`# custom_relu.cpp の内容を文字列として書き、
+# torch.utils.cpp_extension.load_inline でコンパイルせよ
+import torch
+from torch.utils.cpp_extension import load_inline
+
+cpp_source = """
+// ここにC++のrelu_forwardを実装
+"""
+
+# load_inline でコンパイル・ロード`,
+   answer:`import torch
+from torch.utils.cpp_extension import load_inline
+
+cpp_source = """
+#include <torch/extension.h>
+
+torch::Tensor relu_forward(torch::Tensor input) {
+    return torch::clamp_min(input, 0.0);
+}
+
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+    m.def("relu_forward", &relu_forward, "Custom ReLU forward");
+}
+"""
+
+# インラインコンパイル（初回は少し時間がかかる）
+custom_ops = load_inline(
+    name="custom_relu",
+    cpp_sources=[cpp_source],
+    functions=["relu_forward"],
+    verbose=False,
+)
+
+x = torch.randn(4, 4)
+out_custom = custom_ops.relu_forward(x)
+out_torch  = torch.relu(x)
+
+print("Custom ReLU:")
+print(out_custom)
+print("\\nPyTorch ReLU:")
+print(out_torch)
+print("\\nMatch:", torch.allclose(out_custom, out_torch))`},
+  {diff:3, q:"Tritonを使ってGPU上でelementwise_addカーネルを実装せよ。triton.jitデコレータとtl.loadとtl.storeを使い、PyTorchの+演算子と速度を比較せよ。",
+   code:`# pip install triton
+import torch
+import triton
+import triton.language as tl
+
+@triton.jit
+def add_kernel(x_ptr, y_ptr, out_ptr, n, BLOCK: tl.constexpr):
+    # pid, offsets, mask を使って安全にロード・加算・ストア
+    pass
+
+def triton_add(x, y):
+    out = torch.empty_like(x)
+    # グリッドサイズを計算してカーネルを起動
+    pass`,
+   answer:`import torch
+
+try:
+    import triton
+    import triton.language as tl
+    HAS_TRITON = True
+except ImportError:
+    HAS_TRITON = False
+    print("Triton not available, showing pseudocode")
+
+if HAS_TRITON:
+    @triton.jit
+    def add_kernel(x_ptr, y_ptr, out_ptr, n, BLOCK: tl.constexpr):
+        pid = tl.program_id(0)
+        offsets = pid * BLOCK + tl.arange(0, BLOCK)
+        mask = offsets < n
+        x = tl.load(x_ptr + offsets, mask=mask)
+        y = tl.load(y_ptr + offsets, mask=mask)
+        tl.store(out_ptr + offsets, x + y, mask=mask)
+
+    def triton_add(x, y):
+        out = torch.empty_like(x)
+        n = x.numel()
+        BLOCK = 1024
+        grid = ((n + BLOCK - 1) // BLOCK,)
+        add_kernel[grid](x, y, out, n, BLOCK=BLOCK)
+        return out
+
+    device = torch.device("cuda")
+    x = torch.randn(1 << 20, device=device)
+    y = torch.randn(1 << 20, device=device)
+
+    out_triton = triton_add(x, y)
+    out_torch  = x + y
+    print("Match:", torch.allclose(out_triton, out_torch))
+else:
+    # 疑似コードで概念を示す
+    print("Triton カーネルの概念:")
+    print("  pid = program_id: スレッドブロックID")
+    print("  tl.load/store: グローバルメモリのアクセス")
+    print("  mask: 境界外アクセスを防ぐ")`},
+],
+ch5:[
+  {diff:2, q:"REINFORCE（Policy Gradient）アルゴリズムをCartPole-v1で実装せよ。方策ネットワーク（softmax出力）を定義し、エピソードのリターンで重み付けした対数確率の勾配を計算せよ。",
+   code:`import torch
+import torch.nn as nn
+import torch.optim as optim
+import gymnasium as gym
+
+class PolicyNet(nn.Module):
+    def __init__(self, obs_dim, act_dim):
+        super().__init__()
+        # 2層MLP、最終softmax
+
+    def forward(self, x):
+        pass
+
+def compute_returns(rewards, gamma=0.99):
+    # 割引累積報酬を計算
+    pass`,
+   answer:`import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+
+try:
+    import gymnasium as gym
+    env = gym.make("CartPole-v1")
+    HAS_GYM = True
+except ImportError:
+    HAS_GYM = False
+    print("gymnasium not installed; showing code structure only")
+
+class PolicyNet(nn.Module):
+    def __init__(self, obs_dim=4, act_dim=2):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(obs_dim, 64), nn.ReLU(),
+            nn.Linear(64, act_dim)
+        )
+
+    def forward(self, x):
+        return torch.softmax(self.net(x), dim=-1)
+
+def compute_returns(rewards, gamma=0.99):
+    returns = []
+    G = 0
+    for r in reversed(rewards):
+        G = r + gamma * G
+        returns.insert(0, G)
+    returns = torch.tensor(returns, dtype=torch.float32)
+    return (returns - returns.mean()) / (returns.std() + 1e-8)
+
+if HAS_GYM:
+    policy = PolicyNet()
+    optimizer = optim.Adam(policy.parameters(), lr=1e-3)
+
+    for ep in range(3):
+        obs, _ = env.reset()
+        log_probs, rewards = [], []
+
+        for _ in range(500):
+            x = torch.tensor(obs, dtype=torch.float32)
+            probs = policy(x)
+            dist = torch.distributions.Categorical(probs)
+            action = dist.sample()
+            log_probs.append(dist.log_prob(action))
+
+            obs, reward, done, trunc, _ = env.step(action.item())
+            rewards.append(reward)
+            if done or trunc:
+                break
+
+        returns = compute_returns(rewards)
+        loss = -torch.stack(log_probs) * returns
+        loss = loss.sum()
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        print(f"Ep {ep+1}: reward={sum(rewards):.0f}, loss={loss.item():.3f}")
+else:
+    print("PolicyNet と compute_returns の構造を確認してください")`},
+  {diff:3, q:"PPOのClipped Surrogate Objectiveを実装せよ。古い方策と新しい方策の比率rを計算し、clip(r, 1-ε, 1+ε)との最小値を取るPPO損失を実装せよ。",
+   code:`import torch
+
+def ppo_loss(log_probs_new, log_probs_old, advantages, epsilon=0.2):
+    # ratio = exp(log_probs_new - log_probs_old)
+    # L_clip = min(ratio * A, clip(ratio, 1-eps, 1+eps) * A)
+    pass`,
+   answer:`import torch
+
+def ppo_loss(log_probs_new, log_probs_old, advantages, epsilon=0.2):
+    """
+    log_probs_new: 新しい方策の行動の対数確率 (T,)
+    log_probs_old: 古い方策の行動の対数確率 (T,) detached
+    advantages: 標準化済み優位量 (T,)
+    """
+    ratio = torch.exp(log_probs_new - log_probs_old.detach())
+
+    # クリップなしの目標
+    surr1 = ratio * advantages
+
+    # クリップあり
+    surr2 = torch.clamp(ratio, 1 - epsilon, 1 + epsilon) * advantages
+
+    # 最小を取ることで方策が大きく変わりすぎないよう制約
+    loss = -torch.min(surr1, surr2).mean()
+    return loss
+
+# 動作確認
+T = 64  # タイムステップ数
+log_probs_new = torch.randn(T) * 0.1
+log_probs_old = log_probs_new + torch.randn(T) * 0.05  # 少し違う
+advantages = torch.randn(T)
+advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+loss = ppo_loss(log_probs_new, log_probs_old, advantages)
+print(f"PPO Loss: {loss.item():.4f}")
+
+# ratio の分布を確認
+ratio = torch.exp(log_probs_new - log_probs_old)
+print(f"Ratio range: [{ratio.min():.3f}, {ratio.max():.3f}]")
+print(f"Clipped ratio range: [{ratio.clamp(0.8, 1.2).min():.3f}, {ratio.clamp(0.8, 1.2).max():.3f}]")`},
+],
+ch6:[
+  {diff:2, q:"SimCLRのNTXent（Normalized Temperature-scaled Cross Entropy）損失を実装せよ。バッチ内の同じ画像の2つのaugmentedビューをpositive pairとし、それ以外をnegativeとする。",
+   code:`import torch
+import torch.nn.functional as F
+
+def ntxent_loss(z1, z2, temperature=0.5):
+    """
+    z1, z2: (N, D) のL2正規化済み埋め込み
+    各i番目のサンプルでz1[i]とz2[i]がpositive pair
+    """
+    pass`,
+   answer:`import torch
+import torch.nn.functional as F
+
+def ntxent_loss(z1, z2, temperature=0.5):
+    N = z1.shape[0]
+
+    # L2正規化
+    z1 = F.normalize(z1, dim=1)
+    z2 = F.normalize(z2, dim=1)
+
+    # 全ペアのコサイン類似度: (2N, 2N)
+    z = torch.cat([z1, z2], dim=0)
+    sim = torch.mm(z, z.T) / temperature
+
+    # 対角（自己類似度）をマスク
+    mask = torch.eye(2 * N, dtype=torch.bool, device=z.device)
+    sim.masked_fill_(mask, float('-inf'))
+
+    # positive pairのインデックス
+    # z1[i] <-> z2[i]: offset N
+    labels = torch.cat([
+        torch.arange(N, 2*N),   # z1[i]のpositive = z2[i]
+        torch.arange(0, N)       # z2[i]のpositive = z1[i]
+    ]).to(z.device)
+
+    loss = F.cross_entropy(sim, labels)
+    return loss
+
+# 動作確認
+N, D = 32, 128
+z1 = torch.randn(N, D)
+z2 = torch.randn(N, D)
+loss = ntxent_loss(z1, z2)
+print(f"NTXent Loss: {loss.item():.4f}")
+# ランダム埋め込みなら log(2N-1) ≈ 4.1 程度になる
+print(f"Random baseline: {torch.log(torch.tensor(2*N-1.0)):.4f}")`},
+  {diff:3, q:"MAE（Masked Autoencoder）のパッチマスキングを実装せよ。画像をパッチ分割し、75%をランダムにマスクして、残りのパッチのインデックスを返す関数を作れ。",
+   code:`import torch
+
+def mask_patches(imgs, patch_size=16, mask_ratio=0.75):
+    """
+    imgs: (B, C, H, W)
+    Returns: visible_patches (B, num_visible, patch_dim),
+             mask (B, num_patches), ids_restore (B, num_patches)
+    """
+    pass`,
+   answer:`import torch
+
+def patchify(imgs, patch_size=16):
+    B, C, H, W = imgs.shape
+    assert H % patch_size == 0 and W % patch_size == 0
+    h, w = H // patch_size, W // patch_size
+    # (B, h, w, C, p, p) → (B, h*w, C*p*p)
+    x = imgs.reshape(B, C, h, patch_size, w, patch_size)
+    x = x.permute(0, 2, 4, 1, 3, 5).reshape(B, h*w, C*patch_size*patch_size)
+    return x
+
+def mask_patches(imgs, patch_size=16, mask_ratio=0.75):
+    patches = patchify(imgs, patch_size)  # (B, N, D)
+    B, N, D = patches.shape
+
+    num_mask = int(N * mask_ratio)
+    num_visible = N - num_mask
+
+    # ランダムシャッフルでマスク決定
+    noise = torch.rand(B, N)
+    ids_shuffle = torch.argsort(noise, dim=1)
+    ids_restore = torch.argsort(ids_shuffle, dim=1)
+
+    # 前num_visibleをvisible、残りをmask
+    ids_visible = ids_shuffle[:, :num_visible]
+    visible_patches = torch.gather(
+        patches, 1,
+        ids_visible.unsqueeze(-1).expand(-1, -1, D)
+    )
+
+    # boolマスク: True=マスク
+    mask = torch.ones(B, N, dtype=torch.bool)
+    mask.scatter_(1, ids_visible, False)
+
+    return visible_patches, mask, ids_restore
+
+# 動作確認
+imgs = torch.randn(4, 3, 224, 224)
+vis, mask, ids_r = mask_patches(imgs, patch_size=16, mask_ratio=0.75)
+N = (224 // 16) ** 2  # 196
+print(f"Total patches: {N}")
+print(f"Visible patches: {vis.shape}")   # (4, 49, 768)
+print(f"Mask shape: {mask.shape}")        # (4, 196)
+print(f"Masked ratio: {mask.float().mean():.2f}")`},
+],
+ch7:[
+  {diff:2, q:"PyTorchのPost-Training Dynamic Quantization（動的量子化）を適用し、モデルサイズと推論速度を比較せよ。nn.Linear層をINT8に量子化せよ。",
+   code:`import torch
+import torch.nn as nn
+
+# 量子化対象モデル
+model = nn.Sequential(
+    nn.Linear(512, 1024), nn.ReLU(),
+    nn.Linear(1024, 512), nn.ReLU(),
+    nn.Linear(512, 10)
+)
+
+# torch.quantization.quantize_dynamic でINT8量子化
+# モデルサイズと速度を比較`,
+   answer:`import torch
+import torch.nn as nn
+import time, copy
+
+model = nn.Sequential(
+    nn.Linear(512, 1024), nn.ReLU(),
+    nn.Linear(1024, 512), nn.ReLU(),
+    nn.Linear(512, 10)
+).eval()
+
+# 動的量子化（Linear層をINT8に）
+q_model = torch.quantization.quantize_dynamic(
+    copy.deepcopy(model),
+    qconfig_spec={nn.Linear},
+    dtype=torch.qint8
+)
+
+def model_size_mb(m):
+    buf = torch.ones(1)
+    torch.save(m.state_dict(), "/tmp/_tmp_model.pt")
+    import os
+    return os.path.getsize("/tmp/_tmp_model.pt") / 1e6
+
+x = torch.randn(64, 512)
+
+def bench(m, x, n=100):
+    with torch.no_grad():
+        for _ in range(10): m(x)
+        t = time.perf_counter()
+        for _ in range(n): m(x)
+    return (time.perf_counter() - t) / n * 1000
+
+fp32_ms = bench(model, x)
+int8_ms  = bench(q_model, x)
+
+print(f"FP32: {fp32_ms:.2f} ms")
+print(f"INT8: {int8_ms:.2f} ms")
+print(f"Speedup: {fp32_ms/int8_ms:.2f}x")
+
+out_fp32 = model(x[:4])
+out_int8 = q_model(x[:4])
+print(f"Max diff: {(out_fp32 - out_int8).abs().max().item():.5f}")`},
+  {diff:3, q:"torch.autocast（AMP: Automatic Mixed Precision）を使って学習ループを実装せよ。GradScalerと組み合わせてFP16のアンダーフロー問題を回避せよ。",
+   code:`import torch
+import torch.nn as nn
+import torch.optim as optim
+
+model = nn.Sequential(
+    nn.Linear(256, 512), nn.ReLU(),
+    nn.Linear(512, 10)
+)
+optimizer = optim.Adam(model.parameters())
+criterion = nn.CrossEntropyLoss()
+
+# torch.autocast + GradScalerで混合精度学習ループ`,
+   answer:`import torch
+import torch.nn as nn
+import torch.optim as optim
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+dtype_ctx = torch.float16 if device.type == "cuda" else torch.bfloat16
+
+model = nn.Sequential(
+    nn.Linear(256, 512), nn.ReLU(),
+    nn.Linear(512, 10)
+).to(device)
+
+optimizer = optim.Adam(model.parameters(), lr=1e-3)
+criterion = nn.CrossEntropyLoss()
+
+# GradScalerはCUDAのみ有効（CPU/MPSでは不要）
+scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda"))
+
+for step in range(5):
+    x = torch.randn(64, 256, device=device)
+    y = torch.randint(0, 10, (64,), device=device)
+
+    optimizer.zero_grad()
+
+    # autocastブロック内でFP16/BF16の自動キャスト
+    with torch.autocast(device_type=device.type, dtype=dtype_ctx):
+        out = model(x)
+        loss = criterion(out, y)
+
+    # GradScalerでスケールして逆伝播（アンダーフロー防止）
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()
+
+    print(f"Step {step+1}: loss={loss.item():.4f}, scale={scaler.get_scale():.0f}")`},
+],
+ch8:[
+  {diff:2, q:"DDPMの前向き拡散プロセス（Forward Process）を実装せよ。画像xに対してタイムステップtのノイズを直接追加するq(x_t | x_0)を実装し、t=0, 250, 500, 750, 999での画像を生成せよ。",
+   code:`import torch
+import torch.nn as nn
+import math
+
+class DDPM_Scheduler:
+    def __init__(self, T=1000, beta_start=1e-4, beta_end=0.02):
+        self.T = T
+        self.betas = torch.linspace(beta_start, beta_end, T)
+        # alpha_bar（累積積）を計算
+        pass
+
+    def q_sample(self, x0, t, noise=None):
+        # q(x_t|x_0) = sqrt(alpha_bar_t)*x0 + sqrt(1-alpha_bar_t)*eps
+        pass`,
+   answer:`import torch
+import math
+
+class DDPM_Scheduler:
+    def __init__(self, T=1000, beta_start=1e-4, beta_end=0.02):
+        self.T = T
+        self.betas = torch.linspace(beta_start, beta_end, T)
+        self.alphas = 1.0 - self.betas
+        self.alpha_bar = torch.cumprod(self.alphas, dim=0)
+
+    def q_sample(self, x0, t, noise=None):
+        """
+        x0: (B, C, H, W)  元画像
+        t:  (B,) int         タイムステップ
+        """
+        if noise is None:
+            noise = torch.randn_like(x0)
+
+        sqrt_ab = self.alpha_bar[t].sqrt().view(-1, 1, 1, 1)
+        sqrt_1mab = (1 - self.alpha_bar[t]).sqrt().view(-1, 1, 1, 1)
+
+        return sqrt_ab * x0 + sqrt_1mab * noise, noise
+
+scheduler = DDPM_Scheduler()
+
+# ダミー画像（バッチ1）
+x0 = torch.randn(1, 3, 32, 32)
+
+for t_val in [0, 250, 500, 750, 999]:
+    t = torch.tensor([t_val])
+    xt, eps = scheduler.q_sample(x0, t)
+    snr = scheduler.alpha_bar[t_val] / (1 - scheduler.alpha_bar[t_val])
+    print(f"t={t_val:4d}: alpha_bar={scheduler.alpha_bar[t_val]:.4f}, "
+          f"SNR={snr.item():.4f}, x_t std={xt.std().item():.4f}")`},
+  {diff:3, q:"Mambaの選択的状態空間機構のコアとなるSSMスキャン演算を疑似実装せよ。入力依存のA, B, Cパラメータを持つシーケンシャルスキャンを実装し、入力系列に対する出力を計算せよ。",
+   code:`import torch
+import torch.nn as nn
+
+def ssm_scan(x, A, B, C, delta):
+    """
+    x:     (B, L, D) 入力
+    A:     (D, N) 状態遷移行列（対角で簡略化）
+    B:     (B, L, N) 入力射影（入力依存）
+    C:     (B, L, N) 出力射影（入力依存）
+    delta: (B, L, D) 時間ステップ（入力依存）
+    Returns: y (B, L, D)
+    """
+    pass`,
+   answer:`import torch
+import torch.nn as nn
+
+def ssm_scan(x, A, B, C, delta):
+    """
+    Mambaのselective SSMの簡略化実装（N=状態次元）
+    """
+    B_size, L, D = x.shape
+    N = A.shape[1]
+
+    # ZOH離散化: A_bar = exp(delta * A), B_bar = delta * B
+    # delta: (B, L, D) → (B, L, D, 1)
+    delta_A = torch.exp(delta.unsqueeze(-1) * A.unsqueeze(0).unsqueeze(0))  # (B, L, D, N)
+    delta_B_u = delta.unsqueeze(-1) * B.unsqueeze(2) * x.unsqueeze(-1)     # (B, L, D, N)
+
+    # シーケンシャルスキャン
+    h = torch.zeros(B_size, D, N, device=x.device)
+    ys = []
+    for t in range(L):
+        h = delta_A[:, t] * h + delta_B_u[:, t]
+        # y_t = C_t @ h: (B, D, N) × (B, N) → (B, D)
+        y_t = (h * C[:, t].unsqueeze(1)).sum(-1)  # (B, D)
+        ys.append(y_t)
+
+    return torch.stack(ys, dim=1)  # (B, L, D)
+
+# 動作確認
+B_size, L, D, N = 2, 16, 32, 8
+x = torch.randn(B_size, L, D)
+A = -torch.rand(D, N)          # 安定のため負値
+B = torch.randn(B_size, L, N)
+C = torch.randn(B_size, L, N)
+delta = torch.sigmoid(torch.randn(B_size, L, D)) * 0.1
+
+y = ssm_scan(x, A, B, C, delta)
+print("Output shape:", y.shape)  # (2, 16, 32)`},
+],
+};
+
+const chapters = [
+{id:"ch1", num:1, title:"大規模モデル訓練", est:"70分",
+ goal:"FSDP・DDP・Pipeline Parallelの違いを説明できる。勾配チェックポイントの仕組みと適用場面を理解し、大規模モデルをメモリ効率よく訓練するための設計判断ができるようになる。",
+ sections:[
+  {title:"モデル並列化の種類と使い分け",
+   body:`大規模モデルを訓練する際、単一GPUのメモリでは全パラメータを保持できない場合があります。これを解決するために「モデル並列化」と「データ並列化」の複数の手法が存在しており、それぞれトレードオフが異なります。
+
+最も単純なDataParallel（DP）は1枚のGPUがパラメータの「マスター」として機能し、各バッチを複数GPUに分散して処理します。しかし大規模モデルでは「マスターGPU」のメモリがボトルネックになります。DistributedDataParallel（DDP）は各GPUが完全なモデルコピーを持ち、勾配のみをAllReduceで同期するため、より均等な負荷分散が可能です。一方、FSDP（Fully Sharded Data Parallel）はDeepSpeed ZeRO Stage 3と同様に、パラメータ・勾配・オプティマイザ状態を全GPUに分散し、必要な時だけAllGatherで集約することで最大のメモリ効率を達成します。
+
+実務での選択基準はモデルサイズとGPU数で決まります。7Bパラメータ以下のモデルはDDPで十分なことが多く、13B以上ではFSDPやPipeline Parallelの組み合わせが必要になります。研究段階ではMeta社のFAIRSeqやHugging Faceのaccelerateライブラリが設定を抽象化してくれるため、低レベルのdist APIを直接触ることは少なくなっています。`,
+   table: T.parallelTypes,
+   afterTable:"Pipeline Parallelは異なるレイヤーを異なるGPUに配置しますが、マイクロバッチを使わないとGPUがアイドル状態になる「パイプラインバブル」が発生します。GPipe/PipeDreamなどのアルゴリズムでこれを軽減します。"},
+  {title:"FSDP実装の基本パターン",
+   body:`PyTorch 1.12以降、FSDPは`torch.distributed.fsdp`モジュールに正式統合されました。基本的な使い方は`FullyShardedDataParallel`でモデルをラップするだけですが、`auto_wrap_policy`を指定することでTransformerブロック単位での適切なシャーディングが可能になります。
+
+`transformer_auto_wrap_policy`は`transformer_layer_cls`に指定したクラスを見つけて自動的にFSDPでラップします。これにより各Transformerブロックが独立してシャーディングされ、AllGatherのタイミングが最適化されます。デフォルトではモデル全体を一度にシャーディングするため、大きなモデルでは細粒度ラッピングが重要です。
+
+`ShardingStrategy`パラメータでシャーディングの粒度を制御できます。`FULL_SHARD`（ZeRO Stage 3相当）が最もメモリ効率が高く、`SHARD_GRAD_OP`（ZeRO Stage 2相当）は勾配と最適化状態のみをシャーディングします。実務では`FULL_SHARD`から始めて、パフォーマンスが不足する場合に`SHARD_GRAD_OP`に緩和する方針が安全です。`,
+   code:`from torch.distributed.fsdp import (
+    FullyShardedDataParallel as FSDP,
+    ShardingStrategy,
+    MixedPrecision,
+)
+import torch
+
+# 混合精度設定
+mp_policy = MixedPrecision(
+    param_dtype=torch.bfloat16,
+    reduce_dtype=torch.bfloat16,
+    buffer_dtype=torch.bfloat16,
+)
+
+# FSDPセットアップ（マルチGPU環境で使用）
+# model = FSDP(
+#     model,
+#     sharding_strategy=ShardingStrategy.FULL_SHARD,
+#     mixed_precision=mp_policy,
+#     auto_wrap_policy=wrap_policy,
+#     device_id=torch.cuda.current_device(),
+# )
+print("FSDP配置例を確認（マルチGPU環境で実行）")`,
+   afterCode:"FSDPモデルの保存はstate_dictを取り出す際に特別な手順が必要です。`FSDP.state_dict_type()`コンテキストマネージャを使って`FULL_STATE_DICT`モードで保存することで、通常のnn.Moduleと同様に扱えるstate_dictが得られます。"},
+  {title:"勾配チェックポイントとDeepSpeed ZeRO",
+   body:`勾配チェックポイント（Gradient Checkpointing）は、順伝播時に中間活性化値を捨てて、逆伝播時に再計算するトレードオフです。メモリ使用量をO(√n)に削減できる代わりに、計算量が約30%増加します。`torch.utils.checkpoint.checkpoint()`または`checkpoint_sequential()`で適用できます。
+
+DeepSpeed ZeROはMicrosoftが開発したメモリ最適化フレームワークで、Stage 1（オプティマイザ状態分散）・Stage 2（勾配分散）・Stage 3（パラメータ分散）の3段階があります。PyTorchのFSDPはZeRO Stage 3と概念的に同等であり、Hugging Faceのaccelerate/transformersではどちらのバックエンドも選択できます。
+
+実務では「何ができないか」を先に確認する逆順アプローチが有効です。まず混合精度（BF16）だけで試し、それでも足りなければ勾配チェックポイント→FSDPの順で追加します。ZeRO/FSDPを使うと通信オーバーヘッドが増えるため、GPU間の帯域幅（NVLink vs. InfiniBand）が支配的なボトルネックになる場合があります。`,
+   code:`# 勾配チェックポイントの使用例（HuggingFace Transformers）
+# model.gradient_checkpointing_enable()
+
+# PyTorchネイティブな使い方
+import torch
+from torch.utils.checkpoint import checkpoint
+
+class CheckpointedBlock(torch.nn.Module):
+    def __init__(self, layer):
+        super().__init__()
+        self.layer = layer
+
+    def forward(self, x):
+        # 逆伝播時に再計算（中間値を保存しない）
+        return checkpoint(self.layer, x, use_reentrant=False)
+
+# DeepSpeed設定例（ds_config.json）
+ds_config = {
+    "zero_optimization": {"stage": 3},
+    "bf16": {"enabled": True},
+    "gradient_accumulation_steps": 4,
+}
+print("DeepSpeed config:", ds_config)`,
+   afterCode:"gradient_checkpointingは特に長系列Transformerや深いResNetで効果的です。PyTorch 2.0以降はuse_reentrant=Falseが推奨されており、autocastとの互換性が向上しています。"},
+]},
+
+{id:"ch2", num:2, title:"LLMファインチューニング（PEFT）", est:"70分",
+ goal:"LoRAの数学的直感を説明でき、huggingface/peftを使って実際にLLMをファインチューニングできる。QLoRAのメモリ効率の仕組みと、Instruction Tuningのデータ形式を理解している。",
+ sections:[
+  {title:"LoRAの数学的直感",
+   body:`LoRA（Low-Rank Adaptation）の核心アイデアは「事前学習済みモデルの重み更新ΔWは低ランク行列で近似できる」という仮説に基づいています。具体的には、元の重み行列W₀∈ℝ^(d×k)に対して、W₀を固定したまま、低ランク分解ΔW = BA（B∈ℝ^(d×r), A∈ℝ^(r×k), r≪min(d,k)）を学習します。
+
+なぜこれが機能するのかについては、「LLMの適応に必要な重み変化は本来的に低次元の部分空間に存在する」という経験的観察があります。GPT-3のような大規模モデルでr=4〜8程度で十分な性能が得られることが示されており、元の7Bパラメータのうち学習するのは数十万パラメータにとどまります。
+
+スケーリング係数α/rはハイパーパラメータの調整を容易にします。rを変えてもαを同じ比率で変えれば学習率の効果的なスケールが保たれます。慣例的にα=2rと設定することが多く、例えばr=8ならα=16とします。推論時にはW = W₀ + (α/r)BAとマージできるため、LoRAの推論コストはゼロです。`,
+   table: T.loraComp,
+   afterTable:"QLoRAはLoRAにNF4（NormalFloat 4-bit）量子化を組み合わせたもので、コンシューマGPU（24GB VRAM）でも65Bパラメータモデルのファインチューニングを可能にしました。bitsandbytesライブラリの`load_in_4bit=True`オプションで利用できます。"},
+  {title:"Instruction TuningとRLHF概要",
+   body:`Instruction Tuning（指示チューニング）は、「指示文→期待される応答」の形式のデータでモデルをファインチューニングすることで、ユーザーの意図を理解して適切に応答できるアシスタントに変換する手法です。Alpaca（Stanford）やDolly（Databricks）などが代表的なデータセットです。
+
+データ形式としてはChatML形式やAlpaca形式が広く使われています。`<|system|>You are a helpful assistant<|user|>質問<|assistant|>回答`のような特殊トークンを使ってロールを区別します。Hugging Faceの`trl`ライブラリの`SFTTrainer`（Supervised Fine-tuning Trainer）を使うと、この形式のデータを扱う訓練ループを簡単に構築できます。
+
+RLHF（Reinforcement Learning from Human Feedback）はSFTの後段で人間のフィードバックを使って方策を最適化する手法です。Reward ModelでSFTモデルの出力をスコアリングし、PPOでそのスコアを最大化するようにモデルを更新します。しかし実装が複雑でコストが高いため、DPO（Direct Preference Optimization）のような簡略版が近年主流になっています。DPOはReward Modelを別途学習する必要がなく、好み対データ（chosen/rejected）から直接最適化できます。`,
+   code:`# SFTTrainerを使ったInstruction Tuningの例（擬似コード）
+# from trl import SFTTrainer
+# from peft import LoraConfig
+# from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# model = AutoModelForCausalLM.from_pretrained(
+#     "meta-llama/Llama-2-7b-hf",
+#     load_in_4bit=True,       # QLoRA
+#     torch_dtype=torch.bfloat16,
+# )
+
+# peft_config = LoraConfig(r=64, lora_alpha=16, target_modules=["q_proj","v_proj"])
+
+# データ形式例
+dataset_example = {
+    "instruction": "Pythonでフィボナッチ数列を生成する関数を書いてください",
+    "input": "",
+    "output": "def fib(n):\\n    a, b = 0, 1\\n    for _ in range(n):\\n        yield a\\n        a, b = b, a+b"
+}
+print("Instruction Tuning データ形式:", dataset_example)`,
+   afterCode:"実務では、LoRAのtarget_modulesの選択が精度に大きく影響します。注意機構の重み（q_proj, k_proj, v_proj, o_proj）に加えてFFN層（gate_proj, up_proj, down_proj）も対象にすると一般的に性能が向上しますが、学習パラメータ数も増えます。"},
+]},
+
+{id:"ch3", num:3, title:"torch.compile（PyTorch 2.x）", est:"65分",
+ goal:"torch.compileがどのようにPythonコードをコンパイルするかを説明できる。TorchDynamo・TorchInductor・AOT Autogradの役割を理解し、graph breakを診断・修正できるようになる。",
+ sections:[
+  {title:"TorchDynamo・AOT Autograd・TorchInductorの役割",
+   body:`PyTorch 2.0の最大の変更点は`torch.compile`APIの導入です。`model = torch.compile(model)`の1行で、既存のPyTorchコードを大幅に高速化できます。内部は3つのコンポーネントで構成されています。
+
+TorchDynamoはPythonバイトコードを動的に書き換えるフック機構です。Pythonのフレームを監視して、PyTorchの演算が連続する部分を「計算グラフ」としてキャプチャします。純粋なPythonの制御フロー（if/for/while）がある場所では「グラフブレーク（graph break）」が発生し、そこでPythonに制御を戻します。グラフブレークが多いとコンパイルの恩恵が薄れるため、なるべく純粋なテンソル演算の連続としてforwardを記述することが重要です。
+
+AOT Autograd（Ahead-Of-Time Autograd）はキャプチャされたforwardグラフを解析し、backwardグラフも事前に生成します。これにより逆伝播も最適化の対象になります。TorchInductorは最終的なコード生成担当で、GPU向けにはTritonコードを生成し、CPU向けにはC++/OpenMPコードを生成します。このパイプラインにより、手書きのCUDAカーネルに匹敵する速度を自動的に達成できます。`,
+   table: T.compileBackend,
+   afterTable:"torch.compileは最初の実行時にコンパイルが走るため、warmupが必要です。プロダクションコードでは`torch.compile(model, fullgraph=True)`で完全なグラフコンパイルを強制し、graph breakがあればエラーを出すことで品質を保証できます。"},
+  {title:"プロファイリングと最適化の実践",
+   body:`torch.compileの効果を正確に測定するには、warmupを含んだベンチマーク設計が重要です。CUDAは非同期実行モデルを採用しているため、`torch.cuda.synchronize()`を入れないと正確な時間が測れません。また、入力サイズが変わるたびに再コンパイルが走る可能性があるため、固定サイズのバッチで計測することが基本です。
+
+`torch._dynamo.explain(fn)(*args)`はグラフブレークの詳細な分析レポートを返します。何がグラフブレークを引き起こしているか（Python組み込み関数、データ依存の分岐、グローバル変数アクセスなど）を確認し、修正の指針にできます。一般的な修正方針は「Pythonの制御フローをtorch.whereなどのテンソル演算に置き換えること」です。
+
+`torch.profiler`との組み合わせも強力です。`with torch.profiler.profile(activities=[ProfilerActivity.CUDA])`ブロック内でモデルを実行し、どのカーネルに時間がかかっているかを`prof.key_averages()`で確認できます。コンパイル後はカーネルが融合（kernel fusion）されて数が減り、全体的なGPUの稼働率が上がります。`,
+   code:`import torch
+
+# プロファイリング例
+def profile_model(model, x):
+    with torch.profiler.profile(
+        activities=[torch.profiler.ProfilerActivity.CPU,
+                    torch.profiler.ProfilerActivity.CUDA],
+        record_shapes=True,
+    ) as prof:
+        with torch.no_grad():
+            for _ in range(10):
+                model(x)
+
+    print(prof.key_averages().table(
+        sort_by="cuda_time_total", row_limit=10))
+
+# torch._dynamo のデバッグモード
+torch._dynamo.config.verbose = True
+# torch._dynamo.reset()  # キャッシュクリア
+print("torch.compile デバッグ設定を確認")`,
+   afterCode:"コンパイルのキャッシュは~/.cache/torch/inductor/に保存されます。TORCH_COMPILE_DEBUG=1 環境変数を設定することでコンパイルの詳細ログが出力され、生成されたTritonコードを確認できます。"},
+]},
+
+{id:"ch4", num:4, title:"カスタム CUDA カーネル", est:"70分",
+ goal:"C++拡張とTritonを使ってカスタムGPUカーネルを実装できる。pybind11によるPython/C++バインディングの仕組みを理解し、既存のPyTorchカーネルでは表現できない演算を自作できるようになる。",
+ sections:[
+  {title:"CUDA C基礎とtorch.utils.cpp_extension",
+   body:`PyTorchのカスタムC++拡張は`torch.utils.cpp_extension`モジュールで提供されており、`load_inline()`（文字列から直接コンパイル）または`load()`（.cppファイルからコンパイル）の2つの方法があります。どちらもLibTorch（PyTorchのC++フロントエンド）を自動でリンクするため、`#include <torch/extension.h>`だけでテンソル操作が利用できます。
+
+CUDA C（.cuファイル）でGPUカーネルを書く場合は`torch.utils.cpp_extension.CUDAExtension`を使います。カーネル関数は`__global__`修飾子で定義し、`threadIdx.x / blockIdx.x * blockDim.x`でスレッドIDを計算します。メモリアクセスパターン（coalesced access）とshared memoryの活用がパフォーマンスの鍵です。しかしCUDA Cの習熟には相当な時間が必要なため、Pythonから直接GPUカーネルを書けるTritonが近年注目されています。
+
+pybind11はC++の関数・クラスをPythonに公開するためのヘッダオンリーライブラリです。`PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)`マクロの中で`m.def("関数名", &cpp関数, "docstring")`と定義するだけで、`module.関数名(tensor)`という形でPythonから呼び出せます。引数と戻り値の型変換はpybind11が自動的に処理します。`,
+   code:`// relu_cuda.cu の例（概念示用）
+// #include <torch/extension.h>
+//
+// __global__ void relu_kernel(float* x, int n) {
+//     int idx = blockIdx.x * blockDim.x + threadIdx.x;
+//     if (idx < n) x[idx] = fmaxf(0.0f, x[idx]);
+// }
+//
+// torch::Tensor relu_cuda(torch::Tensor input) {
+//     auto out = input.clone();
+//     int n = out.numel();
+//     relu_kernel<<<(n+255)/256, 256>>>(out.data_ptr<float>(), n);
+//     return out;
+// }
+
+# Pythonでのload呼び出し例
+from torch.utils.cpp_extension import load
+
+# ext = load(
+#     name="relu_ext",
+#     sources=["relu_cuda.cu"],
+#     extra_cuda_cflags=["-O2"],
+# )
+print("CUDAカーネル拡張の構造を確認")`,
+   afterCode:"CUDAカーネルのデバッグには`cuda-memcheck`やNSight Systemsが有用です。まずcpu_fallback（C++のみ）で正しさを確認してからGPU版に移行する戦略が安全です。"},
+  {title:"Triton：PythonからGPUカーネルを書く",
+   body:`Tritonは「タイル単位のブロック処理」という抽象化でGPUプログラミングを大幅に簡略化します。CUDAのスレッドレベルの制御ではなく、`BLOCK_SIZE`単位のタイルを単位として記述するため、shared memoryやwarpの同期を明示的に管理する必要がありません。Tritonコンパイラが自動的に最適なshared memory・レジスタ割り当てを行います。
+
+`@triton.jit`デコレータを付けた関数がGPUカーネルになります。`tl.program_id(0)`でブロックIDを取得し、`tl.arange(0, BLOCK_SIZE)`でブロック内のオフセットを生成します。`tl.load(ptr + offsets, mask=mask)`と`tl.store(ptr + offsets, values, mask=mask)`でグローバルメモリの読み書きを行い、`mask`パラメータで境界外アクセスを安全に防ぎます。
+
+Flash Attentionの実装がTritonの代表的な成功例です。標準的なAttention実装では中間のN×N行列をHBM（高帯域幅メモリ）に書き出しますが、Triton版Flash Attentionはタイル単位で計算しSRRAM（shared memory）のみで処理することで、メモリ転送を大幅に削減して高速化を達成しています。PyTorch 2.0以降では`F.scaled_dot_product_attention()`がFlash Attentionを内部的に使用します。`,
+   code:`# Triton matmul の概念コード
+import torch
+
+try:
+    import triton
+    import triton.language as tl
+
+    @triton.jit
+    def matmul_kernel(
+        A_ptr, B_ptr, C_ptr,
+        M, N, K,
+        BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr
+    ):
+        pid_m = tl.program_id(0)
+        pid_n = tl.program_id(1)
+        # タイル単位でA・Bをロードして積算
+        acc = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)
+        for k in range(0, K, BLOCK_K):
+            a = tl.load(A_ptr + pid_m * BLOCK_M * K + k + tl.arange(0, BLOCK_M)[:, None] * K + tl.arange(0, BLOCK_K)[None, :])
+            b = tl.load(B_ptr + k * N + pid_n * BLOCK_N + tl.arange(0, BLOCK_K)[:, None] * N + tl.arange(0, BLOCK_N)[None, :])
+            acc += tl.dot(a, b)
+        tl.store(C_ptr + pid_m * BLOCK_M * N + pid_n * BLOCK_N + tl.arange(0, BLOCK_M)[:, None] * N + tl.arange(0, BLOCK_N)[None, :], acc)
+    print("Triton matmul カーネル定義完了")
+except ImportError:
+    print("Triton not installed: pip install triton")`,
+   afterCode:"Tritonはtorch.compileのTorchInductorバックエンドとしても内部で使われています。自作Tritonカーネルはtorch.library APIでPyTorchのオペレーターとして登録でき、autograd（requires_grad）やtorch.compileとの統合も可能です。"},
+]},
+
+{id:"ch5", num:5, title:"強化学習", est:"70分",
+ goal:"MDP・方策・価値関数の概念を説明できる。REINFORCEアルゴリズムをPyTorchで実装でき、PPOのClipped Surrogateの意味を数式レベルで理解している。Gymnasium環境でエージェントを訓練できる。",
+ sections:[
+  {title:"MDPと方策勾配の基礎",
+   body:`強化学習（RL）の数学的な基盤はMarkov Decision Process（MDP）です。MDPは状態空間S・行動空間A・遷移確率P(s'|s,a)・報酬関数R(s,a)・割引率γ(0<γ≤1)の5つ組で定義されます。エージェントは方策π(a|s)（状態を与えられたときの行動の確率分布）に従って行動し、累積報酬G=Σγ^t・r_tを最大化することを目標にします。
+
+方策勾配法の中核は方策勾配定理です：∇_θ J(π_θ) = E[Σ ∇_θ log π_θ(a_t|s_t) · Q^π(s_t,a_t)]。直感的には「高い報酬をもたらした行動の確率を上げ、低い報酬の行動の確率を下げる」ことを勾配で表しています。REINFORCEはQ^πの推定にモンテカルロ法（実際に得られたリターンG_t）を使うシンプルな実装です。
+
+割引リターンG_t = Σ_{k=0}^{T-t} γ^k r_{t+k}を使います。γを小さくすると近い報酬を重視し（近視眼的）、大きくすると遠い未来の報酬も考慮します（遠視的）。REINFORCEでは各ステップのlog π(a_t|s_t)にG_tを掛けて合計したものを損失の符号反転として最大化します。バリアンス削減にはG_tからベースライン（状態価値V(s_t)）を引いたアドバンテージA_t = G_t - V(s_t)を使います。`,
+   code:`import torch
+import torch.nn as nn
+from torch.distributions import Categorical
+
+class ActorCritic(nn.Module):
+    """方策（Actor）と価値関数（Critic）を共有するネットワーク"""
+    def __init__(self, obs_dim=4, act_dim=2):
+        super().__init__()
+        self.shared = nn.Sequential(nn.Linear(obs_dim, 64), nn.Tanh())
+        self.actor  = nn.Linear(64, act_dim)   # 方策
+        self.critic = nn.Linear(64, 1)          # 価値関数
+
+    def forward(self, x):
+        h = self.shared(x)
+        logits = self.actor(h)
+        value  = self.critic(h).squeeze(-1)
+        return Categorical(logits=logits), value
+
+model = ActorCritic()
+obs = torch.randn(1, 4)
+dist, value = model(obs)
+action = dist.sample()
+print(f"Action: {action.item()}, Value: {value.item():.3f}")
+print(f"Log prob: {dist.log_prob(action).item():.3f}")`,
+   afterCode:"Categoricalは離散行動（CartPole等）に使いますが、連続行動（MuJoCo等）にはNormalやMultivariateNormal分布を使います。連続行動では平均と標準偏差をActorから出力し、行動をサンプリングします。"},
+  {title:"PPOの実装と安定化テクニック",
+   body:`PPO（Proximal Policy Optimization）はREINFORCEの不安定性を解決するために設計されました。古い方策π_oldからデータを収集し、そのデータを使って新しい方策π_newを複数回更新します。重要度サンプリング比 r_t = π_new(a_t|s_t)/π_old(a_t|s_t) でオフポリシー補正を行い、Clipped Surrogateで更新の大きさを制限します。
+
+L_CLIP = E[min(r_t A_t, clip(r_t, 1-ε, 1+ε) A_t)]。ε=0.2が標準的な値で、方策が大幅に変化した場合は勾配をゼロにして変化を制限します。これによりSGDのような大きなステップでの学習が可能になります。
+
+実装上の安定化テクニックとして：①アドバンテージの標準化（平均0・分散1）、②Critic損失の係数調整（通常0.5）、③エントロピーボーナス（探索促進）、④Gradient Clipping（max_norm=0.5）があります。これらを全て組み合わせることで安定した学習が可能になります。また、複数の並列環境からデータを収集するベクター化環境（gym.vector）を使うとサンプル効率が向上します。`,
+   code:`import torch
+
+def ppo_update(policy, optimizer, rollout, clip_eps=0.2, vf_coef=0.5, ent_coef=0.01):
+    """PPOの1回の更新ステップ"""
+    obs, acts, old_logp, returns, advantages = rollout
+
+    # 新しい方策で評価
+    dist, values = policy(obs)
+    new_logp = dist.log_prob(acts)
+    entropy = dist.entropy().mean()
+
+    # PPO Clipped Loss
+    ratio = (new_logp - old_logp.detach()).exp()
+    surr1 = ratio * advantages
+    surr2 = ratio.clamp(1 - clip_eps, 1 + clip_eps) * advantages
+    policy_loss = -torch.min(surr1, surr2).mean()
+
+    # Critic Loss
+    value_loss = ((values - returns) ** 2).mean()
+
+    # 合計損失
+    loss = policy_loss + vf_coef * value_loss - ent_coef * entropy
+
+    optimizer.zero_grad()
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(policy.parameters(), 0.5)
+    optimizer.step()
+
+    return {"policy": policy_loss.item(), "value": value_loss.item(), "entropy": entropy.item()}`,
+   afterCode:"PPOは実装のバグが多いことで知られており、CleanRL（https://github.com/vwxyzjn/cleanrl）の実装が参照実装として広く使われています。1ファイルで完結した実装で、論文の結果を再現できることが検証されています。"},
+]},
+
+{id:"ch6", num:6, title:"自己教師あり学習", est:"65分",
+ goal:"SimCLR・MoCo・MAEの学習方式を説明できる。Contrastive Learningのポジティブ/ネガティブペアの設計思想を理解し、NTXent損失を実装できる。Self-supervised表現の評価方法（Linear Probing）を実践できる。",
+ sections:[
+  {title:"SimCLR・MoCoの原理",
+   body:`自己教師あり学習（Self-Supervised Learning, SSL）はラベルなしデータから有用な表現を学習する手法群です。Contrastive Learningはその代表で、「同じ画像の異なるaugmented viewは近く、異なる画像のviewは遠くなるように」表現空間を学習します。
+
+SimCLR（Simple Framework for Contrastive Learning）は1バッチのN画像それぞれを2回augment（合計2N個のview）し、同じ元画像から来たペアをポジティブ、それ以外をネガティブとして学習します。エンコーダ（ResNet等）の後にProjection Head（2層MLP）を追加し、NTXent損失で学習します。重要なのは学習後にProjection Headを捨ててエンコーダのみを使う点で、ProjectionがNTXent特有のartifactを吸収するためです。
+
+MoCo（Momentum Contrast）はSimCLRの問題点（大きいバッチサイズが必要）を解決します。Query Encoder（通常のSGDで更新）とKey Encoder（Queryのmomentum平均で更新）の2つのエンコーダを持ち、Key Encoderの出力をQueue（FIFO）に蓄積してネガティブサンプルとして利用します。これにより小さいバッチでも大量のネガティブを使えます。τ=0.999程度のmomentum係数でKey Encoderをゆっくり更新することで、キューの表現が安定します。`,
+   table: { h:["手法","ポジティブ","ネガティブ","バッチサイズ要件","特徴"], r:[
+     ["SimCLR","同画像の2 views","バッチ内の他全画像","大（4096推奨）","シンプル・強力"],
+     ["MoCo v2","同画像の2 views","Momentum Queueから","小（256）","Memory-efficient"],
+     ["BYOL","同画像の2 views","不要（collapse防止有）","中（256）","Negativeなし"],
+     ["SimSiam","同画像の2 views","不要（stop-gradient）","小","Negativeなし"],
+     ["MAE","可視パッチ→マスク再構成","不要","中（256）","ViT特化"],
+   ], cap:"Self-Supervised Learning手法の比較" },
+   afterTable:"BYOLとSimSiamはネガティブサンプルなしで機能する驚くべき手法です。Online NetworkとTarget Networkの非対称性（stop-gradientや遅い更新）がCollapse（全出力が定数になる）を防いでいます。"},
+  {title:"MAEと評価手法（Linear Probing）",
+   body:`MAE（Masked Autoencoder）はNLPのBERTからインスピレーションを得た生成型の自己教師あり学習です。画像をパッチに分割し、75%をランダムにマスクして残り25%のパッチのみをViTエンコーダに入力します。マスクされたパッチの位置にはMASKトークンを追加してデコーダで元のピクセル値を再構成するよう学習します。
+
+高いマスク比率（75%）がポイントで、これにより「パッチを局所的に記憶する」ことでは解けない、グローバルな画像理解が必要なタスクになります。またマスクされたパッチをエンコーダに入力しないため、処理するトークン数が1/4になり訓練効率が大幅に向上します。
+
+学習した表現の評価方法としてLinear Probing（線形評価）とFine-tuningの2つが一般的です。Linear Probingはエンコーダを完全にフリーズして、最終層の特徴量の上にLinear分類器だけを学習します。エンコーダの表現の「線形分離可能性」を評価する厳しい指標です。Fine-tuningはエンコーダ全体を少量の教師データで更新するため通常より高い精度が出ますが、表現の品質の純粋な評価にはなりません。実務では両方の数値を報告することで、表現の汎化能力を多面的に示します。`,
+   code:`import torch
+import torch.nn as nn
+
+class SimpleEncoder(nn.Module):
+    """SimCLR/MAE評価用の簡易エンコーダ"""
+    def __init__(self, input_dim=784, hidden=256, out_dim=128):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden), nn.ReLU(),
+            nn.Linear(hidden, out_dim)
+        )
+
+    def forward(self, x):
+        return nn.functional.normalize(self.net(x), dim=1)
+
+class LinearProbe(nn.Module):
+    """Linear Probing評価"""
+    def __init__(self, encoder, feat_dim=128, num_classes=10):
+        super().__init__()
+        self.encoder = encoder
+        self.classifier = nn.Linear(feat_dim, num_classes)
+
+    def forward(self, x):
+        with torch.no_grad():  # エンコーダをフリーズ
+            feat = self.encoder(x)
+        return self.classifier(feat)  # 線形分類器のみ学習
+
+encoder = SimpleEncoder()
+probe = LinearProbe(encoder)
+x = torch.randn(16, 784)
+out = probe(x)
+print("Linear probe output:", out.shape)  # (16, 10)`,
+   afterCode:"Linear Probing の精度はSSLの手法を比較する際の標準的な指標です。ImageNet Linear Probing で80%以上を達成しているモデル（SimCLR v2, MoCo v3, MAE）は教師あり学習に匹敵する表現を学んでいると考えられます。"},
+]},
+
+{id:"ch7", num:7, title:"量子化と推論最適化", est:"65分",
+ goal:"FP16・INT8・INT4量子化の数値特性と精度への影響を説明できる。torch.quantization・AMPによる実装ができ、TensorRTとvLLMの仕組みの概要を理解している。",
+ sections:[
+  {title:"量子化の数学と種類",
+   body:`量子化は浮動小数点数を低ビット幅の表現に変換してメモリと演算コストを削減する技術です。INT8量子化では、FP32の値Xをスケール係数sとゼロ点zを使ってX_q = round(X/s + z)にマッピングします。逆に元の空間に戻す（逆量子化）と誤差が生じます：X_deq = s × (X_q - z)。この量子化誤差がモデルの精度低下の原因です。
+
+量子化には大きく3つのタイミングがあります。①Post-Training Quantization（PTQ）：学習済みモデルを後処理で量子化。実装が簡単ですが精度劣化リスクがあります。②Quantization-Aware Training（QAT）：学習中に量子化誤差をシミュレートして訓練。精度が高いが実装コストが大きい。③Dynamic Quantization：重みを事前に量子化し、活性化は推論時に動的に量子化。CPU推論での高速化に有効です。
+
+LLMの量子化では特殊な手法が使われます。GPTQ（Generative Pre-trained Transformer Quantization）はINT4量子化において、各層を逐次的に量子化して量子化誤差を後続の重みで補正するため高精度を保てます。NF4（NormalFloat 4-bit）は標準正規分布から等確率の量子点を配置する非均一量子化で、LLMの重みが正規分布に近いことを利用します。`,
+   table: T.quantTypes,
+   afterTable:"実務ではまずFP16/BF16の混合精度（ほぼ無劣化・2x高速）を試し、それでも足りなければINT8、さらにINT4の順で試すことを推奨します。各ステップでperplexity・downstream taskのスコアを確認して許容できる劣化かを判断します。"},
+  {title:"TensorRTとvLLMの仕組み",
+   body:`TensorRTはNVIDIAの推論最適化フレームワークで、トレーニング済みモデルをGPUの特性に合わせて最適化します。主な最適化として①レイヤー融合（LayerNorm+GELUを1カーネルで実行）、②カーネル自動選択（入力サイズに最適なcuBLASアルゴリズムを選択）、③精度キャリブレーション（キャリブレーションデータセットを使ったINT8スケール決定）があります。`torch.onnx.export()`でONNXに変換してからTensorRTでエンジンをビルドするか、`torch_tensorrt`を使ってPyTorchから直接最適化できます。
+
+vLLMはLLM推論の高効率化に特化したライブラリで、PagedAttentionが核心技術です。通常のKVキャッシュは最大シーケンス長でメモリを事前確保するため無駄が多いですが、PagedAttentionはOSのページングと同じ発想でKVキャッシュをページ（通常16トークン）単位で動的割り当てします。これによりメモリ利用率が大幅に向上し、同じGPUでより多くのリクエストを並列処理できます。
+
+Continuous Batchingも重要な最適化です。従来のバッチ推論は最長シーケンスの生成が終わるまで他のリクエストが待機しますが、Continuous Batchingはシーケンスが完了次第すぐに新しいリクエストを挿入するため、スループットが大幅に向上します。これらの最適化により、vLLMはシングルGPU上でHugging FaceのTransformersライブラリと比較して数倍〜十数倍のスループットを達成しています。`,
+   code:`# TensorRT変換の概念フロー（NVIDIA GPU環境）
+import torch
+import torch.nn as nn
+
+model = nn.Sequential(
+    nn.Linear(512, 1024), nn.GELU(), nn.Linear(1024, 512)
+).eval()
+
+# ① ONNX エクスポート
+dummy = torch.randn(1, 512)
+torch.onnx.export(
+    model, dummy, "/tmp/model.onnx",
+    opset_version=17,
+    input_names=["input"], output_names=["output"],
+    dynamic_axes={"input": {0: "batch"}, "output": {0: "batch"}}
+)
+print("ONNX exported")
+
+# ② vLLM の使用例（概念）
+# from vllm import LLM, SamplingParams
+# llm = LLM(model="meta-llama/Llama-2-7b-hf", quantization="awq")
+# outputs = llm.generate(["PyTorchとは"], SamplingParams(max_tokens=100))
+print("vLLM: LLM(model=..., quantization='awq') で量子化推論可能")`,
+   afterCode:"TensorRTのエンジンはGPUのアーキテクチャに依存するため、A100用にビルドしたエンジンはV100では動作しません。本番環境ではターゲットGPUでビルドを行い、ONNX Runtime（GPU対応）をクロスプラットフォームの代替として検討してください。"},
+]},
+
+{id:"ch8", num:8, title:"最前線のアーキテクチャ", est:"70分",
+ goal:"Mamba（SSM）・DDPM/DDIM・Flow Matchingの数学的直感を説明できる。Diffusion ModelのForward/Reverse processを実装でき、Mambaの状態空間モデルとTransformerの違いを定量的に比較できる。",
+ sections:[
+  {title:"Mamba：選択的状態空間モデル",
+   body:`Transformerのself-attentionはシーケンス長Nに対してO(N²)の計算量とO(N²)のメモリを消費するため、非常に長いシーケンスの処理が困難です。Mambaはこれを解決する状態空間モデル（SSM）ベースのアーキテクチャです。
+
+従来のSSM（S4等）は入力に依存しない固定の状態遷移行列Aを使うため、コンテンツに基づく情報の選択ができませんでした。Mambaの核心的な革新は「Selective SSM」で、遷移行列A・入力射影B・出力射影C・時間ステップΔをすべて入力xから動的に生成します。これにより「関連する情報は記憶し、無関係な情報は忘れる」という選択的な情報処理が可能になります。
+
+計算量はO(N)であり、並列スキャンアルゴリズムを使えば学習も効率的に行えます。推論時はRNNのように状態を逐次更新するため、KVキャッシュが不要でメモリ効率が非常に高いです。2024年時点でMamba-2・Jamba（Mamba+Transformerのハイブリッド）など多数の派生研究が進行しており、Transformerを完全に置き換えるかどうかは議論が続いています。`,
+   table: T.ssmComp,
+   afterTable:"現時点ではTransformerはLLMの主流であり続けていますが、100k〜1Mトークンの超長文脈処理ではMambaやRWKVの優位性が顕著です。実務では用途とシーケンス長に応じてアーキテクチャを選択することになります。"},
+  {title:"Diffusion Models（DDPM・DDIM）とFlow Matching",
+   body:`Diffusion Model（拡散モデル）は「データにノイズを加えるプロセス（Forward Process）」と「ノイズから元のデータを復元するプロセス（Reverse Process）」を学習する生成モデルです。DDPM（Denoising Diffusion Probabilistic Model）では、Forward Processはq(x_t|x_0)=N(√ᾱ_t・x_0, (1-ᾱ_t)I)という閉形式で表せるため、任意のタイムステップtのノイズ画像を1ステップで計算できます。
+
+ニューラルネットワーク（通常U-Netアーキテクチャ）はタイムステップtと、それに対応するノイズ画像x_tを入力として、加えられたノイズεを予測するように学習します（ε-prediction）。損失はL = E||ε - ε_θ(x_t, t)||²のシンプルなMSEです。
+
+DDIM（Denoising Diffusion Implicit Model）はDDPMのデノイジングステップを非マルコフ過程として定式化することで、決定論的な（確率ゼロの）サンプリングを可能にします。1000ステップ必要だったDDPMに対して50〜100ステップで同等品質の生成が可能で推論を高速化します。さらに最近のFlow Matching（Rectified Flow）はデータとノイズを直線的に結ぶフローを学習するより単純な定式化で、DDPMより少ないステップで高品質な生成が可能です。Stable Diffusion 3やFluxなどの最新モデルはFlow Matchingを採用しています。`,
+   code:`import torch
+import torch.nn as nn
+
+class UNetBlock(nn.Module):
+    """Diffusion ModelのU-Net構成要素（簡略）"""
+    def __init__(self, ch=64, t_dim=256):
+        super().__init__()
+        self.conv = nn.Sequential(nn.Conv2d(ch, ch, 3, padding=1), nn.GroupNorm(8, ch), nn.SiLU())
+        self.t_emb = nn.Linear(t_dim, ch)  # タイムステップ埋め込み
+
+    def forward(self, x, t_emb):
+        return self.conv(x) + self.t_emb(t_emb).view(-1, -1, 1, 1)
+
+class SinusoidalPosEmb(nn.Module):
+    """タイムステップをsin/cos埋め込みに変換"""
+    def __init__(self, dim=256):
+        super().__init__()
+        self.dim = dim
+
+    def forward(self, t):
+        half = self.dim // 2
+        freqs = torch.exp(-torch.arange(half, device=t.device) * (torch.log(torch.tensor(10000.)) / (half - 1)))
+        x = t[:, None].float() * freqs[None]
+        return torch.cat([x.sin(), x.cos()], dim=-1)
+
+emb_fn = SinusoidalPosEmb(256)
+t = torch.randint(0, 1000, (4,))
+emb = emb_fn(t)
+print("Timestep embedding shape:", emb.shape)  # (4, 256)`,
+   afterCode:"Stable DiffusionはLatent Diffusion Model（LDM）の実装です。VAEで画像を低次元の潜在空間に圧縮してからDiffusion Modelを適用することで、ピクセル空間より計算効率を大幅に向上させています。テキスト条件付けはCLIPのテキスト埋め込みをCross-Attentionで注入することで実現しています。"},
+]},
+];
+
+function DataTable({data}) {
+  return React.createElement("div", {
+    style:{overflowX:"auto",margin:"12px 0",borderRadius:10,border:"1px solid #d1d5db",background:"#fff"}
+  }, React.createElement("table", {
+    style:{width:"100%",borderCollapse:"separate",borderSpacing:0,fontSize:13}
+  }, React.createElement("thead", null, React.createElement("tr", null,
+    data.h.map((h, i) => React.createElement("th", {key:i, style:{
+      background:"linear-gradient(180deg,#eef2ff,#e0e7ff)",color:"#312e81",fontWeight:800,
+      fontSize:12.5,padding:"10px 14px",textAlign:"left",borderBottom:"2px solid #a5b4fc",
+      borderRight: i < data.h.length-1 ? "1px solid #c7d2fe" : "none"
+    }}, h))
+  )), React.createElement("tbody", null,
+    data.r.map((row, ri) => React.createElement("tr", {key:ri},
+      row.map((cell, ci) => React.createElement("td", {key:ci, style:{
+        padding:"9px 14px",
+        borderBottom: ri < data.r.length-1 ? "1px solid #e5e7eb" : "none",
+        borderRight: ci < row.length-1 ? "1px solid #f3f4f6" : "none",
+        color: ci===0 ? "#1e1b4b" : "#374151",
+        fontWeight: ci===0 ? 700 : 400,
+        fontSize:13, lineHeight:1.65, verticalAlign:"top", whiteSpace:"pre-line",
+        background: ri%2===0 ? "#fff" : "#f9fafb"
+      }}, cell))
+    ))
+  )), data.cap && React.createElement("div", {
+    style:{padding:"8px 14px",fontSize:12,color:"#6b7280",borderTop:"1px solid #e5e7eb",background:"#f9fafb"}
+  }, data.cap));
+}
+
+function Code({code, hl}) {
+  return React.createElement("pre", {
+    style:{
+      background: hl ? "#1a1a2e" : "#0d0d1a",
+      color:"#d0d0f0", padding:"14px 16px", borderRadius:10, fontSize:12,
+      lineHeight:1.65, overflowX:"auto", margin:"8px 0 0",
+      fontFamily:"'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
+      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
+      whiteSpace:"pre-wrap", wordBreak:"break-word"
+    }
+  }, React.createElement("code", null, code));
+}
+
+const diffLabel = d => d===1 ? "⭐ 基本" : d===2 ? "⭐⭐ 応用" : "⭐⭐⭐ 発展";
+const diffColor = d => d===1 ? "#16a34a" : d===2 ? "#d97706" : "#dc2626";
+
+function Exercise({ex, idx}) {
+  const [showAnswer, setShowAnswer] = useState(false);
+  return React.createElement("div", {
+    style:{borderRadius:12,border:"2px solid #f59e0b",overflow:"hidden",background:"#fff",marginBottom:8}
+  },
+    React.createElement("div", {style:{padding:"12px 16px",background:"linear-gradient(135deg,#fffbeb,#fef3c7)"}},
+      React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}},
+        React.createElement("span", {style:{background:"#f59e0b",color:"#fff",fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:6}}, "問", idx+1),
+        React.createElement("span", {style:{fontSize:12,fontWeight:700,color:diffColor(ex.diff)}}, diffLabel(ex.diff))
+      ),
+      React.createElement("p", {style:{margin:0,fontSize:13.5,lineHeight:1.8,color:"#92400e",whiteSpace:"pre-line"}}, ex.q)
+    ),
+    React.createElement("div", {style:{padding:"0 16px 12px"}},
+      React.createElement(Code, {code:ex.code, hl:true})
+    ),
+    React.createElement("div", {style:{borderTop:"1px dashed #fcd34d",padding:"10px 16px"}},
+      React.createElement("button", {
+        onClick:()=>setShowAnswer(!showAnswer),
+        style:{
+          background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+          color:"#fff",border:"none",borderRadius:8,padding:"8px 20px",fontSize:13,
+          fontWeight:700,cursor:"pointer",width:"100%"
+        }
+      }, showAnswer ? "🙈 解答を隠す" : "👀 解答例を見る"),
+      showAnswer && React.createElement("div", {style:{marginTop:10}},
+        React.createElement("div", {style:{fontSize:11,fontWeight:700,color:"#166534",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}, "✅ 解答例"),
+        React.createElement(Code, {code:ex.answer})
+      )
+    )
+  );
+}
+
+function Section({section, idx, defaultOpen}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return React.createElement("div", {
+    style:{borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",background:"#fff"}
+  },
+    React.createElement("button", {
+      onClick:()=>setOpen(!open),
+      style:{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px 16px",
+        border:"none",background:"#fafafa",cursor:"pointer",textAlign:"left",fontSize:14,fontWeight:700,color:"#1e1b4b"}
+    },
+      React.createElement("span", {style:{flexShrink:0,width:24,height:24,borderRadius:6,background:"#6366f1",
+        color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800}}, idx+1),
+      React.createElement("span", {style:{flex:1}}, section.title),
+      React.createElement("span", {style:{fontSize:18,color:"#9ca3af",transition:"transform 0.2s",
+        transform:open?"rotate(90deg)":"rotate(0)"}}, "›")
+    ),
+    open && React.createElement("div", {style:{padding:"12px 16px 16px"}},
+      section.body && React.createElement("p", {style:{margin:"0 0 8px",fontSize:13.5,lineHeight:1.85,color:"#374151",whiteSpace:"pre-line"}}, section.body),
+      section.table && React.createElement(DataTable, {data:section.table}),
+      section.afterTable && React.createElement("p", {style:{margin:"8px 0",fontSize:13.5,lineHeight:1.85,color:"#374151",whiteSpace:"pre-line"}}, section.afterTable),
+      section.code && React.createElement(Code, {code:section.code}),
+      section.afterCode && React.createElement("p", {style:{margin:"10px 0 0",fontSize:13,lineHeight:1.8,color:"#555",
+        whiteSpace:"pre-line",background:"#f9fafb",padding:"10px 14px",borderRadius:8,border:"1px solid #e5e7eb"}}, section.afterCode)
+    )
+  );
+}
+
+function PyTorchAdvancedCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+
+  return React.createElement("div", {
+    style:{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"}
+  },
+    React.createElement("div", {style:{maxWidth:1100,margin:"0 auto",padding:"20px 14px"}},
+
+      React.createElement("div", {style:{
+        background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
+        borderRadius:16,padding:"24px 20px",marginBottom:16,position:"relative",overflow:"hidden"
+      }},
+        React.createElement("div", {style:{position:"absolute",top:-30,right:-10,fontSize:140,opacity:0.05}}, "🚀"),
+        React.createElement("div", {style:{fontSize:11,fontWeight:700,color:"#a5b4fc",textTransform:"uppercase",letterSpacing:2,marginBottom:4}},
+          "Python開発者のための"),
+        React.createElement("h1", {style:{margin:0,fontSize:22,fontWeight:900,color:"#fff"}},
+          "PyTorch 上級コース"),
+        React.createElement("p", {style:{margin:"6px 0 0",fontSize:12.5,color:"#c4b5fd"}},
+          "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問 ・ 難易度⭐⭐〜⭐⭐⭐"),
+        React.createElement("p", {style:{margin:"10px 0 0",fontSize:12,color:"#ddd6fe",lineHeight:1.8}},
+          "大規模分散訓練（FSDP・DeepSpeed）・LLMファインチューニング（LoRA/QLoRA）・torch.compile・カスタムCUDAカーネル・強化学習・自己教師あり学習・量子化・最前線のアーキテクチャ（Mamba・Diffusion）を網羅します。コース修了後には、実務規模のLLM訓練・最適化・最新研究の実装ができる実践力が身につきます。"),
+        React.createElement("div", {style:{marginTop:14,display:"flex",gap:3}},
+          chapters.map((_, i) => React.createElement("div", {
+            key:i,
+            onClick:()=>{setCh(i);setMenuOpen(false);},
+            style:{flex:1,height:5,borderRadius:3,background: i<=ch?"#818cf8":"rgba(255,255,255,0.15)",cursor:"pointer"}
+          }))
+        )
+      ),
+
+      React.createElement("div", {style:{marginBottom:14}},
+        React.createElement("button", {
+          onClick:()=>setMenuOpen(!menuOpen),
+          style:{width:"100%",padding:"10px 16px",border:"1px solid #d1d5db",borderRadius:10,
+            background:"#fff",fontSize:14,fontWeight:700,color:"#1e1b4b",cursor:"pointer",
+            display:"flex",justifyContent:"space-between"}
+        },
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", {style:{fontSize:12,color:"#9ca3af"}}, menuOpen?"▲":"▼")
+        ),
+        menuOpen && React.createElement("div", {style:{
+          marginTop:4,border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden",
+          background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.08)"
+        }},
+          chapters.map((c, i) => React.createElement("button", {
+            key:c.id,
+            onClick:()=>{setCh(i);setMenuOpen(false);},
+            style:{width:"100%",padding:"10px 16px",border:"none",
+              borderBottom: i<chapters.length-1?"1px solid #f3f4f6":"none",
+              background: i===ch?"#eef2ff":"#fff",fontSize:13,
+              fontWeight: i===ch?700:500,color: i===ch?"#4338ca":"#374151",
+              cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10}
+          },
+            React.createElement("span", {style:{
+              width:22,height:22,borderRadius:"50%",
+              background: i===ch?"#6366f1":"#e5e7eb",
+              color: i===ch?"#fff":"#6b7280",
+              fontWeight:800,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0
+            }}, c.num),
+            React.createElement("span", {style:{flex:1}}, c.title),
+            EX[c.id] && React.createElement("span", {style:{fontSize:11,color:"#f59e0b",fontWeight:700}},
+              EX[c.id].length, "問")
+          ))
+        )
+      ),
+
+      React.createElement("div", {style:{display:"flex",alignItems:"center",gap:10,marginBottom:12}},
+        React.createElement("span", {style:{
+          width:36,height:36,borderRadius:"50%",
+          background:"linear-gradient(135deg,#6366f1,#8b5cf6)",
+          color:"#fff",fontWeight:900,fontSize:16,
+          display:"flex",alignItems:"center",justifyContent:"center"
+        }}, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", {style:{fontWeight:800,fontSize:18,color:"#1e1b4b"}}, chapter.title),
+          React.createElement("div", {style:{fontSize:12,color:"#6b7280"}},
+            "目安: ", chapter.est, exercises.length>0 ? ` ・ 演習${exercises.length}問` : "")
+        )
+      ),
+
+      chapter.goal && React.createElement("div", {style:{
+        background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",
+        border:"1px solid #c7d2fe",borderLeft:"4px solid #6366f1",
+        borderRadius:10,padding:"12px 16px",marginBottom:14
+      }},
+        React.createElement("div", {style:{fontSize:11,fontWeight:800,color:"#4338ca",letterSpacing:1,marginBottom:6}},
+          "🎯 この章のゴール"),
+        React.createElement("div", {style:{fontSize:13.5,color:"#1e1b4b",lineHeight:1.8,whiteSpace:"pre-line"}},
+          chapter.goal)
+      ),
+
+      React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:8}},
+        chapter.sections.map((sec, i) => React.createElement(Section, {
+          key: ch+"-"+i, section:sec, idx:i, defaultOpen:false
+        }))
+      ),
+
+      exercises.length>0 && React.createElement("div", {style:{marginTop:20}},
+        React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}},
+          React.createElement("span", {style:{background:"#f59e0b",color:"#fff",fontWeight:800,fontSize:13,padding:"4px 14px",borderRadius:8}},
+            "🏋️ 演習問題"),
+          React.createElement("span", {style:{fontSize:13,color:"#92400e"}}, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex, i) => React.createElement(Exercise, {key:ch+"-"+i, ex, idx:i}))
+      ),
+
+      React.createElement("div", {style:{display:"flex",justifyContent:"space-between",marginTop:20,gap:10}},
+        ch>0 ? React.createElement("button", {
+          onClick:()=>{setCh(ch-1);window.scrollTo(0,0);},
+          style:{flex:1,padding:"12px 16px",border:"1px solid #d1d5db",borderRadius:10,
+            background:"#fff",cursor:"pointer",fontWeight:600,fontSize:13,color:"#6b7280"}
+        }, "← Ch.", chapters[ch-1].num)
+        : React.createElement("div", {style:{flex:1}}),
+
+        ch<chapters.length-1 ? React.createElement("button", {
+          onClick:()=>{setCh(ch+1);window.scrollTo(0,0);},
+          style:{flex:1,padding:"12px 16px",border:"none",borderRadius:10,
+            background:"linear-gradient(135deg,#6366f1,#8b5cf6)",
+            cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff"}
+        }, "Ch.", chapters[ch+1].num, " →")
+        : React.createElement("a", {
+          href:"../index.html",
+          style:{flex:1,padding:"12px 16px",borderRadius:10,
+            background:"linear-gradient(135deg,#22c55e,#16a34a)",
+            color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none"}
+        }, "🎉 コース完了！")
+      ),
+
+      React.createElement("p", {style:{textAlign:"center",fontSize:11,color:"#9ca3af",marginTop:20}},
+        "pytorch.org/docs ・ PyTorch 2.x 時点")
+    )
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(PyTorchAdvancedCourse));
+  </script>
+</body>
+</html>
