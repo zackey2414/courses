@@ -13,24 +13,10 @@
     #root { min-height: 100vh; padding-top: 56px; }
     #root > div { max-width: 100%; }
     #root > div > div { max-width: 1100px !important; margin: 0 auto; }
-    .site-header {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      height: 56px; display: flex; align-items: center; padding: 0 20px;
-      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
-      border-bottom: 1px solid #e5e7eb;
-    }
-    .site-header a.home-link {
-      display: inline-flex; align-items: center; gap: 10px;
-      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
-      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
-    }
+    .site-header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 56px; display: flex; align-items: center; padding: 0 20px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e5e7eb; }
+    .site-header a.home-link { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px; padding: 6px 12px; border-radius: 10px; transition: background 0.15s; }
     .site-header a.home-link:hover { background: #eef2ff; }
-    .site-header .logo-mark {
-      width: 30px; height: 30px; border-radius: 8px;
-      background: linear-gradient(135deg,#6366f1,#8b5cf6);
-      color: #fff; display: flex; align-items: center; justify-content: center;
-      font-weight: 900; font-size: 15px;
-    }
+    .site-header .logo-mark { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 15px; }
     .site-header .logo-text { letter-spacing: -0.01em; }
     .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
   </style>
@@ -45,723 +31,739 @@
   <div id="root"></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="../assets/course-ui.js"></script>
   <script>
 const { useState } = React;
 
-const T = {
-  k2phases: { h:["フェーズ","旧フロントエンド","K2"], r:[
-    ["パース","psi tree","Fir (Frontend IR)"],
-    ["型解析","複数パス","単一パスで完結"],
-    ["スマートキャスト","限定的","cross-function flow"],
-    ["コンパイル速度","基準","最大2倍高速"],
-    ["IDE統合","Kotlin Plugin独自","K2 mode (IntelliJ 2024+)"],
-  ], cap:"K2コンパイラ フェーズ比較" },
-  kspVsKapt: { h:["比較軸","KAPT","KSP"], r:[
-    ["言語","Java APT経由","Kotlin ネイティブ"],
-    ["速度","遅い（javac起動）","最大2倍高速"],
-    ["Multiplatform","非対応","対応（KMP）"],
-    ["API","javax.annotation.*","com.google.devtools.ksp.*"],
-    ["用途","Room, Dagger（旧）","Room 2.6+, Hilt（移行中）"],
-  ], cap:"KAPT vs KSP" },
-  dispatcherTable: { h:["Dispatcher","用途","スレッド数"], r:[
-    ["Dispatchers.Default","CPU負荷処理","コア数に応じたスレッドプール"],
-    ["Dispatchers.IO","I/O処理（ファイル/DB/ネットワーク）","最大64スレッド（設定変更可）"],
-    ["Dispatchers.Main","UIスレッド（Android/Compose）","1（UIメインスレッド）"],
-    ["Dispatchers.Unconfined","テスト・特殊用途","制約なし（継承）"],
-  ], cap:"主要Dispatcherと使い分け" },
-  arrowTypes: { h:["型","意味","Pythonとの対比"], r:[
-    ["Option<A>","値があるかないか","Optional / None pattern"],
-    ["Either<E,A>","エラーか成功か","Result / Union型"],
-    ["Ior<A,B>","左・右・両方","（標準にはなし）"],
-    ["Effect<E,A>","計算の文脈","Monad（概念的）"],
-    ["Resource<A>","取得と解放","contextlib.contextmanager"],
-  ], cap:"Arrow主要型一覧" },
-  ktorLayers: { h:["レイヤ","役割","クラス例"], r:[
-    ["Route/Plugin","HTTPルーティング・認証・シリアライズ","routing { }, install(Auth)"],
-    ["UseCase","ビジネスロジック（副作用なし）","CreateOrderUseCase"],
-    ["Repository","データアクセス抽象","UserRepository (interface)"],
-    ["DataSource","DB・外部API実装","ExposedUserDataSource"],
-  ], cap:"Clean Architecture レイヤ（Ktor）" },
-  composeState: { h:["概念","説明","Pythonとの対比"], r:[
-    ["@Composable","描画ロジックを持つ関数","関数 = render()"],
-    ["remember { }","再コンポーズをまたいで値を保持","useState の保持側"],
-    ["mutableStateOf","変更可能な状態（変更で再描画）","useState のセッター起動"],
-    ["State hoisting","状態を親に持ち上げる","props + callback パターン"],
-    ["LaunchedEffect","副作用（コルーチン起動）","useEffect"],
-  ], cap:"Compose 主要概念" },
-  kotlin2x: { h:["機能","状態","概要"], r:[
-    ["Context Parameters","2.2 実験的","implicit parameter の簡潔な渡し方"],
-    ["value class","安定","インライン最適化、型安全ラッパー"],
-    ["WASM Target","2.1 安定 (wasm-js)","ブラウザ向けバイナリ出力"],
-    ["K2コンパイラ","2.0 デフォルト","全ターゲットで有効化"],
-    ["Explicit Backing Fields","実験的","カスタムgetterとフィールドの分離"],
-  ], cap:"Kotlin 2.x 主要機能" },
-};
-
 const EX = {
-ch1:[
-  {diff:2,q:"KSPプロセッサを使って @Loggable アノテーションが付いたクラスの名前をコンパイル時に収集し、ログ出力コードを生成する最小実装の骨格を書け。",
-code:`// processor/src/main/kotlin/LoggableProcessor.kt
-// 依存: com.google.devtools.ksp:symbol-processing-api
-
-import com.google.devtools.ksp.processing.*
-import com.google.devtools.ksp.symbol.*
-
-@Target(AnnotationTarget.CLASS)
-annotation class Loggable
-
-class LoggableProcessor(private val env: SymbolProcessorEnvironment) : SymbolProcessor {
-    override fun process(resolver: Resolver): List<KSAnnotated> {
-        // @Loggable が付いたクラスを収集してコード生成せよ
-        TODO()
-    }
-}`,
-answer:`import com.google.devtools.ksp.processing.*
-import com.google.devtools.ksp.symbol.*
-import com.google.devtools.ksp.validate
-
-@Target(AnnotationTarget.CLASS)
-annotation class Loggable
-
-class LoggableProcessor(private val env: SymbolProcessorEnvironment) : SymbolProcessor {
-    override fun process(resolver: Resolver): List<KSAnnotated> {
-        val symbols = resolver
-            .getSymbolsWithAnnotation(Loggable::class.qualifiedName!!)
-            .filterIsInstance<KSClassDeclaration>()
-
-        val file = env.codeGenerator.createNewFile(
-            dependencies = Dependencies(false),
-            packageName = "generated",
-            fileName = "LogRegistry"
-        )
-        file.bufferedWriter().use { w ->
-            w.write("package generated\n\n")
-            w.write("object LogRegistry {\n")
-            w.write("  val classes = listOf(\n")
-            symbols.forEach { w.write("    \"\${it.qualifiedName?.asString()}\",\n") }
-            w.write("  )\n}\n")
-        }
-        return symbols.filterNot { it.validate() }.toList()
-    }
-}
-
-// 使用側
-// println(generated.LogRegistry.classes)`},
-],
-ch2:[
-  {diff:2,q:"DispatcherをDIで注入できるように CoroutineDispatchers クラスを定義し、テストでは TestDispatcher に差し替えてdelay()をスキップするテストコードを書け。",
-code:`import kotlinx.coroutines.*
-import kotlinx.coroutines.test.*
-
-data class CoroutineDispatchers(
-    val io: CoroutineDispatcher = Dispatchers.IO,
-    val default: CoroutineDispatcher = Dispatchers.Default,
-)
-
-class DataService(private val dispatchers: CoroutineDispatchers) {
-    suspend fun loadData(): String {
-        // IO Dispatcher で delay(1000) 後に "data" を返すコードを書け
-        TODO()
-    }
-}
-
-// テストコードも書け`,
-answer:`import kotlinx.coroutines.*
-import kotlinx.coroutines.test.*
-
-data class CoroutineDispatchers(
-    val io: CoroutineDispatcher = Dispatchers.IO,
-    val default: CoroutineDispatcher = Dispatchers.Default,
-)
-
-class DataService(private val dispatchers: CoroutineDispatchers) {
-    suspend fun loadData(): String = withContext(dispatchers.io) {
-        delay(1_000)
-        "data"
-    }
-}
-
-// テスト
-fun main() = runTest {
-    val testDispatchers = CoroutineDispatchers(
-        io = StandardTestDispatcher(testScheduler),
-        default = StandardTestDispatcher(testScheduler),
-    )
-    val service = DataService(testDispatchers)
-    val result = service.loadData()  // delay はスキップされる
-    println(result)  // data
-}`},
-],
-ch3:[
-  {diff:2,q:"Arrow の Either を使って、文字列から年齢をパースし、0〜150の範囲チェックも行う関数を書け。エラーは sealed class で表現せよ。",
-code:`import arrow.core.*
-
-sealed class AgeError {
-    // ParseError と RangeError を定義せよ
-}
-
-fun parseAge(input: String): Either<AgeError, Int> {
-    // 実装せよ
-}`,
-answer:`import arrow.core.*
-
-sealed class AgeError {
-    data class ParseError(val input: String) : AgeError()
-    data class RangeError(val age: Int) : AgeError()
-}
-
-fun parseAge(input: String): Either<AgeError, Int> {
-    val age = input.toIntOrNull()
-        ?: return AgeError.ParseError(input).left()
-    return if (age in 0..150) age.right()
-    else AgeError.RangeError(age).left()
-}
-
-fun main() {
-    println(parseAge("25"))    // Either.Right(25)
-    println(parseAge("abc"))   // Either.Left(ParseError(input=abc))
-    println(parseAge("200"))   // Either.Left(RangeError(age=200))
-}`},
-],
-ch4:[
-  {diff:2,q:"Ktor で /users/{id} エンドポイントを持つ最小のClean Architecture構成を書け。Repository interfaceとその実装、UseCaseを分離すること。",
-code:`import io.ktor.server.application.*
-import io.ktor.server.routing.*
-import io.ktor.server.response.*
-
-// User, UserRepository interface, InMemoryUserRepository,
-// GetUserUseCase, そして routing { } の骨格を書け`,
-answer:`import io.ktor.server.application.*
-import io.ktor.server.engine.*
-import io.ktor.server.netty.*
-import io.ktor.server.routing.*
-import io.ktor.server.response.*
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class User(val id: Int, val name: String)
-
-interface UserRepository {
-    suspend fun findById(id: Int): User?
-}
-
-class InMemoryUserRepository : UserRepository {
-    private val store = mapOf(1 to User(1, "Alice"), 2 to User(2, "Bob"))
-    override suspend fun findById(id: Int) = store[id]
-}
-
-class GetUserUseCase(private val repo: UserRepository) {
-    suspend fun execute(id: Int): User? = repo.findById(id)
-}
-
-fun Application.configureRouting(useCase: GetUserUseCase) {
-    routing {
-        get("/users/{id}") {
-            val id = call.parameters["id"]?.toIntOrNull()
-                ?: return@get call.respond(io.ktor.http.HttpStatusCode.BadRequest)
-            val user = useCase.execute(id)
-                ?: return@get call.respond(io.ktor.http.HttpStatusCode.NotFound)
-            call.respond(user)
-        }
-    }
-}`},
-],
-ch5:[
-  {diff:2,q:"Compose Multiplatform (Desktop) で、カウンターUIを実装せよ。ボタンを押すとカウントが増え、リセットもできること。ViewModelパターンを使うこと。",
-code:`import androidx.compose.runtime.*
-import androidx.compose.ui.window.application
-// ViewModel, Counter UI を実装せよ`,
-answer:`import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.*
-
-class CounterViewModel {
-    var count by mutableStateOf(0)
-        private set
-    fun increment() { count++ }
-    fun reset() { count = 0 }
-}
-
-@Composable
-fun CounterScreen(vm: CounterViewModel = remember { CounterViewModel() }) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Count: \${vm.count}", style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = { vm.increment() }) { Text("+ 1") }
-            OutlinedButton(onClick = { vm.reset() }) { Text("Reset") }
-        }
-    }
-}
-
-fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "Counter") {
-        MaterialTheme { CounterScreen() }
-    }
-}`},
-],
-ch6:[
-  {diff:2,q:"Kotlin 2.2 の Context Parameters を使って、ロガーをコンテキストとして暗黙的に渡す関数を書け（実験的機能のため @OptIn が必要）。また、value class を使って UserId を型安全にラップせよ。",
-code:`// Context Parameters (2.2+, experimental)
-// value class UserId の定義と、context付き関数の例を書け`,
-answer:`@file:OptIn(ExperimentalContextParameters::class)
-
-import kotlin.experimental.ExperimentalContextParameters
-
-interface Logger {
-    fun log(msg: String)
-}
-
-object ConsoleLogger : Logger {
-    override fun log(msg: String) = println("[LOG] \$msg")
-}
-
-// value class: インライン最適化、型安全ラッパー
-@JvmInline
-value class UserId(val value: Int) {
-    init { require(value > 0) { "UserId must be positive" } }
-}
-
-// Context Parameters で Logger を暗黙注入
-context(logger: Logger)
-fun greetUser(id: UserId) {
-    logger.log("Hello, user \${id.value}")
-}
-
-fun main() {
-    val id = UserId(42)
-    with(ConsoleLogger) {
-        greetUser(id)  // [LOG] Hello, user 42
-    }
-
-    // value class はコンパイル後 Int に最適化される
-    // UserId(0) は IllegalArgumentException
-}`},
-],
+  ch1:[
+    {diff:2,q:"AbstractTreeVisitorを継承してIrPluginContextを受け取るシンプルなIRプラグインを実装し、全てのIrCallノードを訪問してcalleeの名前をログ出力してください。",
+     code:`// IrPluginの骨格\nclass LogAllCallsPlugin(val context: IrPluginContext) : IrElementTransformerVoid() {\n    // visitCall をオーバーライド\n}`,
+     answer:`class LogAllCallsPlugin(val context: IrPluginContext) : IrElementTransformerVoid() {\n    override fun visitCall(expression: IrCall): IrExpression {\n        val name = expression.symbol.owner.name.asString()\n        println("[plugin] call: \${name}")\n        return super.visitCall(expression)\n    }\n}\n// ComponentRegistrar で登録\nclass MyPluginRegistrar : ComponentRegistrar {\n    override fun registerProjectComponents(project: MockProject, configuration: CompilerConfiguration) {\n        IrGenerationExtension.registerExtension(project, object : IrGenerationExtension {\n            override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {\n                moduleFragment.transform(LogAllCallsPlugin(pluginContext), null)\n            }\n        })\n    }\n}`},
+    {diff:3,q:"Compiler Pluginでsuspend関数に自動タイムアウトを付与するプラグインの設計方針を説明し、withTimeout(5000)でラップするIR変換のスケッチを書いてください。",
+     code:`// @AutoTimeout アノテーション付き suspend 関数を変換\nannotation class AutoTimeout(val ms: Long = 5000)\n// IrGenerationExtension でどう変換するか`,
+     answer:`// IR変換のスケッチ（実際にはIrBuilderWithScope等を使う）\nclass AutoTimeoutTransformer(val context: IrPluginContext) : IrElementTransformerVoidWithContext() {\n    override fun visitFunction(declaration: IrFunction): IrStatement {\n        if (!declaration.isSuspend) return super.visitFunction(declaration)\n        val hasAnnotation = declaration.annotations.any {\n            it.type.classFqName?.shortName()?.asString() == "AutoTimeout"\n        }\n        if (!hasAnnotation) return super.visitFunction(declaration)\n        // 本体を withTimeout(ms) { ... } でラップする IR を生成\n        // context.referenceFunctions("kotlinx.coroutines", "withTimeout") で参照取得\n        // IrBlockBodyBuilder で新しい body を組み立て\n        println("変換対象: \${declaration.name.asString()}")\n        return super.visitFunction(declaration)\n    }\n}`},
+  ],
+  ch2:[
+    {diff:2,q:"コルーチンのContinuationを手動で使って、中断と再開を制御するシンプルな例を書いてください（suspendCoroutineを使う）。",
+     code:`import kotlin.coroutines.*\n\n// suspendCoroutine を使って手動で継続を制御\nsuspend fun manualDelay(ms: Long): Unit {\n    // Continuation を保存して後で resume\n}`,
+     answer:`import kotlin.coroutines.*\nimport java.util.concurrent.ScheduledExecutorService\nimport java.util.concurrent.TimeUnit\nimport java.util.concurrent.Executors\n\nval scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()\n\nsuspend fun manualDelay(ms: Long): Unit = suspendCoroutine { cont ->\n    scheduler.schedule({ cont.resume(Unit) }, ms, TimeUnit.MILLISECONDS)\n}\n\nfun main() = kotlinx.coroutines.runBlocking {\n    println("開始")\n    manualDelay(500)\n    println("500ms 後")\n    scheduler.shutdown()\n}`},
+    {diff:3,q:"CoroutineDispatcherを自作して、シングルスレッドで順番にディスパッチするMyDispatcherを実装してください。",
+     code:`import kotlin.coroutines.*\nimport java.util.concurrent.*\n\nclass MyDispatcher : CoroutineDispatcher() {\n    // ExecutorService をベースに実装\n}`,
+     answer:`import kotlin.coroutines.*\nimport kotlinx.coroutines.*\nimport java.util.concurrent.*\n\nclass MyDispatcher : CoroutineDispatcher() {\n    private val executor = Executors.newSingleThreadExecutor { r ->\n        Thread(r, "MyDispatcher-thread").also { it.isDaemon = true }\n    }\n    override fun dispatch(context: CoroutineContext, block: Runnable) {\n        executor.execute(block)\n    }\n    fun close() { executor.shutdown() }\n}\n\nfun main() = runBlocking {\n    val dispatcher = MyDispatcher()\n    withContext(dispatcher) {\n        println("実行スレッド: \${Thread.currentThread().name}")\n        delay(100)\n        println("完了")\n    }\n    dispatcher.close()\n}`},
+  ],
+  ch3:[
+    {diff:2,q:"Kotlin/NativeでCのmalloc/free関数をcinteropで呼び出し、メモリを確保・解放するKotlinコードを書いてください。",
+     code:`// cinterop 定義ファイル (memory.def)\nheaders = stdlib.h\n\n// NativeMain でmalloc/freeを呼ぶ`,
+     answer:`// memory.def\nheaders = stdlib.h\n\n// NativeMain.kt\nimport kotlinx.cinterop.*\nimport platform.posix.*\n\nfun main() {\n    // 100バイトのメモリを確保\n    val ptr = malloc(100.toULong())\n        ?: error("メモリ確保失敗")\n    try {\n        // メモリに書き込み\n        val bytePtr = ptr.reinterpret<ByteVar>()\n        for (i in 0 until 10) { bytePtr[i] = (i + 65).toByte() }\n        // 読み取り\n        val str = bytePtr.toKString()\n        println(str.take(10)) // ABCDEFGHIJ\n    } finally {\n        free(ptr) // 必ず解放\n    }\n}`},
+    {diff:3,q:"Kotlin/NativeでCのコールバック（関数ポインタ）をstaticiCFunctionを使って実装し、Cのqsortにコンパレータを渡すコードを書いてください。",
+     code:`import kotlinx.cinterop.*\nimport platform.posix.*\n\n// staticCFunction で Cのコールバックを作る\n// qsort に渡して整数配列をソート`,
+     answer:`import kotlinx.cinterop.*\nimport platform.posix.*\n\nfun main() {\n    val nums = intArrayOf(5, 2, 8, 1, 9, 3)\n    val comparator = staticCFunction<CPointer<*>?, CPointer<*>?, Int> { a, b ->\n        val ia = a!!.reinterpret<IntVar>().pointed.value\n        val ib = b!!.reinterpret<IntVar>().pointed.value\n        ia - ib\n    }\n    nums.usePinned { pinned ->\n        qsort(pinned.addressOf(0), nums.size.toULong(), sizeOf<IntVar>().toULong(), comparator)\n    }\n    println(nums.toList()) // [1, 2, 3, 5, 8, 9]\n}`},
+  ],
+  ch4:[
+    {diff:2,q:"KSPプロセッサを実装して、@Repositoryアノテーションが付いたクラスの一覧をresources/repositories.txtに書き出すコードを書いてください。",
+     code:`// RepositoryProcessor.kt\nclass RepositoryProcessor(val env: SymbolProcessorEnvironment) : SymbolProcessor {\n    override fun process(resolver: Resolver): List<KSAnnotated> {\n        // @Repository アノテーション付きクラスを収集して出力\n    }\n}`,
+     answer:`class RepositoryProcessor(val env: SymbolProcessorEnvironment) : SymbolProcessor {\n    override fun process(resolver: Resolver): List<KSAnnotated> {\n        val symbols = resolver.getSymbolsWithAnnotation("com.example.Repository")\n        val names = symbols\n            .filterIsInstance<KSClassDeclaration>()\n            .map { it.qualifiedName?.asString() ?: it.simpleName.asString() }\n            .toList()\n        if (names.isNotEmpty()) {\n            val file = env.codeGenerator.createNewFile(\n                Dependencies(false), "", "repositories", "txt"\n            )\n            file.writer().use { it.write(names.joinToString("\\n")) }\n        }\n        return emptyList()\n    }\n}`},
+    {diff:3,q:"KSPで@AutoBuilderアノテーション付きdata classのBuilderクラスを自動生成するプロセッサを書いてください。",
+     code:`// 入力\n@AutoBuilder\ndata class User(val name: String, val age: Int, val email: String = "")\n// 出力期待: UserBuilder クラス（各フィールドのセッター + build()）`,
+     answer:`class AutoBuilderProcessor(val env: SymbolProcessorEnvironment) : SymbolProcessor {\n    override fun process(resolver: Resolver): List<KSAnnotated> {\n        resolver.getSymbolsWithAnnotation("AutoBuilder")\n            .filterIsInstance<KSClassDeclaration>()\n            .forEach { cls ->\n                val params = cls.primaryConstructor?.parameters ?: return@forEach\n                val pkg  = cls.packageName.asString()\n                val name = cls.simpleName.asString()\n                val file = env.codeGenerator.createNewFile(Dependencies(false), pkg, "\${name}Builder")\n                file.writer().use { w ->\n                    w.write("package \${pkg}\\n\\n")\n                    w.write("class \${name}Builder {\\n")\n                    params.forEach { p ->\n                        val pName = p.name!!.asString()\n                        val pType = p.type.resolve().declaration.simpleName.asString()\n                        w.write("  var \${pName}: \${pType}? = null\\n")\n                    }\n                    w.write("  fun build() = \${name}(\${params.joinToString(",") { "\${it.name!!.asString()}=\${it.name!!.asString()}!!" }})\\n")\n                    w.write("}\\n")\n                }\n            }\n        return emptyList()\n    }\n}`},
+  ],
+  ch5:[
+    {diff:2,q:"Arrow-ktのEffect（旧IO/Raise）を使って、エラー蓄積（accumulating errors）バリデーションを実装してください。",
+     code:`import arrow.core.*\nimport arrow.core.raise.*\n\ndata class UserInput(val name: String, val age: Int, val email: String)\ndata class ValidUser(val name: String, val age: Int, val email: String)\n// 全バリデーションエラーを蓄積して返す`,
+     answer:`import arrow.core.*\nimport arrow.core.raise.*\n\ndata class UserInput(val name: String, val age: Int, val email: String)\ndata class ValidUser(val name: String, val age: Int, val email: String)\n\nfun validate(input: UserInput): Either<Nel<String>, ValidUser> = either {\n    zipOrAccumulate(\n        { ensure(input.name.isNotBlank()) { "名前は必須" } },\n        { ensure(input.age in 0..150)    { "年齢は0〜150" } },\n        { ensure(input.email.contains("@")) { "メールが不正" } }\n    ) { _, _, _ -> ValidUser(input.name, input.age, input.email) }\n}\n\nfun main() {\n    println(validate(UserInput("", -1, "bad")))\n    // Left(NonEmptyList(名前は必須, 年齢は0〜150, メールが不正))\n    println(validate(UserInput("Alice", 30, "a@b.com")))\n    // Right(ValidUser(name=Alice, age=30, email=a@b.com))\n}`},
+    {diff:3,q:"Arrow-ktのOpticsを使って、ネストしたドメインモデルの特定フィールドをLensで更新するコードを書いてください（3レベルのネスト）。",
+     code:`import arrow.optics.*\n\n@optics data class Street(val name: String, val number: Int) { companion object }\n@optics data class Address(val city: String, val street: Street) { companion object }\n@optics data class Company(val name: String, val address: Address) { companion object }\n// street.number を Lens で更新`,
+     answer:`import arrow.optics.*\n\n@optics data class Street(val name: String, val number: Int) { companion object }\n@optics data class Address(val city: String, val street: Street) { companion object }\n@optics data class Company(val name: String, val address: Address) { companion object }\n\nfun main() {\n    val company = Company("JetBrains", Address("Prague", Street("V Parku", 2308)))\n\n    // 3段ネストのLens合成\n    val streetNumberLens = Company.address compose Address.street compose Street.number\n    val updated = streetNumberLens.modify(company) { it + 1 }\n    println(updated.address.street.number)  // 2309\n\n    // Prism との合成（sealed class内）\n    println(Company.address.city.get(company)) // Prague\n}`},
+  ],
+  ch6:[
+    {diff:2,q:"Ktor（バックエンド） + React（フロントエンド、Kotlin/JS）のKMPフルスタック構成で、共通のデータモデルを共有するプロジェクト構造を設計してください。",
+     code:`// build.gradle.kts の構成\n// shared/ commonMain に @Serializable な API モデル\n// server/ は Ktor JVM\n// client/ は React KMP（Kotlin/JS）`,
+     answer:`// settings.gradle.kts\ninclude(":shared", ":server", ":client")\n\n// shared/build.gradle.kts\nplugins { kotlin("multiplatform"); kotlin("plugin.serialization") }\nkotlin {\n    jvm(); js(IR) { browser() }\n    sourceSets.commonMain.dependencies {\n        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")\n    }\n}\n// shared/src/commonMain/ApiModels.kt\n@Serializable data class Post(val id: Int, val title: String, val body: String)\n\n// server/build.gradle.kts\ndependencies { implementation(project(":shared")); implementation("io.ktor:ktor-server-netty:2.3.7") }\n\n// client/build.gradle.kts\ndependencies { implementation(project(":shared")); implementation("org.jetbrains.kotlin-wrappers:kotlin-react:18.2.0-pre.681") }`},
+    {diff:3,q:"Kotlin/JSでReactコンポーネントを実装し、共通モジュールのAPIクライアントを呼んでデータを表示するコードを書いてください。",
+     code:`// Kotlin/JS React コンポーネント\n// 共通の ApiClient を使って /api/posts を取得し表示`,
+     answer:`import react.*\nimport react.dom.html.ReactHTML.div\nimport react.dom.html.ReactHTML.ul\nimport react.dom.html.ReactHTML.li\nimport react.dom.html.ReactHTML.h2\nimport kotlinx.coroutines.*\n\nexternal interface PostListProps : Props\n\nval PostList = FC<PostListProps> {\n    val (posts, setPosts) = useState<List<Post>>(emptyList())\n    val (loading, setLoading) = useState(true)\n\n    useEffect {\n        MainScope().launch {\n            try {\n                val result = ApiClient.fetchPosts() // commonMainのクライアント\n                setPosts(result)\n            } finally { setLoading(false) }\n        }\n    }\n\n    div {\n        if (loading) +\"読み込み中...\"\n        else ul {\n            posts.forEach { post ->\n                li { key=post.id.toString(); +post.title }\n            }\n        }\n    }\n}`},
+  ],
+  ch7:[
+    {diff:2,q:"JVMのJFR（Java Flight Recorder）を使ってコルーチンのパフォーマンスを計測し、bottleneckを特定するコードを書いてください。",
+     code:`import jdk.jfr.*\n// カスタムJFRイベントを定義してコルーチンの実行時間を計測`,
+     answer:`import jdk.jfr.*\nimport kotlinx.coroutines.*\n\n@Label("Coroutine Execution")\n@Category("Kotlin", "Coroutines")\nclass CoroutineEvent : Event() {\n    @Label("Function Name") lateinit var functionName: String\n    @Label("Duration ms") var durationMs: Long = 0\n}\n\nsuspend fun <T> measureCoroutine(name: String, block: suspend () -> T): T {\n    val event = CoroutineEvent().apply { this.functionName = name; begin() }\n    val start = System.currentTimeMillis()\n    return try { block() }\n    finally {\n        event.durationMs = System.currentTimeMillis() - start\n        event.commit()\n        println("[JFR] \${name}: \${event.durationMs}ms")\n    }\n}\n\nfun main() = runBlocking {\n    measureCoroutine("fetchData") {\n        delay(100)\n        "result"\n    }\n}`},
+    {diff:3,q:"GraalVM Native Imageを使ってKotlinアプリをネイティブバイナリにコンパイルするGradleタスクとreflect-config.jsonを設定してください。",
+     code:`// build.gradle.kts に GraalVM プラグインを追加\n// reflect-config.json でリフレクション設定`,
+     answer:`// build.gradle.kts\nplugins {\n    kotlin("jvm") version "2.0.21"\n    id("org.graalvm.buildtools.native") version "0.9.28"\n}\ngraalvmNative {\n    binaries.named("main") {\n        imageName.set("myapp")\n        mainClass.set("MainKt")\n        buildArgs.add("--no-fallback")\n        buildArgs.add("-O2")\n    }\n}\n\n// src/main/resources/META-INF/native-image/reflect-config.json\n// [\n//   {"name":"com.example.MyClass","allDeclaredMethods":true,"allDeclaredFields":true},\n//   {"name":"kotlinx.serialization.json.JsonKt","allDeclaredMethods":true}\n// ]\n\n// ビルドコマンド\n// ./gradlew nativeCompile\n// ./build/native/nativeCompile/myapp（起動 <10ms）`},
+  ],
+  ch8:[
+    {diff:2,q:"MavenCentralにKotlinライブラリをpublishするbuild.gradle.ktsとgithub actionsのworkflowを書いてください。",
+     code:`// build.gradle.kts\n// maven-publish + signing の設定\n// github actions: tagプッシュでMavenCentralへリリース`,
+     answer:`// build.gradle.kts\nplugins {\n    kotlin("jvm") version "2.0.21"\n    id("maven-publish"); id("signing")\n}\ngroup = "com.example"; version = "1.0.0"\njava { withSourcesJar(); withJavadocJar() }\npublishing {\n    publications.create<MavenPublication>("maven") {\n        from(components["java"])\n        pom {\n            name.set("MyLib"); description.set("A Kotlin library")\n            url.set("https://github.com/example/mylib")\n            licenses { license { name.set("Apache-2.0") } }\n            developers { developer { id.set("me"); name.set("Dev") } }\n            scm { url.set("https://github.com/example/mylib") }\n        }\n    }\n    repositories { maven { name="OSSRH"; url=uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/") }\n}\nsigning { sign(publishing.publications["maven"]) }\n\n// .github/workflows/release.yml（骨格）\n// on: push: tags: ['v*']\n// jobs: publish: steps: [checkout, java 21, ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository]`},
+    {diff:3,q:"Kotlinライブラリの後方互換性を検証するBinary Compatibility Validatorをセットアップし、publicAPIの変更を検出するGradleタスクを書いてください。",
+     code:`// build.gradle.kts\n// kotlin-binary-compatibility-validator プラグインを追加\n// api/*.api ファイルとの差分で互換性チェック`,
+     answer:`// build.gradle.kts\nplugins {\n    kotlin("jvm") version "2.0.21"\n    id("org.jetbrains.kotlinx.binary-compatibility-validator") version "0.14.0"\n}\napiValidation {\n    ignoredClasses.add("com.example.internal.*")\n    nonPublicMarkers.add("com.example.InternalApi")\n}\n// ./gradlew apiDump   → api/mylib.api ファイルを生成\n// ./gradlew apiCheck  → コミット済み api/ との差分を検査（CI で使用）\n\n// github actions CI 設定\n// - name: API Compatibility Check\n//   run: ./gradlew apiCheck\n// → public API が変更されているとビルド失敗\n// → 意図的な変更は apiDump でスナップショット更新`},
+  ],
 };
 
 const chapters = [
-{id:"ch1",num:1,title:"Kotlinコンパイラ内部（K2）",est:"65分",
-goal:"K2コンパイラが旧フロントエンドより高速な理由を説明できる。KSPを使ってアノテーション処理とコード生成の最小実装を書ける。KAPTとKSPの違いを選択の根拠とともに説明できる。",
-sections:[
-{title:"K2コンパイラの改善点",
-body:`Kotlin 2.0からデフォルトになったK2コンパイラは、フロントエンド（型解析・シンタックスチェック）を完全に書き直したものです。旧フロントエンドは複数パスで解析していたため、Null安全のスマートキャストやインクリメンタルコンパイルに限界がありました。K2では単一パスでFrontend IR（FIR）を生成し、コンパイル速度は最大2倍向上しています。
+  {id:"ch1",num:1,title:"Compiler Plugin開発",est:"70分",
+   goal:"Kotlinコンパイラのプラグインアーキテクチャを理解し、IrGenerationExtensionを使ってIR（中間表現）を変換するプラグインを実装できる。アノテーション処理と組み合わせてコード生成の自動化ができるようになる。",
+   sections:[
+    {title:"Kotlinコンパイラの内部アーキテクチャとIR",
+     body:`Kotlinコンパイラは複数のフロントエンドとバックエンドを持つ複雑な処理パイプラインです。ソースコード→PSI（Program Structure Interface）→フロントエンドIR（FIR）→バックエンドIR（IR）→JVMバイトコード/JS/Nativeという流れで処理されます。Pythonのast モジュールでASTを操作するのと概念的に近いですが、Kotlinのコンパイラプラグインははるかに強力です。\n\nIR（Intermediate Representation）はコンパイラの中間表現で、型付きのASTと考えられます。IrGenerationExtensionを実装することで、コンパイルの最後の段階でIRを変換できます。関数の本体を書き換えたり、新しい関数を追加したり、アノテーションに基づいてコードを変換したりできます。\n\nKotlinコンパイラプラグインの実用例：kotlinx.serializationはクラスのserialize/deserialize関数を自動生成します。KotestはDSLの型チェックを強化します。Composed（Jetpack Compose）はComposable関数を変換してComposeランタイムが扱える形に変換します。これらは全てCompiler Pluginとして実装されています。`,
+     code:`// build.gradle.kts（プラグインプロジェクト）
+plugins {
+    kotlin("jvm") version "2.0.21"
+    kotlin("kapt")
+}
+dependencies {
+    compileOnly("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21")
+    kapt("com.google.auto.service:auto-service:1.1.1")
+    compileOnly("com.google.auto.service:auto-service-annotations:1.1.1")
+}
 
-実務での影響は大きく、GradleのKotlinビルドが体感できるほど速くなります。またクロスファンクションスマートキャスト（関数呼び出しをまたいだnull性の伝播）やsealed classの解析精度も向上しています。IntelliJ 2024+のK2 modeをONにすると、IDE上の型推論もK2エンジンで動作します。
+// ComponentRegistrar.kt
+@AutoService(ComponentRegistrar::class)
+class MyPluginRegistrar : ComponentRegistrar {
+    override val supportsK2 = true
+    override fun registerProjectComponents(
+        project: MockProject, configuration: CompilerConfiguration
+    ) {
+        IrGenerationExtension.registerExtension(
+            project, MyIrGenerationExtension(configuration)
+        )
+    }
+}
+class MyIrGenerationExtension(val config: CompilerConfiguration) : IrGenerationExtension {
+    override fun generate(module: IrModuleFragment, context: IrPluginContext) {
+        module.transform(MyTransformer(context), null)
+    }
+}`,
+     afterCode:"K2コンパイラ（Kotlin 2.0以降のデフォルト）ではFIRプラグインAPIが変わっています。ComponentRegistrarのsupportsK2=trueを設定することでK2互換を宣言できます。FirExtensionRegistrarを使った新しいAPIに移行する際は公式ドキュメントのK2 Migrationガイドを参照してください。"},
+    {title:"IRトランスフォーマーの実装",
+     body:`IrElementTransformerVoidを継承してvisit*メソッドをオーバーライドすることでIRノードを変換します。visitFunction・visitCall・visitClass等の各ノード種別に対応したメソッドがあります。Pythonのast.NodeTransformerと同じ設計パターンです。\n\n新しいIRノードの生成にはIrBuilderWithScopeやIrBlockBodyBuilderを使います。IrPluginContextからKotlinの標準ライブラリ関数（delay・withTimeout等）へのシンボル参照を取得し、IrCallノードを組み立てます。型情報（IrType）も正確に扱う必要があり、型の不一致はコンパイラのパニックを引き起こします。\n\nデバッグにはdumpKotlinLike()メソッドが有効です。変換前後のIRをKotlinコードとして出力することで、変換が期待通りか視覚的に確認できます。プラグインのテストは通常別プロジェクトを用意し、対象プラグインを依存に追加してKotlinコードをコンパイルする形で行います。`,
+     code:`// IRトランスフォーマーの実装例（関数呼び出しをログ出力でラップ）
+class LoggingTransformer(val context: IrPluginContext) : IrElementTransformerVoidWithContext() {
+    private val printlnFun = context.referenceFunctions(
+        CallableId(FqName("kotlin.io"), Name.identifier("println"))
+    ).first { it.owner.valueParameters.size == 1 }
 
-Pythonの型チェッカー（mypy/pyright）と比べると、KotlinのK2はコンパイラ組み込みで追加ツール不要という点が大きな違いです。K2は言語仕様の変更なしにコンパイラ内部を置き換えたため、既存コードはほぼそのまま動作します。`,
-table:T.k2phases,
-afterTable:`K2移行で問題が起きるのは主にコンパイラプラグイン（KAPT/KSP・Serializationなど）です。kotlinx.serialization 1.7+、Room 2.6+、Hilt 2.51+はK2対応済みです。自社のコンパイラプラグインがある場合はFIR APIへの移行が必要になります。`},
-{title:"KSPによるコード生成",
-body:`KSP（Kotlin Symbol Processing）はアノテーション処理とコード生成のための公式フレームワークです。旧来のKAPTはJavaのAnnotation Processing Tool経由でJavacを起動するため遅く、Kotlin Multiplatformにも対応していませんでした。KSPはKotlinのシンボルツリー（KSAnnotated/KSClassDeclaration等）を直接走査するため高速で、KMPにもフルに対応しています。
+    override fun visitFunction(declaration: IrFunction): IrStatement {
+        // @Logged アノテーションが付いている場合のみ変換
+        val hasLogged = declaration.annotations.any {
+            it.type.classFqName?.shortName()?.asString() == "Logged"
+        }
+        if (!hasLogged) return super.visitFunction(declaration)
 
-実務でKSPが使われる代表的なケースはRoomのDAOコード生成、Hiltの依存注入コード生成、Moshiのアダプター生成などです。自社ライブラリで「アノテーションを付けるだけで定型コードを自動生成したい」という要件にも応えられます。
+        val name = declaration.name.asString()
+        declaration.body = context.irFactory.createBlockBody(
+            declaration.startOffset, declaration.endOffset
+        ) {
+            // println(">> functionName") を先頭に挿入
+            // ... IrCall を使ってprintlnを呼ぶ
+            // 元の body の statement を追加
+        }
+        return declaration
+    }
+}`,
+     afterCode:"KotlinコンパイラプラグインのAPIはKotlinのマイナーバージョン間でも変更されることがあります。プラグインの依存はkotlin-compiler-embeddableを使い、バージョンを固定して管理します。Kotlinのメジャーバージョンアップ時に必ずプラグインの互換性テストを行ってください。"},
+  ]},
+  {id:"ch2",num:2,title:"コルーチン内部実装（Continuation・Dispatcher）",est:"70分",
+   goal:"Kotlinコルーチンがどのようにstatemachineにコンパイルされるかを理解する。Continuationインターフェースを手動で実装し、カスタムCoroutineDispatcherを作成できる。コルーチンのスケジューリングと構造化された同時実行の内部動作を説明できるようになる。",
+   sections:[
+    {title:"ステートマシンへのコンパイルとContinuation",
+     body:`suspend関数はコンパイル時にContinuationPassing Style（CPS）に変換されます。各suspend呼び出しポイントがステートマシンの状態（state）になり、再開時にどのポイントから実行を続けるかを管理します。Pythonのジェネレータが内部でstatemachineになるのと同じ原理です。\n\nコンパイルされたsuspend関数は「最後の引数にContinuation<T>が追加されたメソッド」になります。suspend fun fetch(): Stringはfun fetch(cont: Continuation<String>): Anyにコンパイルされます。中断時はCORROUTINE_SUSPENDEDを返し、完了時はcont.resumeWith(Result.success(value))を呼びます。\n\nsuspendCoroutineまたはsuspendCancellableCoroutineを使うと、Continuation<T>に直接アクセスして保存・後で再開するコードを書けます。これがThreadをブリッジしたり、コールバックAPIをsuspend関数にラップしたりするための基盤です。kotlin.coroutinesパッケージの低レベルAPIを理解することで、既存の非同期ライブラリとの統合が容易になります。`,
+     code:`import kotlin.coroutines.*
+import kotlinx.coroutines.*
 
-PythonのメタクラスやデコレーターでできるようなことをKotlinではKSPで実現します。ただしPythonが実行時に動的にクラスを変更するのに対し、KSPはコンパイル時にソースコードを生成する点が根本的に異なります。生成されたコードはbuild/generated以下に置かれ、通常のKotlinコードとして型チェックされます。`,
-table:T.kspVsKapt,
-afterTable:`KSPプロセッサの設定はbuild.gradle.ktsに plugins { id("com.google.devtools.ksp") version "2.0.21-1.0.25" } を追加し、dependencies { ksp(":my-processor") } で登録します。生成コードはksp/src/main/kotlin以下に置きます。`},
-]},
-{id:"ch2",num:2,title:"高度なCoroutines",est:"65分",
-goal:"CPSとしてのsuspend関数の変換を説明できる。DispatcherとスレッドプールをDI可能な形で設計できる。kotlinx-coroutines-debugを使ってCoroutineのスタックトレースをデバッグできる。",
-sections:[
-{title:"CPS変換とDispatcher管理",
-body:`suspend関数はコンパイル時にCPS（Continuation Passing Style）変換されます。fun fetchUser(): String がsuspendになると、コンパイラは末尾引数にContinuation<String>を追加し、resumeWith()で結果を返す形に書き換えます。これによりスレッドをブロックせずに中断・再開できます。Pythonのasyncioがイベントループとコルーチンオブジェクトで実現していることを、KotlinはJVMバイトコードレベルで実現しています。
+// Continuation を手動で操作するコールバックブリッジ
+fun <T> callbackToCoroutine(
+    doAsync: (callback: (T?, Throwable?) -> Unit) -> Unit
+): suspend () -> T = {
+    suspendCancellableCoroutine { cont ->
+        doAsync { result, error ->
+            when {
+                cont.isActive && error != null -> cont.resumeWithException(error)
+                cont.isActive && result != null -> cont.resume(result)
+            }
+        }
+        cont.invokeOnCancellation { /* クリーンアップ */ }
+    }
+}
 
-DispatcherはCoroutineがどのスレッドで実行されるかを制御します。実務での重要なパターンは「DispatcherをDIで注入してテスト時にTestDispatcherに差し替える」です。これによりrunTest { }内でdelay()を仮想時間でスキップでき、1秒のdelayをテストで0msで実行できます。スレッドのブロッキングを検知するBlockingCoroutineDispatcherも開発中の診断に有効です。
+// 使用例：コールバックAPIをsuspendに変換
+fun legacyApiCall(callback: (String?, Throwable?) -> Unit) {
+    Thread { Thread.sleep(100); callback("result", null) }.start()
+}
 
-Dispatchers.IOは最大64スレッドのプールを持ちますが、limitedParallelism(n)で上限を絞れます。データベース接続プールが10本しかない場合にDispatchers.IO.limitedParallelism(10)とするなど、リソース競合を防ぐ設計が実務では重要です。`,
-table:T.dispatcherTable,
-afterTable:`withContext(Dispatchers.IO) { } でブロッキングI/Oを安全に実行できます。Android開発ではViewModelScope（Main）でUI更新し、withContext(IO)でDB/APIを呼ぶパターンが標準です。`},
-{title:"kotlinx-coroutines-debugとStructured Concurrency",
-body:`kotlinx-coroutines-debugライブラリを追加すると、CoroutineのスタックトレースがJVMの通常スタックトレースに統合されます。通常のCoroutineは中断点で「どのsuspend関数から呼ばれたか」がスタックに残らないため、例外発生時の原因特定が難しいです。debug modeでは各Coroutineの名前と発生元コードをスタックトレースに含めてくれます。
-
-CoroutineDebugger.install()またはVM引数に -ea -Dkotlinx.coroutines.debug を追加するだけで有効になります。また、DebugProbes.dumpCoroutinesを使うとプロセス内の全アクティブCoroutineを一覧できます。これはCoroutineリークの調査に非常に有効です。
-
-Structured Concurrencyの原則として「子Coroutineの失敗は親に伝播し、親がキャンセルされると全子がキャンセルされる」があります。supervisorScope { }を使うと一部の子の失敗が他に影響しないようにできます。Pythonのasyncio.gather(return_exceptions=True)と似ていますが、スコープによる構造化という概念がより明確です。`,
-code:`import kotlinx.coroutines.*
-import kotlinx.coroutines.debug.*
+suspend fun modernApiCall(): String = suspendCancellableCoroutine { cont ->
+    legacyApiCall { result, error ->
+        if (error != null) cont.resumeWithException(error)
+        else cont.resume(result ?: "")
+    }
+}
 
 fun main() = runBlocking {
-    // 名前付きCoroutineでデバッグしやすくする
-    val job = launch(CoroutineName("DataFetcher") + Dispatchers.IO) {
-        delay(500)
-        println("fetched in \${Thread.currentThread().name}")
-    }
-    // supervisorScope: 子の失敗が他に影響しない
-    supervisorScope {
-        val a = async { delay(100); "A" }
-        val b = async { throw RuntimeException("B failed") }
-        println(a.await())                  // A
-        println(runCatching { b.await() })  // Failure(...)
-    }
-    job.join()
+    println(modernApiCall()) // "result"
 }`,
-afterCode:`テスト時は runTest { } と StandardTestDispatcher を組み合わせましょう。advanceTimeBy(1000) で仮想時間を進めてdelayをスキップできます。`},
-]},
-{id:"ch3",num:3,title:"Arrowで関数型プログラミング",est:"65分",
-goal:"Arrow の Option/Either/raise DSL を使ってエラー処理を型安全に書ける。Effect System の概念を説明し、Pythonのmonadic patternとの違いを述べられる。",
-sections:[
-{title:"Option・Either・raise DSL",
-body:`ArrowはKotlin向けの関数型プログラミングライブラリです。Option<A>はnullの代わりに「値があるかないか」を型で表現し、Either<E,A>は「エラーか成功か」を表現します。PythonではOptionalをNoneチェックで扱い、エラーはResult型や例外で扱いますが、Arrowではこれらをモナドとしてチェーン可能にします。
+     afterCode:"Continuationのresume/resumeWithExceptionはスレッドセーフに呼べますが、同じContinuationを2回resumeするとIllegalStateExceptionになります。コールバックが複数回呼ばれる可能性がある場合はAtomicBooleanで一度だけresumeするガードを設けてください。"},
+    {title:"CoroutineDispatcherとStructured Concurrency",
+     body:`CoroutineDispatcherはコルーチンをどのスレッド/スレッドプールで実行するかを決定します。Dispatchers.IO・Dispatchers.Default・Dispatchers.Mainがデフォルトで提供されます。カスタムDispatcherはCoroutineDispatcher抽象クラスを継承しdispatch(context, block)を実装します。これはPythonのasyncio.set_event_loop_policy()でイベントループを差し替えるのに相当します。\n\nStructured Concurrency（構造化された同時実行）はコルーチンの「親子関係」によってライフサイクルを管理します。子コルーチンが完了するまで親は終わらず、親がキャンセルされると全子がキャンセルされます。この仕組みにより「起動したコルーチンが迷子になる（leaked coroutine）」問題を防ぎます。\n\nCoroutineScope.coroutineContextはJob・Dispatcher・CoroutineName等の要素を持ちます。withContext(Dispatchers.IO + CoroutineName("fetch"))のように複数の要素を+で組み合わせられます。launch/asyncのcontextパラメーターでジョブを共有したり、新しいスコープでアイソレーションを作ったりできます。`,
+     code:`import kotlin.coroutines.*
+import kotlinx.coroutines.*
+import java.util.concurrent.Executors
 
-raise DSLはArrow 2.0で導入された直感的なエラーハンドリング方法です。effect { } ブロック内でraise(error)を呼ぶと型安全にエラーを返せ、ネストしたEitherのflatMapを書く必要がなくなります。PythonのContextManagerを使ったwith構文に似た「計算のコンテキスト」を提供します。
+// カスタム Dispatcher（ワークスティーリング付きExecutor）
+class BoundedDispatcher(threads: Int) : CoroutineDispatcher() {
+    private val executor = Executors.newWorkStealingPool(threads)
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+        executor.execute(block)
+    }
+    fun shutdown() { executor.shutdown() }
+}
 
-Pythonの関数型ライブラリ（returns, pymonad）と比べると、Arrowはコルーチンと統合しており、suspend関数の中でraiseが使えます。型システムと統合されているためランタイムエラーをコンパイル時に検出できる点が最大のメリットです。`,
-table:T.arrowTypes,
-afterTable:`Arrowの追加はbuild.gradle.ktsに implementation("io.arrow-kt:arrow-core:2.0.0") と implementation("io.arrow-kt:arrow-fx-coroutines:2.0.0") を追加します。`},
-{title:"Effect SystemとPythonとの比較",
-body:`Effect System（またはEffect Monad）は「副作用を型に表現する」概念です。ArrowのEffect<E,A>は「エラーEが起きうる、値Aを返す計算」を表します。通常の関数呼び出しと見た目は変わりませんが、エラー型がシグネチャに現れるためAPIの使い手がエラーハンドリングを強制されます。
+// Structured Concurrency の確認
+fun main() = runBlocking {
+    val parent = launch {
+        val child1 = launch {
+            delay(1000)
+            println("子1完了") // キャンセルされた場合は実行されない
+        }
+        val child2 = launch {
+            delay(500)
+            println("子2完了")
+        }
+        // parent をキャンセルすると child1・child2 も自動キャンセル
+    }
+    delay(200)
+    parent.cancelAndJoin() // 子コルーチンも含めてキャンセル
+    println("全終了（子1は未完了）")
+}`,
+     afterCode:"GlobalScope.launchはStructured Concurrencyの外側で動作するため、コルーチンが迷子になるリスクがあります。アプリケーションのトップレベルスコープ（CoroutineScope(SupervisorJob() + Dispatchers.Default)）を自前で管理するか、DI経由でinjectionすることが推奨されます。"},
+  ]},
+  {id:"ch3",num:3,title:"Kotlin/Native・C interop",est:"65分",
+   goal:"Kotlin/NativeのメモリモデルとcinteropによるCライブラリ連携を実装できる。staticCFunctionでCコールバックを作成し、POSIX・platform APIを使ったシステムプログラミングができるようになる。",
+   sections:[
+    {title:"Kotlin/Nativeのメモリモデルとcinterop",
+     body:`Kotlin/NativeはKotlinコードをLLVMを通じてネイティブバイナリにコンパイルします。JVMなしで動作し、iOSアプリのFramework・Linux/Windows実行ファイル・WebAssemblyとして出力できます。Pythonのctypesでネイティブライブラリを呼ぶのに相当しますが、静的型付けのためより安全です。\n\ncinteropはCのヘッダーファイルからKotlinのバインディング（.klib）を生成するツールです。.defファイルでヘッダーとリンクするライブラリを指定し、gradlewタスクで自動生成します。生成されたバインディングでCのstructをKotlinの型として安全にアクセスできます。\n\nKotlin/Nativeのメモリ管理はGCではなくSwiftに似たARC（自動参照カウント）ベースです。Kotlin 1.7.20以降は新しいメモリマネージャー（Unified Memory Manager）がデフォルトになり、JVM側と同様のGCが使われます。Cのメモリ（malloc/free）はKotlinのGCの管理外なので、必ずfinallyブロックで解放してください。`,
+     code:`// cinterop 定義ファイル: libcurl.def
+headers = curl/curl.h
+linkerOpts = -lcurl
+compilerOpts = -I/usr/include
 
-PythonのResult型パターン（return (value, None) or (None, error)）と比べると、ArrowはEitherをflatMapでチェーンできるため、複数のエラーを持つ処理を読みやすく書けます。また、Pythonではエラーをraise/exceptで扱う命令型スタイルが主流ですが、Arrowでは「エラーも値として扱う」宣言的スタイルです。
+// Main.kt（libcurl を使って HTTP GET）
+import kotlinx.cinterop.*
+import libcurl.*
 
-実務では「例外をどこでcatchするか」問題（外側のtry-catchが深くなる）をEitherで解消できます。ただし全コードをArrowで書くのではなく、コアなビジネスロジック層のエラー表現にEitherを使い、エッジ（HTTP handler等）で変換するのが現実的な設計です。`,
-code:`import arrow.core.*
+fun httpGet(url: String): String = memScoped {
+    val curl = curl_easy_init() ?: error("curl init failed")
+    try {
+        val resultBuilder = StringBuilder()
+        curl_easy_setopt(curl, CURLOPT_URL, url.cstr.ptr)
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, staticCFunction<CPointer<ByteVar>?,ULong,ULong,COpaquePointer?,ULong> { data, size, nmemb, _ ->
+            val bytes = data?.readBytes((size * nmemb).toInt()) ?: return@staticCFunction 0UL
+            resultBuilder.append(bytes.decodeToString())
+            size * nmemb
+        })
+        curl_easy_perform(curl)
+        resultBuilder.toString()
+    } finally {
+        curl_easy_cleanup(curl)
+    }
+}`,
+     afterCode:"memScoped { }ブロック内で確保したメモリは、ブロックを抜けると自動的に解放されます。ブロックをまたいで長期間メモリを保持したい場合はnativeHeap.allocで確保し、nativeHeap.freeで明示的に解放します。"},
+    {title:"POSIX・Platformライブラリとシステムプログラミング",
+     body:`Kotlin/Nativeにはplatform.posixパッケージを通じてPOSIX APIが提供されます。ファイル操作・ソケット・スレッド（pthread）・シグナル処理などのシステムプログラミングがKotlinから直接行えます。これはPythonのosモジュール・subprocessに相当します。\n\nplatform.linux・platform.darwin（macOS/iOS）・platform.windows等のプラットフォーム固有パッケージでOS固有のAPIにアクセスできます。Linuxのepoll・macOSのkqueue・WindowsのIOCPなどの高性能I/Oを直接使う際に必要です。KMPのexpect/actualと組み合わせてプラットフォーム間の差異を吸収できます。\n\nワーカースレッドはpthread_createやplatform.posix.pthread_*関数で管理できます。ただしKotlin/Nativeはimmutableなオブジェクトのみスレッド間で安全に共有でき、mutableオブジェクトはfreezeまたはAtomicRef・AtomicInt等を使います。Kotlin 1.7.20以降のUnified Memory Managerではこの制限が大幅に緩和されています。`,
+     code:`import kotlinx.cinterop.*
+import platform.posix.*
+
+// POSIX でファイルを読み込む
+fun readFile(path: String): String = memScoped {
+    val file = fopen(path, "r") ?: error("Cannot open file: \${path}")
+    try {
+        val buffer = allocArray<ByteVar>(4096)
+        val result = StringBuilder()
+        while (true) {
+            val line = fgets(buffer, 4096, file) ?: break
+            result.append(line.toKString())
+        }
+        result.toString()
+    } finally {
+        fclose(file)
+    }
+}
+
+// ソケット通信（TCP クライアント）
+fun tcpConnect(host: String, port: Int): Int {
+    val sock = socket(AF_INET, SOCK_STREAM, 0)
+    if (sock < 0) error("socket() failed")
+    memScoped {
+        val addr = alloc<sockaddr_in>()
+        addr.sin_family = AF_INET.convert()
+        addr.sin_port = htons(port.toUShort())
+        inet_aton(host, addr.sin_addr.ptr)
+        connect(sock, addr.ptr.reinterpret(), sizeOf<sockaddr_in>().convert())
+    }
+    return sock
+}`,
+     afterCode:"Kotlin/NativeでPOSIX関数を使う際、エラー返却値（-1や NULL）とerrnoを必ずチェックしてください。nativeErrorが設定されたerrnoの値を返すネイティブ関数のエラーハンドリングは、JVM例外と異なりC流の明示的なチェックが必要です。"},
+  ]},
+  {id:"ch4",num:4,title:"KSP（Kotlin Symbol Processing）",est:"65分",
+   goal:"KSPプロセッサを実装し、アノテーション付きクラスからKotlinコードを自動生成できる。Resolver APIでシンボルを検索し、KSPのインクリメンタル処理を活用できる。プロセッサのテストをksp-testing-libraryで書けるようになる。",
+   sections:[
+    {title:"KSPとkaptの違い・Resolver API",
+     body:`KSP（Kotlin Symbol Processing）はkaptの後継であるアノテーション処理フレームワークです。kaptはJavaのAnnotation Processing APIをKotlinから利用するためJavaソースへの変換が必要でビルドが遅いという問題がありました。KSPはKotlinのシンボルを直接処理するためkaptより最大で2倍高速です。KMPにも対応しています。\n\nKSPのプロセッサはSymbolProcessorインターフェースを実装します。process(resolver)メソッドが呼ばれ、Resolverを使ってシンボルを検索します。resolver.getSymbolsWithAnnotation("com.example.MyAnnotation")でアノテーション付きシンボルを取得できます。PythonのASTを処理するのに比べて型情報が豊富で、メソッドシグネチャ・型パラメーター・アノテーション引数まで型安全にアクセスできます。\n\nコード生成にはCodeGeneratorを使います。env.codeGenerator.createNewFile()でKotlinソースファイルを作成し、kotlinx.poet（KotlinPoet）でKotlinコードを生成するのが標準的なパターンです。インクリメンタル処理（変更されたファイルだけ再処理）のためにDependenciesを適切に設定することでビルド速度が向上します。`,
+     code:`// SymbolProcessor の実装
+class BuilderGeneratorProcessor(val env: SymbolProcessorEnvironment) : SymbolProcessor {
+    override fun process(resolver: Resolver): List<KSAnnotated> {
+        val symbols = resolver.getSymbolsWithAnnotation("com.example.AutoBuilder")
+        val unprocessed = mutableListOf<KSAnnotated>()
+
+        symbols.filterIsInstance<KSClassDeclaration>().forEach { cls ->
+            if (!cls.validate()) { unprocessed.add(cls); return@forEach }
+            generateBuilder(cls)
+        }
+        return unprocessed
+    }
+
+    private fun generateBuilder(cls: KSClassDeclaration) {
+        val pkg  = cls.packageName.asString()
+        val name = cls.simpleName.asString()
+        val props = cls.primaryConstructor?.parameters?.map { p ->
+            "\${p.name!!.asString()}: \${p.type.resolve().declaration.simpleName.asString()}"
+        } ?: return
+
+        val code = buildString {
+            appendLine("package \${pkg}")
+            appendLine("class \${name}Builder {")
+            cls.primaryConstructor?.parameters?.forEach { p ->
+                appendLine("  var \${p.name!!.asString()}: \${p.type.resolve().declaration.simpleName.asString()}? = null")
+            }
+            appendLine("  fun build() = \${name}(\${props.joinToString(",")})")
+            appendLine("}")
+        }
+        env.codeGenerator.createNewFile(
+            Dependencies(false, cls.containingFile!!), pkg, "\${name}Builder"
+        ).writer().use { it.write(code) }
+    }
+}`,
+     afterCode:"KSPのincrementalな処理では、生成されたファイルが依存するソースファイルをDependenciesに渡すことが重要です。間違えると変更検知が機能せず、再ビルドが必要なときにスキップされる問題が起きます。"},
+    {title:"KotlinPoetとプロセッサのテスト",
+     body:`KotlinPoetはSquare製のKotlinコード生成ライブラリです。文字列テンプレートでコードを書く代わりに、型安全なビルダーAPIでKotlinコードを生成します。FunSpec・TypeSpec・PropertySpec等のビルダーを使うことで、構文エラーのないコードを確実に生成できます。Pythonのjinja2でコードを生成するより安全です。\n\nKotlinPoetはimportの自動管理ができます。ClassName("kotlin.collections","List")のように完全修飾クラス名でコード内の型を参照し、KotlinPoetが自動でimportを追加します。手動でimport文を書く必要がなく、衝突する名前もエイリアスで解決されます。\n\nKSPプロセッサのテストにはksp-testing-library（Poko・KSP公式）を使います。もしくはcompile-testingライブラリでテストプロセッサをin-memoryでコンパイルし、生成されたコードを文字列比較でテストします。プロセッサのロジックが複雑な場合はユニットテストでKSシンボルをモックして個別に検証します。`,
+     code:`// KotlinPoet を使ったコード生成
+import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+
+fun generateRepository(entityName: String, pkg: String): FileSpec {
+    val entityClass = ClassName(pkg, entityName)
+    val listType = List::class.asClassName().parameterizedBy(entityClass)
+
+    val findAll = FunSpec.builder("findAll")
+        .returns(listType)
+        .addStatement("return db.query(\"SELECT * FROM \${entityName.lowercase()}s\")")
+        .build()
+    val findById = FunSpec.builder("findById")
+        .addParameter("id", Int::class)
+        .returns(entityClass.copy(nullable=true))
+        .addStatement("return db.queryOne(\"SELECT * FROM \${entityName.lowercase()}s WHERE id = \$id\")")
+        .build()
+
+    val repoClass = TypeSpec.classBuilder("\${entityName}Repository")
+        .addFunction(findAll)
+        .addFunction(findById)
+        .build()
+
+    return FileSpec.builder(pkg, "\${entityName}Repository")
+        .addType(repoClass)
+        .build()
+}`,
+     afterCode:"KSPとKotlinPoetの組み合わせはRoomDatabase（Android）・Dagger/Hilt・Moshi・Retrofit等の主要ライブラリで使われています。これらのソースコードを読むことで、実践的なプロセッサ設計のベストプラクティスを学べます。"},
+  ]},
+  {id:"ch5",num:5,title:"Arrow-kt高度な使い方（Effect・Optics）",est:"65分",
+   goal:"Arrow-ktのRaise DSL・Effect・ResourceをEitherと組み合わせて実務規模のエラー処理を設計できる。Opticsでネストしたimmutableデータ構造を効率的に操作し、Kleisli合成などの関数型パターンを実務コードに適用できるようになる。",
+   sections:[
+    {title:"Raise DSLとResource管理",
+     body:`Arrow 1.2のRaise APIはEitherを直接使うよりも自然な命令型スタイルでエラーを表現できます。effect { }・either { }ブロック内でraise(error)をスローのように使い、bind()でEither値を取り出します。Haskellのdo-notationに近い書き心地です。\n\nResourceはArrow 1.2で追加されたリソース管理モナドです。Kotlinのuse { }・try/finallyの問題（ネストが深くなる）を解決し、複数リソースの取得・解放を宣言的に書けます。Pythonのcontextlib.ExitStackに対応し、例外やキャンセルが発生しても全リソースが確実に解放されます。\n\nArrowのScheduleは再試行ロジック（retry）を型安全に表現します。Schedule.recurs(3)で3回リトライ、Schedule.exponential(Duration(100, MILLISECONDS))で指数バックオフ、Schedule.jittered()でジッター付きバックオフが設定できます。PythonのtenacityやBackoffに相当します。`,
+     code:`import arrow.core.*
 import arrow.core.raise.*
+import arrow.fx.coroutines.*
 
-sealed class AppError {
-    data class NotFound(val id: Int) : AppError()
-    data class Unauthorized(val msg: String) : AppError()
+// Raise DSL でエラー処理
+sealed interface AppError
+data class DbError(val msg: String)  : AppError
+data class ApiError(val msg: String) : AppError
+
+suspend fun fetchUser(id: Int): Either<DbError, User> = TODO()
+suspend fun callApi(user: User): Either<ApiError, String> = TODO()
+
+suspend fun process(id: Int): Either<AppError, String> = either {
+    val user   = fetchUser(id).mapLeft { it as AppError }.bind()
+    val result = callApi(user).mapLeft { it as AppError }.bind()
+    result
 }
 
-// raise DSL でネストなしにエラーを返す
-suspend fun getUser(id: Int, token: String): Either<AppError, String> = either {
-    if (token != "secret") raise(AppError.Unauthorized("invalid token"))
-    if (id <= 0) raise(AppError.NotFound(id))
-    "User#\$id"  // 正常値
+// Resource 管理
+fun dbConnection(url: String): Resource<Connection> = resource {
+    val conn = DriverManager.getConnection(url)
+    install({ conn }) { c, _ -> c.close() }  // 確実にcloseされる
 }
+
+suspend fun withDb(url: String) {
+    dbConnection(url).use { conn ->
+        // conn を使用
+    }  // ここで自動クローズ
+}`,
+     afterCode:"Arrow-ktのEitherとコルーチンを組み合わせる際、withContext内でeither { }が使えます。Arrow 1.2のRaiseコンテキストはコルーチンコンテキストと独立しているため、suspend関数内でbind()を使うにはeither { }ブロックが必要です。"},
+    {title:"型クラスとKleisli合成",
+     body:`Kotlinには言語レベルの型クラスはありませんが、interfaceとジェネリクスで型クラスパターンを模倣できます。ArrowのTypeClass概念（Eq・Order・Show等）はKotlin 1.9以降のcontext parameters（コンテキスト受け取り）で将来的により自然な記述が可能になります。\n\nKleisliはA → M<B>という形の関数を合成するパターンです。KleisliはA → Either<E, B>のような型を持ち、flatMap・andThenで複数の変換をパイプラインとして組み合わせます。Repositoryのバリデーション・変換・永続化を連鎖させる際に使います。ReaderモナドはKleisli<R, A, B>として表現でき、依存性注入の純粋関数型版です。\n\nArrow-ktのoptics-composeはLens・Prism・Traversalを自由に合成できます。Prism.andThen(Lens)はPrismとLensの合成を返し、sealed classのサブタイプ内のフィールドを1段の操作で変更できます。大きなドメインモデルの不変更新に有効で、Haskellのlendsライブラリの哲学をKotlinで実現します。`,
+     code:`import arrow.optics.*
+import arrow.optics.dsl.*
+import arrow.core.*
+
+// Kleisli 合成パターン（Either でのパイプライン）
+typealias Step<I, O> = (I) -> Either<String, O>
+
+fun <A, B, C> Step<A, B>.andThen(next: Step<B, C>): Step<A, C> =
+    { input -> this(input).flatMap { next(it) } }
+
+fun validateAge(n: Int): Either<String, Int> =
+    if (n >= 0) n.right() else "負の年齢".left()
+fun toAgeGroup(age: Int): Either<String, String> =
+    when {
+        age < 18 -> "未成年".right()
+        age < 65 -> "成人".right()
+        else     -> "シニア".right()
+    }
+fun requireAdult(group: String): Either<String, String> =
+    if (group == "成人" || group == "シニア") group.right()
+    else "未成年は不可".left()
+
+val adultCheck: Step<Int, String> =
+    ::validateAge andThen ::toAgeGroup andThen ::requireAdult
 
 fun main() {
-    // kotlinx.coroutines.runBlocking は import が必要
-    // ここでは簡略化のため直接値を使う
-    println(getUser(1, "secret"))    // Either.Right(User#1)
-    println(getUser(1, "bad"))       // Either.Left(Unauthorized(...))
-    println(getUser(-1, "secret"))   // Either.Left(NotFound(id=-1))
+    println(adultCheck(30))   // Right(成人)
+    println(adultCheck(-1))   // Left(負の年齢)
+    println(adultCheck(10))   // Left(未成年は不可)
 }`,
-afterCode:`Arrow の zip / parZip を使うと複数の Either を同時にバリデーションし、全エラーを集約できます（Validated の役割）。フォームバリデーションやリクエスト検証に有効です。`},
-]},
-{id:"ch4",num:4,title:"Ktor本番アーキテクチャ",est:"65分",
-goal:"KtorでClean Architectureのレイヤ分離を実装できる。graphql-kotlinを使って基本的なスキーマを定義できる。マイクロサービス設計における分散トレーシングの考え方を説明できる。",
-sections:[
-{title:"Clean Architecture with Ktor",
-body:`KtorはJetBrains製の軽量Webフレームワークで、Springのような重厚な規約はなく、アーキテクチャは開発者が設計します。Clean Architectureを採用する場合、Route/Plugin層・UseCase層・Repository層・DataSource層に分離するのが一般的です。PythonのFastAPI + 手動レイヤ分離に近い感覚で設計できます。
+     afterCode:"context parameters（旧context receivers）はKotlin 2.1以降の実験的機能で、型クラスパターンをより自然に記述できます。fun context(eq: Eq<T>) areEqual(a: T, b: T) = eq.equals(a, b)のようにコンテキスト引数を受け取る関数を定義できます。現時点では@OptIn(ExperimentalContextParameters::class)が必要です。"},
+  ]},
+  {id:"ch6",num:6,title:"Ktor + React KMPフルスタック",est:"65分",
+   goal:"KMPを使ってKtor（JVM）バックエンドとKotlin/JS Reactフロントエンドで共通のモデルを共有するフルスタックアプリを構築できる。kotlinx.serializationとKtor Clientを使ったAPI通信・セッション認証・デプロイまで一貫して実装できるようになる。",
+   sections:[
+    {title:"KMPフルスタックアーキテクチャ",
+     body:`KMPフルスタックはshared（共通モデル・APIインターフェース）・server（Ktor JVM）・client（Kotlin/JS + React）の3モジュール構成が基本です。sharedモジュールのコードは全プラットフォームでコンパイルされるため、APIのリクエスト・レスポンス型をサーバーとクライアントで完全に共有できます。PythonのFastAPIとReact（TypeScript）の構成でOpenAPIスキーマを共有するのに相当しますが、Kotlinの型システムで完全に静的に保証されます。\n\nsharedモジュールにはAPIのエンドポイント定義（インターフェースまたはsealed class）・レスポンスモデル・バリデーションロジックを配置します。KtorのResources APIを使うとタイプセーフなルーティングをsharedに定義でき、クライアントもサーバーも同じルートを参照します。\n\nKotlin/JSのReactバインディング（kotlin-wrappers）はReact 18のhooks・コンポーネント・Context APIをKotlinから型安全に使えます。ReactのJSXに相当するKotlin DSL（react-dom/html）でDOM要素を型安全に構築できます。Webpack（または Vite-plugin-kotlin-multiplatform）でバンドルします。`,
+     code:`// shared/src/commonMain/Api.kt
+@Serializable
+data class TodoItem(val id: Int, val title: String, val done: Boolean = false)
 
-DIはKoinやHiltが多く使われます。Koinはシンプルで、module { single { UserRepository() } } のように定義し、by inject<UserRepository>()で注入します。テスト時はモジュールをオーバーライドしてMockRepositoryに差し替えられます。
+@Serializable
+data class CreateTodoRequest(val title: String)
 
-実務のKtorプロジェクトではExposedかKtorm（SQLのORMライブラリ）、またはJOOQを使ってDB操作を行います。ExposedはKotlin DSLでSQLを書けるため、PythonのSQLAlchemyコアAPIに近い書き方ができます。コネクションプールにはHikariCPを使い、Coroutines対応のラッパー（exposed-coroutines）と組み合わせるのが標準的です。`,
-table:T.ktorLayers,
-afterTable:`KtorのPluginとしてinstall(ContentNegotiation) { json() }・install(Authentication) { jwt { } }を追加することでJSONシリアライズと認証を設定できます。これはFastAPIのDependsやMiddlewareに相当します。`},
-{title:"GraphQL（graphql-kotlin）とマイクロサービス設計",
-body:`graphql-kotlinはExpediaが開発するKotlin向けGraphQLライブラリで、Ktor向けのktor-graphqlサーバーを提供します。スキーマはKotlinのクラスから自動生成され、@GraphQLQueryアノテーションを持つクラスがルートQueryになります。Pythonのstrawberryやariadneと同様の「コードファースト」アプローチです。
-
-マイクロサービス構成では各サービスをKtorで実装し、サービス間通信にはKtorのHTTPクライアントまたはgRPC（grpc-kotlin）を使います。分散トレーシングにはOpenTelemetry Kotlin SDKをCoroutinesと統合して使うのが現在のベストプラクティスです。CoroutineContextにTraceContextを載せることで、async { }をまたいだトレース伝播が実現できます。
-
-PythonのFastAPI + Celeryで実現していたような非同期タスクキューは、KotlinではKtor + Coroutines + Redis/Kafka Client（kotlinx-coroutines対応）で実装します。Coroutinesのstructured concurrencyにより、タスクのキャンセルとエラー伝播が自然に管理できます。`,
-code:`// graphql-kotlin の最小例
-import com.expediagroup.graphql.server.ktor.*
-import com.expediagroup.graphql.generator.annotations.GraphQLDescription
-
-data class User(val id: Int, val name: String)
-
-class UserQuery {
-    @GraphQLDescription("IDでユーザーを取得")
-    suspend fun user(id: Int): User? =
-        if (id == 1) User(1, "Alice") else null
+// Ktor Resources（タイプセーフなルート定義）
+@Resource("/todos")
+class Todos {
+    @Resource("{id}")
+    class ById(val parent: Todos = Todos(), val id: Int)
 }
 
-// Application.module() 内
-fun Application.configureGraphQL() {
-    install(GraphQL) {
-        schema { packages = listOf("com.example") }
-        queries = listOf(UserQuery())
-    }
-    routing { graphQLPostRoute() }
-}
-// POST /graphql に { "query": "{ user(id:1) { id name } }" }`,
-afterCode:`graphql-kotlinのsubscriptionsにはWebSocketが使われます。Coroutinesの Flow<T> を返すことでリアルタイムストリーミングを実装できます。`},
-]},
-{id:"ch5",num:5,title:"Compose Multiplatform",est:"60分",
-goal:"Composable関数・State・rememberの仕組みを説明できる。Compose MultiplatformでデスクトップおよびWebへのKMP配信の基礎を理解できる。ViewModelパターンをCompose UIと組み合わせて実装できる。",
-sections:[
-{title:"Composable・State・rememberの仕組み",
-body:`Compose Multiplatformは宣言的UIフレームワークで、Android向けJetpack Composeの思想をデスクトップ・Web・iOSに拡張したものです。@ComposableアノテーションはKotlinコンパイラプラグインが処理し、差分更新（再コンポーズ）の単位になります。Pythonのtkinterやtkmesと異なり、状態が変わると影響するComposableのみが再描画されます。
-
-remember { mutableStateOf(0) }は「コンポーズをまたいで値を保持する」機能で、ReactのuseStateに相当します。stateオブジェクトの.valueが変わると、そのstateを読んでいるComposableが自動的に再コンポーズされます。この仕組みをState Hoistingと組み合わせると、親が状態を持ち子に値とコールバックを渡す「単方向データフロー」が実現できます。
-
-Compose UIのレイアウトはColumn/Row/Box/LazyColumnが基本です。これはFlutterのColumn/Row、SwiftUIのVStack/HStackと同様の概念です。Modifierチェーンでパディング・クリック・背景などを付与します。`,
-table:T.composeState,
-afterTable:`rememberCoroutineScope()でComposable内からCoroutineを起動できます。LaunchedEffect(key)はkeyが変わった時に副作用（データフェッチ等）を再実行します。PythonのuseEffect依存配列と同等の概念です。`},
-{title:"Kotlin Multiplatform（KMP）とCompose Web",
-body:`Kotlin Multiplatform（KMP）はビジネスロジックを複数のプラットフォームで共有する仕組みです。expect/actual機構により「共通コードでAPIを定義し、各プラットフォーム実装を提供する」パターンが使えます。例えばexpect class PlatformFile(path: String)をiOS/Android/JVM向けにそれぞれactualで実装します。
-
-Compose MultiplatformのWebターゲットはKotlin/JSまたはKotlin/WASMを使います。WASM（wasm-js）はKotlin 2.1で安定化されており、Kotlin/JSより実行速度が大幅に向上しています。ただしWASMはHTTPリクエストやDOMアクセスにJavaScriptとの橋渡し（interop）が必要で、まだエコシステムが発展途上です。
-
-Flutterと比べると、KMP+Composeは「ビジネスロジックの共有」に強みがあり、UIは各プラットフォームで調整できます。Flutterは「完全同一UI」を全プラットフォームで実現する思想です。どちらが適切かはプロダクトのUX要件によります。`,
-code:`// Compose Desktop の最小アプリ
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.window.*
-
-// expect/actual でプラットフォーム分岐
-expect fun getPlatformName(): String
-// JVM側: actual fun getPlatformName() = "Desktop"
-// JS側:  actual fun getPlatformName() = "Web"
-
-@Composable
-fun App() {
-    var text by remember { mutableStateOf("Hello") }
-    MaterialTheme {
-        Button(onClick = { text = "KMP on \${getPlatformName()}" }) {
-            Text(text)
+// server/src/main/Application.kt
+fun Application.configureRouting() {
+    routing {
+        get<Todos> {
+            call.respond(TodoService.findAll())
+        }
+        post<Todos> {
+            val req = call.receive<CreateTodoRequest>()
+            call.respond(HttpStatusCode.Created, TodoService.create(req))
+        }
+        delete<Todos.ById> { route ->
+            TodoService.delete(route.id)
+            call.respond(HttpStatusCode.NoContent)
         }
     }
+}`,
+     afterCode:"Ktor ResourcesはKMP対応のタイプセーフルーティングで、クライアント（Ktor HttpClient）からhref(Todos.ById(id=1))でURLを生成できます。これによりサーバー・クライアント間のURLの文字列的な不一致が排除されます。"},
+    {title:"Kotlin/JS ReactコンポーネントとデプロイメNt",
+     body:`Kotlin/JSでReactアプリを書く場合、FC<Props>（Function Component）とhooks（useState・useEffect・useContext）をKotlinから使います。Propsはexternalインターフェースで定義し、型安全にコンポーネントに渡せます。JavaScriptのReactコードをKotlinで書き直すイメージで、ほぼ同等の機能が利用できます。\n\nAPIクライアントはKtor HttpClientのJSエンジンを使います。Ktor ResourcesのAPIをKMPクライアントとして使うとURLの型安全が担保されます。useEffectでデータフェッチを行い、StateFlowをcollectAsStateで購読するパターンがKMPフルスタックでは一般的です。\n\nデプロイはサーバー（Ktor/fat jar）とクライアント（Webpack bundle）を別々にビルドし、Ktorのstaticルートでフロントエンドの静的ファイルを配信します。Dockerizeする場合はマルチステージビルドでJDK+node環境でビルドし、軽量なJRE実行環境イメージで動作させます。GraalVM Native Imageを使うとコールドスタートを劇的に短縮できます。`,
+     code:`// client/src/jsMain/App.kt（Kotlin/JS React）
+import react.*
+import react.dom.html.ReactHTML.*
+import kotlinx.browser.window
+import kotlinx.coroutines.*
+
+val App = FC<Props> {
+    var todos by useState<List<TodoItem>>(emptyList())
+    var input  by useState("")
+    val scope  = remember { MainScope() }
+
+    useEffect { // マウント時にデータ取得
+        scope.launch {
+            val result = ApiClient.getTodos()
+            todos = result
+        }
+        cleanup { scope.cancel() }
+    }
+
+    div {
+        h1 { +"Kotlin/JS Todo App" }
+        div {
+            input {
+                value = input
+                onChange = { e -> input = e.target.value }
+                placeholder = "新しいTodo"
+            }
+            button {
+                onClick = {
+                    if (input.isNotBlank()) {
+                        scope.launch {
+                            val created = ApiClient.createTodo(CreateTodoRequest(input))
+                            todos = todos + created
+                            input = ""
+                        }
+                    }
+                }
+                +"追加"
+            }
+        }
+        ul {
+            todos.forEach { todo ->
+                li { key = todo.id.toString(); +todo.title }
+            }
+        }
+    }
+}`,
+     afterCode:"Kotlin/JSのWebpackバンドルサイズはデフォルトで大きくなりがちです。./gradlew jsBrowserProductionWebpackでminify・tree-shakingが有効になります。さらにDCE（Dead Code Elimination）を有効にするとKotlin標準ライブラリの未使用部分が除去され大幅に削減できます。"},
+  ]},
+  {id:"ch7",num:7,title:"パフォーマンスチューニング",est:"60分",
+   goal:"JFR・async-profiler・JVM GCログを使ってJVMアプリのボトルネックを特定できる。オブジェクトアロケーション削減・インライン最適化・コルーチンのディスパッチ最適化を実装でき、ベンチマークをKotlin Benchmarkで計測できるようになる。",
+   sections:[
+    {title:"JVMプロファイリングとGC最適化",
+     body:`Kotlinアプリのパフォーマンスチューニングはまず計測から始まります。async-profilerはサンプリングベースのプロファイラーで、CPU・アロケーション・ロックのFlame Chartを生成します。JFR（Java Flight Recorder）はJDK標準の継続的プロファイリングツールで、本番環境でも低オーバーヘッドで動作します。PythonのcProfileやpySpyに相当します。\n\nJVMのGC（ガベージコレクション）はデフォルトでG1GCが使われます。大量の短命オブジェクトはEden領域のマイナーGCで回収されますが、頻繁なオブジェクト生成はGCプレッシャーを高めます。-Xlog:gc*でGCログを有効にし、GCViewer等でグラフ化するとGCの頻度・時間が視覚化できます。\n\nKotlinのinlineキーワードはラムダを呼び出し先にインライン展開し、Function objectのアロケーションをゼロにします。高階関数をhotpathで使う場合にinlineを付けることでGCプレッシャーを大幅に削減できます。また、プリミティブ型を使うとboxing（Integer vs int）が避けられJVMが最適化しやすくなります。Kotlin 2.0以降はValue Classが安定しており、型安全なラッパーをプリミティブ同等のパフォーマンスで使えます。`,
+     code:`// inline 関数でアロケーション削減
+inline fun <T> measureTime(block: () -> T): Pair<T, Long> {
+    val start = System.nanoTime()
+    val result = block()  // ラムダがインライン展開される → アロケーションなし
+    return result to (System.nanoTime() - start)
 }
 
-fun main() = application {
-    Window(onCloseRequest = ::exitApplication) { App() }
-}`,
-afterCode:`KMPプロジェクトの作成はKotlin Multiplatform Wizard（kmp.jetbrains.com）が最も手軽です。gradle/libs.versions.tomlでバージョン管理することがKotlinエコシステムの標準です。`},
-]},
-{id:"ch6",num:6,title:"Kotlin最新機能（2.x）",est:"55分",
-goal:"Context Parametersの構文と用途を説明できる。value classのインライン最適化の仕組みを理解し適切に使える。WASM Targetの現状とKotlinエコシステムの全体像を把握できる。",
-sections:[
-{title:"Context Parameters・value class・WASM",
-body:`Kotlin 2.2で実験的に導入されたContext Parametersは、暗黙的なパラメータを型安全に渡す機能です。context(logger: Logger)と宣言することで、関数呼び出し側のwith(logger) { }ブロック内でそのパラメータが自動的に利用可能になります。ScalaのGiven/Usingやimplicit parameterに相当し、依存注入のボイラープレートを大幅に削減できます。
+// Value Class（JVM ではプリミティブとして扱われる）
+@JvmInline
+value class UserId(val value: Int)  // Int のラッパーだがboxingなし
 
-value class（旧inline class）は単一プロパティをラップした型で、コンパイル後はラップを除去して元の型として扱われます。@JvmInline value class UserId(val value: Int)とすると、JVMレベルではIntとして動作しながら、コード上はUserId型として型安全に扱えます。Pythonではint型のIDを間違えてstr型の別IDと混同してしまうバグが起きやすいですが、value classを使えばコンパイル時にチェックできます。
-
-WASM Targetはブラウザ向けのWebAssembly出力で、Kotlin/WASMとも呼ばれます。2.1でwasm-jsターゲットが安定化されており、Compose for WebのWASMバックエンドとして使われています。JavaScript interopにはJsExternalインターフェースを使い、JS APIをKotlinから呼び出します。`,
-table:T.kotlin2x,
-afterTable:`Context Parametersを有効にするにはbuild.gradle.ktsに kotlinOptions { freeCompilerArgs += "-Xcontext-parameters" } を追加します（2.2時点）。安定化後はこの設定は不要になる予定です。`},
-{title:"Kotlinエコシステムの現状と今後",
-body:`2025年現在、Kotlinエコシステムはサーバーサイド・Android・KMPの3軸で急速に成熟しています。サーバーサイドではSpring Boot + Kotlin、またはKtor + Kotlin Coroutinesが二大選択肢です。Spring Bootは大企業での採用実績が多く、KtorはJetBrains謹製で軽量・Coroutinesネイティブです。
-
-AndroidではJetpack Compose + KMMが事実上の標準になりつつあります。GoogleはKotlinファーストを明言しており、新しいJetpackライブラリはKotlin APIが優先されます。iOSとロジックを共有したい場合はKMM（Kotlin Multiplatform Mobile）を使い、UIはそれぞれSwiftUIとCompose Androidで書くのが現実的な選択です。
-
-Pythonとの比較という観点では、Kotlinはより静的型付け・パフォーマンス・マルチプラットフォームに強みがあります。Pythonはデータサイエンス・スクリプティング・プロトタイピングに優れます。実務では両方を使い分けることも多く、KotlinバックエンドとPython ML推論サービスをgRPCで繋ぐアーキテクチャなども一般的です。Kotlinエンジニアとして食っていくために最重要なのは、Coroutines・型システム・KMPの理解です。`,
-code:`// Kotlin 2.x の主要機能まとめ
-
-// 1. value class で型安全ラッパー
-@JvmInline value class Email(val value: String) {
-    init { require("@" in value) { "Invalid email" } }
+@JvmInline
+value class Email(val value: String) {
+    init { require(value.contains("@")) { "Invalid email" } }
 }
 
-// 2. Context Parameters (2.2+)
-context(scope: CoroutineScope)
-fun launchWork() = scope.launch { delay(100); println("done") }
-
-// 3. データクラスのcopy改善 (2.0+)
-data class Config(val host: String, val port: Int = 8080)
-val dev  = Config("localhost")
-val prod = dev.copy(host = "prod.example.com", port = 443)
-
-fun main() {
-    val email = Email("user@example.com")
-    println(email.value)  // user@example.com
-    println(prod)         // Config(host=prod.example.com, port=443)
+// crossinline・noinline の違い
+inline fun doWithCallback(
+    crossinline onSuccess: () -> Unit,
+    noinline onError: (Throwable) -> Unit  // Functionオブジェクトとして渡す
+) {
+    try {
+        onSuccess()  // crossinline: inlineされるが非局所returnは禁止
+    } catch (e: Throwable) {
+        onError(e)  // noinline: Functionオブジェクトのまま渡す
+    }
 }`,
-afterCode:`Kotlinの公式ロードマップはkotlinlang.org/docs/roadmap.htmlで確認できます。Context Parameters・Explicit Backing Fields・improved WASMは今後のリリースで安定化予定です。コミュニティはKotlin Slack（kotlinlang.slack.com）が最も活発です。`},
-]},
+     afterCode:"Kotlinのinline関数内でreturnを使うと「非局所return」が発生し、呼び出し元の関数を返します。これはPythonにない概念です。意図しない非局所returnを防ぐにはcrossinlineを使ってラムダ内の非局所returnを禁止します。"},
+    {title:"Kotlin Benchmarkとコルーチン最適化",
+     body:`kotlinx-benchmarkライブラリを使うとJMH（Java Microbenchmark Harness）ベースのベンチマークをKotlinで書けます。@Benchmark・@Setup・@TearDown・@Stateアノテーションを使い、JVMのJITウォームアップを考慮した正確な計測ができます。Pythonのtimeit・benchmarkアプローチと比べてJVMの最適化を考慮したより信頼性の高い結果が得られます。\n\nコルーチンのパフォーマンスで重要なのはDispatcherの選択とコンテキストスイッチのコストです。withContext(Dispatchers.IO)は毎回スレッドを切り替えるため、I/O処理の粒度が細かいとオーバーヘッドになります。IO処理をまとめてバッチ化するか、Channel・Flowを使ってストリームとして処理することでコンテキストスイッチを減らせます。\n\nメモリ消費の削減にはSequence（遅延コレクション）・Channel・Flowを使います。大量データをListに全件読み込まずストリーム処理することで、ピークメモリを数十分の一に抑えられます。OOMエラーはHeapDumpを解析し、DomainObjectが大量に保持されている場合はストリーム化を検討します。`,
+     code:`import kotlinx.benchmark.*
+import org.openjdk.jmh.annotations.*
+
+@State(Scope.Benchmark)
+@Fork(1)
+@Warmup(iterations = 3)
+@Measurement(iterations = 5)
+class ListVsSequenceBenchmark {
+    private val data = (1..100_000).toList()
+
+    @Benchmark
+    fun withList(): Long {
+        return data
+            .filter { it % 2 == 0 }
+            .map { it.toLong() * it }
+            .sum()
+    }
+
+    @Benchmark
+    fun withSequence(): Long {
+        return data.asSequence()
+            .filter { it % 2 == 0 }
+            .map { it.toLong() * it }
+            .sum()
+    }
+}
+
+// build.gradle.kts
+// plugins { id("org.jetbrains.kotlinx.benchmark") version "0.4.10" }
+// benchmark { targets { register("main") } }
+// ./gradlew benchmark`,
+     afterCode:"JMHベンチマークはウォームアップが重要です。@Warmup(iterations=5)でJITコンパイルが落ち着いた状態から計測を始めます。Warmupなしの計測はJITが安定していないため10倍以上の誤差が出ることがあります。GCの影響を排除するために@GCアノテーションもあります。"},
+  ]},
+  {id:"ch8",num:8,title:"ライブラリ公開・API設計",est:"60分",
+   goal:"Kotlinライブラリを設計・実装・テストしてMavenCentralに公開できる。Binary Compatibility Validatorで後方互換性を管理し、@ExperimentalAPIアノテーションで段階的なAPI安定化ができるようになる。",
+   sections:[
+    {title:"ライブラリAPI設計と互換性管理",
+     body:`優れたKotlinライブラリのAPI設計はいくつかの原則に従います。第一に「最小限のpublicサーface」：不要なクラス・関数はinternalまたはprivateにして、外部への依存を最小化します。第二に「イミュータビリティの優先」：publicなpropertyはvalで定義し、副作用のないAPIを設計します。第三に「型安全な設計」：Stringの代わりにvalue classを使い、誤った値の渡し方をコンパイル時に防ぎます。\n\n後方互換性の管理は大規模ライブラリの継続的な課題です。Binary Compatibility Validator（BCV）はpublicなAPI（クラス・メソッド・シグネチャ）のスナップショット（.apiファイル）を維持し、CIでの変更を検出します。Kotlinx.coroutinesやKtorがこのツールを使っています。APIを変更する前に@Deprecated(ReplaceWith)でマイグレーションパスを示すことで、利用者がアップグレードしやすくなります。\n\n@RequiresOptIn（旧@Experimental）はAPI利用者が明示的に@OptIn(MyApi::class)を宣言しないと使えないようにします。段階的なAPI安定化（実験的→安定）のプロセスで、Kotlin自身もこの仕組みを使ってcoroutinesのAPIを段階的に安定化させました。Kotlinx.serializationのSerializationExperimentalApiが典型例です。`,
+     code:`// API設計のベストプラクティス
+@RequiresOptIn(message = "This API is experimental and may change")
+@Retention(AnnotationRetention.BINARY)
+annotation class ExperimentalMyLibraryApi
+
+// Value Class で型安全
+@JvmInline value class PageNumber(val value: Int) {
+    init { require(value > 0) { "PageNumber must be positive" } }
+}
+@JvmInline value class PageSize(val value: Int) {
+    init { require(value in 1..1000) { "PageSize must be 1-1000" } }
+}
+
+// DSL for library configuration（Builderパターン）
+class LibraryConfig private constructor(
+    val baseUrl: String,
+    val timeout: Long,
+    val retries: Int,
+) {
+    class Builder {
+        var baseUrl: String = ""
+        var timeout: Long   = 5000
+        var retries: Int    = 3
+        fun build() = LibraryConfig(baseUrl, timeout, retries)
+    }
+    companion object {
+        fun build(block: Builder.() -> Unit) = Builder().apply(block).build()
+    }
+}
+
+// 非推奨マーカー
+@Deprecated(
+    message = "Use newFunction() instead",
+    replaceWith = ReplaceWith("newFunction()"),
+    level = DeprecationLevel.WARNING
+)
+fun oldFunction() = Unit`,
+     afterCode:"KDocはKotlinの公式ドキュメンテーションコメント形式で、Javadocに相当します。@param・@return・@throws・@sampleタグを使ってAPIを文書化します。Dokkaコマンドで HTML/Markdown/Javadocドキュメントを生成でき、GitHub Pagesで公開するとライブラリのドキュメントサイトが完成します。"},
+    {title:"MavenCentralへの公開とCI/CD",
+     body:`Kotlin/KMPライブラリをMavenCentralに公開するにはSonatype OSSRHアカウント・GPG署名・POMメタデータの3つが必要です。maven-publishプラグインとsigningプラグインを組み合わせて設定します。Gradle nexus-publish-pluginを使うとclose/releaseの操作も自動化できます。Pythonのtwine（PyPI）やnpm publish（npm registry）に相当します。\n\nKMPライブラリのpublishは各ターゲット（JVM・JS・Native）ごとに別々のアーティファクトが生成されます。Kotlin Multiplatformのpublication設定はkotlin { }ブロックで行い、Gradle MetadataでKMP対応が宣言されます。macOS上でのビルドが必要なターゲット（iosArm64等）はGitHub ActionsのmacOSランナーで実行します。\n\nCIは「PR→テスト＋APIチェック」「tagプッシュ→MavenCentralへのリリース」の2段階が典型的です。GitHub ActionsのGRADLE_PUBLISHシークレットにGPGキーとOSSRH認証情報を登録し、自動リリースを実現します。ChangeLogの自動生成にはgit-cliff・release-pleaseが使えます。`,
+     code:`// build.gradle.kts（KMP ライブラリのリリース設定）
+plugins {
+    kotlin("multiplatform") version "2.0.21"
+    id("maven-publish")
+    id("signing")
+    id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
+}
+
+kotlin {
+    jvm(); js(IR) { browser() }
+    // iOS ターゲットは macOS ランナーが必要
+    // iosArm64(); iosSimulatorArm64()
+}
+
+group   = "com.example"
+version = "1.0.0"
+
+nexusPublishing {
+    repositories.sonatype {
+        nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
+        snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+        username.set(providers.environmentVariable("OSSRH_USERNAME"))
+        password.set(providers.environmentVariable("OSSRH_PASSWORD"))
+    }
+}
+
+signing {
+    val key = providers.environmentVariable("GPG_SIGNING_KEY")
+    val pwd = providers.environmentVariable("GPG_SIGNING_PASSWORD")
+    useInMemoryPgpKeys(key.orNull, pwd.orNull)
+    sign(publishing.publications)
+}`,
+     afterCode:"KMPライブラリのバージョニングにはSemVer（Major.Minor.Patch）を使います。パブリックAPIの後方互換を破る変更はMajorバージョンを上げ、新機能追加はMinor、バグ修正はPatchを上げます。Binary Compatibility Validatorと組み合わせることで、意図しないAPIの破壊的変更をCIで防止できます。"},
+  ]},
 ];
 
-// ── UI Components ──────────────────────────────────────────────
-
-function DataTable({ data }) {
-  if (!data) return null;
-  const s = {
-    wrapper: { overflowX:'auto', margin:'16px 0' },
-    table: { width:'100%', borderCollapse:'collapse', fontSize:13, fontFamily:"'JetBrains Mono',monospace" },
-    th: { background:'#f3f0ff', color:'#5b21b6', padding:'8px 12px', textAlign:'left', borderBottom:'2px solid #c4b5fd', whiteSpace:'nowrap' },
-    td: { padding:'7px 12px', borderBottom:'1px solid #ede9fe', verticalAlign:'top' },
-    cap: { fontSize:12, color:'#7c3aed', marginTop:6, textAlign:'right' },
-  };
-  return React.createElement('div', { style: s.wrapper },
-    React.createElement('table', { style: s.table },
-      React.createElement('thead', null,
-        React.createElement('tr', null, data.h.map((h, i) => React.createElement('th', { key:i, style:s.th }, h)))
-      ),
-      React.createElement('tbody', null,
-        data.r.map((row, i) => React.createElement('tr', { key:i, style:{ background: i%2===0?'#fff':'#faf5ff' } },
-          row.map((cell, j) => React.createElement('td', { key:j, style:s.td }, cell))
-        ))
-      )
-    ),
-    data.cap && React.createElement('div', { style:s.cap }, data.cap)
-  );
-}
-
-function Code({ children }) {
-  return React.createElement('pre', {
-    style: {
-      background:'#1e1b4b', color:'#e0e7ff', borderRadius:10, padding:'16px 20px',
-      fontFamily:"'JetBrains Mono',monospace", fontSize:13, lineHeight:1.7,
-      overflowX:'auto', margin:'16px 0', whiteSpace:'pre-wrap', wordBreak:'break-word',
-    }
-  }, React.createElement('code', null, children));
-}
-
-function Exercise({ ex, chId }) {
-  const [open, setOpen] = useState(false);
-  const stars = '⭐'.repeat(ex.diff);
-  return React.createElement('div', {
-    style: { border:'1px solid #c4b5fd', borderRadius:12, marginBottom:16, overflow:'hidden' }
-  },
-    React.createElement('div', { style:{ padding:'14px 18px', background:'#f5f3ff' } },
-      React.createElement('div', { style:{ fontWeight:700, color:'#5b21b6', marginBottom:6, fontSize:13 } }, stars),
-      React.createElement('div', { style:{ color:'#3730a3', fontWeight:600, marginBottom: ex.code ? 10 : 0 } }, ex.q),
-      ex.code && React.createElement(Code, null, ex.code)
-    ),
-    React.createElement('div', { style:{ padding:'10px 18px', background:'#ede9fe', borderTop:'1px solid #c4b5fd' } },
-      React.createElement('button', {
-        onClick: () => setOpen(o => !o),
-        style: { background:'#7c3aed', color:'#fff', border:'none', borderRadius:8, padding:'7px 18px', cursor:'pointer', fontWeight:700, fontSize:13 }
-      }, open ? '回答を隠す' : '回答を見る'),
-      open && React.createElement(Code, null, ex.answer)
-    )
-  );
-}
-
-function Section({ sec, chId }) {
-  const [open, setOpen] = useState(false);
-  return React.createElement('div', {
-    style: { border:'1px solid #ddd6fe', borderRadius:12, marginBottom:14, overflow:'hidden' }
-  },
-    React.createElement('button', {
-      onClick: () => setOpen(o => !o),
-      style: {
-        width:'100%', textAlign:'left', padding:'14px 20px',
-        background: open ? '#7c3aed' : '#fff', color: open ? '#fff' : '#3730a3',
-        border:'none', cursor:'pointer', fontWeight:700, fontSize:15,
-        display:'flex', justifyContent:'space-between', alignItems:'center',
-      }
-    },
-      React.createElement('span', null, sec.title),
-      React.createElement('span', null, open ? '▲' : '▼')
-    ),
-    open && React.createElement('div', { style:{ padding:'20px 24px', background:'#faf5ff' } },
-      React.createElement('div', { style:{ color:'#374151', lineHeight:1.85, marginBottom:12, whiteSpace:'pre-line' } }, sec.body),
-      sec.table && React.createElement(DataTable, { data: sec.table }),
-      sec.code && React.createElement(Code, null, sec.code),
-      sec.afterCode && React.createElement('div', {
-        style:{ background:'#ede9fe', borderLeft:'4px solid #7c3aed', padding:'12px 16px', borderRadius:8, marginTop:8, fontSize:13.5, color:'#4c1d95', lineHeight:1.7 }
-      }, sec.afterCode),
-      sec.afterTable && React.createElement('div', {
-        style:{ background:'#ede9fe', borderLeft:'4px solid #7c3aed', padding:'12px 16px', borderRadius:8, marginTop:8, fontSize:13.5, color:'#4c1d95', lineHeight:1.7 }
-      }, sec.afterTable)
-    )
-  );
-}
-
 function KotlinAdvancedCourse() {
-  const [currentCh, setCurrentCh] = useState(0);
-  const [completed, setCompleted] = useState(false);
-  const ch = chapters[currentCh];
-  const exKey = 'ch' + ch.num;
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
   const exercises = EX[exKey] || [];
 
-  if (completed) {
-    return React.createElement('div', {
-      style:{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-        background:'linear-gradient(135deg,#1e1b4b,#4c1d95)', color:'#fff', padding:40, textAlign:'center' }
-    },
-      React.createElement('div', { style:{ fontSize:64, marginBottom:24 } }, '🎉'),
-      React.createElement('h1', { style:{ fontSize:36, fontWeight:900, marginBottom:16 } }, 'コース完了！'),
-      React.createElement('p', { style:{ fontSize:18, color:'#c4b5fd', maxWidth:560, lineHeight:1.7, marginBottom:32 } },
-        'Kotlin 上級コースを修了しました。K2コンパイラ・高度なCoroutines・Arrow・Ktor本番設計・Compose Multiplatform・Kotlin 2.x 最新機能を習得しました。実務でKotlinを使い、ライブラリを設計できるレベルに達しています。'
-      ),
-      React.createElement('a', { href:'../index.html',
-        style:{ background:'#7c3aed', color:'#fff', padding:'14px 36px', borderRadius:12, textDecoration:'none',
-          fontWeight:800, fontSize:16 }
-      }, 'ホームに戻る')
-    );
-  }
-
-  return React.createElement('div', { style:{ background:'linear-gradient(135deg,#f5f3ff,#ede9fe)', minHeight:'100vh' } },
-    React.createElement('div', { style:{ background:'linear-gradient(135deg,#1e1b4b,#4c1d95,#7c3aed)', color:'#fff', padding:'60px 24px 50px', textAlign:'center' } },
-      React.createElement('div', { style:{ display:'inline-block', background:'rgba(255,255,255,0.15)', borderRadius:12, padding:'6px 18px', fontSize:13, fontWeight:700, marginBottom:20, letterSpacing:2 } }, '上級コース'),
-      React.createElement('h1', { style:{ fontSize:'clamp(28px,5vw,48px)', fontWeight:900, marginBottom:16 } }, 'Kotlin 上級コース'),
-      React.createElement('p', { style:{ fontSize:16, color:'#c4b5fd', maxWidth:640, margin:'0 auto 28px', lineHeight:1.8 } },
-        'K2コンパイラ内部・高度なCoroutines・Arrow関数型・Ktor本番アーキテクチャ・Compose Multiplatform・Kotlin 2.x 最新機能を習得し、実務で戦えるKotlinエンジニア・ライブラリ設計者を目指します。'
-      ),
-      React.createElement('div', { style:{ display:'flex', justifyContent:'center', gap:24, flexWrap:'wrap' } },
-        [['📚','6章'], ['✏️','6演習'], ['⏱','約375分']].map(([icon,label]) =>
-          React.createElement('div', { key:label, style:{ background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'10px 22px', fontSize:14, fontWeight:700 } }, `${icon} ${label}`)
-        )
-      )
-    ),
-
-    React.createElement('div', { style:{ maxWidth:1100, margin:'0 auto', padding:'28px 16px 0' } },
-      React.createElement('div', { style:{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center', marginBottom:32 } },
-        chapters.map((c, i) =>
-          React.createElement('button', {
-            key: c.id,
-            onClick: () => { setCurrentCh(i); },
-            style: {
-              padding:'8px 18px', borderRadius:10, border:'2px solid',
-              borderColor: i === currentCh ? '#7c3aed' : '#c4b5fd',
-              background: i === currentCh ? '#7c3aed' : '#fff',
-              color: i === currentCh ? '#fff' : '#5b21b6',
-              fontWeight:700, cursor:'pointer', fontSize:13, transition:'all 0.15s',
-            }
-          }, `${c.num}. ${c.title}`)
+  return React.createElement("div", {
+    style:{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"}
+  },
+    React.createElement("div", {style:{maxWidth:1100,margin:"0 auto",padding:"20px 14px"}},
+      React.createElement("div", {style:{background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",borderRadius:16,padding:"24px 20px",marginBottom:16,position:"relative",overflow:"hidden"}},
+        React.createElement("div", {style:{position:"absolute",top:-30,right:-10,fontSize:140,opacity:0.05}}, "🟣"),
+        React.createElement("div", {style:{fontSize:11,fontWeight:700,color:"#a5b4fc",textTransform:"uppercase",letterSpacing:2,marginBottom:4}}, "Python開発者のための"),
+        React.createElement("h1", {style:{margin:0,fontSize:22,fontWeight:900,color:"#fff"}}, "Kotlin 上級コース"),
+        React.createElement("p", {style:{margin:"6px 0 0",fontSize:12.5,color:"#c4b5fd"}},
+          "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問"),
+        React.createElement("p", {style:{margin:"10px 0 0",fontSize:12,color:"#ddd6fe",lineHeight:1.8}}, "Compiler Plugin・コルーチン内部実装・Kotlin/Native・Arrow-kt高度な使い方・フルスタックKotlinを習得します。"),
+        React.createElement("div", {style:{marginTop:14,display:"flex",gap:3}},
+          chapters.map((_,i) => React.createElement("div", {key:i,
+            onClick:()=>{setCh(i);setMenuOpen(false);},
+            style:{flex:1,height:5,borderRadius:3,background:i<=ch?"#818cf8":"rgba(255,255,255,0.15)",cursor:"pointer"}
+          }))
         )
       ),
-
-      React.createElement('div', { key: ch.id, style:{ background:'#fff', borderRadius:20, padding:'32px', boxShadow:'0 4px 24px rgba(124,58,237,0.08)', marginBottom:32 } },
-        React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:16, marginBottom:8 } },
-          React.createElement('span', { style:{ background:'linear-gradient(135deg,#6366f1,#7c3aed)', color:'#fff', borderRadius:10, padding:'4px 14px', fontWeight:800, fontSize:13 } }, `Chapter ${ch.num}`),
-          React.createElement('span', { style:{ color:'#9ca3af', fontSize:13 } }, `⏱ ${ch.est}`)
+      React.createElement("div", {style:{marginBottom:14}},
+        React.createElement("button", {onClick:()=>setMenuOpen(!menuOpen),
+          style:{width:"100%",padding:"10px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",fontSize:14,fontWeight:700,color:"#1e1b4b",cursor:"pointer",display:"flex",justifyContent:"space-between"}
+        },
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", {style:{fontSize:12,color:"#9ca3af"}}, menuOpen?"▲":"▼")
         ),
-        React.createElement('h2', { style:{ fontSize:24, fontWeight:900, color:'#1e1b4b', marginBottom:20 } }, ch.title),
-
-        React.createElement('div', { style:{ background:'#f5f3ff', border:'2px solid #7c3aed', borderRadius:12, padding:'16px 20px', marginBottom:28 } },
-          React.createElement('div', { style:{ fontWeight:800, color:'#5b21b6', marginBottom:8, fontSize:14 } }, '🎯 この章のゴール'),
-          React.createElement('div', { style:{ color:'#3730a3', lineHeight:1.75 } }, ch.goal)
-        ),
-
-        ch.sections.map((sec, i) =>
-          React.createElement(Section, { key: `${ch.id}-sec-${i}`, sec, chId: ch.id })
-        ),
-
-        exercises.length > 0 && React.createElement('div', { style:{ marginTop:32 } },
-          React.createElement('h3', { style:{ fontSize:18, fontWeight:800, color:'#5b21b6', marginBottom:16 } }, '✏️ 演習問題'),
-          exercises.map((ex, i) => React.createElement(Exercise, { key: `${ch.id}-ex-${i}`, ex, chId: ch.id }))
-        ),
-
-        React.createElement('div', { style:{ display:'flex', justifyContent:'space-between', marginTop:36 } },
-          currentCh > 0
-            ? React.createElement('button', {
-                onClick: () => setCurrentCh(currentCh - 1),
-                style:{ background:'#ede9fe', color:'#5b21b6', border:'none', borderRadius:10, padding:'10px 24px', fontWeight:700, cursor:'pointer', fontSize:14 }
-              }, `← Chapter ${chapters[currentCh-1].num}: ${chapters[currentCh-1].title}`)
-            : React.createElement('div'),
-          currentCh < chapters.length - 1
-            ? React.createElement('button', {
-                onClick: () => setCurrentCh(currentCh + 1),
-                style:{ background:'#7c3aed', color:'#fff', border:'none', borderRadius:10, padding:'10px 24px', fontWeight:700, cursor:'pointer', fontSize:14 }
-              }, `Chapter ${chapters[currentCh+1].num}: ${chapters[currentCh+1].title} →`)
-            : React.createElement('button', {
-                onClick: () => setCompleted(true),
-                style:{ background:'linear-gradient(135deg,#7c3aed,#6366f1)', color:'#fff', border:'none', borderRadius:10, padding:'10px 28px', fontWeight:800, cursor:'pointer', fontSize:14 }
-              }, 'コースを完了する 🎉')
+        menuOpen && React.createElement("div", {style:{marginTop:4,border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden",background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}},
+          chapters.map((c,i) => React.createElement("button", {key:c.id,
+            onClick:()=>{setCh(i);setMenuOpen(false);},
+            style:{width:"100%",padding:"10px 16px",border:"none",borderBottom:i<chapters.length-1?"1px solid #f3f4f6":"none",background:i===ch?"#eef2ff":"#fff",fontSize:13,fontWeight:i===ch?700:500,color:i===ch?"#4338ca":"#374151",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10}
+          },
+            React.createElement("span", {style:{width:22,height:22,borderRadius:"50%",background:i===ch?"#6366f1":"#e5e7eb",color:i===ch?"#fff":"#6b7280",fontWeight:800,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}, c.num),
+            React.createElement("span", {style:{flex:1}}, c.title),
+            EX[c.id] && React.createElement("span", {style:{fontSize:11,color:"#f59e0b",fontWeight:700}}, EX[c.id].length, "問")
+          ))
         )
       ),
-
-      React.createElement('div', { style:{ textAlign:'center', color:'#9ca3af', fontSize:12, paddingBottom:40 } },
-        'kotlinlang.org ・ Kotlin 2.x 時点'
-      )
+      React.createElement("div", {style:{display:"flex",alignItems:"center",gap:10,marginBottom:12}},
+        React.createElement("span", {style:{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",fontWeight:900,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", {style:{fontWeight:800,fontSize:18,color:"#1e1b4b"}}, chapter.title),
+          React.createElement("div", {style:{fontSize:12,color:"#6b7280"}}, "目安: ", chapter.est, exercises.length>0?" ・ 演習"+exercises.length+"問":"")
+        )
+      ),
+      chapter.goal && React.createElement("div", {style:{background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",border:"1px solid #c7d2fe",borderLeft:"4px solid #6366f1",borderRadius:10,padding:"12px 16px",marginBottom:14}},
+        React.createElement("div", {style:{fontSize:11,fontWeight:800,color:"#4338ca",letterSpacing:1,marginBottom:6}}, "🎯 この章のゴール"),
+        React.createElement("div", {style:{fontSize:13.5,color:"#1e1b4b",lineHeight:1.8,whiteSpace:"pre-line"}}, chapter.goal)
+      ),
+      React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:8}},
+        chapter.sections.map((sec,i) => React.createElement(Section, {key:ch+"-"+i, section:sec, idx:i, defaultOpen:false}))
+      ),
+      exercises.length>0 && React.createElement("div", {style:{marginTop:20}},
+        React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}},
+          React.createElement("span", {style:{background:"#f59e0b",color:"#fff",fontWeight:800,fontSize:13,padding:"4px 14px",borderRadius:8}}, "🏋️ 演習問題"),
+          React.createElement("span", {style:{fontSize:13,color:"#92400e"}}, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex,i) => React.createElement(Exercise, {key:ch+"-"+i, ex, idx:i}))
+      ),
+      React.createElement("div", {style:{display:"flex",justifyContent:"space-between",marginTop:20,gap:10}},
+        ch>0 ? React.createElement("button", {onClick:()=>{setCh(ch-1);window.scrollTo(0,0);},
+          style:{flex:1,padding:"12px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",cursor:"pointer",fontWeight:600,fontSize:13,color:"#6b7280"}
+        }, "← Ch.", chapters[ch-1].num)
+        : React.createElement("div", {style:{flex:1}}),
+        ch<chapters.length-1 ? React.createElement("button", {onClick:()=>{setCh(ch+1);window.scrollTo(0,0);},
+          style:{flex:1,padding:"12px 16px",border:"none",borderRadius:10,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff"}
+        }, "Ch.", chapters[ch+1].num, " →")
+        : React.createElement("a", {href:"../index.html",
+          style:{flex:1,padding:"12px 16px",borderRadius:10,background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none"}
+        }, "🎉 コース完了！")
+      ),
+      React.createElement("p", {style:{textAlign:"center",fontSize:11,color:"#9ca3af",marginTop:20}}, "kotlinlang.org ・ Kotlin 2.x 時点")
     )
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(KotlinAdvancedCourse));
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(KotlinAdvancedCourse));
   </script>
 </body>
 </html>
