@@ -2,25 +2,9 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <link rel="stylesheet" href="../assets/course.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kotlin 中級コース</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
-    button { font-family: inherit; }
-    #root { min-height: 100vh; padding-top: 56px; }
-    #root > div { max-width: 100%; }
-    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
-    .site-header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 56px; display: flex; align-items: center; padding: 0 20px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e5e7eb; }
-    .site-header a.home-link { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px; padding: 6px 12px; border-radius: 10px; transition: background 0.15s; }
-    .site-header a.home-link:hover { background: #eef2ff; }
-    .site-header .logo-mark { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 15px; }
-    .site-header .logo-text { letter-spacing: -0.01em; }
-    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
-  </style>
-</head>
+  <title>Kotlin 中級コース</title></head>
 <body>
   <header class="site-header">
     <a class="home-link" href="../index.html">
@@ -63,7 +47,7 @@ const EX = {
   ch4:[
     {diff:2,q:"KotlinのDSLビルダーパターンを使ってHTMLを生成するミニライブラリを実装してください。div・h1・pタグを生成できるようにします。",
      code:`// 使用例\nval html = html {\n    body {\n        h1 { +"タイトル" }\n        p { +"段落テキスト" }\n        div(className = "container") {\n            p { +"内側の段落" }\n        }\n    }\n}\nprintln(html)`,
-     answer:`class Tag(val name: String, val attrs: Map<String,String> = emptyMap()) {\n    val children = mutableListOf<Any>()\n    operator fun String.unaryPlus() { children.add(this) }\n    fun render(sb: StringBuilder, indent: String = "") {\n        val attrStr = attrs.entries.joinToString(" ") { " \${it.key}=\\"\\${it.value}\\"" }\n        sb.append("\${indent}<\${name}\${attrStr}>\\n")\n        children.forEach { when(it) {\n            is String -> sb.append("\${indent}  \${it}\\n")\n            is Tag    -> it.render(sb, "\${indent}  ")\n        }}\n        sb.append("\${indent}</\${name}>\\n")\n    }\n}\nfun tag(name: String, attrs: Map<String,String> = emptyMap(), block: Tag.() -> Unit): Tag =\n    Tag(name, attrs).apply(block)\nfun html(block: Tag.() -> Unit) = buildString { tag("html", block = block).render(this) }\nfun Tag.body(block: Tag.() -> Unit) { children.add(tag("body", block = block)) }\nfun Tag.h1(block: Tag.() -> Unit) { children.add(tag("h1", block = block)) }\nfun Tag.p(block: Tag.() -> Unit)  { children.add(tag("p", block = block)) }\nfun Tag.div(className: String="", block: Tag.() -> Unit) {\n    children.add(tag("div", if (className.isNotEmpty()) mapOf("class" to className) else emptyMap(), block))\n}`},
+     answer:`class Tag(val name: String, val attrs: Map<String,String> = emptyMap()) {\n    val children = mutableListOf<Any>()\n    operator fun String.unaryPlus() { children.add(this) }\n    fun render(sb: StringBuilder, indent: String = "") {\n        val attrStr = attrs.entries.joinToString(" ") { " \${it.key}=\\"\${it.value}\\"" }\n        sb.append("\${indent}<\${name}\${attrStr}>\\n")\n        children.forEach { when(it) {\n            is String -> sb.append("\${indent}  \${it}\\n")\n            is Tag    -> it.render(sb, "\${indent}  ")\n        }}\n        sb.append("\${indent}</\${name}>\\n")\n    }\n}\nfun tag(name: String, attrs: Map<String,String> = emptyMap(), block: Tag.() -> Unit): Tag =\n    Tag(name, attrs).apply(block)\nfun html(block: Tag.() -> Unit) = buildString { tag("html", block = block).render(this) }\nfun Tag.body(block: Tag.() -> Unit) { children.add(tag("body", block = block)) }\nfun Tag.h1(block: Tag.() -> Unit) { children.add(tag("h1", block = block)) }\nfun Tag.p(block: Tag.() -> Unit)  { children.add(tag("p", block = block)) }\nfun Tag.div(className: String="", block: Tag.() -> Unit) {\n    children.add(tag("div", if (className.isNotEmpty()) mapOf("class" to className) else emptyMap(), block))\n}`},
     {diff:3,q:"@DslMarkerアノテーションを使って、DSLのスコープを正しく制限するコードを書いてください（外側のDSLのメソッドが内側から呼べないようにする）。",
      code:`@DslMarker\nannotation class HtmlDsl\n\n// @HtmlDsl を使ってスコープ制限を実装`,
      answer:`@DslMarker\nannotation class HtmlDsl\n\n@HtmlDsl\nclass HtmlScope {\n    val builder = StringBuilder()\n    fun h1(text: String) { builder.appendLine("<h1>\${text}</h1>") }\n    fun p(text: String)  { builder.appendLine("<p>\${text}</p>") }\n    // 入れ子の div も HtmlScope を使う\n    fun div(block: HtmlScope.() -> Unit) {\n        builder.append("<div>")\n        val inner = HtmlScope().apply(block)\n        builder.append(inner.builder)\n        builder.appendLine("</div>")\n    }\n}\nfun html(block: HtmlScope.() -> Unit): String =\n    HtmlScope().apply(block).builder.toString()\n\nfun main() {\n    println(html {\n        h1("タイトル")\n        div { p("段落") } // OK\n        // div { div { h1(...) } } ← @DslMarker で外側のh1は呼べない\n    })\n}`},
