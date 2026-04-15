@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>React 初級コース — Python開発者向け</title>
-  <meta name="description" content="Python開発者のためのReact初級コース。全10章・30問の演習付き。Todoアプリを段階的に構築しながらReactの基礎を学びます。">
+  <title>React 初級コース — Todoアプリ開発</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
@@ -14,24 +13,10 @@
     #root { min-height: 100vh; padding-top: 56px; }
     #root > div { max-width: 100%; }
     #root > div > div { max-width: 1100px !important; margin: 0 auto; }
-    .site-header {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      height: 56px; display: flex; align-items: center; padding: 0 20px;
-      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
-      border-bottom: 1px solid #e5e7eb;
-    }
-    .site-header a.home-link {
-      display: inline-flex; align-items: center; gap: 10px;
-      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
-      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
-    }
+    .site-header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 56px; display: flex; align-items: center; padding: 0 20px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e5e7eb; }
+    .site-header a.home-link { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px; padding: 6px 12px; border-radius: 10px; transition: background 0.15s; }
     .site-header a.home-link:hover { background: #eef2ff; }
-    .site-header .logo-mark {
-      width: 30px; height: 30px; border-radius: 8px;
-      background: linear-gradient(135deg,#6366f1,#8b5cf6);
-      color: #fff; display: flex; align-items: center; justify-content: center;
-      font-weight: 900; font-size: 15px;
-    }
+    .site-header .logo-mark { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 15px; }
     .site-header .logo-text { letter-spacing: -0.01em; }
     .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
   </style>
@@ -46,451 +31,486 @@
   <div id="root"></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="../assets/course-ui.js"></script>
   <script>
-const {
-  useState
-} = React;
+const { useState } = React;
 
-/* ── Table definitions ── */
-const T = {
-  viteScripts: {
-    h: ["コマンド", "説明", "用途"],
-    r: [["npm run dev", "開発サーバを起動（HMR対応）", "開発中のプレビュー"], ["npm run build", "本番ビルド（dist/ に出力）", "デプロイ用バンドル生成"], ["npm run preview", "本番ビルドをローカルでプレビュー", "ビルド結果の確認"], ["npm run lint", "ESLint でコード検査", "品質チェック"]]
-  },
-  projectFiles: {
-    h: ["ファイル/フォルダ", "役割"],
-    r: [["vite.config.ts", "Vite の設定ファイル。プラグインやエイリアス等を定義"], ["tsconfig.json", "TypeScript の設定。strict モード推奨"], ["src/main.tsx", "エントリポイント。ReactDOM.createRoot でアプリをマウント"], ["src/App.tsx", "ルートコンポーネント。ここからツリーが始まる"], ["src/index.css", "グローバルCSS。リセットやフォント設定"], ["public/", "静的アセット。ビルド時にそのままコピーされる"], ["index.html", "SPA のシェル。Vite が script を自動注入"]]
-  },
-  componentDesign: {
-    h: ["コンポーネント", "責務", "props"],
-    r: [["App", "全体レイアウト・状態管理のルート", "なし"], ["Header", "タイトルとTodo数の表示", "totalCount, doneCount"], ["AddForm", "新規Todo入力フォーム", "onAdd"], ["TodoList", "Todoの一覧表示（フィルタ済み）", "todos, onToggle, onDelete"], ["TodoItem", "個別Todoの表示・操作", "todo, onToggle, onDelete"], ["FilterBar", "フィルタ切り替えUI", "filter, onFilterChange"]]
-  },
-  propsVsState: {
-    h: ["項目", "props", "state"],
-    r: [["定義場所", "親コンポーネント", "コンポーネント自身"], ["変更可能性", "読み取り専用（immutable）", "setState で更新可能"], ["データフロー", "親 → 子（一方向）", "コンポーネント内部"], ["再レンダリング", "親が変わると子も再レンダリング", "setState 呼び出しで再レンダリング"], ["用途", "コンポーネント間のデータ受け渡し", "UI の状態管理（入力値、開閉状態等）"]]
-  },
-  hookRules: {
-    h: ["ルール", "理由", "違反例"],
-    r: [["トップレベルでのみ呼ぶ", "Reactが呼び出し順で状態を管理するため", "if文の中でuseState"], ["React関数内でのみ呼ぶ", "通常のJS関数では動作しないため", "普通の関数でuseEffect"], ["カスタムフックはuseで始める", "Reactがフック呼び出しを検知するため", "fetchData() という名前"]]
-  },
-  useStatePatterns: {
-    h: ["パターン", "コード例", "説明"],
-    r: [["単純な値", "useState(0)", "数値・文字列・真偽値など"], ["オブジェクト", "useState({ name: '', age: 0 })", "関連する値をまとめる"], ["配列", "useState<Todo[]>([])", "リストデータの管理"], ["関数で初期化", "useState(() => loadFromLS())", "コストの高い初期値計算を遅延実行"]]
-  },
-  rhfVsPlain: {
-    h: ["項目", "React Hook Form", "素のReact"],
-    r: [["バリデーション", "register + rules で宣言的", "onChange + 手動チェック"], ["エラー表示", "formState.errors で自動管理", "state で手動管理"], ["パフォーマンス", "非制御コンポーネント（再レンダリング最小）", "制御コンポーネント（毎回再レンダリング）"], ["コード量", "少ない（ボイラープレート削減）", "多い（全て手書き）"], ["学習コスト", "API を覚える必要あり", "React の基本だけで可能"]]
-  },
-  fetchPatterns: {
-    h: ["パターン", "説明", "使い分け"],
-    r: [["GET → useEffect", "マウント時にデータ取得", "一覧表示・初期ロード"], ["POST → イベントハンドラ", "ボタン押下でデータ送信", "作成・更新"], ["DELETE → イベントハンドラ", "ボタン押下でデータ削除", "削除操作"], ["楽観的更新", "APIレスポンス前にUIを更新", "UX向上（即時フィードバック）"], ["エラーリトライ", "失敗時にUIを戻す", "信頼性向上"]]
-  },
-  customHookBenefits: {
-    h: ["メリット", "説明", "具体例"],
-    r: [["ロジックの再利用", "同じ処理を複数コンポーネントで共有", "useTodos を TodoPage と Dashboard で使用"], ["テスト容易性", "UIなしでロジックだけテスト可能", "renderHook でフック単体テスト"], ["関心の分離", "UIロジックとビジネスロジックを分離", "コンポーネントはJSXだけに集中"], ["可読性向上", "コンポーネントがシンプルになる", "100行 → 20行に削減"]]
-  },
-  stateLibCompare: {
-    h: ["項目", "Zustand", "Jotai", "Redux Toolkit"],
-    r: [["設計思想", "シンプルなストア", "アトムベース", "Flux アーキテクチャ"], ["ボイラープレート", "最小限", "最小限", "やや多い（slice）"], ["学習コスト", "低い", "低い", "中〜高"], ["DevTools", "Redux DevTools 対応", "専用DevTools", "Redux DevTools 完全対応"], ["ミドルウェア", "immer, persist 等", "atom 派生で対応", "thunk, saga, listener 等"], ["適用規模", "小〜中規模", "小〜中規模", "中〜大規模"], ["TypeScript", "型推論が優秀", "型推論が優秀", "型定義がやや冗長"], ["バンドルサイズ", "約1KB", "約2KB", "約11KB"]]
-  },
-  testTypes: {
-    h: ["テスト種別", "対象", "ツール", "実行速度"],
-    r: [["単体テスト", "関数・ユーティリティ", "Vitest", "最速"], ["コンポーネントテスト", "React コンポーネント", "Testing Library + Vitest", "速い"], ["統合テスト", "複数コンポーネント連携", "Testing Library + MSW", "やや遅い"], ["E2Eテスト", "ブラウザ操作全体", "Playwright / Cypress", "遅い"]]
-  },
-  testingLibQueries: {
-    h: ["クエリ", "用途", "優先度"],
-    r: [["getByRole", "ARIAロールで要素取得", "最優先（アクセシビリティ）"], ["getByLabelText", "ラベルテキストで取得", "フォーム要素に最適"], ["getByPlaceholderText", "プレースホルダで取得", "ラベルがない場合"], ["getByText", "表示テキストで取得", "ボタン・リンク等"], ["getByTestId", "data-testid で取得", "最終手段"]]
-  },
-  memoApis: {
-    h: ["API", "用途", "引数", "戻り値"],
-    r: [["React.memo", "コンポーネントのメモ化", "コンポーネント", "メモ化されたコンポーネント"], ["useMemo", "計算結果のメモ化", "計算関数 + 依存配列", "計算結果の値"], ["useCallback", "関数のメモ化", "コールバック + 依存配列", "メモ化された関数"]]
-  },
-  deployCompare: {
-    h: ["サービス", "特徴", "料金", "適用場面"],
-    r: [["Vercel", "Next.js 親和性・ゼロ設定", "無料枠あり", "フロントエンド SPA / SSR"], ["Netlify", "ビルド設定が簡単・フォーム機能", "無料枠あり", "静的サイト・JAMstack"], ["GitHub Pages", "GitHub 連携が最も簡単", "完全無料", "静的サイト・ドキュメント"], ["Cloudflare Pages", "エッジ配信・高速", "無料枠あり", "グローバル配信"]]
-  },
-  ciChecks: {
-    h: ["チェック項目", "ツール", "目的"],
-    r: [["型チェック", "tsc --noEmit", "TypeScript の型エラー検出"], ["Lint", "eslint .", "コードスタイル・品質チェック"], ["テスト", "vitest run", "ユニット/コンポーネントテスト"], ["ビルド", "vite build", "ビルドが通ることの確認"], ["Lighthouse CI", "lhci autorun", "パフォーマンス・a11y スコア"]]
-  }
-};
-
-/* ── Exercises ── */
 const EX = {
-  ch1: [{
-    diff: 1,
-    q: "Viteを使ってReact + TypeScriptプロジェクトを作成し、開発サーバを起動してください。\nブラウザで http://localhost:5173 にアクセスして表示を確認すること。",
-    code: `# ターミナルで以下を実行
-# プロジェクト名は my-todo-app とする`,
-    answer: `npm create vite@latest my-todo-app -- --template react-ts
-cd my-todo-app
-npm install
-npm run dev
-# ブラウザで http://localhost:5173 を開く`
-  }, {
-    diff: 1,
-    q: "src/App.tsx を編集して、「Todo App」というタイトルと現在の日付を表示するコンポーネントに変更してください。\n不要なデフォルトコードはすべて削除すること。",
-    code: `// src/App.tsx を以下の要件で書き換え
-// 1. <h1>Todo App</h1> を表示
-// 2. <p>で今日の日付を表示
-// 3. 不要な import や CSS を削除`,
-    answer: `function App() {
-  const today = new Date().toLocaleDateString('ja-JP');
-  return (
-    <div>
-      <h1>Todo App</h1>
-      <p>今日の日付: {today}</p>
-    </div>
-  );
+  ch1: [
+    {diff:1, q:"Viteでプロジェクトを作成し、Appコンポーネントに「Todoアプリ」というh1を表示してください。",
+     code:`// src/App.jsx
+function App() {
+  // h1を返す
 }
-
-export default App;`
-  }, {
-    diff: 2,
-    q: "tsconfig.json の strict モードが有効であることを確認し、\n以下のコードが型エラーになる理由を説明してください。\nその後、型エラーを修正したコードを書いてください。",
-    code: `// 型エラーが出るコード
-function greet(name) {
-  return "Hello, " + name;
+export default App;`,
+     answer:`// src/App.jsx
+function App() {
+  return <h1>Todoアプリ</h1>;
 }
-
-const result: number = greet("World");`,
-    answer: `// 修正版
-// 1. name に型注釈がない → string を追加
-// 2. 戻り値は string なのに number に代入 → string に修正
-function greet(name: string): string {
-  return "Hello, " + name;
+export default App;
+// vite.config.jsはデフォルトのまま使用`},
+    {diff:2, q:"TodoItemコンポーネントを別ファイルに作り、textプロップを受け取って<li>で表示し、App.jsxでインポートして使ってください。",
+     code:`// src/components/TodoItem.jsx
+export function TodoItem({ text }) {
+  // liを返す
 }
-
-const result: string = greet("World");`
-  }],
-  ch2: [{
-    diff: 1,
-    q: "Header コンポーネントを作成してください。\nprops で todoCount（総数）と doneCount（完了数）を受け取り、表示すること。\n型定義を interface で行うこと。",
-    code: `// src/components/Header.tsx
-// interface HeaderProps { ... }
-// export function Header(props: HeaderProps) { ... }`,
-    answer: `interface HeaderProps {
-  todoCount: number;
-  doneCount: number;
+// src/App.jsx
+// import { TodoItem } from './components/TodoItem';`,
+     answer:`// src/components/TodoItem.jsx
+export function TodoItem({ text }) {
+  return <li style={{ padding: '4px 0' }}>{text}</li>;
 }
-
-export function Header({ todoCount, doneCount }: HeaderProps) {
-  return (
-    <header>
-      <h1>Todo App</h1>
-      <p>全 {todoCount} 件 / 完了 {doneCount} 件</p>
-    </header>
-  );
-}`
-  }, {
-    diff: 2,
-    q: "TodoItem コンポーネントを作成してください。\nTodo 型を定義し、完了/未完了のトグルと削除ボタンを含むこと。\nクリックイベントは props のコールバックで親に通知すること。",
-    code: `// src/components/TodoItem.tsx
-// Todo 型定義と TodoItem コンポーネント
-// チェックボックスと削除ボタンを含む`,
-    answer: `export interface Todo {
-  id: string;
-  text: string;
-  done: boolean;
-}
-
-interface TodoItemProps {
-  todo: Todo;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
-}
-
-export function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
-  return (
-    <li style={{ textDecoration: todo.done ? 'line-through' : 'none' }}>
-      <input
-        type="checkbox"
-        checked={todo.done}
-        onChange={() => onToggle(todo.id)}
-      />
-      <span>{todo.text}</span>
-      <button onClick={() => onDelete(todo.id)}>削除</button>
-    </li>
-  );
-}`
-  }, {
-    diff: 2,
-    q: "TodoList コンポーネントを作成し、TodoItem を map でレンダリングしてください。\n空配列の場合は「Todoがありません」と表示すること。\nkey に todo.id を指定すること。",
-    code: `// src/components/TodoList.tsx
-// TodoItem を map で描画
-// 空の場合の表示も忘れずに`,
-    answer: `import { Todo, TodoItem } from './TodoItem';
-
-interface TodoListProps {
-  todos: Todo[];
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
-}
-
-export function TodoList({ todos, onToggle, onDelete }: TodoListProps) {
-  if (todos.length === 0) {
-    return <p>Todoがありません</p>;
-  }
+// src/App.jsx
+import { TodoItem } from './components/TodoItem';
+function App() {
+  return <ul><TodoItem text="牛乳を買う" /></ul>;
+}`}
+  ],
+  ch2: [
+    {diff:1, q:"todos配列をPropsで受け取り、リスト表示するTodoListコンポーネントを作ってください。",
+     code:`function TodoList({ todos }) {
+  // ulとliでレンダリング
+}`,
+     answer:`function TodoList({ todos }) {
   return (
     <ul>
       {todos.map(todo => (
-        <TodoItem
-          key={todo.id}
-          todo={todo}
-          onToggle={onToggle}
-          onDelete={onDelete}
-        />
+        <li key={todo.id}>{todo.text}</li>
       ))}
     </ul>
   );
-}`
-  }],
-  ch3: [{
-    diff: 1,
-    q: "useState を使って Todo の追加機能を実装してください。\ninput に入力したテキストで新しい Todo を配列に追加する。\nid は crypto.randomUUID() で生成すること。",
-    code: `// App.tsx で useState<Todo[]>([]) を使い、
-// addTodo 関数を実装して AddForm に渡す`,
-    answer: `import { useState } from 'react';
-
-interface Todo {
-  id: string;
-  text: string;
-  done: boolean;
-}
-
-function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [input, setInput] = useState('');
-
-  const addTodo = () => {
-    if (!input.trim()) return;
-    setTodos(prev => [
-      ...prev,
-      { id: crypto.randomUUID(), text: input.trim(), done: false }
-    ]);
-    setInput('');
-  };
-
+}`},
+    {diff:2, q:"useStateでtodosを管理し、初期データ3件を表示してください。completedがtrueのものは取り消し線を表示してください。",
+     code:`function App() {
+  const [todos, setTodos] = useState([
+    {id:1, text:'買い物', completed:false},
+    {id:2, text:'読書', completed:true},
+  ]);
+  // completedならtext-decorationをline-through
+}`,
+     answer:`function App() {
+  const [todos, setTodos] = useState([
+    {id:1, text:'買い物', completed:false},
+    {id:2, text:'読書', completed:true},
+    {id:3, text:'運動', completed:false},
+  ]);
   return (
-    <div>
-      <input value={input} onChange={e => setInput(e.target.value)} />
-      <button onClick={addTodo}>追加</button>
-      <ul>
-        {todos.map(t => <li key={t.id}>{t.text}</li>)}
-      </ul>
-    </div>
+    <ul>
+      {todos.map(t => (
+        <li key={t.id}
+          style={{ textDecoration: t.completed ? 'line-through' : 'none' }}>
+          {t.text}
+        </li>
+      ))}
+    </ul>
   );
-}`
-  }, {
-    diff: 2,
-    q: "Todo の完了トグル・削除・フィルタ機能を実装してください。\nフィルタは「すべて」「未完了」「完了」の3つ。\n表示する todos は useMemo でフィルタリングすること。",
-    code: `// toggleTodo, deleteTodo, filteredTodos を実装
-// filter state は 'all' | 'active' | 'done'`,
-    answer: `import { useState, useMemo } from 'react';
-
-type Filter = 'all' | 'active' | 'done';
-
-interface Todo {
-  id: string;
-  text: string;
-  done: boolean;
-}
-
+}`}
+  ],
+  ch3: [
+    {diff:1, q:"テキスト入力とボタンでTodoを追加するフォームを作ってください。空文字は追加しないようにしてください。",
+     code:`function AddTodoForm({ onAdd }) {
+  const [text, setText] = useState('');
+  // 送信時にonAdd(text)を呼び、フィールドをクリア
+}`,
+     answer:`function AddTodoForm({ onAdd }) {
+  const [text, setText] = useState('');
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    onAdd(text.trim());
+    setText('');
+  };
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={text} onChange={e => setText(e.target.value)}
+        placeholder="新しいTodo" />
+      <button type="submit">追加</button>
+    </form>
+  );
+}`},
+    {diff:2, q:"フォームに「20文字以内」のバリデーションを追加し、超えた場合はエラーメッセージを赤字で表示してください。",
+     code:`function AddTodoForm({ onAdd }) {
+  const [text, setText] = useState('');
+  // 20文字超えたらエラー表示、ボタン無効化
+}`,
+     answer:`function AddTodoForm({ onAdd }) {
+  const [text, setText] = useState('');
+  const tooLong = text.length > 20;
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (!text.trim() || tooLong) return;
+    onAdd(text.trim());
+    setText('');
+  };
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={text} onChange={e => setText(e.target.value)} />
+      {tooLong && <p style={{ color:'red' }}>20文字以内にしてください</p>}
+      <button disabled={tooLong || !text.trim()}>追加</button>
+    </form>
+  );
+}`}
+  ],
+  ch4: [
+    {diff:1, q:"useMemoを使って、todosのうちcompletedがfalseのものだけをフィルタした配列を計算してください。",
+     code:`function TodoApp() {
+  const [todos, setTodos] = useState([...]);
+  const activeTodos = React.useMemo(
+    () => /* todosをフィルタ */,
+    [todos]
+  );
+}`,
+     answer:`function TodoApp() {
+  const [todos, setTodos] = useState([
+    {id:1, text:'A', completed:false},
+    {id:2, text:'B', completed:true},
+  ]);
+  const activeTodos = React.useMemo(
+    () => todos.filter(t => !t.completed),
+    [todos]
+  );
+  return <p>未完了: {activeTodos.length}件</p>;
+}`},
+    {diff:2, q:"useCallbackを使って、todo削除ハンドラをメモ化し、React.memoでラップしたTodoItemに渡してください。",
+     code:`const TodoItem = React.memo(function TodoItem({ todo, onDelete }) {
+  return <li>{todo.text} <button onClick={() => onDelete(todo.id)}>削除</button></li>;
+});
 function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [filter, setFilter] = useState<Filter>('all');
-
-  const toggleTodo = (id: string) => {
-    setTodos(prev =>
-      prev.map(t => t.id === id ? { ...t, done: !t.done } : t)
-    );
-  };
-
-  const deleteTodo = (id: string) => {
+  const [todos, setTodos] = useState([...]);
+  const handleDelete = /* useCallbackでメモ化 */;
+}`,
+     answer:`const TodoItem = React.memo(function TodoItem({ todo, onDelete }) {
+  return (
+    <li>{todo.text}
+      <button onClick={() => onDelete(todo.id)}>削除</button>
+    </li>
+  );
+});
+function App() {
+  const [todos, setTodos] = useState([{id:1,text:'A',completed:false}]);
+  const handleDelete = React.useCallback(id => {
     setTodos(prev => prev.filter(t => t.id !== id));
-  };
+  }, []);
+  return <ul>{todos.map(t => <TodoItem key={t.id} todo={t} onDelete={handleDelete} />)}</ul>;
+}`}
+  ],
+  ch5: [
+    {diff:1, q:"Zustandでtodosストアを作り、addTodo・removeTodoアクションを定義してください。",
+     code:`// store/todoStore.js
+import { create } from 'zustand';
+const useTodoStore = create(set => ({
+  todos: [],
+  addTodo: /* text を受け取り追加 */,
+  removeTodo: /* id を受け取り削除 */,
+}));`,
+     answer:`import { create } from 'zustand';
+const useTodoStore = create(set => ({
+  todos: [],
+  addTodo: text => set(state => ({
+    todos: [...state.todos, { id: Date.now(), text, completed: false }]
+  })),
+  removeTodo: id => set(state => ({
+    todos: state.todos.filter(t => t.id !== id)
+  })),
+}));`},
+    {diff:2, q:"ZustandストアにtoggleTodoアクションを追加し、コンポーネントからcompletedを切り替えられるようにしてください。",
+     code:`// store/todoStore.js にtoggleTodoを追加
+// component: チェックボックスクリックでtoggle`,
+     answer:`// store
+const useTodoStore = create(set => ({
+  todos: [],
+  toggleTodo: id => set(state => ({
+    todos: state.todos.map(t =>
+      t.id === id ? { ...t, completed: !t.completed } : t
+    )
+  })),
+}));
+// component
+function TodoItem({ todo }) {
+  const toggleTodo = useTodoStore(s => s.toggleTodo);
+  return (
+    <li>
+      <input type="checkbox" checked={todo.completed}
+        onChange={() => toggleTodo(todo.id)} />
+      {todo.text}
+    </li>
+  );
+}`}
+  ],
+  ch6: [
+    {diff:1, q:"useEffectでJSONPlaceholderからTodosを取得し、初期データとしてストアに設定してください。",
+     code:`function App() {
+  const setTodos = useTodoStore(s => s.setTodos);
+  useEffect(() => {
+    // fetch して setTodos する
+  }, []);
+}`,
+     answer:`function App() {
+  const setTodos = useTodoStore(s => s.setTodos);
+  useEffect(() => {
+    fetch('https://jsonplaceholder.typicode.com/todos?_limit=5')
+      .then(r => r.json())
+      .then(data => setTodos(
+        data.map(d => ({ id: d.id, text: d.title, completed: d.completed }))
+      ));
+  }, []);
+  return <TodoList />;
+}`},
+    {diff:2, q:"APIへのPOSTリクエストでTodoを追加する非同期アクションをZustandストアに実装してください。",
+     code:`const useTodoStore = create(set => ({
+  todos: [],
+  addTodoAsync: async text => {
+    // fetchでPOSTし、レスポンスをstoreに追加
+  },
+}));`,
+     answer:`const useTodoStore = create(set => ({
+  todos: [],
+  addTodoAsync: async text => {
+    const res = await fetch('https://jsonplaceholder.typicode.com/todos', {
+      method: 'POST',
+      body: JSON.stringify({ title: text, completed: false }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await res.json();
+    set(state => ({
+      todos: [...state.todos, { id: data.id, text: data.title, completed: false }]
+    }));
+  },
+}));`}
+  ],
+  ch7: [
+    {diff:1, q:"@testing-library/reactを使って、Todoアイテムがレンダリングされることをテストしてください。",
+     code:`import { render, screen } from '@testing-library/react';
+import { TodoItem } from './TodoItem';
 
-  const filteredTodos = useMemo(() => {
-    switch (filter) {
-      case 'active': return todos.filter(t => !t.done);
-      case 'done': return todos.filter(t => t.done);
-      default: return todos;
-    }
+test('Todoテキストが表示される', () => {
+  // renderしてscreenで確認
+});`,
+     answer:`import { render, screen } from '@testing-library/react';
+import { TodoItem } from './TodoItem';
+
+test('Todoテキストが表示される', () => {
+  render(<TodoItem todo={{ id:1, text:'買い物', completed:false }} onDelete={() => {}} />);
+  expect(screen.getByText('買い物')).toBeInTheDocument();
+});`},
+    {diff:2, q:"userEventを使って、追加ボタンをクリックするとTodoが追加されることをテストしてください。",
+     code:`import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import App from './App';
+
+test('Todoを追加できる', async () => {
+  // テキスト入力してボタンクリック後、テキストが表示されることを確認
+});`,
+     answer:`import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import App from './App';
+
+test('Todoを追加できる', async () => {
+  render(<App />);
+  const input = screen.getByPlaceholderText('新しいTodo');
+  await userEvent.type(input, '新しいタスク');
+  await userEvent.click(screen.getByRole('button', { name: '追加' }));
+  expect(screen.getByText('新しいタスク')).toBeInTheDocument();
+});`}
+  ],
+  ch8: [
+    {diff:1, q:"Viteプロジェクトをビルドし、distフォルダを確認してください。package.jsonのbuildスクリプトとpreviewスクリプトを確認してください。",
+     code:`// package.json のscriptsセクションを確認
+// $ npm run build の出力を確認
+// dist/ フォルダの構成を説明してください`,
+     answer:`// package.json
+{
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview"  // ローカルでdistをプレビュー
+  }
+}
+// ビルド後のdist/構成:
+// dist/index.html
+// dist/assets/index-[hash].js  ← バンドル済みJS
+// dist/assets/index-[hash].css ← バンドル済みCSS`},
+    {diff:2, q:"GitHub Actionsを使って、mainブランチへのpushで自動的にGitHub Pagesにデプロイするワークフローを書いてください。",
+     code:`# .github/workflows/deploy.yml
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    # steps を書いてください`,
+     answer:`name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npm run build
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist`}
+  ],
+};
+
+const chapters = [
+  {id:"ch1", num:1, title:"Vite環境構築・初めてのコンポーネント", est:"45分",
+   goal:"Viteでプロジェクトを作成し、コンポーネントをファイルに分割してimport/exportできる。開発サーバーとホットリロードの仕組みを理解できる。",
+   sections:[
+     {title:"Viteとは・プロジェクト作成", body:`ViteはEvan You（Vue.jsの作者）が開発した次世代フロントエンドビルドツールです。webpackと比べてESモジュールをネイティブに活用するため、開発サーバーの起動が数秒で完了し、ホットモジュールリプレイスメント（HMR）も瞬時に反映されます。Pythonでいえば、uvとfastAPIの組み合わせのような開発体験の改善です。
+
+create-react-appは2023年に非推奨となり、現在のReact公式ドキュメントではViteやNext.jsが推奨されています。本コースではシンプルなSPAとしてViteを使います。npm create vite@latestコマンドでReact + JavaScriptテンプレートを選択するだけで環境が整います。
+
+プロジェクト構成はsrc/にコンポーネント、public/に静的ファイルを置くのが基本です。Pythonのプロジェクト構造（src/とtests/を分ける）と同じような考え方で、役割ごとにフォルダを分けます。`,
+      code:`# プロジェクト作成
+npm create vite@latest todo-app -- --template react
+cd todo-app
+npm install
+npm run dev  # 開発サーバー起動 (http://localhost:5173)
+
+# 開発に必要なパッケージを追加
+npm install zustand
+npm install -D @testing-library/react @testing-library/user-event vitest`,
+      afterCode:"npm run devで開発サーバーが起動します。ファイルを保存するとブラウザが自動更新されます（HMR）。Python の flask run --debug と同じような感覚です。"},
+     {title:"コンポーネントをファイルに分割する", body:`Reactでは1ファイルに1コンポーネントが基本です。コンポーネントはexport defaultまたは名前付きexportでエクスポートし、使う側でimportします。Pythonのfrom module import ClassNameと同じ構文です。
+
+src/components/ディレクトリを作ってコンポーネントをまとめるのが一般的なプロジェクト構造です。機能ごとにディレクトリを分けるFeature-basedディレクトリ構造も人気があります。Todoアプリでは、components/, store/, hooks/のように役割で分けます。
+
+index.jsをディレクトリに置いてコンポーネントをre-exportすると、import { TodoItem } from './components'のようにきれいにインポートできます。Pythonの__init__.pyとほぼ同じ役割です。`,
+      code:`// src/components/TodoItem.jsx
+export function TodoItem({ todo, onToggle, onDelete }) {
+  return (
+    <li style={{
+      display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0',
+      textDecoration: todo.completed ? 'line-through' : 'none'
+    }}>
+      <input type="checkbox" checked={todo.completed}
+        onChange={() => onToggle(todo.id)} />
+      <span style={{ flex: 1 }}>{todo.text}</span>
+      <button onClick={() => onDelete(todo.id)}>削除</button>
+    </li>
+  );
+}`,
+      afterCode:"コンポーネントのpropsには型をつけましょう。TypeScriptを使う場合はinterface TodoItemProps { todo: Todo; onToggle: (id: number) => void; }のように定義します。"}
+   ]},
+  {id:"ch2", num:2, title:"Props・useState・Todo一覧表示", est:"45分",
+   goal:"propsとuseStateを使ってTodoリストを状態管理し、追加・完了切り替え・削除の基本操作を実装できる。",
+   sections:[
+     {title:"TodoリストのState設計", body:`Todoアプリの状態設計は重要です。各Todoはid・text・completedフィールドを持つオブジェクトにします。idには一意の値（Date.now()やuuid）を使います。Pythonのデータクラス（@dataclass）に相当する構造です。
+
+useStateで配列を管理するとき、Pythonのリストのように直接push()やsplice()を使ってはいけません。Reactは参照が変わったことで変更を検知するため、必ず新しい配列を返す操作（filter・map・spread）を使います。
+
+Todoの追加は[...prev, newItem]、削除はprev.filter(t => t.id !== id)、更新はprev.map(t => t.id === id ? {...t, key: val} : t)のパターンで覚えましょう。これらはReact開発で最頻出の操作です。`,
+      code:`function useTodos() {
+  const [todos, setTodos] = useState([
+    { id: 1, text: '牛乳を買う', completed: false },
+    { id: 2, text: '本を読む', completed: true },
+  ]);
+
+  const addTodo = text =>
+    setTodos(prev => [...prev, { id: Date.now(), text, completed: false }]);
+  const toggleTodo = id =>
+    setTodos(prev => prev.map(t =>
+      t.id === id ? { ...t, completed: !t.completed } : t));
+  const deleteTodo = id =>
+    setTodos(prev => prev.filter(t => t.id !== id));
+
+  return { todos, addTodo, toggleTodo, deleteTodo };
+}`,
+      afterCode:"カスタムフック useTodos にロジックをまとめることで、App.jsxをシンプルに保てます。このパターンは後でZustandに移行するときも移行しやすい設計です。"},
+     {title:"フィルタリングとソートの実装", body:`Todoアプリでは「全て」「未完了」「完了済み」のフィルタリングが必要です。フィルタの状態をuseStateで管理し、表示するTodoをuseMemoで計算します。Pythonのリスト内包表記でフィルタするのと同じロジックで、書き方がJavaScriptになるだけです。
+
+useMemoを使うのは、filteredTodosの計算コストを考慮してではなく、依存配列を明示するためです。todosやfilterが変わったときだけ再計算し、無関係なstateの変更では再計算しません。
+
+ソート機能はtodosのコピーを作ってsort()します。Pythonのsorted()と同様、元の配列は変更しないようにします。JavaScriptのsort()は破壊的（インプレース）なので、[...todos].sort(...)と展開してから使います。`,
+      code:`function TodoApp() {
+  const { todos, addTodo, toggleTodo, deleteTodo } = useTodos();
+  const [filter, setFilter] = useState('all'); // 'all'|'active'|'done'
+
+  const filtered = React.useMemo(() => {
+    if (filter === 'active') return todos.filter(t => !t.completed);
+    if (filter === 'done') return todos.filter(t => t.completed);
+    return todos;
   }, [todos, filter]);
 
   return (
     <div>
       <div>
-        {(['all', 'active', 'done'] as Filter[]).map(f => (
+        {['all','active','done'].map(f => (
           <button key={f} onClick={() => setFilter(f)}
-            style={{ fontWeight: filter === f ? 'bold' : 'normal' }}>
-            {f === 'all' ? 'すべて' : f === 'active' ? '未完了' : '完了'}
+            style={{ fontWeight: filter===f ? 700 : 400 }}>
+            {f}
           </button>
         ))}
       </div>
-      <ul>
-        {filteredTodos.map(t => (
-          <li key={t.id}>
-            <input type="checkbox" checked={t.done}
-              onChange={() => toggleTodo(t.id)} />
-            <span style={{textDecoration: t.done ? 'line-through' : 'none'}}>
-              {t.text}
-            </span>
-            <button onClick={() => deleteTodo(t.id)}>削除</button>
-          </li>
-        ))}
-      </ul>
+      <p>{filtered.length}件表示中</p>
     </div>
   );
-}`
-  }, {
-    diff: 3,
-    q: "Todo の編集機能（インライン編集）を追加してください。\nTodoItem をダブルクリックすると編集モードになり、\nEnter で確定、Escape でキャンセルできるようにすること。",
-    code: `// TodoItem に editMode state を追加
-// ダブルクリック → input 表示 → Enter/Escape で切り替え`,
-    answer: `import { useState, useRef, useEffect } from 'react';
+}`,
+      afterCode:"フィルタの選択状態をURLのクエリパラメータ（?filter=active）に保存すると、ページリロード後もフィルタが維持されます。React RouterのuseSearchParamsを使って実装できます。"}
+   ]},
+  {id:"ch3", num:3, title:"フォームとバリデーション", est:"50分",
+   goal:"制御コンポーネントを使ったフォームを実装し、リアルタイムバリデーションとエラーメッセージを表示できる。",
+   sections:[
+     {title:"Todoフォームのバリデーション実装", body:`フォームバリデーションは2種類あります。HTMLのrequired・maxlengthなどのネイティブバリデーションと、Reactで制御するカスタムバリデーションです。本格的なアプリでは、React Hook Formやzodと組み合わせたバリデーションが主流ですが、まずは手動実装で仕組みを理解します。
 
-interface Todo {
-  id: string; text: string; done: boolean;
+バリデーションはonChangeでリアルタイムに行うか、onSubmitで送信時に行うかを選べます。UX的には、一度フォーカスが当たったフィールドに対してonBlurでバリデーションするのが一般的です。Pythonのweb frameworkのフォームバリデーションとは異なり、クライアント側でリアルタイムにフィードバックできます。
+
+エラーメッセージはstateで管理し、フィールドごとにエラー内容を保持するオブジェクトにします: const [errors, setErrors] = useState({})。バリデーション関数はロジックを分離してテストしやすくします。`,
+      code:`function validate(text) {
+  if (!text.trim()) return '内容を入力してください';
+  if (text.length > 50) return '50文字以内で入力してください';
+  if (text.trim().length < 2) return '2文字以上入力してください';
+  return null; // null = エラーなし
 }
 
-interface TodoItemProps {
-  todo: Todo;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
-  onUpdate: (id: string, text: string) => void;
-}
+function AddTodoForm({ onAdd }) {
+  const [text, setText] = useState('');
+  const [touched, setTouched] = useState(false);
+  const error = touched ? validate(text) : null;
 
-function TodoItem({ todo, onToggle, onDelete, onUpdate }: TodoItemProps) {
-  const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState(todo.text);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing) inputRef.current?.focus();
-  }, [editing]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      if (editText.trim()) {
-        onUpdate(todo.id, editText.trim());
-        setEditing(false);
-      }
-    } else if (e.key === 'Escape') {
-      setEditText(todo.text);
-      setEditing(false);
-    }
+  const handleSubmit = e => {
+    e.preventDefault();
+    setTouched(true);
+    if (validate(text)) return;
+    onAdd(text.trim());
+    setText('');
+    setTouched(false);
   };
 
   return (
-    <li>
-      <input type="checkbox" checked={todo.done}
-        onChange={() => onToggle(todo.id)} />
-      {editing ? (
-        <input ref={inputRef} value={editText}
-          onChange={e => setEditText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => { setEditText(todo.text); setEditing(false); }}
-        />
-      ) : (
-        <span onDoubleClick={() => setEditing(true)}
-          style={{textDecoration: todo.done ? 'line-through' : 'none'}}>
-          {todo.text}
-        </span>
-      )}
-      <button onClick={() => onDelete(todo.id)}>削除</button>
-    </li>
-  );
-}`
-  }],
-  ch4: [{
-    diff: 1,
-    q: "react-hook-form を使って AddForm を書き直してください。\n空文字の場合にエラーメッセージを表示すること。",
-    code: `// npm install react-hook-form
-// useForm を使って register + handleSubmit
-// errors.text?.message でエラー表示`,
-    answer: `import { useForm } from 'react-hook-form';
-
-interface FormData {
-  text: string;
-}
-
-interface AddFormProps {
-  onAdd: (text: string) => void;
-}
-
-export function AddForm({ onAdd }: AddFormProps) {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>();
-
-  const onSubmit = (data: FormData) => {
-    onAdd(data.text.trim());
-    reset();
-  };
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <input
-        {...register('text', {
-          required: 'Todoを入力してください',
-          minLength: { value: 2, message: '2文字以上入力してください' }
-        })}
-        placeholder="新しいTodo..."
-      />
-      {errors.text && <p style={{color:'red'}}>{errors.text.message}</p>}
+    <form onSubmit={handleSubmit}>
+      <input value={text} onChange={e => setText(e.target.value)}
+        onBlur={() => setTouched(true)}
+        style={{ borderColor: error ? '#ef4444' : '#d1d5db' }} />
+      {error && <p style={{ color: '#ef4444', fontSize: 12 }}>{error}</p>}
       <button type="submit">追加</button>
     </form>
   );
-}`
-  }, {
-    diff: 2,
-    q: "react-hot-toast を使って、Todo追加/削除時にトースト通知を表示してください。\n追加時は「Todoを追加しました」、削除時は「Todoを削除しました」と表示。",
-    code: `// npm install react-hot-toast
-// main.tsx に <Toaster /> を追加
-// toast.success() で通知`,
-    answer: `// main.tsx
-import { Toaster } from 'react-hot-toast';
+}`,
+      afterCode:"touchedフラグを使うことで、まだ操作していないフィールドにはエラーを表示しないUXを実現しています。ユーザーが最初からエラーだらけの画面を見るのを防ぎます。"},
+     {title:"React Hook Formの導入", body:`手動バリデーションは学習に有益ですが、実務ではReact Hook Form（RHF）が広く使われています。RHFは非制御コンポーネントを使うため、入力のたびに再レンダリングが起きず、パフォーマンスが優れています。Pythonのweb frameworkでいえば、WTFormsやpydanticに相当します。
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-    <Toaster position="top-right" />
-  </React.StrictMode>
-);
+useForm()フックからregister・handleSubmit・formState: { errors }を取得します。registerで各フィールドのバリデーションルールを設定し、handleSubmitがバリデーション通過後のコールバックを呼びます。
 
-// App.tsx 内の addTodo / deleteTodo
-import toast from 'react-hot-toast';
+zodと組み合わせるとより強力なスキーマバリデーションができます。@hookform/resolversパッケージでzodスキーマをRHFと繋ぎます。Pythonのpydanticモデルと同じようにスキーマを定義して入力値を検証できます。`,
+      code:`// npm install react-hook-form
+import { useForm } from 'react-hook-form';
 
-const addTodo = (text: string) => {
-  setTodos(prev => [
-    ...prev,
-    { id: crypto.randomUUID(), text, done: false }
-  ]);
-  toast.success('Todoを追加しました');
-};
+function AddTodoForm({ onAdd }) {
+  const {
+    register, handleSubmit,
+    reset,
+    formState: { errors }
+  } = useForm();
 
-const deleteTodo = (id: string) => {
-  setTodos(prev => prev.filter(t => t.id !== id));
-  toast.success('Todoを削除しました');
-};`
-  }, {
-    diff: 3,
-    q: "バリデーションをカスタムして以下のルールを実装してください。\n1. 必須入力（空文字禁止）\n2. 2〜50文字\n3. 重複禁止（既存の Todo と同じテキストはエラー）\nカスタム validate 関数を使うこと。",
-    code: `// register の validate オプションを使用
-// 既存 todos との重複チェックも実装`,
-    answer: `import { useForm } from 'react-hook-form';
-
-interface FormData { text: string; }
-
-interface AddFormProps {
-  onAdd: (text: string) => void;
-  existingTexts: string[];
-}
-
-export function AddForm({ onAdd, existingTexts }: AddFormProps) {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>();
-
-  const onSubmit = (data: FormData) => {
-    onAdd(data.text.trim());
+  const onSubmit = data => {
+    onAdd(data.text);
     reset();
   };
 
@@ -498,522 +518,64 @@ export function AddForm({ onAdd, existingTexts }: AddFormProps) {
     <form onSubmit={handleSubmit(onSubmit)}>
       <input
         {...register('text', {
-          required: 'Todoを入力してください',
-          minLength: { value: 2, message: '2文字以上で入力してください' },
+          required: '内容を入力してください',
           maxLength: { value: 50, message: '50文字以内で入力してください' },
-          validate: {
-            noDuplicate: (value) =>
-              !existingTexts.includes(value.trim()) || '同じTodoが既に存在します',
-            noWhitespaceOnly: (value) =>
-              value.trim().length > 0 || '空白のみは入力できません'
-          }
+          minLength: { value: 2, message: '2文字以上入力してください' },
         })}
-        placeholder="新しいTodo..."
+        placeholder="新しいTodo"
       />
-      {errors.text && <p style={{color:'red'}}>{errors.text.message}</p>}
+      {errors.text && (
+        <p style={{ color: '#ef4444', fontSize: 12 }}>{errors.text.message}</p>
+      )}
       <button type="submit">追加</button>
     </form>
   );
-}`
-  }],
-  ch5: [{
-    diff: 1,
-    q: "json-server を使って db.json に todos のダミーデータを作成し、\nuseEffect で GET /todos してデータを取得・表示してください。",
-    code: `// npm install -D json-server
-// db.json を作成して npx json-server db.json --port 3001
-// App.tsx で useEffect + fetch`,
-    answer: `// db.json
-{
-  "todos": [
-    { "id": "1", "text": "買い物に行く", "done": false },
-    { "id": "2", "text": "レポートを書く", "done": true },
-    { "id": "3", "text": "運動する", "done": false }
-  ]
+}`,
+      afterCode:"RHFのregisterが返すオブジェクトをスプレッドするだけでref・onChange・onBlurが自動的にinputにバインドされます。コード量が大幅に減り、パフォーマンスも向上します。"}
+   ]},
+  {id:"ch4", num:4, title:"useMemo・useCallback", est:"45分",
+   goal:"useMemoで重い計算をメモ化し、useCallbackで関数参照を安定させてReact.memoと組み合わせた最適化ができる。",
+   sections:[
+     {title:"useMemoで計算コストを削減する", body:`useMemoは計算結果をキャッシュします。第2引数の依存配列に含まれる値が変わったときだけ再計算します。Pythonのfunctools.lru_cacheに似ていますが、コンポーネントのレンダリングサイクルに合わせて動作します。
+
+TodoアプリでuseMemoが活躍する場面はフィルタリングや統計情報の計算です。todosが100件あって毎回フィルタ計算するより、todosかfilterが変わったときだけ再計算する方が効率的です。ただし、useMemo自体もオーバーヘッドがあるので、本当に重い計算にだけ使いましょう。
+
+Pythonのリスト内包表記をそのままJavaScriptのfilter・mapに置き換えるだけでほぼ同じことができます。filter(lambda t: not t.completed, todos) → todos.filter(t => !t.completed)という対応関係です。`,
+      code:`function useTodoStats(todos) {
+  return React.useMemo(() => {
+    const total = todos.length;
+    const done = todos.filter(t => t.completed).length;
+    const active = total - done;
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { total, done, active, percent };
+  }, [todos]); // todosが変わったときだけ再計算
 }
 
-// App.tsx
-import { useState, useEffect } from 'react';
-
-const API = 'http://localhost:3001/todos';
-
-interface Todo { id: string; text: string; done: boolean; }
-
-function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(API)
-      .then(res => res.json())
-      .then(data => { setTodos(data); setLoading(false); })
-      .catch(err => { console.error(err); setLoading(false); });
-  }, []);
-
-  if (loading) return <p>読み込み中...</p>;
-  return (
-    <ul>
-      {todos.map(t => <li key={t.id}>{t.text}</li>)}
-    </ul>
-  );
-}`
-  }, {
-    diff: 2,
-    q: "POST /todos で新規Todoを作成し、DELETE /todos/:id で削除する機能を実装してください。\nAPI通信中はボタンを disabled にすること。",
-    code: `// fetch の POST / DELETE メソッド
-// submitting state で UI を制御`,
-    answer: `const API = 'http://localhost:3001/todos';
-
-function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-
-  const addTodo = async (text: string) => {
-    setSubmitting(true);
-    try {
-      const newTodo = { id: crypto.randomUUID(), text, done: false };
-      const res = await fetch(API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newTodo),
-      });
-      const created = await res.json();
-      setTodos(prev => [...prev, created]);
-    } catch (err) {
-      console.error('追加に失敗:', err);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const deleteTodo = async (id: string) => {
-    setSubmitting(true);
-    try {
-      await fetch(API + '/' + id, { method: 'DELETE' });
-      setTodos(prev => prev.filter(t => t.id !== id));
-    } catch (err) {
-      console.error('削除に失敗:', err);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // ... レンダリング（ボタンに disabled={submitting} を付与）
-}`
-  }, {
-    diff: 3,
-    q: "エラーハンドリングとリトライ機能を実装してください。\nfetch 失敗時にエラーメッセージを表示し、「再試行」ボタンで再度 fetch を実行。\nローディング・エラー・成功の3状態を管理すること。",
-    code: `// status: 'idle' | 'loading' | 'error' | 'success'
-// error state にメッセージを保存
-// retry 関数を実装`,
-    answer: `type Status = 'idle' | 'loading' | 'error' | 'success';
-
-function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [status, setStatus] = useState<Status>('idle');
-  const [error, setError] = useState<string>('');
-
-  const fetchTodos = async () => {
-    setStatus('loading');
-    setError('');
-    try {
-      const res = await fetch(API);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      setTodos(data);
-      setStatus('success');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '不明なエラー');
-      setStatus('error');
-    }
-  };
-
-  useEffect(() => { fetchTodos(); }, []);
-
-  if (status === 'loading') return <p>読み込み中...</p>;
-  if (status === 'error') return (
-    <div>
-      <p style={{color:'red'}}>エラー: {error}</p>
-      <button onClick={fetchTodos}>再試行</button>
-    </div>
-  );
-
-  return <ul>{todos.map(t => <li key={t.id}>{t.text}</li>)}</ul>;
-}`
-  }],
-  ch6: [{
-    diff: 1,
-    q: "useTodos カスタムフックを作成してください。\ntodos の状態管理と add / toggle / delete 関数をまとめること。",
-    code: `// src/hooks/useTodos.ts
-// useState を内部で管理
-// { todos, addTodo, toggleTodo, deleteTodo } を返す`,
-    answer: `import { useState } from 'react';
-
-interface Todo { id: string; text: string; done: boolean; }
-
-export function useTodos(initialTodos: Todo[] = []) {
-  const [todos, setTodos] = useState<Todo[]>(initialTodos);
-
-  const addTodo = (text: string) => {
-    setTodos(prev => [
-      ...prev,
-      { id: crypto.randomUUID(), text, done: false }
-    ]);
-  };
-
-  const toggleTodo = (id: string) => {
-    setTodos(prev =>
-      prev.map(t => t.id === id ? { ...t, done: !t.done } : t)
-    );
-  };
-
-  const deleteTodo = (id: string) => {
-    setTodos(prev => prev.filter(t => t.id !== id));
-  };
-
-  return { todos, addTodo, toggleTodo, deleteTodo };
-}
-
-// 使い方
-// const { todos, addTodo, toggleTodo, deleteTodo } = useTodos();`
-  }, {
-    diff: 2,
-    q: "useFilter カスタムフックを作成してください。\nフィルタの状態管理とフィルタリング済みの配列を返すこと。\nuseMemo で計算をメモ化すること。",
-    code: `// src/hooks/useFilter.ts
-// filter state + filteredItems を返す`,
-    answer: `import { useState, useMemo } from 'react';
-
-type Filter = 'all' | 'active' | 'done';
-
-interface Todo { id: string; text: string; done: boolean; }
-
-export function useFilter(todos: Todo[]) {
-  const [filter, setFilter] = useState<Filter>('all');
-
-  const filteredTodos = useMemo(() => {
-    switch (filter) {
-      case 'active': return todos.filter(t => !t.done);
-      case 'done':   return todos.filter(t => t.done);
-      default:       return todos;
-    }
-  }, [todos, filter]);
-
-  const counts = useMemo(() => ({
-    all: todos.length,
-    active: todos.filter(t => !t.done).length,
-    done: todos.filter(t => t.done).length,
-  }), [todos]);
-
-  return { filter, setFilter, filteredTodos, counts };
-}
-
-// 使い方
-// const { filter, setFilter, filteredTodos, counts } = useFilter(todos);`
-  }, {
-    diff: 3,
-    q: "useDebounce カスタムフックを作成してください。\n検索入力に対してデバウンスを適用し、300ms 遅延後にフィルタリングを実行すること。\nuseEffect と setTimeout を使うこと。",
-    code: `// src/hooks/useDebounce.ts
-// value と delay を受け取り、遅延後の値を返す
-// クリーンアップで clearTimeout すること`,
-    answer: `import { useState, useEffect } from 'react';
-
-export function useDebounce<T>(value: T, delay: number = 300): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-
-// 使い方: Todo検索
-function TodoSearch({ todos }: { todos: Todo[] }) {
-  const [query, setQuery] = useState('');
-  const debouncedQuery = useDebounce(query, 300);
-
-  const results = useMemo(
-    () => todos.filter(t =>
-      t.text.toLowerCase().includes(debouncedQuery.toLowerCase())
-    ),
-    [todos, debouncedQuery]
-  );
-
+function StatsBar({ todos }) {
+  const { total, done, active, percent } = useTodoStats(todos);
   return (
     <div>
-      <input value={query} onChange={e => setQuery(e.target.value)}
-        placeholder="検索..." />
-      <ul>{results.map(t => <li key={t.id}>{t.text}</li>)}</ul>
+      <p>全{total}件 / 完了{done}件 / 未完了{active}件</p>
+      <div style={{ background:'#e5e7eb', borderRadius:4, height:8 }}>
+        <div style={{ background:'#6366f1', width:percent+'%', height:'100%', borderRadius:4 }} />
+      </div>
     </div>
   );
-}`
-  }],
-  ch7: [{
-    diff: 1,
-    q: "Zustand で Todo のストアを作成してください。\ntodos 配列と add / toggle / delete アクションを定義すること。",
-    code: `// npm install zustand
-// src/store/todoStore.ts
-// create<TodoState>()(...) でストア定義`,
-    answer: `import { create } from 'zustand';
+}`,
+      afterCode:"useMemoの依存配列にtodosを含めているのは、todosが変わったときだけ再計算するためです。空配列にすると最初の計算結果を使い続けてしまいます。"},
+     {title:"useCallbackとReact.memoの組み合わせ", body:`useCallbackは関数をメモ化します。コンポーネントが再レンダリングされるたびに新しい関数が作成されますが、useCallbackを使うと依存配列が変わらない限り同じ関数参照を返します。
 
-interface Todo { id: string; text: string; done: boolean; }
+これはReact.memoと組み合わせることで意味を持ちます。React.memoはpropsの浅い比較（===）で再レンダリングをスキップしますが、毎回新しい関数が渡されるとpropsが変わったと判断されてスキップできません。useCallbackで関数を安定させることで、React.memoの最適化が効くようになります。
 
-interface TodoState {
-  todos: Todo[];
-  addTodo: (text: string) => void;
-  toggleTodo: (id: string) => void;
-  deleteTodo: (id: string) => void;
-}
-
-export const useTodoStore = create<TodoState>((set) => ({
-  todos: [],
-  addTodo: (text) => set((state) => ({
-    todos: [...state.todos, { id: crypto.randomUUID(), text, done: false }]
-  })),
-  toggleTodo: (id) => set((state) => ({
-    todos: state.todos.map(t =>
-      t.id === id ? { ...t, done: !t.done } : t
-    )
-  })),
-  deleteTodo: (id) => set((state) => ({
-    todos: state.todos.filter(t => t.id !== id)
-  })),
-}));
-
-// コンポーネントで使用
-// const { todos, addTodo } = useTodoStore();`
-  }, {
-    diff: 2,
-    q: "Zustand の persist ミドルウェアを使って、\nTodo データを localStorage に自動保存・復元する機能を追加してください。",
-    code: `// zustand/middleware の persist を使用
-// ストレージキーは 'todo-storage'`,
-    answer: `import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
-interface Todo { id: string; text: string; done: boolean; }
-
-interface TodoState {
-  todos: Todo[];
-  addTodo: (text: string) => void;
-  toggleTodo: (id: string) => void;
-  deleteTodo: (id: string) => void;
-}
-
-export const useTodoStore = create<TodoState>()(
-  persist(
-    (set) => ({
-      todos: [],
-      addTodo: (text) => set((state) => ({
-        todos: [...state.todos,
-          { id: crypto.randomUUID(), text, done: false }]
-      })),
-      toggleTodo: (id) => set((state) => ({
-        todos: state.todos.map(t =>
-          t.id === id ? { ...t, done: !t.done } : t)
-      })),
-      deleteTodo: (id) => set((state) => ({
-        todos: state.todos.filter(t => t.id !== id)
-      })),
-    }),
-    {
-      name: 'todo-storage',
-    }
-  )
-);`
-  }, {
-    diff: 3,
-    q: "Jotai を使って同じ Todo 管理をアトムベースで実装してください。\ntodosAtom, filteredTodosAtom（派生アトム）, filterAtom を定義。\nZustand 版との違いをコメントで説明すること。",
-    code: `// npm install jotai
-// src/store/atoms.ts
-// atom() と 派生 atom を定義`,
-    answer: `import { atom, useAtom } from 'jotai';
-
-interface Todo { id: string; text: string; done: boolean; }
-type Filter = 'all' | 'active' | 'done';
-
-// 基本アトム（Zustandのストアに相当するが、個別の値ごとに分離）
-const todosAtom = atom<Todo[]>([]);
-const filterAtom = atom<Filter>('all');
-
-// 派生アトム（Zustandにはない概念。自動で再計算される）
-const filteredTodosAtom = atom((get) => {
-  const todos = get(todosAtom);
-  const filter = get(filterAtom);
-  switch (filter) {
-    case 'active': return todos.filter(t => !t.done);
-    case 'done':   return todos.filter(t => t.done);
-    default:       return todos;
-  }
-});
-
-// 書き込みアトム（アクションに相当）
-const addTodoAtom = atom(null, (get, set, text: string) => {
-  set(todosAtom, [
-    ...get(todosAtom),
-    { id: crypto.randomUUID(), text, done: false }
-  ]);
-});
-
-// コンポーネントで使用
-// const [todos] = useAtom(filteredTodosAtom);
-// const [, addTodo] = useAtom(addTodoAtom);
-
-// Zustandとの違い:
-// - Zustand: 1つのストアに全状態をまとめる（トップダウン）
-// - Jotai: 個別のアトムを組み合わせる（ボトムアップ）
-// - Jotai の方が粒度が細かく、不要な再レンダリングが起きにくい
-
-export { todosAtom, filterAtom, filteredTodosAtom, addTodoAtom };`
-  }],
-  ch8: [{
-    diff: 1,
-    q: "Vitest + Testing Library で TodoItem のレンダリングテストを書いてください。\nテキストが表示されること、チェックボックスの状態が正しいことを検証。",
-    code: `// npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
-// src/components/TodoItem.test.tsx`,
-    answer: `import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
-import { TodoItem } from './TodoItem';
-
-describe('TodoItem', () => {
-  const todo = { id: '1', text: '買い物に行く', done: false };
-  const onToggle = vi.fn();
-  const onDelete = vi.fn();
-
-  it('テキストが表示される', () => {
-    render(<TodoItem todo={todo} onToggle={onToggle} onDelete={onDelete} />);
-    expect(screen.getByText('買い物に行く')).toBeInTheDocument();
-  });
-
-  it('未完了の場合チェックボックスが未チェック', () => {
-    render(<TodoItem todo={todo} onToggle={onToggle} onDelete={onDelete} />);
-    const checkbox = screen.getByRole('checkbox');
-    expect(checkbox).not.toBeChecked();
-  });
-
-  it('完了の場合チェックボックスがチェック済み', () => {
-    const doneTodo = { ...todo, done: true };
-    render(<TodoItem todo={doneTodo} onToggle={onToggle} onDelete={onDelete} />);
-    expect(screen.getByRole('checkbox')).toBeChecked();
-  });
-});`
-  }, {
-    diff: 2,
-    q: "userEvent を使って、チェックボックスのクリックと削除ボタンのクリックをテストしてください。\nコールバックが正しい引数で呼ばれることを検証すること。",
-    code: `// @testing-library/user-event を使用
-// await user.click() でイベント発火
-// expect(onToggle).toHaveBeenCalledWith('1')`,
-    answer: `import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi } from 'vitest';
-import { TodoItem } from './TodoItem';
-
-describe('TodoItem interactions', () => {
-  it('チェックボックスクリックで onToggle が呼ばれる', async () => {
-    const onToggle = vi.fn();
-    const onDelete = vi.fn();
-    const todo = { id: '1', text: 'テスト', done: false };
-    const user = userEvent.setup();
-
-    render(<TodoItem todo={todo} onToggle={onToggle} onDelete={onDelete} />);
-    await user.click(screen.getByRole('checkbox'));
-
-    expect(onToggle).toHaveBeenCalledTimes(1);
-    expect(onToggle).toHaveBeenCalledWith('1');
-  });
-
-  it('削除ボタンクリックで onDelete が呼ばれる', async () => {
-    const onToggle = vi.fn();
-    const onDelete = vi.fn();
-    const todo = { id: '1', text: 'テスト', done: false };
-    const user = userEvent.setup();
-
-    render(<TodoItem todo={todo} onToggle={onToggle} onDelete={onDelete} />);
-    await user.click(screen.getByRole('button', { name: '削除' }));
-
-    expect(onDelete).toHaveBeenCalledTimes(1);
-    expect(onDelete).toHaveBeenCalledWith('1');
-  });
-});`
-  }, {
-    diff: 3,
-    q: "AddForm の統合テストを書いてください。\nフォーム入力 → バリデーションエラー表示 → 正常送信の一連のフローをテスト。\n空送信でエラー、2文字以上入力で成功することを検証。",
-    code: `// AddForm コンポーネントの統合テスト
-// バリデーションの動作確認を含む`,
-    answer: `import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi } from 'vitest';
-import { AddForm } from './AddForm';
-
-describe('AddForm', () => {
-  it('空送信でバリデーションエラーが表示される', async () => {
-    const onAdd = vi.fn();
-    const user = userEvent.setup();
-    render(<AddForm onAdd={onAdd} existingTexts={[]} />);
-
-    await user.click(screen.getByRole('button', { name: '追加' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Todoを入力してください')).toBeInTheDocument();
-    });
-    expect(onAdd).not.toHaveBeenCalled();
-  });
-
-  it('1文字入力でminLengthエラーが表示される', async () => {
-    const onAdd = vi.fn();
-    const user = userEvent.setup();
-    render(<AddForm onAdd={onAdd} existingTexts={[]} />);
-
-    await user.type(screen.getByPlaceholderText('新しいTodo...'), 'a');
-    await user.click(screen.getByRole('button', { name: '追加' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('2文字以上で入力してください')).toBeInTheDocument();
-    });
-  });
-
-  it('正常入力で onAdd が呼ばれフォームがリセットされる', async () => {
-    const onAdd = vi.fn();
-    const user = userEvent.setup();
-    render(<AddForm onAdd={onAdd} existingTexts={[]} />);
-
-    const input = screen.getByPlaceholderText('新しいTodo...');
-    await user.type(input, '買い物に行く');
-    await user.click(screen.getByRole('button', { name: '追加' }));
-
-    await waitFor(() => {
-      expect(onAdd).toHaveBeenCalledWith('買い物に行く');
-    });
-  });
-});`
-  }],
-  ch9: [{
-    diff: 1,
-    q: "React.memo を使って TodoItem をメモ化してください。\n親の再レンダリング時に props が変わらなければ再描画をスキップすること。\nconsole.log で再レンダリングの有無を確認すること。",
-    code: `// React.memo でラップ
-// console.log('TodoItem rendered:', todo.id) で確認`,
-    answer: `import React from 'react';
-
-interface Todo { id: string; text: string; done: boolean; }
-
-interface TodoItemProps {
-  todo: Todo;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
-}
-
-export const TodoItem = React.memo(function TodoItem({
-  todo, onToggle, onDelete
-}: TodoItemProps) {
-  console.log('TodoItem rendered:', todo.id);
-
+Pythonで同じ処理を何度も定義し直す無駄をなくすように、JavaScriptでも参照を安定させることで不要な計算を省きます。ただし、useCallbackの使いすぎはコードを複雑にするので、まずはプロファイラーで問題を確認してから使いましょう。`,
+      code:`const TodoItem = React.memo(function TodoItem({ todo, onToggle, onDelete }) {
+  console.log('TodoItem render:', todo.id);
   return (
-    <li>
-      <input type="checkbox" checked={todo.done}
+    <li style={{ display:'flex', gap:8, padding:'4px 0' }}>
+      <input type="checkbox" checked={todo.completed}
         onChange={() => onToggle(todo.id)} />
-      <span style={{textDecoration: todo.done ? 'line-through' : 'none'}}>
+      <span style={{ flex:1,
+        textDecoration: todo.completed ? 'line-through' : 'none' }}>
         {todo.text}
       </span>
       <button onClick={() => onDelete(todo.id)}>削除</button>
@@ -1021,1827 +583,354 @@ export const TodoItem = React.memo(function TodoItem({
   );
 });
 
-// 注意: onToggle/onDelete が毎回新しい参照だと
-// memo が効かない → useCallback と組み合わせる`
-  }, {
-    diff: 2,
-    q: "useCallback を使って onToggle と onDelete をメモ化し、\nReact.memo と組み合わせて不要な再レンダリングを防いでください。\nReact DevTools の Profiler で効果を確認する手順もコメントで記述。",
-    code: `// App.tsx で useCallback を使用
-// TodoItem は React.memo でラップ済み`,
-    answer: `import { useState, useCallback } from 'react';
+function TodoApp() {
+  const { todos, toggleTodo, deleteTodo } = useTodos();
+  // useCallbackで関数参照を安定させる
+  const handleToggle = React.useCallback(id => toggleTodo(id), [toggleTodo]);
+  const handleDelete = React.useCallback(id => deleteTodo(id), [deleteTodo]);
+  return (
+    <ul>
+      {todos.map(t =>
+        <TodoItem key={t.id} todo={t}
+          onToggle={handleToggle} onDelete={handleDelete} />
+      )}
+    </ul>
+  );
+}`,
+      afterCode:"React Developer Toolsのプロファイラーで「Highlight updates when components render」をオンにすると、どのコンポーネントが再レンダリングされているか視覚的に確認できます。"}
+   ]},
+  {id:"ch5", num:5, title:"Zustand状態管理", est:"50分",
+   goal:"ZustandでグローバルなTodo状態を管理し、複数コンポーネントからストアを参照・更新できる。",
+   sections:[
+     {title:"Zustandの基本とストア設計", body:`ZustandはReduxより大幅にシンプルなグローバル状態管理ライブラリです。Providerが不要で、create()関数でストアを定義するだけで使えます。Pythonのsingletonパターンに近く、アプリ全体で一つのストアを共有します。
 
-interface Todo { id: string; text: string; done: boolean; }
+Zustandのストアは状態（state）とアクション（関数）を同じオブジェクトに定義します。setを使って部分的に状態を更新でき、immerプラグインを使うとドラフト状態を直接変更するような書き方もできます。これはPythonでクラスのメソッドとして操作を定義するのと同じ感覚です。
 
-function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
+TodoアプリをuseStateからZustandに移行するメリットは、状態をどのコンポーネントからでも直接参照・更新できることです。Props経由でバケツリレーする必要がなくなります。`,
+      code:`import { create } from 'zustand';
 
-  // useCallback でメモ化 → 参照が変わらない → memo が効く
-  const toggleTodo = useCallback((id: string) => {
-    setTodos(prev =>
-      prev.map(t => t.id === id ? { ...t, done: !t.done } : t)
-    );
-  }, []); // 依存配列が空 → 関数は一度だけ生成
+const useTodoStore = create(set => ({
+  todos: [],
+  filter: 'all',
 
-  const deleteTodo = useCallback((id: string) => {
-    setTodos(prev => prev.filter(t => t.id !== id));
+  addTodo: text => set(state => ({
+    todos: [...state.todos, {
+      id: Date.now(), text, completed: false
+    }]
+  })),
+  toggleTodo: id => set(state => ({
+    todos: state.todos.map(t =>
+      t.id === id ? { ...t, completed: !t.completed } : t)
+  })),
+  deleteTodo: id => set(state => ({
+    todos: state.todos.filter(t => t.id !== id)
+  })),
+  setFilter: filter => set({ filter }),
+}));
+
+// 使用: コンポーネントの中で
+// const { todos, addTodo } = useTodoStore();`,
+      afterCode:"Zustandはサブスクリプションを使って、使用しているstateが変わったときだけコンポーネントを再レンダリングします。useTodoStore(s => s.todos)のようにセレクタを使うと、todosが変わったときだけ再レンダリングされます。"},
+     {title:"Zustand devtoolsとpersist", body:`Zustandにはmiddlewareがあり、devtoolsをオンにするとRedux DevToolsでstoreの変化を追えます。persistを使うとlocalStorageに自動保存され、ページリロード後も状態が維持されます。Pythonのshelveやpickleでデータを永続化するのに相当します。
+
+persistミドルウェアはZustandのストアをlocalStorageと同期します。シリアライズできないデータ（関数・クラスインスタンス）は保存できないので、状態には純粋なオブジェクト・配列・プリミティブのみを使います。
+
+本番環境での状態管理ではZustandだけでなく、TanStack Query（旧React Query）を組み合わせてサーバー状態（APIから取得したデータ）とクライアント状態（UIの状態）を分離するアーキテクチャが現在の主流です。`,
+      code:`import { create } from 'zustand';
+import { devtools, persist } from 'zustand/middleware';
+
+const useTodoStore = create(
+  devtools(
+    persist(
+      set => ({
+        todos: [],
+        filter: 'all',
+        addTodo: text => set(state => ({
+          todos: [...state.todos,
+            { id: Date.now(), text, completed: false }]
+        }), false, 'addTodo'), // 3rd引数はDevToolsに表示されるアクション名
+        toggleTodo: id => set(state => ({
+          todos: state.todos.map(t =>
+            t.id === id ? { ...t, completed: !t.completed } : t)
+        }), false, 'toggleTodo'),
+      }),
+      { name: 'todo-storage' } // localStorageのキー名
+    )
+  )
+);`,
+      afterCode:"devtools middlewareを通すことで、Redux DevTools Chrome拡張機能でZustandのstoreをリアルタイムに監視・タイムトラベルデバッグできます。開発効率が大幅に向上します。"}
+   ]},
+  {id:"ch6", num:6, title:"APIとuseEffect", est:"50分",
+   goal:"useEffectとfetchを使ってAPIからデータを取得し、ローディング・エラー状態を適切に処理できる。TanStack Queryの基本を理解できる。",
+   sections:[
+     {title:"APIフェッチのパターン", body:`実際のアプリではTodoデータをAPIから取得します。useEffectとfetchの組み合わせはReactの基本パターンで、ローディング・エラー・成功の3状態を管理します。Pythonのrequests.get()で同期的にデータを取るのと違い、JavaScriptは非同期処理でUIをブロックしません。
+
+競合状態（race condition）に注意が必要です。複数のリクエストが同時に走ると、古いリクエストの結果が最後に来ることがあります。AbortControllerでリクエストをキャンセルするか、後述のTanStack Queryを使うことで自動的に対処できます。
+
+エラーハンドリングは必須です。HTTPステータスが200番台でなければr.ok===falseになりますが、fetchはこれをthrowしないので自分でチェックします。ネットワークエラーの場合だけcatchに入ります。`,
+      code:`function useTodosFromAPI() {
+  const [todos, setTodos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+
+    fetch('https://jsonplaceholder.typicode.com/todos?_limit=10',
+      { signal: controller.signal })
+      .then(r => {
+        if (!r.ok) throw new Error('サーバーエラー: ' + r.status);
+        return r.json();
+      })
+      .then(data => {
+        setTodos(data.map(d => ({ id:d.id, text:d.title, completed:d.completed })));
+        setLoading(false);
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          setError(err.message);
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
   }, []);
+
+  return { todos, loading, error };
+}`,
+      afterCode:"AbortControllerのabort()はReact 18のStrictMode（開発時に2回エフェクトが実行される）でも正しく動作します。クリーンアップ関数にabortを置くことが重要です。"},
+     {title:"TanStack Queryでデータフェッチを楽にする", body:`TanStack Query（旧React Query）はサーバー状態の管理に特化したライブラリです。キャッシュ・バックグラウンド再フェッチ・ローディング状態・エラー状態を自動で管理します。Pythonのhttpxとキャッシュライブラリを組み合わせたようなものですが、React向けに最適化されています。
+
+useQueryフックにqueryKeyとqueryFnを渡すだけで、フェッチ・キャッシュ・ローディング状態が全て管理されます。同じqueryKeyのデータは自動的にキャッシュされ、別のコンポーネントから参照しても余分なリクエストが発生しません。
+
+useMutationフックでPOST・PUT・DELETEリクエストを行い、成功時にキャッシュを更新（invalidateQueries）します。これにより、データの変更後に自動的に再フェッチされ、UIが常に最新になります。`,
+      code:`// npm install @tanstack/react-query
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+const fetchTodos = () =>
+  fetch('https://jsonplaceholder.typicode.com/todos?_limit=5')
+    .then(r => r.json());
+
+function TodoList() {
+  const { data: todos, isLoading, error } = useQuery({
+    queryKey: ['todos'],
+    queryFn: fetchTodos,
+    staleTime: 1000 * 60, // 1分間はキャッシュを使う
+  });
+
+  if (isLoading) return <p>読み込み中...</p>;
+  if (error) return <p>エラー: {error.message}</p>;
 
   return (
     <ul>
-      {todos.map(t => (
-        <TodoItem
-          key={t.id}
-          todo={t}
-          onToggle={toggleTodo}
-          onDelete={deleteTodo}
-        />
-      ))}
+      {todos.map(t => <li key={t.id}>{t.title}</li>)}
     </ul>
   );
-  // React DevTools で確認する手順:
-  // 1. ブラウザ拡張 React Developer Tools をインストール
-  // 2. DevTools > Profiler タブを開く
-  // 3. Record ボタンを押して操作
-  // 4. コンポーネントごとの再レンダリング回数・時間を確認
-  // 5. "Highlight updates" をONにすると視覚的に確認可能
-}`
-  }, {
-    diff: 3,
-    q: "useMemo を使ってフィルタリング結果と統計情報をメモ化してください。\n統計情報は { total, active, done, doneRate } を含むこと。\n不要な再計算が起きないことを console.log で確認。",
-    code: `// filteredTodos と stats の両方を useMemo で計算
-// 依存配列を正しく設定すること`,
-    answer: `import { useState, useMemo } from 'react';
-
-type Filter = 'all' | 'active' | 'done';
-interface Todo { id: string; text: string; done: boolean; }
-
-function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [filter, setFilter] = useState<Filter>('all');
-
-  const filteredTodos = useMemo(() => {
-    console.log('filteredTodos 再計算');
-    switch (filter) {
-      case 'active': return todos.filter(t => !t.done);
-      case 'done':   return todos.filter(t => t.done);
-      default:       return todos;
-    }
-  }, [todos, filter]); // todos か filter が変わった時だけ再計算
-
-  const stats = useMemo(() => {
-    console.log('stats 再計算');
-    const total = todos.length;
-    const done = todos.filter(t => t.done).length;
-    const active = total - done;
-    const doneRate = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { total, active, done, doneRate };
-  }, [todos]); // filter 変更では再計算しない（todosだけに依存）
-
-  return (
-    <div>
-      <p>全{stats.total}件 完了{stats.done}件 ({stats.doneRate}%)</p>
-      <div>
-        {(['all','active','done'] as Filter[]).map(f => (
-          <button key={f} onClick={() => setFilter(f)}>{f}</button>
-        ))}
-      </div>
-      <ul>
-        {filteredTodos.map(t => <li key={t.id}>{t.text}</li>)}
-      </ul>
-    </div>
-  );
-}`
-  }],
-  ch10: [{
-    diff: 1,
-    q: "Vercel にデプロイするための設定を行ってください。\nvercel.json を作成し、SPA のルーティング設定を追加すること。\nデプロイコマンドも記述。",
-    code: `// vercel.json を作成
-// npx vercel でデプロイ`,
-    answer: `// vercel.json
-{
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
-
-// デプロイ手順:
-// 1. npm install -g vercel
-// 2. vercel login
-// 3. vercel           (初回: プロジェクト設定)
-// 4. vercel --prod    (本番デプロイ)
-
-// 環境変数の設定:
-// vercel env add VITE_API_URL
-
-// プレビューデプロイ（PRごと）:
-// Git push → 自動でプレビューURLが生成される`
-  }, {
-    diff: 2,
-    q: "GitHub Actions で CI パイプラインを作成してください。\nPR 作成時に lint, 型チェック, テスト, ビルドを実行すること。",
-    code: `// .github/workflows/ci.yml
-// push / pull_request トリガー
-// Node.js 20 + npm ci`,
-    answer: `# .github/workflows/ci.yml
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  ci:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Type Check
-        run: npx tsc --noEmit
-
-      - name: Test
-        run: npx vitest run --coverage
-
-      - name: Build
-        run: npm run build
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/`
-  }, {
-    diff: 3,
-    q: "Lighthouse CI を GitHub Actions に組み込んでください。\nパフォーマンス 90点以上、アクセシビリティ 90点以上を閾値として設定。\n閾値を下回った場合は CI を失敗させること。",
-    code: `// lighthouserc.js を作成
-// GitHub Actions に Lighthouse CI ステップを追加`,
-    answer: `// lighthouserc.js
-module.exports = {
-  ci: {
-    collect: {
-      staticDistDir: './dist',
-      numberOfRuns: 3,
-    },
-    assert: {
-      assertions: {
-        'categories:performance': ['error', { minScore: 0.9 }],
-        'categories:accessibility': ['error', { minScore: 0.9 }],
-        'categories:best-practices': ['warn', { minScore: 0.85 }],
-        'categories:seo': ['warn', { minScore: 0.9 }],
-      },
-    },
-    upload: {
-      target: 'temporary-public-storage',
-    },
-  },
-};
-
-# GitHub Actions に追加するステップ:
-# （ci.yml の build ステップの後に追加）
-#
-#      - name: Lighthouse CI
-#        run: |
-#          npm install -g @lhci/cli
-#          lhci autorun
-#        env:
-#          LHCI_GITHUB_APP_TOKEN: \${{ secrets.LHCI_GITHUB_APP_TOKEN }}`
-  }]
-};
-
-/* ── Chapter data ── */
-const chapters = [{
-  id: "ch1",
-  num: 1,
-  title: "Viteプロジェクトセットアップ",
-  est: "90分",
-  goal: "Vite + React + TypeScript のプロジェクトを一からセットアップし、開発サーバの起動・HMR（Hot Module Replacement）による即時反映を体験する。プロジェクトのディレクトリ構造を理解し、各ファイルの役割を説明できるようになること。TypeScript の strict モードで型安全な開発環境を整えるまでがゴール。",
-  sections: [{
-    title: "なぜ Vite なのか",
-    body: "React アプリケーションの開発環境としては、かつて Create React App (CRA) が定番でしたが、2024年以降はメンテナンスが停止状態にあり、公式ドキュメントでも推奨されなくなりました。代わりに台頭したのが Vite です。Vite はフランス語で「速い」を意味するビルドツールで、開発サーバの起動が数百ミリ秒、ファイル変更の反映が即座という圧倒的な速度が特徴です。\n\nVite が速い理由は、開発時にバンドルを行わず、ブラウザのネイティブ ESM（ES Modules）をそのまま活用するアーキテクチャにあります。従来の webpack ベースのツールはすべてのモジュールを事前にバンドルしてからサーバに渡していましたが、Vite は必要なモジュールだけをオンデマンドで変換します。これにより、プロジェクトが大きくなっても起動速度がほぼ一定に保たれます。\n\nPython 開発者にとってのイメージとしては、Django の runserver が毎回全ファイルをコンパイルするのに対し、Flask の開発サーバが変更ファイルだけをリロードするような違いです。開発体験が根本的に変わるので、一度使うと戻れなくなります。",
-    afterCode: "ポイント: Vite は React だけでなく Vue, Svelte, Solid などほぼ全てのフロントエンドフレームワークに対応しています。ツール自体はフレームワーク非依存なので、将来別のフレームワークに移る場合もビルド設定の知識が活きます。"
-  }, {
-    title: "プロジェクトの作成",
-    body: "Vite のプロジェクト作成は npm create vite@latest コマンド一発です。テンプレートとして react-ts を指定すると、React + TypeScript の雛形が生成されます。Python で言えば django-admin startproject や cookiecutter に相当する操作です。\n\n生成されるプロジェクトには ESLint の設定も含まれており、コードの品質チェックが最初からできる状態になっています。tsconfig.json の strict: true もデフォルトで有効なので、型安全な開発が初日から始められます。\n\nインストール後は npm run dev で開発サーバを起動します。ブラウザで http://localhost:5173 にアクセスすると、Vite + React のデフォルトページが表示されます。ここから App.tsx を編集すれば、保存した瞬間にブラウザが自動更新されます。",
-    code: `# プロジェクト作成
-npm create vite@latest my-todo-app -- --template react-ts
-
-# ディレクトリに移動して依存インストール
-cd my-todo-app
-npm install
-
-# 開発サーバ起動
-npm run dev`,
-    afterCode: "ミニ演習: 実際にプロジェクトを作成し、src/App.tsx の h1 タグのテキストを変更してみましょう。保存した瞬間にブラウザが更新されることを確認してください。これが HMR です。"
-  }, {
-    title: "ディレクトリ構造",
-    body: "Vite が生成するプロジェクトのディレクトリ構造は非常にシンプルです。Python プロジェクトと対比すると、vite.config.ts は pyproject.toml、tsconfig.json は mypy.ini、src/ はアプリケーションコード、public/ は static ディレクトリに相当します。\n\nエントリポイントは index.html で、ここに Vite が自動的に <script> タグを注入します。Django のテンプレートのように HTML から始まるのではなく、HTML はシェル（箱）でしかなく、実際のアプリケーションロジックは src/main.tsx から始まります。main.tsx で ReactDOM.createRoot を呼び、App コンポーネントをマウントするのが React アプリの起動フローです。\n\n今後 Todo アプリを構築する中で、src/ 以下に components/ hooks/ store/ types/ などのディレクトリを追加していきます。この構成パターンは React コミュニティで広く採用されている標準的なものです。",
-    table: T.projectFiles,
-    afterTable: "ポイント: public/ に置いたファイルはビルド時にそのままコピーされるため、favicon や robots.txt など変換不要なアセットに使います。画像など最適化したいアセットは src/assets/ に置きましょう。"
-  }, {
-    title: "npm スクリプト",
-    body: "package.json に定義されている npm スクリプトは、開発で頻繁に使うコマンドのショートカットです。Python で言えば Makefile や tox のコマンドに相当します。開発中は npm run dev をほぼ常に起動しておき、デプロイ前に npm run build でバンドルを生成する、というのが基本的なワークフローです。\n\nnpm run build を実行すると dist/ ディレクトリに最適化されたファイルが出力されます。JavaScript は minify（圧縮）され、CSS は結合・最適化され、画像は最適なフォーマットに変換されます。この dist/ をそのまま Web サーバにデプロイすれば、本番環境でアプリが動きます。\n\nnpm run preview は build の結果をローカルで確認するためのコマンドで、本番と同じ静的ファイル配信をシミュレートします。開発サーバ（dev）とは挙動が異なる場合があるので、デプロイ前に必ず preview で確認する習慣をつけましょう。",
-    table: T.viteScripts,
-    afterTable: "ポイント: npm run dev は Vite の開発サーバを使いますが、npm run preview は Vite のプレビューサーバを使います。前者は HMR 対応・ソースマップ付き、後者は本番同様の静的配信です。"
-  }, {
-    title: "TypeScript 設定",
-    body: "TypeScript は JavaScript に静的型付けを加えた言語です。Python で言えば mypy + type hints のような存在ですが、TypeScript はコンパイル時に型チェックが必須で、型エラーがあるとビルドが通りません。Python の mypy は任意ツールですが、TypeScript の型チェックはエコシステムに完全に組み込まれています。\n\nVite テンプレートでは tsconfig.json に strict: true が設定されており、暗黙の any 型禁止・null チェック必須・厳密なプロパティチェックなどが有効です。最初は窮屈に感じますが、バグを実行前に発見でき、IDE の補完が格段に賢くなるため、中長期的には開発速度が上がります。\n\nPython の型ヒントと異なり、TypeScript の型は erasure（消去）方式です。コンパイル後の JavaScript には型情報が一切残りません。つまり型チェックは開発時の安全ネットであり、実行時のパフォーマンスには一切影響しません。",
-    code: `// tsconfig.json の重要な設定
-{
-  "compilerOptions": {
-    "strict": true,           // 厳密モード（推奨）
-    "target": "ES2020",       // 出力先の JS バージョン
-    "module": "ESNext",       // ESM を使用
-    "jsx": "react-jsx",       // React 17+ の JSX 変換
-    "moduleResolution": "bundler",
-    "noUnusedLocals": true,   // 未使用変数を警告
-    "noUnusedParameters": true
-  }
 }`,
-    afterCode: "ポイント: strict: true は以下を一括で有効にします — noImplicitAny, strictNullChecks, strictFunctionTypes, strictBindCallApply, noImplicitThis, alwaysStrict。個別に切ることもできますが、全て有効のまま開発するのが推奨です。"
-  }]
-}, {
-  id: "ch2",
-  num: 2,
-  title: "コンポーネント分割設計",
-  est: "120分",
-  goal: "React の基本単位であるコンポーネントの考え方を理解し、Todo アプリを適切な粒度でコンポーネントに分割できるようになること。props によるデータの受け渡しと、TypeScript による型定義を自然に書けるようになること。一方向データフローの原則を理解し、「状態はどこに置くべきか」を判断できる状態がゴール。",
-  sections: [{
-    title: "コンポーネントとは何か",
-    body: "React のコンポーネントは「UI の部品」です。Python のクラスや関数と同じように、再利用可能な単位でコードを分割するための仕組みです。ただし、Python のクラスがデータと振る舞いをカプセル化するのに対して、React のコンポーネントは「データ（props/state）を受け取り、UI（JSX）を返す関数」として動作します。\n\nReact ではコンポーネントを関数として定義します。かつてはクラスコンポーネントが主流でしたが、React 16.8 で Hooks が導入されて以降、関数コンポーネントが標準になりました。クラスコンポーネントは今も動きますが、新規開発でわざわざ使う理由はありません。\n\nコンポーネントの戻り値は JSX（JavaScript XML）で、HTML に似た構文で UI を記述します。JSX はビルド時に React.createElement() の呼び出しに変換されるシンタックスシュガーです。Python の f-string がフォーマット文字列を簡潔に書けるのと同じで、JSX は createElement を簡潔に書くための構文です。",
-    code: `// 最もシンプルなコンポーネント
-function Greeting() {
-  return <h1>こんにちは！</h1>;
-}
-
-// props を受け取るコンポーネント
-function Greeting({ name }: { name: string }) {
-  return <h1>こんにちは、{name}さん！</h1>;
-}
-
-// 使い方
-function App() {
-  return <Greeting name="太郎" />;
-}`,
-    afterCode: "ポイント: コンポーネント名は必ず大文字始まり（PascalCase）です。小文字で始まると HTML タグとして解釈されてしまいます。"
-  }, {
-    title: "Todo アプリのコンポーネント設計",
-    body: "Todo アプリを構築するにあたり、まずどのようにコンポーネントを分割するかを設計します。設計の基本原則は「単一責任の原則（SRP）」で、1つのコンポーネントは1つの責務だけを持つようにします。Python でクラスを設計するときと同じ考え方です。\n\nTodo アプリの場合、大きく分けて Header（ヘッダー）、AddForm（入力フォーム）、FilterBar（フィルタ切替）、TodoList（一覧）、TodoItem（個別アイテム）の5つに分割するのが自然です。App はこれらを束ねるルートコンポーネントとして機能します。\n\nコンポーネントの粒度は「1画面分」ではなく「1つの関心事」で区切ります。TodoList と TodoItem を分けるのは、リストの「一覧表示」と個別アイテムの「表示・操作」が異なる関心事だからです。逆に、分けすぎて1行コンポーネントだらけになるのもメンテナンスコストが上がるので避けましょう。",
-    table: T.componentDesign,
-    afterTable: "ポイント: 各コンポーネントの props を先に定義してから実装に入ると、データの流れが明確になり、手戻りが少なくなります。TypeScript の interface を先に書く「型ファースト」の開発スタイルを意識しましょう。"
-  }, {
-    title: "props と型定義",
-    body: "props（プロパティ）はコンポーネントに外部からデータを渡す仕組みです。Python の関数引数と同じで、呼び出し側が値を指定し、コンポーネント内部では読み取り専用です。props を直接変更することはできません。\n\nTypeScript で React コンポーネントを書く場合、props の型を interface で定義するのが標準的な方法です。これにより、どんなデータを受け取るのかがコードを見ただけでわかり、誤った型のデータを渡すとコンパイル時にエラーになります。Python の dataclass で型を定義するのに似ていますが、TypeScript の型チェックはビルド時に行われるため、より厳密です。\n\n関数コンポーネントの引数で props を分割代入（destructuring）するのが一般的なスタイルです。Python の辞書アンパックに似ており、必要なプロパティだけを変数として取り出せます。",
-    code: `// interface で props の型を定義
-interface HeaderProps {
-  title: string;
-  todoCount: number;
-  doneCount: number;
-}
-
-// 分割代入で受け取る
-function Header({ title, todoCount, doneCount }: HeaderProps) {
-  return (
-    <header>
-      <h1>{title}</h1>
-      <p>{todoCount}件中 {doneCount}件完了</p>
-    </header>
-  );
-}
-
-// 使い方（型が合わないとコンパイルエラー）
-<Header title="Todo App" todoCount={10} doneCount={3} />`,
-    afterCode: "ポイント: children という特殊な props を使うと、コンポーネントタグの中身をそのまま子要素として受け取れます。レイアウトコンポーネントやラッパーを作るときに便利です。"
-  }, {
-    title: "props vs state",
-    body: "React のデータ管理には props と state の2つがあります。props は外部から与えられるデータ（読み取り専用）、state はコンポーネント内部で管理するデータ（更新可能）です。Python のクラスに例えると、props はコンストラクタ引数（__init__ の引数）、state はインスタンス変数（self.xxx）に相当します。\n\nReact のデータフローは「一方向」です。親コンポーネントから子コンポーネントへ、props を通じてデータが流れます。子から親にデータを戻したい場合は、親がコールバック関数を props として渡し、子がその関数を呼ぶことで実現します。Python のイベントハンドラパターンと同じ考え方です。\n\nこの一方向データフローにより、データの出所が常に明確になります。「この値はどこで管理されていて、誰が変更するのか」が追跡しやすくなり、バグの原因特定が容易になります。双方向バインディング（Vue や Angular）と比べると冗長に見えますが、大規模アプリでの保守性は一方向の方が高いとされています。",
-    table: T.propsVsState,
-    afterTable: "ポイント: 「state を持つべきコンポーネントはどこか？」の判断基準は、そのデータを使うコンポーネントの最も近い共通の祖先です。これを「状態の持ち上げ（lifting state up）」と呼びます。"
-  }, {
-    title: "ファイル構成のベストプラクティス",
-    body: "React プロジェクトでは、コンポーネントごとにファイルを分けるのが基本です。1ファイル1コンポーネントの原則を守ることで、ファイル名からコンポーネントを見つけやすくなり、チーム開発でのコンフリクトも減ります。\n\nファイルの命名規則は PascalCase（Header.tsx, TodoItem.tsx）が React コミュニティの慣習です。Python の snake_case とは異なりますが、コンポーネント名とファイル名を一致させることで、import 文が直感的になります。関連するスタイルやテストは同じディレクトリに置くのが co-location パターンです。\n\nindex.ts（バレルファイル）を各ディレクトリに置くことで、import パスを短縮できます。ただし、バレルファイルはツリーシェイキング（未使用コードの除去）を妨げる場合があるため、大規模プロジェクトでは使いすぎに注意しましょう。",
-    code: `// 推奨するディレクトリ構造
-src/
-  components/
-    Header/
-      Header.tsx        // コンポーネント本体
-      Header.test.tsx   // テスト
-      Header.module.css // スタイル（CSS Modules）
-    TodoItem/
-      TodoItem.tsx
-      TodoItem.test.tsx
-    TodoList/
-      TodoList.tsx
-    AddForm/
-      AddForm.tsx
-  hooks/
-    useTodos.ts
-    useFilter.ts
-  types/
-    todo.ts             // 共通の型定義
-  App.tsx
-  main.tsx`,
-    afterCode: "ポイント: 型定義（interface Todo など）を複数のコンポーネントで共有する場合は types/ ディレクトリに切り出します。1箇所だけで使う型はそのコンポーネントファイル内に書いて問題ありません。"
-  }]
-}, {
-  id: "ch3",
-  num: 3,
-  title: "状態管理 — useStateでTodo CRUD",
-  est: "150分",
-  goal: "React の最も基本的な状態管理フック useState を完全に理解し、Todo アプリの CRUD（追加・表示・更新・削除）操作を実装できるようになること。イミュータブルな状態更新パターン（スプレッド構文、map、filter）を体に染み込ませ、状態更新が React の再レンダリングをどのようにトリガーするかを説明できる状態がゴール。",
-  sections: [{
-    title: "useState の基本",
-    body: "useState は React が提供する最も基本的なフック（Hook）です。コンポーネント内で「変化する値」を管理するために使います。Python のインスタンス変数に似ていますが、重要な違いがあります。React では state を直接変更してはならず、必ず setter 関数を通じて更新します。\n\nuseState の戻り値は [現在の値, 更新関数] のタプルで、Python の tuple 分割代入と同じ形で受け取ります。初期値を引数に渡すと、コンポーネントの最初のレンダリング時にその値が state にセットされます。2回目以降のレンダリングでは初期値は無視され、最新の state が返されます。\n\nstate を更新すると React はそのコンポーネント（とその子孫）を再レンダリングします。つまり state は「UI に反映されるべきデータ」を置く場所です。UI に影響しない値（タイマーID、前回の API レスポンスの生データなど）は state に入れず、useRef や通常の変数で管理するのが適切です。",
-    code: `import { useState } from 'react';
-
-function Counter() {
-  // [state値, setter関数] = useState(初期値)
-  const [count, setCount] = useState(0);
-
-  return (
-    <div>
-      <p>カウント: {count}</p>
-      <button onClick={() => setCount(count + 1)}>+1</button>
-      <button onClick={() => setCount(prev => prev - 1)}>-1</button>
-    </div>
-  );
-}`,
-    afterCode: "ポイント: setCount(count + 1) と setCount(prev => prev + 1) の違いに注意。連続して呼ぶ場合は関数形式（prev => ...）を使わないと、古い値をベースに計算してしまうバグが起きます。"
-  }, {
-    title: "フックのルール",
-    body: "React の Hooks には守らなければならないルールが2つあります。これを破ると状態管理が壊れ、予期しない動作の原因になります。Python のデコレータが特定の位置にしか書けないのと同じく、Hooks にも呼び出せる場所の制約があります。\n\nルール1: Hooks はコンポーネントのトップレベルでのみ呼び出す。if 文や for ループの中で呼んではいけません。React は Hooks の呼び出し順序で内部状態を管理しているため、条件分岐で呼び出しが変わると状態がずれます。\n\nルール2: Hooks は React の関数コンポーネントまたはカスタムフック内でのみ呼び出す。通常の JavaScript 関数では使えません。カスタムフックを作る場合は関数名を use で始める規約があり、これにより ESLint がルール違反を自動検出してくれます。",
-    table: T.hookRules,
-    afterTable: "ポイント: eslint-plugin-react-hooks を導入すると、これらのルール違反をエディタ上でリアルタイムに警告してくれます。Vite テンプレートにはデフォルトで含まれています。"
-  }, {
-    title: "useState のパターン集",
-    body: "useState は単純な値だけでなく、オブジェクトや配列も管理できます。Todo アプリでは Todo の配列を state で管理するのが典型パターンです。TypeScript のジェネリクスで useState<Todo[]>([]) のように型を明示すると、配列の各要素にアクセスする際の型推論が効きます。\n\n重要な注意点として、React の state はイミュータブル（不変）として扱う必要があります。Python の list.append() のように直接変更してはいけません。代わりに新しい配列やオブジェクトを作って setter に渡します。スプレッド構文（...）がこのパターンで頻出するので、しっかり身につけましょう。\n\n初期値の計算が重いケース（localStorage からの読み込みなど）では、初期値を関数として渡す「遅延初期化」が使えます。useState(() => JSON.parse(localStorage.getItem('key') || '[]')) のように書くと、初回レンダリング時にだけ関数が実行され、2回目以降はスキップされます。",
-    table: T.useStatePatterns,
-    afterTable: "ポイント: 複数の関連する state をまとめるか分けるかは判断が難しいところです。原則として「一緒に更新されるデータはまとめる」「独立して変化するデータは分ける」です。"
-  }, {
-    title: "Todo の追加 (Create)",
-    body: "Todo の追加処理は、既存の配列の末尾に新しい要素を加えた新しい配列を作って state に設定する、という流れです。Python の list + [new_item] に相当しますが、React ではスプレッド構文を使って [...todos, newTodo] と書きます。\n\n各 Todo にはユニークな ID が必要です。React がリストの差分を効率的に計算するために key prop として使うからです。crypto.randomUUID() を使えば十分にユニークな ID が生成できます。配列のインデックスを key にするのはアンチパターンです（並び替えや削除で UI がおかしくなるため）。\n\n入力フォームの値も state で管理します。input 要素の value に state を、onChange イベントで setter を呼ぶ「制御コンポーネント」パターンが React の基本です。Python の tkinter の StringVar に似た概念で、UI の状態とデータの状態を常に同期させます。",
-    code: `const [todos, setTodos] = useState<Todo[]>([]);
-const [input, setInput] = useState('');
-
-const addTodo = () => {
-  if (!input.trim()) return;
-  const newTodo: Todo = {
-    id: crypto.randomUUID(),
-    text: input.trim(),
-    done: false,
-  };
-  // スプレッド構文で新しい配列を作成（イミュータブル更新）
-  setTodos(prev => [...prev, newTodo]);
-  setInput('');  // フォームをリセット
-};`,
-    afterCode: "ポイント: setTodos(prev => [...prev, newTodo]) の prev は最新の state を保証します。setTodos([...todos, newTodo]) でも動きますが、イベントが連続すると古い todos を参照するリスクがあります。"
-  }, {
-    title: "Todo の完了・削除・フィルタ (Read/Update/Delete)",
-    body: "完了トグルは map で対象の todo だけ done を反転させた新しい配列を作ります。削除は filter で対象以外を残した新しい配列を作ります。どちらも元の配列を変更しないイミュータブルな操作です。Python の内包表記 [t for t in todos if t.id != id] と同じ発想ですが、JavaScript では filter メソッドを使います。\n\nフィルタ機能は「表示用のデータを加工する」処理です。元の todos state は変えず、フィルタ条件に応じた部分集合を作って表示します。この「元データは触らず、派生データをその場で作る」パターンは React の基本戦略です。フィルタの状態自体も別の state として管理し、useMemo で計算結果をメモ化するのが効率的です。\n\n削除の場合、削除されたアイテムに対応する DOM が消えますが、React は key を手がかりに「どの要素が消えたか」を効率的に判断します。だからこそ key にユニークな ID を使うことが重要なのです。",
-    code: `// 完了トグル（map で対象だけ更新）
-const toggleTodo = (id: string) => {
-  setTodos(prev =>
-    prev.map(t => t.id === id ? { ...t, done: !t.done } : t)
-  );
-};
-
-// 削除（filter で対象を除外）
-const deleteTodo = (id: string) => {
-  setTodos(prev => prev.filter(t => t.id !== id));
-};
-
-// フィルタ
-type Filter = 'all' | 'active' | 'done';
-const [filter, setFilter] = useState<Filter>('all');
-
-const filteredTodos = useMemo(() => {
-  switch (filter) {
-    case 'active': return todos.filter(t => !t.done);
-    case 'done':   return todos.filter(t => t.done);
-    default:       return todos;
-  }
-}, [todos, filter]);`,
-    afterCode: "ポイント: { ...t, done: !t.done } はオブジェクトのスプレッド構文です。t の全プロパティをコピーしつつ done だけ上書きする、というイミュータブル更新の定石パターンです。"
-  }]
-}, {
-  id: "ch4",
-  num: 4,
-  title: "フォームバリデーションとUX",
-  est: "120分",
-  goal: "React でのフォーム処理の基本（制御コンポーネント vs 非制御コンポーネント）を理解し、react-hook-form を使った宣言的なバリデーションを実装できるようになること。ユーザーへのフィードバック（エラーメッセージ、トースト通知）を適切に設計し、「使いやすいフォーム」を作れる状態がゴール。",
-  sections: [{
-    title: "制御コンポーネント vs 非制御コンポーネント",
-    body: "React のフォーム入力には2つのアプローチがあります。制御コンポーネント（Controlled Component）は、input の値を React の state で管理し、onChange イベントで state を更新する方式です。Python の tkinter の Entry + StringVar パターンに近く、React のフォームの基本形です。\n\n非制御コンポーネント（Uncontrolled Component）は、DOM 自身が値を管理し、必要なときに ref で値を取得する方式です。React の state を介さないため、入力のたびに再レンダリングが発生しません。パフォーマンスが重要な大量入力フォームでは有利です。\n\nreact-hook-form は非制御コンポーネントベースのフォームライブラリで、パフォーマンスとDX（開発者体験）の両方を高いレベルで実現しています。制御コンポーネントの直感的な API を保ちながら、内部では非制御で動作するため、フォーム要素が多くても再レンダリングが最小限に抑えられます。",
-    code: `// 制御コンポーネント: state で値を管理
-function ControlledInput() {
-  const [value, setValue] = useState('');
-  return (
-    <input value={value} onChange={e => setValue(e.target.value)} />
-  );
-}
-
-// 非制御コンポーネント: ref で値を取得
-function UncontrolledInput() {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const handleSubmit = () => {
-    console.log(inputRef.current?.value);
-  };
-  return <input ref={inputRef} />;
-}`,
-    afterCode: "ポイント: 小さなフォーム（入力欄1-2個）なら制御コンポーネントで十分です。入力欄が多いフォームや、リアルタイムバリデーションが不要なケースでは非制御（+ react-hook-form）が適しています。"
-  }, {
-    title: "react-hook-form の導入",
-    body: "react-hook-form は React で最も人気のあるフォームライブラリの1つです。register 関数で input 要素を登録し、handleSubmit でフォーム送信を処理し、formState.errors でバリデーションエラーにアクセスする、という3ステップで使えます。\n\nPython の wtforms や Django の forms.Form に近い概念で、バリデーションルールを宣言的に定義できます。required, minLength, maxLength, pattern などの組み込みルールに加え、validate プロパティでカスタムバリデーションも書けます。\n\nreact-hook-form の最大の特徴は、入力のたびにコンポーネント全体が再レンダリングされないことです。内部で ref を使って DOM を直接監視しているため、バリデーションエラーが変化したときだけ最小限の再レンダリングが走ります。",
-    table: T.rhfVsPlain,
-    code: `import { useForm } from 'react-hook-form';
-
-interface FormData {
-  text: string;
-}
-
-function AddForm({ onAdd }: { onAdd: (text: string) => void }) {
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors }
-  } = useForm<FormData>();
-
-  const onSubmit = (data: FormData) => {
-    onAdd(data.text.trim());
-    reset();
-  };
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <input
-        {...register('text', {
-          required: '入力してください',
-          minLength: { value: 2, message: '2文字以上' }
-        })}
-      />
-      {errors.text && <span>{errors.text.message}</span>}
-      <button type="submit">追加</button>
-    </form>
-  );
-}`,
-    afterCode: "ポイント: register が返すのは { ref, name, onChange, onBlur } のオブジェクトで、これをスプレッドで input に渡しています。ref でDOM要素を掴み、onChange でバリデーションを走らせる仕組みです。"
-  }, {
-    title: "カスタムバリデーション",
-    body: "組み込みルールだけでは対応できないビジネスロジック（例: 重複チェック、非同期バリデーション）にはカスタム validate を使います。validate に関数を渡すと、true を返せば通過、文字列を返せばその文字列がエラーメッセージになります。\n\nvalidate には複数のルールを名前付きオブジェクトで渡せます。各ルールが独立して評価されるため、「空白のみ禁止」と「重複禁止」を別々のルールとして記述でき、どのルールに引っかかったかが明確になります。\n\n非同期バリデーション（APIで重複チェックするなど）も validate を async 関数にするだけで対応できます。ただし、キー入力のたびに API を叩くと負荷が大きいので、mode: 'onBlur'（フォーカスが外れたとき）や mode: 'onSubmit'（送信時）と組み合わせるのが実用的です。",
-    code: `register('text', {
-  required: '入力してください',
-  minLength: { value: 2, message: '2文字以上' },
-  maxLength: { value: 50, message: '50文字以内' },
-  validate: {
-    noWhitespaceOnly: (v) =>
-      v.trim().length > 0 || '空白のみは不可',
-    noDuplicate: (v) =>
-      !existingTexts.includes(v.trim()) || '同じTodoが既にあります',
-    noSpecialChars: (v) =>
-      !/[<>]/.test(v) || 'HTMLタグは入力できません',
-  }
-})`,
-    afterCode: "ポイント: validate 関数が true を返すと「バリデーション通過」、文字列を返すと「エラー（メッセージがその文字列）」です。Python の validator で例外を投げる代わりにメッセージを返す方式です。"
-  }, {
-    title: "トースト通知",
-    body: "ユーザー操作に対するフィードバックとして、トースト通知（画面端に一時的に表示されるメッセージ）は UX 改善に非常に効果的です。react-hot-toast は軽量で使いやすいトーストライブラリで、toast.success() / toast.error() を呼ぶだけで通知が表示されます。\n\nトーストは「操作の結果をユーザーに伝える」目的で使います。Todo追加→「追加しました」、削除→「削除しました」、API エラー→「通信に失敗しました」といった具合です。ダイアログ（alert）と違ってユーザーの操作を妨げないため、フローを中断しません。\n\n配置位置は一般的に画面右上（top-right）が多いですが、モバイルでは下部（bottom-center）の方が親指で届きやすく使いやすい場合があります。react-hot-toast の Toaster コンポーネントで position を指定できます。",
-    code: `// main.tsx
-import { Toaster } from 'react-hot-toast';
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-    <Toaster position="top-right" toastOptions={{
-      duration: 3000,
-      style: { fontSize: '14px' }
-    }} />
-  </React.StrictMode>
-);
-
-// 使用例
-import toast from 'react-hot-toast';
-
-const addTodo = (text: string) => {
-  setTodos(prev => [...prev, { id: crypto.randomUUID(), text, done: false }]);
-  toast.success('Todoを追加しました');
-};
-
-const deleteTodo = (id: string) => {
-  setTodos(prev => prev.filter(t => t.id !== id));
-  toast('Todoを削除しました', { icon: '🗑️' });
-};`,
-    afterCode: "ポイント: toast.promise() を使うと、API 通信の loading → success → error の3状態をトーストで自動表示できます。非同期処理のフィードバックに最適です。"
-  }]
-}, {
-  id: "ch5",
-  num: 5,
-  title: "API連携 — Mockサーバとfetch",
-  est: "150分",
-  goal: "フロントエンドとバックエンドの連携パターンを理解し、useEffect でのデータ取得、イベントハンドラでのデータ送信を実装できるようになること。json-server を使った Mock API でのプロトタイピング手法を習得し、ローディング・エラー・成功の3状態を適切に管理できる状態がゴール。",
-  sections: [{
-    title: "json-server で Mock API",
-    body: "フロントエンド開発では、バックエンド API がまだ完成していない段階でも開発を進めたい場面が多々あります。json-server は JSON ファイルをもとに REST API を自動生成するツールで、Python の Flask でダミーエンドポイントを作るのに似ていますが、コードを一行も書かずに CRUD API が立ち上がります。\n\ndb.json ファイルにデータを定義するだけで、GET / POST / PUT / PATCH / DELETE の全メソッドに対応した API が使えます。データは db.json に永続化されるため、サーバを再起動してもデータが残ります。フィルタリングやソート、ページネーションまでクエリパラメータで対応しています。\n\n実際のプロジェクトでは、Mock API の I/F（エンドポイント URL、リクエスト/レスポンスの形式）をバックエンドチームと先に合意しておき、それに合わせて json-server を設定するのが効率的です。",
-    code: `# json-server のインストール
-npm install -D json-server
-
-# db.json を作成
-{
-  "todos": [
-    { "id": "1", "text": "買い物に行く", "done": false },
-    { "id": "2", "text": "レポートを書く", "done": true }
-  ]
-}
-
-# Mock サーバ起動（ポート 3001）
-npx json-server db.json --port 3001
-
-# 自動生成される API:
-# GET    /todos        → 一覧取得
-# GET    /todos/:id    → 個別取得
-# POST   /todos        → 作成
-# PUT    /todos/:id    → 全体更新
-# PATCH  /todos/:id    → 部分更新
-# DELETE /todos/:id    → 削除`,
-    afterCode: "ポイント: package.json の scripts に \"api\": \"json-server db.json --port 3001\" を追加しておくと、npm run api で Mock サーバを起動できて便利です。"
-  }, {
-    title: "useEffect でのデータ取得",
-    body: "useEffect は「副作用（side effect）」を実行するためのフックです。API 通信、DOM の直接操作、タイマーの設定など、レンダリング以外の処理をここに書きます。Python のクラスで言えば、__init__ 後に実行される非同期処理のようなものです。\n\nuseEffect の第2引数は依存配列（dependency array）で、この配列の値が変化したときだけ effect が再実行されます。空配列 [] を渡すと「マウント時に1回だけ」実行されます。API からの初期データ取得は典型的な [] パターンです。\n\nuseEffect 内で async/await を直接使うことはできません（useEffect は同期関数を受け取るため）。内部で async 関数を定義して即座に呼び出すか、.then() チェーンで書きます。これは React の設計上の制約で、クリーンアップ関数の戻り値と Promise が衝突するのを防ぐためです。",
-    code: `import { useState, useEffect } from 'react';
-
-const API = 'http://localhost:3001/todos';
-
-function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // async 関数を内部で定義
-    const fetchTodos = async () => {
-      try {
-        const res = await fetch(API);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        setTodos(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : '不明なエラー');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchTodos();
-  }, []); // 空配列: マウント時に1回だけ実行
-
-  if (loading) return <p>読み込み中...</p>;
-  if (error) return <p>エラー: {error}</p>;
-  return <ul>{todos.map(t => <li key={t.id}>{t.text}</li>)}</ul>;
-}`,
-    afterCode: "ポイント: useEffect のクリーンアップ関数（return () => { ... }）は、コンポーネントのアンマウント時や依存値の変化時に実行されます。Strict Mode では開発時に effect が2回実行されるので、冪等（何度実行しても同じ結果）に書くことが重要です。"
-  }, {
-    title: "イベントハンドラでのデータ送信",
-    body: "GET によるデータ取得は useEffect で行いますが、POST / PUT / DELETE などのデータ変更操作はイベントハンドラ内で行うのが React の標準パターンです。ボタンクリックやフォーム送信のタイミングでユーザーが明示的にトリガーする操作だからです。\n\n送信中の状態管理も重要です。API 通信中はボタンを disabled にして二重送信を防ぎ、成功時にはデータを更新、失敗時にはエラーメッセージを表示します。Python のWebフレームワークでCSRFトークンを送信するのと同様に、フロントエンドでも「送信中」「成功」「失敗」の状態遷移を適切に管理する必要があります。\n\n楽観的更新（Optimistic Update）は、API レスポンスを待たずに UI を先に更新するパターンです。ユーザーには即座に結果が反映されるため、UX が向上します。API が失敗した場合は UI を元に戻す（ロールバック）処理が必要です。",
-    table: T.fetchPatterns,
-    code: `// POST: 新規作成
-const addTodo = async (text: string) => {
-  const newTodo: Todo = {
-    id: crypto.randomUUID(), text, done: false
-  };
-
-  // 楽観的更新: API 前に UI を更新
-  setTodos(prev => [...prev, newTodo]);
-
-  try {
-    await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newTodo),
-    });
-  } catch {
-    // 失敗時: UI を元に戻す（ロールバック）
-    setTodos(prev => prev.filter(t => t.id !== newTodo.id));
-    toast.error('追加に失敗しました');
-  }
-};`,
-    afterCode: "ポイント: 楽観的更新は UX を大幅に改善しますが、ロールバック処理を忘れるとデータの不整合が起きます。重要なデータ（決済など）では楽観的更新を避け、API レスポンス後に UI を更新する方が安全です。"
-  }, {
-    title: "ローディングとエラー状態の管理",
-    body: "API 連携のあるアプリでは、データの状態は常に「読み込み中」「成功」「エラー」のいずれかです。これを適切に管理し、ユーザーに現在の状態を視覚的にフィードバックすることが重要です。スピナーやスケルトンスクリーンで読み込み中を示し、エラー時にはリトライボタンを提供する、といった設計です。\n\n状態管理のパターンとして、個別の boolean（loading, error）を使うか、統一的な status 列挙型（'idle' | 'loading' | 'success' | 'error'）を使うかの選択があります。後者の方がありえない状態（loading かつ error が同時に true）を防げるため、推奨されます。\n\nTypeScript の Union 型でステータスを定義すると、switch 文で網羅性チェック（exhaustive check）が効きます。新しいステータスを追加したときに、対応するUIを書き忘れるとコンパイルエラーになるため、バグを防げます。",
-    code: `type Status = 'idle' | 'loading' | 'success' | 'error';
-
-function App() {
-  const [status, setStatus] = useState<Status>('idle');
-  const [error, setError] = useState('');
-
-  const fetchTodos = async () => {
-    setStatus('loading');
-    try {
-      const res = await fetch(API);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      setTodos(data);
-      setStatus('success');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '不明なエラー');
-      setStatus('error');
-    }
-  };
-
-  // ステータスに応じた UI
-  switch (status) {
-    case 'idle':
-    case 'loading':
-      return <Spinner />;
-    case 'error':
-      return (
-        <div>
-          <p>エラー: {error}</p>
-          <button onClick={fetchTodos}>再試行</button>
-        </div>
-      );
-    case 'success':
-      return <TodoList todos={todos} />;
-  }
-}`,
-    afterCode: "ポイント: AbortController を使うと、コンポーネントのアンマウント時や新しいリクエスト発行時に進行中の fetch をキャンセルできます。メモリリークの防止に有効です。"
-  }]
-}, {
-  id: "ch6",
-  num: 6,
-  title: "カスタムフックでロジック抽出",
-  est: "120分",
-  goal: "カスタムフックの概念を理解し、コンポーネントからビジネスロジックを分離できるようになること。useTodos, useFilter, useDebounce などの実践的なカスタムフックを自作し、ロジックの再利用・テスト容易性・可読性の向上を実感できる状態がゴール。",
-  sections: [{
-    title: "カスタムフックとは",
-    body: "カスタムフックは、React の組み込みフック（useState, useEffect など）を組み合わせて作る独自のフックです。Python のミックスインやユーティリティクラスに近い概念で、コンポーネント間で共通のロジックを再利用する仕組みです。\n\n関数名を use で始めるのが唯一のルールです。これにより React がフックとして認識し、内部で他のフックを呼び出すことが許可されます。use で始まらない関数内でフックを呼ぶと ESLint がエラーを出します。\n\nカスタムフックの最大のメリットは「関心の分離」です。コンポーネントは UI の描画に集中し、データ取得やビジネスロジックはカスタムフックに任せます。これにより、コンポーネントの JSX が短くなり、ロジックの単体テストがしやすくなります。",
-    table: T.customHookBenefits,
-    code: `// コンポーネントからロジックを抽出する前（肥大化）
-function TodoPage() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [filter, setFilter] = useState<Filter>('all');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => { /* fetch logic */ }, []);
-  const addTodo = (text: string) => { /* ... */ };
-  const toggleTodo = (id: string) => { /* ... */ };
-  const deleteTodo = (id: string) => { /* ... */ };
-  const filteredTodos = useMemo(() => { /* ... */ }, [todos, filter]);
-
-  // JSX が50行以上...
-}
-
-// カスタムフックで分離した後（スッキリ）
-function TodoPage() {
-  const { todos, addTodo, toggleTodo, deleteTodo, loading } = useTodos();
-  const { filter, setFilter, filteredTodos } = useFilter(todos);
-
-  // JSX だけに集中できる
-}`,
-    afterCode: "ポイント: カスタムフックは状態（state）を共有しません。2つのコンポーネントで同じカスタムフックを使っても、それぞれ独立した state を持ちます。状態を共有したい場合は Context や状態管理ライブラリを使います。"
-  }, {
-    title: "useTodos フック",
-    body: "Todo の CRUD ロジックをまとめたカスタムフックです。todos の state と、それを操作する関数群を返します。コンポーネント側は「何ができるか」だけを知っていれば良く、「どう実装されているか」は知る必要がありません。\n\nこのパターンの利点は、API 連携の有無にかかわらずコンポーネントのコードが変わらないことです。初期段階ではローカル state だけで動作させ、後から API 連携に切り替えても、useTodos の内部実装を変えるだけでコンポーネントは一切変更不要です。Python のリポジトリパターン（Repository Pattern）と同じ発想です。\n\nTypeScript の型定義もフック内に閉じ込めることで、型の変更が影響する範囲を最小限に抑えられます。戻り値の型を明示的に定義しておくと、フックの API が安定し、リファクタリング時の影響範囲が把握しやすくなります。",
-    code: `// src/hooks/useTodos.ts
-import { useState, useCallback } from 'react';
-
-interface Todo {
-  id: string;
-  text: string;
-  done: boolean;
-}
-
-interface UseTodosReturn {
-  todos: Todo[];
-  addTodo: (text: string) => void;
-  toggleTodo: (id: string) => void;
-  deleteTodo: (id: string) => void;
-  updateTodo: (id: string, text: string) => void;
-}
-
-export function useTodos(): UseTodosReturn {
-  const [todos, setTodos] = useState<Todo[]>([]);
-
-  const addTodo = useCallback((text: string) => {
-    setTodos(prev => [
-      ...prev,
-      { id: crypto.randomUUID(), text, done: false }
-    ]);
-  }, []);
-
-  const toggleTodo = useCallback((id: string) => {
-    setTodos(prev =>
-      prev.map(t => t.id === id ? { ...t, done: !t.done } : t)
-    );
-  }, []);
-
-  const deleteTodo = useCallback((id: string) => {
-    setTodos(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  const updateTodo = useCallback((id: string, text: string) => {
-    setTodos(prev =>
-      prev.map(t => t.id === id ? { ...t, text } : t)
-    );
-  }, []);
-
-  return { todos, addTodo, toggleTodo, deleteTodo, updateTodo };
-}`,
-    afterCode: "ポイント: useCallback で関数をメモ化しています。これにより、子コンポーネントに渡す際に不要な再レンダリングを防げます（Ch.9 で詳しく解説）。"
-  }, {
-    title: "useFilter フック",
-    body: "フィルタリングロジックを独立したフックに切り出します。フィルタの状態管理とフィルタリング結果の計算をカプセル化することで、コンポーネント側のコードが大幅に短くなります。\n\nuseMemo を内部で使い、todos か filter が変わらない限りフィルタリング結果を再計算しないようにしています。これは Python のキャッシュ（@functools.lru_cache）と似た発想ですが、React のライフサイクルに統合されている点が異なります。\n\ncounts（全件数、未完了数、完了数）も一緒に返すことで、FilterBar や Header で使う統計情報もこのフック1つで取得できます。関連するデータの計算を1箇所にまとめる「集約」の考え方です。",
-    code: `// src/hooks/useFilter.ts
-import { useState, useMemo } from 'react';
-
-type Filter = 'all' | 'active' | 'done';
-
-interface Todo { id: string; text: string; done: boolean; }
-
-export function useFilter(todos: Todo[]) {
-  const [filter, setFilter] = useState<Filter>('all');
-
-  const filteredTodos = useMemo(() => {
-    switch (filter) {
-      case 'active': return todos.filter(t => !t.done);
-      case 'done':   return todos.filter(t => t.done);
-      default:       return todos;
-    }
-  }, [todos, filter]);
-
-  const counts = useMemo(() => ({
-    all: todos.length,
-    active: todos.filter(t => !t.done).length,
-    done: todos.filter(t => t.done).length,
-  }), [todos]);
-
-  return { filter, setFilter, filteredTodos, counts };
-}`,
-    afterCode: "ポイント: このフックはコンポーネントに依存しないため、renderHook（Testing Library）でフック単体のテストが書けます。UI を描画せずにロジックだけを検証できるのはカスタムフックの大きな利点です。"
-  }, {
-    title: "useDebounce フック",
-    body: "デバウンス（debounce）は「連続するイベントの最後の1回だけを処理する」テクニックです。検索ボックスへの入力でAPIを叩く場合、キーを押すたびにリクエストを送ると負荷が大きすぎます。300ms 入力が止まったら初めてリクエストを送る、というのがデバウンスです。\n\nPython では asyncio.sleep と cancel のパターンで実装しますが、React では useEffect と setTimeout の組み合わせが定石です。useEffect のクリーンアップ関数で clearTimeout を呼ぶことで、新しい入力があるたびに前のタイマーがキャンセルされ、最後の入力から delay ミリ秒後にだけ値が確定します。\n\nこのフックはジェネリクスで型パラメータを受け取るので、文字列だけでなく任意の型に対してデバウンスを適用できます。例えばスライダーの値やウィンドウサイズの変化にも使えます。",
-    code: `// src/hooks/useDebounce.ts
-import { useState, useEffect } from 'react';
-
-export function useDebounce<T>(value: T, delay = 300): T {
-  const [debounced, setDebounced] = useState<T>(value);
-
-  useEffect(() => {
-    // delay ミリ秒後に値を確定
-    const timer = setTimeout(() => setDebounced(value), delay);
-    // 新しい値が来たら前のタイマーをキャンセル
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return debounced;
-}
-
-// 使い方: 検索機能
-function SearchTodos({ todos }: { todos: Todo[] }) {
-  const [query, setQuery] = useState('');
-  const debouncedQuery = useDebounce(query, 300);
-
-  const results = useMemo(
-    () => todos.filter(t =>
-      t.text.toLowerCase().includes(debouncedQuery.toLowerCase())
-    ),
-    [todos, debouncedQuery]
-  );
-
-  return (
-    <div>
-      <input value={query}
-        onChange={e => setQuery(e.target.value)}
-        placeholder="検索..." />
-      <p>{results.length}件ヒット</p>
-    </div>
-  );
-}`,
-    afterCode: "ポイント: useDebounce は汎用フックの好例です。Todo の検索以外にも、オートコンプリート、リサイズイベントの制御、API の検索エンドポイント呼び出しなど、あらゆる場面で再利用できます。"
-  }]
-}, {
-  id: "ch7",
-  num: 7,
-  title: "状態管理ライブラリ",
-  est: "150分",
-  goal: "useState + props のバケツリレーでは管理しきれなくなった状態を、外部の状態管理ライブラリで効率的に管理できるようになること。Zustand, Jotai, Redux Toolkit の3つを比較し、プロジェクトの規模や特性に応じて適切なライブラリを選定できる状態がゴール。",
-  sections: [{
-    title: "なぜ状態管理ライブラリが必要なのか",
-    body: "React の useState と props だけでも状態管理は可能ですが、アプリが成長すると「props のバケツリレー（prop drilling）」が問題になります。ルートコンポーネントで管理している state を、何階層も下の子コンポーネントに渡すために、途中のコンポーネントが使いもしない props を中継するだけになってしまうのです。\n\nPython で言えば、関数の引数を何重にも受け渡すコードが増えていくようなもので、可読性とメンテナンス性が急速に悪化します。React の Context API で解決する方法もありますが、Context は値が変わるとそれを購読する全コンポーネントが再レンダリングされるため、パフォーマンスの問題が起きやすいです。\n\n状態管理ライブラリは、コンポーネントツリーの外側にグローバルなストアを置き、必要なコンポーネントが直接アクセスする仕組みを提供します。props を経由しないので、コンポーネント間の結合度が下がり、リファクタリングがしやすくなります。",
-    afterCode: "ポイント: 全ての state を状態管理ライブラリに置く必要はありません。フォームの入力値やモーダルの開閉状態など、1つのコンポーネント内で完結する state は useState のままで問題ありません。共有が必要な state だけをストアに移すのがベストプラクティスです。"
-  }, {
-    title: "Zustand — シンプルな状態管理",
-    body: "Zustand は「最小限の API で最大限の機能を提供する」ことを目指した状態管理ライブラリです。バンドルサイズは約1KBと極めて軽量で、学習コストもほぼゼロです。create 関数でストアを定義し、コンポーネントからフックとして呼び出す、という2ステップだけで使えます。\n\nZustand のストアは関数1つで定義します。state（データ）と actions（操作）を同じオブジェクトにまとめて返すスタイルで、Python のクラスでデータとメソッドを一緒に定義するのと似た感覚です。Redux のように action type や reducer を分けて書く必要がなく、直接 set() で状態を更新します。\n\nTypeScript との相性も良く、ストアの型推論が自動で効きます。ジェネリクスで型を渡すと、コンポーネント側で useStore() を呼んだときに正しい型が推論されます。",
-    code: `// src/store/todoStore.ts
-import { create } from 'zustand';
-
-interface Todo { id: string; text: string; done: boolean; }
-
-interface TodoStore {
-  todos: Todo[];
-  addTodo: (text: string) => void;
-  toggleTodo: (id: string) => void;
-  deleteTodo: (id: string) => void;
-}
-
-export const useTodoStore = create<TodoStore>((set) => ({
-  todos: [],
-
-  addTodo: (text) => set((state) => ({
-    todos: [...state.todos,
-      { id: crypto.randomUUID(), text, done: false }]
-  })),
-
-  toggleTodo: (id) => set((state) => ({
-    todos: state.todos.map(t =>
-      t.id === id ? { ...t, done: !t.done } : t)
-  })),
-
-  deleteTodo: (id) => set((state) => ({
-    todos: state.todos.filter(t => t.id !== id)
-  })),
-}));
-
-// コンポーネントで使用（フックとして呼ぶだけ）
-function TodoPage() {
-  const todos = useTodoStore(s => s.todos);
-  const addTodo = useTodoStore(s => s.addTodo);
-  // ...
-}`,
-    afterCode: "ポイント: useTodoStore(s => s.todos) のようにセレクタを使うと、todos が変わったときだけこのコンポーネントが再レンダリングされます。全体を取得する useTodoStore() だと、ストアのどの値が変わっても再レンダリングされるので注意。"
-  }, {
-    title: "Jotai — アトムベースの状態管理",
-    body: "Jotai は個別の「アトム（atom）」を組み合わせて状態を管理するライブラリです。Zustand が1つのストアに全状態をまとめるトップダウンアプローチなのに対し、Jotai は最小単位のアトムをボトムアップに組み合わせるアプローチです。Python で言えば、Zustand がクラス1つで全データを持つパターン、Jotai が個別の変数を必要に応じて組み合わせるパターンです。\n\nJotai の特徴は「派生アトム」です。基本アトムから計算で導出される値を派生アトムとして定義できます。例えば todos アトムと filter アトムから filteredTodos 派生アトムを作ると、元のアトムが変わったときだけ自動で再計算されます。Excel のセル参照に似た依存関係の自動追跡です。\n\n再レンダリングの粒度が非常に細かいのもJotaiの強みです。特定のアトムを購読しているコンポーネントだけが、そのアトムの変化時に再レンダリングされます。大量のコンポーネントがある画面でのパフォーマンスに優れています。",
-    code: `// src/store/atoms.ts
-import { atom } from 'jotai';
-
-interface Todo { id: string; text: string; done: boolean; }
-type Filter = 'all' | 'active' | 'done';
-
-// 基本アトム
-export const todosAtom = atom<Todo[]>([]);
-export const filterAtom = atom<Filter>('all');
-
-// 派生アトム（自動で再計算される）
-export const filteredTodosAtom = atom((get) => {
-  const todos = get(todosAtom);
-  const filter = get(filterAtom);
-  switch (filter) {
-    case 'active': return todos.filter(t => !t.done);
-    case 'done':   return todos.filter(t => t.done);
-    default:       return todos;
+      afterCode:"TanStack Queryは内部でキャッシュを管理しており、ウィンドウのフォーカス復帰時に自動でデータを再フェッチします（refetchOnWindowFocus）。ユーザーが別のタブから戻ったときに最新データが表示されます。"}
+   ]},
+  {id:"ch7", num:7, title:"Testing Library", est:"50分",
+   goal:"Vitestと@testing-library/reactでコンポーネントのユニットテストを書き、ユーザーインタラクションをシミュレートできる。",
+   sections:[
+     {title:"Vitestと@testing-library/reactのセットアップ", body:`VitestはViteと統合されたテストフレームワークです。JestのAPIと互換性があるため、Jestの経験があれば即座に使えます。Pythonのpytestに相当します。@testing-library/reactはコンポーネントをDOMにレンダリングし、ユーザー視点でテストするためのライブラリです。
+
+「ユーザー視点でテストする」とは、実装の詳細（state・props・内部変数）ではなく、画面に表示されているものとユーザーの操作を対象にすることです。Pythonのseleniumによるブラウザテストに近い考え方ですが、仮想DOMで高速に動作します。
+
+screen.getByText()・screen.getByRole()・screen.getByPlaceholderText()でDOM要素を取得します。role（button・listitem・textboxなど）でセレクトするのが最もアクセシビリティに親和的なアプローチです。`,
+      code:`// vite.config.js
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/setupTests.js',
+    globals: true,
   }
 });
 
-// コンポーネントで使用
-import { useAtom } from 'jotai';
+// src/setupTests.js
+import '@testing-library/jest-dom';
 
-function TodoList() {
-  const [filteredTodos] = useAtom(filteredTodosAtom);
-  return <ul>{filteredTodos.map(t => <li key={t.id}>{t.text}</li>)}</ul>;
-}
+// TodoItem.test.jsx
+import { render, screen } from '@testing-library/react';
+import { TodoItem } from './components/TodoItem';
 
-function FilterBar() {
-  const [filter, setFilter] = useAtom(filterAtom);
-  return <button onClick={() => setFilter('active')}>未完了</button>;
-}`,
-    afterCode: "ポイント: Jotai はアトムが増えすぎると全体像が把握しにくくなる場合があります。小〜中規模のアプリや、細粒度のリアクティビティが必要な場面（チャート、ダッシュボード）に向いています。"
-  }, {
-    title: "Redux Toolkit — 大規模向け状態管理",
-    body: "Redux は React の状態管理ライブラリとして最も歴史が長く、エコシステムが充実しています。Redux Toolkit（RTK）はその公式ツールキットで、Redux の冗長さを大幅に削減します。Zustand や Jotai と比べるとボイラープレートは多いですが、大規模チームでの一貫性やDevToolsの充実度では優位性があります。\n\ncreateSlice で「状態の一部分（スライス）」を定義します。Django の models.py に似た感覚で、データ構造とその操作を1ファイルにまとめます。Immer が内蔵されているため、イミュータブル更新を直接変更風の構文で書けます（state.push() が内部的にイミュータブルに変換される）。\n\n非同期処理は createAsyncThunk で定義します。pending / fulfilled / rejected の3状態が自動管理され、ローディング・成功・エラーの状態遷移を一箇所に集約できます。",
-    table: T.stateLibCompare,
-    code: `// src/store/todoSlice.ts
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+const mockTodo = { id: 1, text: '牛乳を買う', completed: false };
 
-interface Todo { id: string; text: string; done: boolean; }
-
-const todoSlice = createSlice({
-  name: 'todos',
-  initialState: [] as Todo[],
-  reducers: {
-    addTodo: (state, action: PayloadAction<string>) => {
-      // Immer のおかげで push が使える（内部的にはイミュータブル）
-      state.push({
-        id: crypto.randomUUID(),
-        text: action.payload,
-        done: false,
-      });
-    },
-    toggleTodo: (state, action: PayloadAction<string>) => {
-      const todo = state.find(t => t.id === action.payload);
-      if (todo) todo.done = !todo.done;
-    },
-    deleteTodo: (state, action: PayloadAction<string>) => {
-      return state.filter(t => t.id !== action.payload);
-    },
-  },
+test('Todoのテキストが表示される', () => {
+  render(<TodoItem todo={mockTodo} onToggle={() => {}} onDelete={() => {}} />);
+  expect(screen.getByText('牛乳を買う')).toBeInTheDocument();
 });
 
-export const { addTodo, toggleTodo, deleteTodo } = todoSlice.actions;
-export default todoSlice.reducer;`,
-    afterCode: "ポイント: プロジェクトの規模で選ぶのが基本です。個人〜小チーム（Zustand/Jotai）、中〜大チーム（Redux Toolkit）。迷ったら Zustand から始めて、必要に応じて移行するのが実践的なアプローチです。"
-  }]
-}, {
-  id: "ch8",
-  num: 8,
-  title: "テスト",
-  est: "150分",
-  goal: "React コンポーネントのテストを Vitest + Testing Library で書けるようになること。「何をテストすべきか」「どの粒度でテストを書くか」を判断でき、ユーザー視点のテスト（ボタンをクリックしたらどう変わるか）を自然に記述できる状態がゴール。",
-  sections: [{
-    title: "テストの種類と戦略",
-    body: "テストには複数のレイヤーがあり、それぞれカバーする範囲と実行速度が異なります。ユニットテスト（単体テスト）は関数やフックの個別テスト、コンポーネントテストはUIコンポーネントのレンダリングと操作のテスト、統合テストは複数コンポーネントの連携テスト、E2Eテストはブラウザを使った全体テストです。\n\nReact のテストでは「Testing Trophy」という戦略が推奨されています。これはピラミッド型ではなく、統合テストを最も厚くする考え方です。個別の関数や見た目のテストよりも、「ユーザーがボタンを押したときにTodoが追加される」という振る舞いのテストが最もバグ防止に効果的だからです。\n\nPython の pytest に慣れている方は、Vitest が非常に似たAPIを持っているので違和感なく書けるでしょう。describe/it でテストを構造化し、expect で検証する基本パターンは pytest の test_/assert_ と対応します。",
-    table: T.testTypes,
-    afterTable: "ポイント: 全てのテスト種別を均等に書く必要はありません。コンポーネントテスト + 統合テストを中心に、ユーティリティ関数にユニットテストを足す、というのが現実的なバランスです。"
-  }, {
-    title: "Vitest + Testing Library のセットアップ",
-    body: "Vitest は Vite ベースのテストランナーで、Jest と互換性のある API を持ちながら、Vite の高速なビルドパイプラインを活用します。Testing Library は「ユーザーの視点でテストを書く」ことを哲学とするテストユーティリティで、実装の詳細ではなく振る舞いをテストすることを推奨しています。\n\nセットアップは npm install で必要なパッケージをインストールし、vite.config.ts にテスト設定を追加するだけです。Jest からの移行もほぼ設定変更のみで済みます。\n\nTesting Library のクエリ（要素の取得方法）には優先順位があり、最もアクセシブルな方法を推奨しています。getByRole が最優先で、これは実際のユーザーがスクリーンリーダーで要素にアクセスする方法と一致します。テストを書くことがそのままアクセシビリティの改善につながるのが Testing Library の設計思想です。",
-    table: T.testingLibQueries,
-    code: `// vite.config.ts
+test('完了済みTodoは取り消し線が表示される', () => {
+  const doneTodo = { ...mockTodo, completed: true };
+  render(<TodoItem todo={doneTodo} onToggle={() => {}} onDelete={() => {}} />);
+  const span = screen.getByText('牛乳を買う');
+  expect(span).toHaveStyle('text-decoration: line-through');
+});`,
+      afterCode:"toBeInTheDocument()・toHaveStyle()・toBeChecked()などのマッチャーは@testing-library/jest-domが提供します。setupFiles で import しておくことで全テストファイルで使えます。"},
+     {title:"ユーザーインタラクションのテスト", body:`@testing-library/user-eventを使うと、クリック・テキスト入力・フォーカスなどのユーザー操作をシミュレートできます。fireEventよりも実際のブラウザの動作に近く、イベントの順序（focus→input→change）を正しく再現します。
+
+非同期操作（fetch・タイマー）が絡む場合はasync/awaitとwaitFor・findByText等のメソッドを使います。findByText()はgetByText()の非同期バージョンで、要素が現れるまで待機します。Pythonのpytestのasyncioと同じような感覚です。
+
+Zustandストアを使うコンポーネントのテストでは、テスト前にストアをリセットする必要があります。beforeEach()でストアの状態を初期化します。Pythonのpytestのsetupフィクスチャに相当します。`,
+      code:`import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { AddTodoForm } from './components/AddTodoForm';
+
+test('Todoを追加するとonAddが呼ばれる', async () => {
+  const user = userEvent.setup();
+  const handleAdd = jest.fn(); // Vitestではvi.fn()
+
+  render(<AddTodoForm onAdd={handleAdd} />);
+
+  const input = screen.getByPlaceholderText('新しいTodo');
+  await user.type(input, '新しいタスク');
+  await user.click(screen.getByRole('button', { name: '追加' }));
+
+  expect(handleAdd).toHaveBeenCalledWith('新しいタスク');
+  expect(input).toHaveValue(''); // 送信後にinputがクリアされる
+});
+
+test('空文字では送信できない', async () => {
+  const user = userEvent.setup();
+  const handleAdd = vi.fn();
+
+  render(<AddTodoForm onAdd={handleAdd} />);
+  await user.click(screen.getByRole('button', { name: '追加' }));
+  expect(handleAdd).not.toHaveBeenCalled();
+});`,
+      afterCode:"vi.fn()はVitestのモック関数です。JestのjestFn()と同じです。toHaveBeenCalledWith()で正しい引数で呼ばれたかを確認します。テストはTDD（テスト駆動開発）で書くとより効果的です。"}
+   ]},
+  {id:"ch8", num:8, title:"デプロイ・最終仕上げ", est:"50分",
+   goal:"ViteプロジェクトをGitHub Pagesにデプロイし、本番ビルドの最適化とパフォーマンス計測ができる。コース全体を振り返りTodoアプリを完成できる。",
+   sections:[
+     {title:"本番ビルドとパフォーマンス", body:`npm run buildを実行するとViteがプロジェクトを最適化されたバンドルに変換します。コード分割・Tree shaking・minification・gzip圧縮が自動的に行われます。Pythonのpyinstallerやwheelでパッケージを配布するのに似た概念です。
+
+Viteのビルド出力にはソースマップ（.map）が含まれ、本番環境でもエラースタックトレースを読めます。パフォーマンス計測はChrome DevToolsのLighthouseでFirst Contentful Paint（FCP）・Largest Contentful Paint（LCP）・Cumulative Layout Shift（CLS）を計測します。
+
+バンドルサイズはnpm run build後にdist/assets/を確認します。rollup-plugin-visualizerを使うとバンドルの内訳を視覚化できます。不要なライブラリの除外・動的importによるコード分割でサイズを削減できます。`,
+      code:`// vite.config.js: 本番最適化設定
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
-  },
+  base: '/todo-app/', // GitHub Pagesのリポジトリ名に合わせる
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          zustand: ['zustand'],
+        }
+      }
+    }
+  }
 });
 
-// src/test/setup.ts
-import '@testing-library/jest-dom';
+// package.json
+// "scripts": {
+//   "build": "vite build",
+//   "preview": "vite preview"  ← ローカルで本番をプレビュー
+// }`,
+      afterCode:"manualChunksでreact・react-domをvendorチャンクに分離すると、アプリのコードが変わっても依存ライブラリのキャッシュが有効のままになり、2回目以降のアクセスが高速になります。"},
+     {title:"GitHub PagesへのCI/CDデプロイ", body:`GitHub ActionsでCI/CDパイプラインを構築すると、mainブランチへのpushで自動的にビルド・テスト・デプロイが実行されます。Pythonプロジェクトのテスト自動化と同じ考え方で、人手を介さずにデプロイできます。
 
-// package.json に追加
-// npm install -D vitest @testing-library/react
-//   @testing-library/jest-dom @testing-library/user-event jsdom`,
-    afterCode: "ポイント: environment: 'jsdom' を指定すると、Node.js 上でブラウザの DOM をシミュレートしてテストが実行されます。実際のブラウザは不要なので、CI 環境でも高速に動きます。"
-  }, {
-    title: "コンポーネントテストの基本",
-    body: "Testing Library でのコンポーネントテストは、render 関数でコンポーネントを描画し、screen オブジェクトで要素を取得し、expect で検証する、という3ステップです。Python の pytest で fixture を準備し、関数を呼び、assert で検証するパターンと同じ流れです。\n\nテストの書き方で最も重要なのは「ユーザーが見るもの・操作するものをテストする」ことです。内部の state の値や、関数が呼ばれた回数ではなく、「画面に何が表示されているか」「ボタンを押したら何が変わるか」をテストします。\n\nモック（vi.fn()）はコールバック関数のテストに使います。親コンポーネントから渡される onToggle や onDelete が「正しい引数で呼ばれたか」を検証できます。Python の unittest.mock.MagicMock と同じ概念です。",
-    code: `// src/components/TodoItem.test.tsx
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi } from 'vitest';
-import { TodoItem } from './TodoItem';
+GitHub Pagesはgh-pagesブランチに静的ファイルを置くことでホスティングします。peaceiris/actions-gh-pagesアクションを使うと、distフォルダの内容を自動的にgh-pagesブランチにプッシュしてくれます。
 
-describe('TodoItem', () => {
-  const todo = { id: '1', text: '買い物に行く', done: false };
-
-  it('テキストが表示される', () => {
-    render(
-      <TodoItem todo={todo}
-        onToggle={vi.fn()} onDelete={vi.fn()} />
-    );
-    expect(screen.getByText('買い物に行く')).toBeInTheDocument();
-  });
-
-  it('チェックボックスクリックで onToggle が呼ばれる', async () => {
-    const onToggle = vi.fn();
-    const user = userEvent.setup();
-    render(
-      <TodoItem todo={todo}
-        onToggle={onToggle} onDelete={vi.fn()} />
-    );
-
-    await user.click(screen.getByRole('checkbox'));
-    expect(onToggle).toHaveBeenCalledWith('1');
-  });
-});`,
-    afterCode: "ポイント: userEvent は実際のユーザー操作をシミュレートします。fireEvent よりもリアルで、キーボードイベントの発火順序やフォーカスの移動まで再現します。テストでは userEvent を使うのが推奨です。"
-  }, {
-    title: "非同期テストとモック",
-    body: "API 通信を含むコンポーネントのテストでは、実際の API を叩かずにモックで応答を返す必要があります。vi.fn() で fetch をモックするか、MSW（Mock Service Worker）を使ってネットワークレベルでリクエストをインターセプトする方法があります。\n\n非同期のテストでは waitFor や findBy クエリを使って、状態の変化を待ちます。API レスポンスが返ってきて state が更新され、画面に反映されるまでには時間がかかるため、同期的な getBy では要素が見つかりません。findBy は要素が現れるまで自動でリトライしてくれます。\n\nローディング状態のテストも重要です。API 通信中に「読み込み中...」が表示され、完了後にデータが表示される、という一連のフローを検証することで、ユーザー体験の品質を担保できます。",
-    code: `import { render, screen, waitFor } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import App from './App';
-
-// fetch をモック
-const mockTodos = [
-  { id: '1', text: 'テスト用Todo', done: false }
-];
-
-beforeEach(() => {
-  global.fetch = vi.fn(() =>
-    Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve(mockTodos),
-    })
-  ) as any;
-});
-
-describe('App', () => {
-  it('読み込み中 → データ表示の遷移', async () => {
-    render(<App />);
-
-    // 読み込み中が表示される
-    expect(screen.getByText('読み込み中...')).toBeInTheDocument();
-
-    // データが表示されるまで待つ
-    await waitFor(() => {
-      expect(screen.getByText('テスト用Todo')).toBeInTheDocument();
-    });
-
-    // 読み込み中が消えている
-    expect(screen.queryByText('読み込み中...')).not.toBeInTheDocument();
-  });
-});`,
-    afterCode: "ポイント: screen.queryByText は要素が見つからなくても null を返す（エラーにならない）ので、「要素が存在しないこと」のテストに使います。getByText は要素が見つからないとエラーを投げます。"
-  }]
-}, {
-  id: "ch9",
-  num: 9,
-  title: "パフォーマンス最適化",
-  est: "120分",
-  goal: "React のレンダリングの仕組み（仮想DOM、差分検出）を理解し、不要な再レンダリングを特定して最適化できるようになること。React.memo, useMemo, useCallback の3つのメモ化 API を「いつ使うべきか」「いつ使わないべきか」の判断基準を持てる状態がゴール。React DevTools の Profiler で実測し、数値に基づいた最適化ができること。",
-  sections: [{
-    title: "React のレンダリングの仕組み",
-    body: "React は state や props が変わるとコンポーネントを「再レンダリング」します。ここで言う「レンダリング」は DOM の更新ではなく、コンポーネント関数の再実行（JSX の再生成）です。生成された新しい JSX と前回の JSX を比較し（差分検出 = reconciliation）、実際に変わった部分だけ DOM を更新します。\n\n重要なポイントは、「親が再レンダリングされると子も再レンダリングされる」という React のデフォルト動作です。たとえ子コンポーネントの props が変わっていなくても、親が setState を呼べば子のコンポーネント関数も再実行されます。これが不要な再レンダリングの原因です。\n\nただし、不要な再レンダリング = パフォーマンス問題ではありません。React の差分検出は非常に高速で、数十個程度のコンポーネントの再レンダリングは問題になりません。最適化は「実測して遅い場合にだけ」行うべきで、早すぎる最適化はコードの複雑さを不必要に増やします。",
-    afterCode: "ポイント: React DevTools の Profiler で「どのコンポーネントが何回再レンダリングされているか」「各レンダリングに何ミリ秒かかっているか」を確認できます。体感で遅いと感じたら、まず Profiler で計測しましょう。"
-  }, {
-    title: "React.memo, useMemo, useCallback",
-    body: "React には3つのメモ化 API があります。React.memo はコンポーネントをメモ化し、props が変わらない限り再レンダリングをスキップします。useMemo は計算結果をメモ化し、依存する値が変わるまで再計算をスキップします。useCallback は関数をメモ化し、依存する値が変わるまで同じ関数参照を返します。\n\nReact.memo と useCallback はセットで使うのが基本です。React.memo でコンポーネントをラップしても、親から渡されるコールバック関数が毎回新しい参照だと、props の比較で「変わった」と判定されてしまいます。useCallback で関数の参照を安定させることで、初めて React.memo が効果を発揮します。\n\nuseMemo はフィルタリングやソートなど、計算コストの高い処理に使います。単純な値の参照やプリミティブ値の計算に useMemo を付けるのはオーバーヘッドの方が大きいので避けましょう。",
-    table: T.memoApis,
-    code: `import React, { useState, useMemo, useCallback } from 'react';
-
-// React.memo: props が変わらなければ再レンダリングをスキップ
-const TodoItem = React.memo(function TodoItem({
-  todo, onToggle, onDelete
-}: TodoItemProps) {
-  console.log('render:', todo.id);
-  return (
-    <li>
-      <input type="checkbox" checked={todo.done}
-        onChange={() => onToggle(todo.id)} />
-      <span>{todo.text}</span>
-      <button onClick={() => onDelete(todo.id)}>削除</button>
-    </li>
-  );
-});
-
-function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [filter, setFilter] = useState<Filter>('all');
-
-  // useCallback: 関数の参照を安定させる
-  const toggleTodo = useCallback((id: string) => {
-    setTodos(prev => prev.map(t =>
-      t.id === id ? { ...t, done: !t.done } : t));
-  }, []);
-
-  // useMemo: 計算結果をキャッシュ
-  const filteredTodos = useMemo(() =>
-    filter === 'all' ? todos :
-    filter === 'active' ? todos.filter(t => !t.done) :
-    todos.filter(t => t.done)
-  , [todos, filter]);
-
-  return (
-    <ul>
-      {filteredTodos.map(t => (
-        <TodoItem key={t.id} todo={t}
-          onToggle={toggleTodo} onDelete={deleteTodo} />
-      ))}
-    </ul>
-  );
-}`,
-    afterCode: "ポイント: メモ化のコスト（メモリ消費 + 依存配列の比較）よりも、再レンダリングのコスト（コンポーネント関数の実行 + DOM更新）の方が大きい場合にだけメモ化を使いましょう。小さなコンポーネントへの React.memo は不要な場合が多いです。"
-  }, {
-    title: "React DevTools で計測する",
-    body: "パフォーマンス最適化で最も重要なのは「推測ではなく計測」です。React DevTools の Profiler タブは、コンポーネントごとのレンダリング回数・時間をフレームグラフで可視化してくれます。「Highlight updates」をONにすると、画面上で再レンダリングされたコンポーネントがハイライトされるので、視覚的に確認できます。\n\nProfiler の使い方は3ステップです。Record ボタンを押して操作を行い、Stop ボタンを押して結果を見る。各コンポーネントの「Self time」が実際にそのコンポーネントの処理にかかった時間で、これが大きいコンポーネントが最適化の候補です。\n\n「Why did this render?」セクションでは、コンポーネントが再レンダリングされた理由（どの props/state が変わったか）が表示されます。これを見れば、React.memo や useCallback を追加すべき箇所が一目でわかります。",
-    code: `// React DevTools Profiler の活用手順
-
-// 1. ブラウザ拡張 React Developer Tools をインストール
-//    Chrome: chrome://extensions/
-//    Firefox: about:addons
-
-// 2. アプリを開発サーバで起動（npm run dev）
-
-// 3. DevTools > Profiler タブ
-//    設定: "Record why each component rendered" を ON
-
-// 4. Record → 操作 → Stop
-
-// 5. フレームグラフで確認:
-//    - 黄色/赤: 時間がかかっている（要最適化）
-//    - 緑/灰色: 高速 or スキップ済み
-
-// 6. コンポーネントをクリックすると詳細:
-//    - "Why did this render?"
-//    - "Props changed: onToggle"
-//    → useCallback を追加すべき箇所が判明`,
-    afterCode: "ポイント: 開発モードでの計測結果は本番よりも遅くなります。正確なパフォーマンスを計測するには、npm run build + npm run preview で本番ビルドの Profiler を使いましょう。React DevTools は本番ビルドでも Profiler が使えるオプションがあります。"
-  }, {
-    title: "最適化のアンチパターン",
-    body: "最適化にはやりすぎのリスクがあります。全てのコンポーネントに React.memo を付け、全ての関数に useCallback を付け、全ての値に useMemo を付けるのは、コードの可読性を下げるだけでなく、メモ化のオーバーヘッドが再レンダリングのコストを上回る場合すらあります。\n\n特に避けるべきアンチパターンは「依存配列のごまかし」です。useCallback や useMemo の依存配列から意図的に値を省略すると、古い値を参照し続けるクロージャバグが発生します。ESLint の exhaustive-deps ルールの警告は無視せず、依存配列は正直に書きましょう。\n\n最適化の優先順位は、1) 不要な state 更新を減らす、2) コンポーネントの分割を見直す、3) リストの key を安定させる、4) 重い計算に useMemo を使う、5) React.memo + useCallback で再レンダリングをスキップ、の順です。1〜3 はコードの構造改善なので、メモ化より先に検討すべきです。",
-    code: `// ❌ アンチパターン: 全てにメモ化
-const MemoizedDiv = React.memo(({ children }: { children: React.ReactNode }) => {
-  return <div>{children}</div>;  // 単純すぎてメモ化の意味がない
-});
-
-// ❌ アンチパターン: 依存配列のごまかし
-const handleClick = useCallback(() => {
-  console.log(count);  // 常に 0 のまま（古いクロージャ）
-}, []);  // count を依存に入れていない!
-
-// ✅ 正しい最適化: 重い計算だけメモ化
-const sortedTodos = useMemo(() => {
-  // 1000件以上のTodoをソートする重い処理
-  return [...todos].sort((a, b) => a.text.localeCompare(b.text));
-}, [todos]);
-
-// ✅ 正しい最適化: リストアイテムのメモ化
-const TodoItem = React.memo(function TodoItem({ todo, onToggle }: Props) {
-  return <li onClick={() => onToggle(todo.id)}>{todo.text}</li>;
-});`,
-    afterCode: "ポイント: 「推測ではなく計測」を繰り返し強調します。React DevTools の Profiler で遅いコンポーネントを特定してから最適化に着手し、最適化後に再度計測して効果を確認する。このサイクルを回すのがプロの最適化です。"
-  }]
-}, {
-  id: "ch10",
-  num: 10,
-  title: "デプロイとCI",
-  est: "120分",
-  goal: "完成した Todo アプリを Vercel にデプロイし、GitHub Actions で CI パイプラインを構築できるようになること。lint・型チェック・テスト・ビルドを自動化し、Lighthouse CI でパフォーマンス品質を継続的に監視できる状態がゴール。開発からデプロイまでの一連のワークフローを理解し、チーム開発に必要なインフラを整えられること。",
-  sections: [{
-    title: "デプロイサービスの比較",
-    body: "React の SPA をデプロイするサービスは複数あります。2026年時点で最も一般的なのは Vercel、Netlify、GitHub Pages、Cloudflare Pages の4つです。どれもフロントエンドの静的ファイルをホスティングするサービスで、Git リポジトリと連携して push 時に自動デプロイできます。\n\nVercel は Next.js（React のフレームワーク）を開発している会社が運営しているため、React との親和性が非常に高いです。設定ゼロでデプロイでき、PR ごとにプレビュー URL が自動生成されるのが大きな特徴です。Python で言えば、Heroku のような手軽さでデプロイできます。\n\n今回の Todo アプリは純粋な SPA（クライアントサイドレンダリング）なので、どのサービスでもデプロイ可能です。SSR（サーバサイドレンダリング）が必要な場合は Vercel か Netlify が選択肢になりますが、本コースの範囲では SPA デプロイで十分です。",
-    table: T.deployCompare,
-    afterTable: "ポイント: 無料枠はどのサービスも個人開発には十分です。チーム開発やトラフィックが増えた場合に料金体系が異なるので、成長を見据えた選択が重要です。"
-  }, {
-    title: "Vercel へのデプロイ",
-    body: "Vercel へのデプロイは3ステップで完了します。vercel CLI をインストールし、ログインし、vercel コマンドを実行するだけです。初回はプロジェクトの設定（フレームワーク検出、ビルドコマンド、出力ディレクトリ）を聞かれますが、Vite + React は自動検出されるので Enter を押すだけで済みます。\n\nGitHub リポジトリと連携すると、main ブランチへの push で自動的に本番デプロイ、PR の作成でプレビューデプロイが行われます。プレビューデプロイは PR ごとにユニークな URL が発行されるため、レビュアーが実際に動作を確認してからマージできます。\n\n環境変数は Vercel のダッシュボード、または vercel env add コマンドで設定します。VITE_ プレフィックスを付けた環境変数はクライアントサイドに露出するため、API キーなどの秘密情報には使わないでください。秘密情報はサーバサイドの API Route（Next.js）や別途バックエンドで管理します。",
-    code: `# Vercel CLI のインストールとデプロイ
-npm install -g vercel
-
-# ログイン
-vercel login
-
-# デプロイ（初回: 設定ウィザード）
-vercel
-
-# 本番デプロイ
-vercel --prod
-
-# 環境変数の設定
-vercel env add VITE_API_URL
-
-# SPA ルーティング設定（vercel.json）
-{
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}`,
-    afterCode: "ポイント: SPA では全てのパスを index.html に書き換える（rewrite）設定が必要です。React Router を使っている場合、/todos/123 のような URL でブラウザを直接リロードすると 404 になるのを防ぎます。"
-  }, {
-    title: "GitHub Actions で CI パイプライン",
-    body: "CI（Continuous Integration）は、コードの変更を push するたびに自動でテストやビルドを実行する仕組みです。Python の tox + GitHub Actions と同じ概念で、「テストが通らないコードはマージさせない」というガードレールを設けます。\n\nGitHub Actions は .github/workflows/ ディレクトリに YAML ファイルを置くだけで設定できます。on: でトリガー（push, pull_request）を、jobs: で実行する処理を定義します。Node.js のセットアップ、依存のインストール、lint、型チェック、テスト、ビルドを順番に実行するのが典型的な構成です。\n\nnpm ci を使うことでpackage-lock.json に基づいた再現可能なインストールが行われます。npm install との違いは、npm ci はロックファイルと package.json の不一致があるとエラーになる点で、CI 環境ではこちらが推奨されます。",
-    table: T.ciChecks,
-    code: `# .github/workflows/ci.yml
-name: CI
-
+環境変数は.envファイルにVITE_で始まる変数を定義します。VITE_API_URLのようにprefixをつけることでクライアントサイドのコードからimport.meta.env.VITE_API_URLとして参照できます。秘密情報（APIキー）はフロントエンドに埋め込んではいけません。バックエンド経由でアクセスしてください。`,
+      code:`# .github/workflows/deploy.yml
+name: Build and Deploy
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
 jobs:
-  ci:
+  test-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
           cache: 'npm'
+      - run: npm ci
+      - run: npm test -- --run  # Vitestでテスト実行
+      - run: npm run build
+      - uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist`,
+      afterCode:"pull_requestイベントでもテストを実行することで、マージ前にテストが通ることを確認できます。if: github.ref == 'refs/heads/main'条件でデプロイはmainへのpush時だけに限定しています。"}
+   ]},
+];
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-      - name: Test
-        run: npx vitest run
-
-      - name: Build
-        run: npm run build`,
-    afterCode: "ポイント: actions/setup-node の cache: 'npm' を指定すると、node_modules のキャッシュが効いて2回目以降のインストールが高速になります。CI の実行時間短縮に大きく寄与します。"
-  }, {
-    title: "Lighthouse CI",
-    body: "Lighthouse はGoogleが提供するWeb品質監査ツールで、パフォーマンス・アクセシビリティ・ベストプラクティス・SEO の4カテゴリでスコアを計測します。Lighthouse CI はこれを GitHub Actions に組み込み、デプロイ前に品質チェックを自動化するツールです。\n\nパフォーマンススコアが閾値（例: 90点）を下回った場合に CI を失敗させることで、品質劣化を早期に発見できます。Python の coverage で「テストカバレッジ80%以上をCI必須にする」のと同じ発想です。\n\n計測結果は一時的にクラウドにアップロードされ、PR のコメントにレポートが自動投稿されます。これにより、レビュアーはコードだけでなくパフォーマンスへの影響も含めてレビューできます。「この PR でパフォーマンスが5点下がった」といった変化が一目でわかるので、リグレッションの防止に効果的です。",
-    code: `// lighthouserc.js
-module.exports = {
-  ci: {
-    collect: {
-      staticDistDir: './dist',  // ビルド成果物のディレクトリ
-      numberOfRuns: 3,          // 3回計測して中央値を使用
-    },
-    assert: {
-      assertions: {
-        'categories:performance': ['error', { minScore: 0.9 }],
-        'categories:accessibility': ['error', { minScore: 0.9 }],
-        'categories:best-practices': ['warn', { minScore: 0.85 }],
-        'categories:seo': ['warn', { minScore: 0.9 }],
-      },
-    },
-    upload: {
-      target: 'temporary-public-storage',
-    },
-  },
-};
-
-// GitHub Actions に追加（ci.yml の build 後に）
-// - name: Lighthouse CI
-//   run: |
-//     npm install -g @lhci/cli
-//     lhci autorun`,
-    afterCode: "コース完了後に習得できる状態: React + TypeScript で Todo アプリを一から構築し、コンポーネント設計・状態管理・API連携・テスト・パフォーマンス最適化・デプロイ・CI まで、フロントエンド開発の一連のワークフローを実践できるようになっています。次のステップとして、React Router によるルーティング、Next.js による SSR/SSG、TanStack Query による高度なデータフェッチなどに進むとよいでしょう。"
-  }]
-}];
-
-/* ─── UI Components ─── */
-function DataTable({
-  data
-}) {
-  return React.createElement("div", {
-    style: {
-      overflowX: "auto",
-      margin: "12px 0",
-      borderRadius: 10,
-      border: "1px solid #d1d5db",
-      background: "#fff"
-    }
-  }, React.createElement("table", {
-    style: {
-      width: "100%",
-      borderCollapse: "separate",
-      borderSpacing: 0,
-      fontSize: 13
-    }
-  }, React.createElement("thead", null, React.createElement("tr", null, data.h.map((h, i) => React.createElement("th", {
-    key: i,
-    style: {
-      background: "linear-gradient(180deg,#eef2ff,#e0e7ff)",
-      color: "#312e81",
-      fontWeight: 800,
-      fontSize: 12.5,
-      padding: "10px 14px",
-      textAlign: "left",
-      borderBottom: "2px solid #a5b4fc",
-      borderRight: i < data.h.length - 1 ? "1px solid #c7d2fe" : "none"
-    }
-  }, h)))), React.createElement("tbody", null, data.r.map((row, ri) => React.createElement("tr", {
-    key: ri
-  }, row.map((cell, ci) => React.createElement("td", {
-    key: ci,
-    style: {
-      padding: "9px 14px",
-      borderBottom: ri < data.r.length - 1 ? "1px solid #e5e7eb" : "none",
-      borderRight: ci < row.length - 1 ? "1px solid #f3f4f6" : "none",
-      color: ci === 0 ? "#1e1b4b" : "#374151",
-      fontWeight: ci === 0 ? 700 : 400,
-      fontSize: 13,
-      lineHeight: 1.65,
-      verticalAlign: "top",
-      whiteSpace: "pre-line",
-      background: ri % 2 === 0 ? "#fff" : "#f9fafb"
-    }
-  }, cell)))))), data.cap && React.createElement("div", {
-    style: {
-      padding: "8px 14px",
-      fontSize: 12,
-      color: "#6b7280",
-      borderTop: "1px solid #e5e7eb",
-      background: "#f9fafb"
-    }
-  }, data.cap));
-}
-function Code({
-  code,
-  hl
-}) {
-  return React.createElement("pre", {
-    style: {
-      background: hl ? "#1a1a2e" : "#0d0d1a",
-      color: "#d0d0f0",
-      padding: "14px 16px",
-      borderRadius: 10,
-      fontSize: 12,
-      lineHeight: 1.65,
-      overflowX: "auto",
-      margin: "8px 0 0",
-      fontFamily: "'JetBrains Mono','Fira Code','Source Code Pro','Noto Sans JP','Hiragino Sans','Yu Gothic',monospace",
-      border: hl ? "2px solid #6366f1" : "1px solid rgba(255,255,255,0.06)",
-      whiteSpace: "pre-wrap",
-      wordBreak: "break-word"
-    }
-  }, React.createElement("code", null, code));
-}
-const diffLabel = d => d === 1 ? "\u2B50 \u57FA\u672C" : d === 2 ? "\u2B50\u2B50 \u5FDC\u7528" : "\u2B50\u2B50\u2B50 \u767A\u5C55";
-const diffColor = d => d === 1 ? "#16a34a" : d === 2 ? "#d97706" : "#dc2626";
-function Exercise({
-  ex,
-  idx
-}) {
-  const [showAnswer, setShowAnswer] = useState(false);
-  return React.createElement("div", {
-    style: {
-      borderRadius: 12,
-      border: "2px solid #f59e0b",
-      overflow: "hidden",
-      background: "#fff",
-      marginBottom: 8
-    }
-  }, React.createElement("div", {
-    style: {
-      padding: "12px 16px",
-      background: "linear-gradient(135deg,#fffbeb,#fef3c7)"
-    }
-  }, React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 6
-    }
-  }, React.createElement("span", {
-    style: {
-      background: "#f59e0b",
-      color: "#fff",
-      fontSize: 11,
-      fontWeight: 800,
-      padding: "3px 10px",
-      borderRadius: 6
-    }
-  }, "\u554F", idx + 1), React.createElement("span", {
-    style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: diffColor(ex.diff)
-    }
-  }, diffLabel(ex.diff))), React.createElement("p", {
-    style: {
-      margin: 0,
-      fontSize: 13.5,
-      lineHeight: 1.8,
-      color: "#92400e",
-      whiteSpace: "pre-line"
-    }
-  }, ex.q)), React.createElement("div", {
-    style: {
-      padding: "0 16px 12px"
-    }
-  }, React.createElement(Code, {
-    code: ex.code,
-    hl: true
-  })), React.createElement("div", {
-    style: {
-      borderTop: "1px dashed #fcd34d",
-      padding: "10px 16px"
-    }
-  }, React.createElement("button", {
-    onClick: () => setShowAnswer(!showAnswer),
-    style: {
-      background: showAnswer ? "#22c55e" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
-      color: "#fff",
-      border: "none",
-      borderRadius: 8,
-      padding: "8px 20px",
-      fontSize: 13,
-      fontWeight: 700,
-      cursor: "pointer",
-      width: "100%"
-    }
-  }, showAnswer ? "\uD83D\uDE48 \u89E3\u7B54\u3092\u96A0\u3059" : "\uD83D\uDC40 \u89E3\u7B54\u4F8B\u3092\u898B\u308B"), showAnswer && React.createElement("div", {
-    style: {
-      marginTop: 10
-    }
-  }, React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#166534",
-      textTransform: "uppercase",
-      letterSpacing: 1,
-      marginBottom: 4
-    }
-  }, "\u2705 \u89E3\u7B54\u4F8B"), React.createElement(Code, {
-    code: ex.answer
-  }))));
-}
-function Section({
-  section,
-  idx,
-  defaultOpen
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return React.createElement("div", {
-    style: {
-      borderRadius: 12,
-      border: "1px solid #e5e7eb",
-      overflow: "hidden",
-      background: "#fff"
-    }
-  }, React.createElement("button", {
-    onClick: () => setOpen(!open),
-    style: {
-      width: "100%",
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      padding: "12px 16px",
-      border: "none",
-      background: "#fafafa",
-      cursor: "pointer",
-      textAlign: "left",
-      fontSize: 14,
-      fontWeight: 700,
-      color: "#1e1b4b"
-    }
-  }, React.createElement("span", {
-    style: {
-      flexShrink: 0,
-      width: 24,
-      height: 24,
-      borderRadius: 6,
-      background: "#6366f1",
-      color: "#fff",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 11,
-      fontWeight: 800
-    }
-  }, idx + 1), React.createElement("span", {
-    style: {
-      flex: 1
-    }
-  }, section.title), React.createElement("span", {
-    style: {
-      fontSize: 18,
-      color: "#9ca3af",
-      transition: "transform 0.2s",
-      transform: open ? "rotate(90deg)" : "rotate(0)"
-    }
-  }, "\u203A")), open && React.createElement("div", {
-    style: {
-      padding: "12px 16px 16px"
-    }
-  }, section.body && React.createElement("p", {
-    style: {
-      margin: "0 0 8px",
-      fontSize: 13.5,
-      lineHeight: 1.85,
-      color: "#374151",
-      whiteSpace: "pre-line"
-    }
-  }, section.body), section.table && React.createElement(DataTable, {
-    data: section.table
-  }), section.afterTable && React.createElement("p", {
-    style: {
-      margin: "8px 0",
-      fontSize: 13.5,
-      lineHeight: 1.85,
-      color: "#374151",
-      whiteSpace: "pre-line"
-    }
-  }, section.afterTable), section.code && React.createElement(Code, {
-    code: section.code
-  }), section.afterCode && React.createElement("p", {
-    style: {
-      margin: "10px 0 0",
-      fontSize: 13,
-      lineHeight: 1.8,
-      color: "#555",
-      whiteSpace: "pre-line",
-      background: "#f9fafb",
-      padding: "10px 14px",
-      borderRadius: 8,
-      border: "1px solid #e5e7eb"
-    }
-  }, section.afterCode)));
-}
-
-/* ─── Main App ─── */
 function ReactBeginnerCourse() {
   const [ch, setCh] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const chapter = chapters[ch];
   const exKey = chapter.id;
   const exercises = EX[exKey] || [];
-  return React.createElement("div", {
-    style: {
-      minHeight: "100vh",
-      background: "#f8f7f4",
-      fontFamily: "'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"
-    }
-  }, React.createElement("div", {
-    style: {
-      maxWidth: 1100,
-      margin: "0 auto",
-      padding: "20px 14px"
-    }
-  }, React.createElement("div", {
-    style: {
-      background: "linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",
-      borderRadius: 16,
-      padding: "24px 20px",
-      marginBottom: 16,
-      position: "relative",
-      overflow: "hidden"
-    }
-  }, React.createElement("div", {
-    style: {
-      position: "absolute",
-      top: -30,
-      right: -10,
-      fontSize: 140,
-      opacity: 0.05
-    }
-  }, "\u269B\uFE0F"), React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#a5b4fc",
-      textTransform: "uppercase",
-      letterSpacing: 2,
-      marginBottom: 4
-    }
-  }, "Python\u958B\u767A\u8005\u306E\u305F\u3081\u306E"), React.createElement("h1", {
-    style: {
-      margin: 0,
-      fontSize: 22,
-      fontWeight: 900,
-      color: "#fff"
-    }
-  }, "React \u521D\u7D1A\u30B3\u30FC\u30B9"), React.createElement("p", {
-    style: {
-      margin: "6px 0 0",
-      fontSize: 12.5,
-      color: "#c4b5fd"
-    }
-  }, "\u5168", chapters.length, "\u7AE0 \u30FB \u6F14\u7FD2", Object.values(EX).flat().length, "\u554F \u30FB \u96E3\u6613\u5EA6\u2B50\u301C\u2B50\u2B50\u2B50"), React.createElement("p", {
-    style: { margin: "10px 0 0", fontSize: 12, color: "#ddd6fe", lineHeight: 1.8 }
-  }, "Todo \u30A2\u30D7\u30EA\u3092\u6BB5\u968E\u7684\u306B\u69CB\u7BC9\u3057\u306A\u304C\u3089\u3001React + TypeScript \u306E\u5B9F\u8DF5\u7684\u306A\u958B\u767A\u30D5\u30ED\u30FC\u3092\u4E00\u901A\u308A\u5B66\u3073\u307E\u3059\u3002\u30B3\u30F3\u30DD\u30FC\u30CD\u30F3\u30C8\u8A2D\u8A08\u30FB\u72B6\u614B\u7BA1\u7406\u30FBAPI\u9023\u643A\u30FB\u30C6\u30B9\u30C8\u30FB\u30D1\u30D5\u30A9\u30FC\u30DE\u30F3\u30B9\u6700\u9069\u5316\u30FB\u30C7\u30D7\u30ED\u30A4\u307E\u3067\u3001\u30D5\u30ED\u30F3\u30C8\u30A8\u30F3\u30C9\u958B\u767A\u306E\u5168\u5DE5\u7A0B\u3092\u7DB2\u7F85\u3057\u307E\u3059\u3002"), React.createElement("div", {
-    style: {
-      marginTop: 14,
-      display: "flex",
-      gap: 3
-    }
-  }, chapters.map((_, i) => React.createElement("div", {
-    key: i,
-    onClick: () => {
-      setCh(i);
-      setMenuOpen(false);
-    },
-    style: {
-      flex: 1,
-      height: 5,
-      borderRadius: 3,
-      background: i <= ch ? "#818cf8" : "rgba(255,255,255,0.15)",
-      cursor: "pointer"
-    }
-  })))), React.createElement("div", {
-    style: {
-      marginBottom: 14
-    }
-  }, React.createElement("button", {
-    onClick: () => setMenuOpen(!menuOpen),
-    style: {
-      width: "100%",
-      padding: "10px 16px",
-      border: "1px solid #d1d5db",
-      borderRadius: 10,
-      background: "#fff",
-      fontSize: 14,
-      fontWeight: 700,
-      color: "#1e1b4b",
-      cursor: "pointer",
-      display: "flex",
-      justifyContent: "space-between"
-    }
-  }, React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title), React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "#9ca3af"
-    }
-  }, menuOpen ? "\u25B2" : "\u25BC")), menuOpen && React.createElement("div", {
-    style: {
-      marginTop: 4,
-      border: "1px solid #e5e7eb",
-      borderRadius: 10,
-      overflow: "hidden",
-      background: "#fff",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
-    }
-  }, chapters.map((c, i) => React.createElement("button", {
-    key: c.id,
-    onClick: () => {
-      setCh(i);
-      setMenuOpen(false);
-    },
-    style: {
-      width: "100%",
-      padding: "10px 16px",
-      border: "none",
-      borderBottom: i < chapters.length - 1 ? "1px solid #f3f4f6" : "none",
-      background: i === ch ? "#eef2ff" : "#fff",
-      fontSize: 13,
-      fontWeight: i === ch ? 700 : 500,
-      color: i === ch ? "#4338ca" : "#374151",
-      cursor: "pointer",
-      textAlign: "left",
-      display: "flex",
-      alignItems: "center",
-      gap: 10
-    }
-  }, React.createElement("span", {
-    style: {
-      width: 22,
-      height: 22,
-      borderRadius: "50%",
-      background: i === ch ? "#6366f1" : "#e5e7eb",
-      color: i === ch ? "#fff" : "#6b7280",
-      fontWeight: 800,
-      fontSize: 11,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0
-    }
-  }, c.num), React.createElement("span", {
-    style: {
-      flex: 1
-    }
-  }, c.title), EX[c.id] && React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: "#f59e0b",
-      fontWeight: 700
-    }
-  }, EX[c.id].length, "\u554F"))))), React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      marginBottom: 12
-    }
-  }, React.createElement("span", {
-    style: {
-      width: 36,
-      height: 36,
-      borderRadius: "50%",
-      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
-      color: "#fff",
-      fontWeight: 900,
-      fontSize: 16,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, chapter.num), React.createElement("div", null, React.createElement("div", {
-    style: {
-      fontWeight: 800,
-      fontSize: 18,
-      color: "#1e1b4b"
-    }
-  }, chapter.title), React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#6b7280"
-    }
-  }, "\u76EE\u5B89: ", chapter.est, exercises.length > 0 ? " \u30FB \u6F14\u7FD2" + exercises.length + "\u554F" : ""))), chapter.goal && React.createElement("div", {
-    style: {
-      background: "linear-gradient(135deg,#eef2ff,#f5f3ff)",
-      border: "1px solid #c7d2fe",
-      borderLeft: "4px solid #6366f1",
-      borderRadius: 10,
-      padding: "12px 16px",
-      marginBottom: 14
-    }
-  }, React.createElement("div", {
-    style: { fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 1, marginBottom: 6 }
-  }, "\uD83C\uDFAF \u3053\u306E\u7AE0\u306E\u30B4\u30FC\u30EB"), React.createElement("div", {
-    style: { fontSize: 13.5, color: "#1e1b4b", lineHeight: 1.8, whiteSpace: "pre-line" }
-  }, chapter.goal)), React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 8
-    }
-  }, chapter.sections.map((sec, i) => React.createElement(Section, {
-    key: ch + "-" + i,
-    section: sec,
-    idx: i,
-    defaultOpen: false
-  }))), exercises.length > 0 && React.createElement("div", {
-    style: {
-      marginTop: 20
-    }
-  }, React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 12
-    }
-  }, React.createElement("span", {
-    style: {
-      background: "#f59e0b",
-      color: "#fff",
-      fontWeight: 800,
-      fontSize: 13,
-      padding: "4px 14px",
-      borderRadius: 8
-    }
-  }, "\uD83C\uDFCB\uFE0F \u6F14\u7FD2\u554F\u984C"), React.createElement("span", {
-    style: {
-      fontSize: 13,
-      color: "#92400e"
-    }
-  }, "\u6613\u3057\u3044\u9806\u306B", exercises.length, "\u554F")), exercises.map((ex, i) => React.createElement(Exercise, {
-    key: ch + "-" + i,
-    ex: ex,
-    idx: i
-  }))), React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      marginTop: 20,
-      gap: 10
-    }
-  }, ch > 0 ? React.createElement("button", {
-    onClick: () => {
-      setCh(ch - 1);
-      window.scrollTo(0, 0);
-    },
-    style: {
-      flex: 1,
-      padding: "12px 16px",
-      border: "1px solid #d1d5db",
-      borderRadius: 10,
-      background: "#fff",
-      cursor: "pointer",
-      fontWeight: 600,
-      fontSize: 13,
-      color: "#6b7280"
-    }
-  }, "\u2190 Ch.", chapters[ch - 1].num) : React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }), ch < chapters.length - 1 ? React.createElement("button", {
-    onClick: () => {
-      setCh(ch + 1);
-      window.scrollTo(0, 0);
-    },
-    style: {
-      flex: 1,
-      padding: "12px 16px",
-      border: "none",
-      borderRadius: 10,
-      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
-      cursor: "pointer",
-      fontWeight: 700,
-      fontSize: 13,
-      color: "#fff"
-    }
-  }, "Ch.", chapters[ch + 1].num, " \u2192") : React.createElement("a", {
-    href: "../index.html",
-    style: {
-      flex: 1,
-      padding: "12px 16px",
-      borderRadius: 10,
-      background: "linear-gradient(135deg,#22c55e,#16a34a)",
-      color: "#fff",
-      fontWeight: 700,
-      fontSize: 13,
-      textAlign: "center",
-      textDecoration: "none"
-    }
-  }, "\uD83C\uDF89 \u30B3\u30FC\u30B9\u5B8C\u4E86\uFF01")), React.createElement("p", {
-    style: {
-      textAlign: "center",
-      fontSize: 11,
-      color: "#9ca3af",
-      marginTop: 20
-    }
-  }, "React 18.2 \u00B7 Vite 5 \u00B7 Zustand 4 \u6E96\u62DA \u00B7 2026\u5E744\u6708\u6642\u70B9")));
+
+  return React.createElement("div", {style:{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"}},
+    React.createElement("div", {style:{maxWidth:1100,margin:"0 auto",padding:"20px 14px"}},
+      React.createElement("div", {style:{background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",borderRadius:16,padding:"24px 20px",marginBottom:16,position:"relative",overflow:"hidden"}},
+        React.createElement("div", {style:{position:"absolute",top:-30,right:-10,fontSize:140,opacity:0.05}}, "⚛️"),
+        React.createElement("div", {style:{fontSize:11,fontWeight:700,color:"#a5b4fc",textTransform:"uppercase",letterSpacing:2,marginBottom:4}}, "Python開発者のための"),
+        React.createElement("h1", {style:{margin:0,fontSize:22,fontWeight:900,color:"#fff"}}, "React 初級コース"),
+        React.createElement("p", {style:{margin:"6px 0 0",fontSize:12.5,color:"#c4b5fd"}}, "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問"),
+        React.createElement("p", {style:{margin:"10px 0 0",fontSize:12,color:"#ddd6fe",lineHeight:1.8}}, "Vite・Zustand・Testing LibraryでTodoアプリを段階的に構築しながら、実践的なReact開発を習得します。"),
+        React.createElement("div", {style:{marginTop:14,display:"flex",gap:3}},
+          chapters.map((_,i) => React.createElement("div", {key:i, onClick:()=>{setCh(i);setMenuOpen(false);}, style:{flex:1,height:5,borderRadius:3,background:i<=ch?"#818cf8":"rgba(255,255,255,0.15)",cursor:"pointer"}}))
+        )
+      ),
+      React.createElement("div", {style:{marginBottom:14}},
+        React.createElement("button", {onClick:()=>setMenuOpen(!menuOpen), style:{width:"100%",padding:"10px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",fontSize:14,fontWeight:700,color:"#1e1b4b",cursor:"pointer",display:"flex",justifyContent:"space-between"}},
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", {style:{fontSize:12,color:"#9ca3af"}}, menuOpen?"▲":"▼")
+        ),
+        menuOpen && React.createElement("div", {style:{marginTop:4,border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden",background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}},
+          chapters.map((c,i) => React.createElement("button", {key:c.id, onClick:()=>{setCh(i);setMenuOpen(false);}, style:{width:"100%",padding:"10px 16px",border:"none",borderBottom:i<chapters.length-1?"1px solid #f3f4f6":"none",background:i===ch?"#eef2ff":"#fff",fontSize:13,fontWeight:i===ch?700:500,color:i===ch?"#4338ca":"#374151",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10}},
+            React.createElement("span", {style:{width:22,height:22,borderRadius:"50%",background:i===ch?"#6366f1":"#e5e7eb",color:i===ch?"#fff":"#6b7280",fontWeight:800,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}, c.num),
+            React.createElement("span", {style:{flex:1}}, c.title),
+            EX[c.id] && React.createElement("span", {style:{fontSize:11,color:"#f59e0b",fontWeight:700}}, EX[c.id].length, "問")
+          ))
+        )
+      ),
+      React.createElement("div", {style:{display:"flex",alignItems:"center",gap:10,marginBottom:12}},
+        React.createElement("span", {style:{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",fontWeight:900,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", {style:{fontWeight:800,fontSize:18,color:"#1e1b4b"}}, chapter.title),
+          React.createElement("div", {style:{fontSize:12,color:"#6b7280"}}, "目安: ", chapter.est, exercises.length>0?" ・ 演習"+exercises.length+"問":"")
+        )
+      ),
+      chapter.goal && React.createElement("div", {style:{background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",border:"1px solid #c7d2fe",borderLeft:"4px solid #6366f1",borderRadius:10,padding:"12px 16px",marginBottom:14}},
+        React.createElement("div", {style:{fontSize:11,fontWeight:800,color:"#4338ca",letterSpacing:1,marginBottom:6}}, "🎯 この章のゴール"),
+        React.createElement("div", {style:{fontSize:13.5,color:"#1e1b4b",lineHeight:1.8,whiteSpace:"pre-line"}}, chapter.goal)
+      ),
+      React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:8}},
+        chapter.sections.map((sec,i) => React.createElement(Section, {key:ch+"-"+i, section:sec, idx:i, defaultOpen:false}))
+      ),
+      exercises.length>0 && React.createElement("div", {style:{marginTop:20}},
+        React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}},
+          React.createElement("span", {style:{background:"#f59e0b",color:"#fff",fontWeight:800,fontSize:13,padding:"4px 14px",borderRadius:8}}, "🏋️ 演習問題"),
+          React.createElement("span", {style:{fontSize:13,color:"#92400e"}}, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex,i) => React.createElement(Exercise, {key:ch+"-"+i, ex, idx:i}))
+      ),
+      React.createElement("div", {style:{display:"flex",justifyContent:"space-between",marginTop:20,gap:10}},
+        ch>0 ? React.createElement("button", {onClick:()=>{setCh(ch-1);window.scrollTo(0,0);}, style:{flex:1,padding:"12px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",cursor:"pointer",fontWeight:600,fontSize:13,color:"#6b7280"}}, "← Ch.", chapters[ch-1].num) : React.createElement("div", {style:{flex:1}}),
+        ch<chapters.length-1 ? React.createElement("button", {onClick:()=>{setCh(ch+1);window.scrollTo(0,0);}, style:{flex:1,padding:"12px 16px",border:"none",borderRadius:10,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff"}}, "Ch.", chapters[ch+1].num, " →")
+        : React.createElement("a", {href:"../index.html", style:{flex:1,padding:"12px 16px",borderRadius:10,background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none"}}, "🎉 コース完了！")
+      ),
+      React.createElement("p", {style:{textAlign:"center",fontSize:11,color:"#9ca3af",marginTop:20}}, "react.dev ・ React 19 時点")
+    )
+  );
 }
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(React.createElement(ReactBeginnerCourse));
   </script>

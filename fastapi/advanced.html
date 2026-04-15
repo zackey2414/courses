@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FastAPI 上級コース — マイクロサービス・可観測性・本番運用</title>
-  <meta name="description" content="FastAPI上級コース。マイクロサービス・イベント駆動・MLサービング・可観測性・セキュリティ・CI/CD・パフォーマンスチューニングを習得する全8章。">
+  <title>FastAPI 上級コース — エンタープライズAPI設計</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
@@ -14,24 +13,10 @@
     #root { min-height: 100vh; padding-top: 56px; }
     #root > div { max-width: 100%; }
     #root > div > div { max-width: 1100px !important; margin: 0 auto; }
-    .site-header {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      height: 56px; display: flex; align-items: center; padding: 0 20px;
-      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
-      border-bottom: 1px solid #e5e7eb;
-    }
-    .site-header a.home-link {
-      display: inline-flex; align-items: center; gap: 10px;
-      text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px;
-      padding: 6px 12px; border-radius: 10px; transition: background 0.15s;
-    }
+    .site-header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 56px; display: flex; align-items: center; padding: 0 20px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e5e7eb; }
+    .site-header a.home-link { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px; padding: 6px 12px; border-radius: 10px; transition: background 0.15s; }
     .site-header a.home-link:hover { background: #eef2ff; }
-    .site-header .logo-mark {
-      width: 30px; height: 30px; border-radius: 8px;
-      background: linear-gradient(135deg,#6366f1,#8b5cf6);
-      color: #fff; display: flex; align-items: center; justify-content: center;
-      font-weight: 900; font-size: 15px;
-    }
+    .site-header .logo-mark { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 15px; }
     .site-header .logo-text { letter-spacing: -0.01em; }
     .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
   </style>
@@ -46,1485 +31,1215 @@
   <div id="root"></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="../assets/course-ui.js"></script>
   <script>
 const { useState } = React;
 
-/* ── Table definitions ── */
-const T = {
-  serviceDecomposition: {
-    h: ["サービス", "責務", "通信方式"],
-    r: [["API Gateway", "ルーティング・認証・レート制限", "HTTP/HTTPS"], ["User Service", "ユーザ管理・認証トークン発行", "REST"], ["Order Service", "注文の作成・管理", "REST + イベント"], ["Inventory Service", "在庫の確認・引き当て", "gRPC"], ["Notification Service", "メール・プッシュ通知", "メッセージキュー"]]
-  },
-  circuitBreaker: {
-    h: ["状態", "説明", "遷移条件"],
-    r: [["Closed（通常）", "リクエストを通す", "エラー率が閾値未満"], ["Open（遮断）", "即座に失敗を返す", "エラー率が閾値超過"], ["Half-Open（試験）", "一部のリクエストを試す", "一定時間後に自動遷移"]]
-  },
-  kafkaConcepts: {
-    h: ["概念", "説明"],
-    r: [["Topic", "メッセージの論理的なチャネル"], ["Partition", "トピックの並列分割単位（スケール）"], ["Consumer Group", "複数コンシューマで並列処理するグループ"], ["Offset", "パーティション内のメッセージ位置"], ["Producer", "メッセージを送信するプロセス"], ["Consumer", "メッセージを受信・処理するプロセス"]]
-  },
-  sagaPatterns: {
-    h: ["パターン", "説明", "適したシナリオ"],
-    r: [["Choreography", "各サービスがイベントを発行・購読", "疎結合・シンプルなフロー"], ["Orchestration", "中央コーディネータが手順を指示", "複雑なフロー・補償ロジック多い"]]
-  },
-  mlLoadStrategy: {
-    h: ["戦略", "説明", "適したケース"],
-    r: [["起動時ロード", "lifespan で1回だけロード", "単一モデル・小〜中モデル"], ["遅延ロード", "初回リクエスト時にロード", "多モデル・低メモリ環境"], ["外部ストア", "MLflow/S3からon-demandロード", "モデルバージョン管理が必要"]]
-  },
-  otelComponents: {
-    h: ["コンポーネント", "役割", "FastAPI統合"],
-    r: [["Traces", "リクエストの処理経路を記録", "FastAPIInstrumentor"], ["Metrics", "数値の計測（レイテンシ等）", "PrometheusMetricsExporter"], ["Logs", "構造化ログ", "structlog + OTel Bridge"], ["Collector", "テレメトリを収集・転送", "OTLP Exporter"]]
-  },
-  k8sResources: {
-    h: ["リソース", "役割"],
-    r: [["Deployment", "Podのレプリカ管理・ローリング更新"], ["HorizontalPodAutoscaler", "CPU/メモリに応じた自動スケール"], ["Service", "Pod群へのロードバランシング"], ["Ingress", "外部HTTPルーティング"], ["ConfigMap", "設定値の管理"], ["Secret", "機密情報の管理"]]
-  },
-  owaspTop10: {
-    h: ["脅威", "FastAPI対策"],
-    r: [["Broken Access Control", "スコープ検証、リソースの所有者チェック"], ["Cryptographic Failures", "HTTPS強制、argon2でパスワードハッシュ"], ["Injection", "Pydanticバリデーション、ORMパラメータ化クエリ"], ["Insecure Design", "脅威モデリング、レート制限"], ["Security Misconfiguration", "セキュリティヘッダ、デバッグ無効化"], ["Vulnerable Components", "pip audit、依存関係の定期更新"]]
-  },
-  helmFiles: {
-    h: ["ファイル", "役割"],
-    r: [["Chart.yaml", "チャートのメタ情報（名前・バージョン）"], ["values.yaml", "デフォルト設定値"], ["templates/deployment.yaml", "Deployment定義テンプレート"], ["templates/service.yaml", "Service定義テンプレート"], ["templates/ingress.yaml", "Ingress定義テンプレート"], ["templates/hpa.yaml", "HPA定義テンプレート"]]
-  },
-  profileTools: {
-    h: ["ツール", "用途", "使い方"],
-    r: [["py-spy", "CPUプロファイル（本番対応）", "py-spy top --pid <PID>"], ["memray", "メモリプロファイル", "memray run -o out.bin app.py"], ["asyncio debug", "遅いコルーチン検出", "PYTHONASYNCIODEBUG=1"], ["uvicorn --workers", "マルチプロセス", "本番はGunicorn経由で"]]
-  }
-};
-
-/* ── Exercises ── */
 const EX = {
-  ch1: [{
-    diff: 2,
-    q: "httpx を使って別のマイクロサービス（inventory-service）に在庫確認リクエストを送る関数を書いてください。\nタイムアウト3秒・503エラー時はHTTPExceptionを返すこと。\n\nポイント: httpx.AsyncClient の使い方、サービス間通信のエラーハンドリング。",
-    code: `# app/clients/inventory.py
-# GET /inventory/{item_id} を呼ぶ async 関数`,
-    answer: `import httpx
-from fastapi import HTTPException
+  ch1: [
+    {diff:2, q:"Starletteのカスタムミドルウェアを書き、全リクエストにX-Request-IDヘッダーを付与してください。",
+     code:`from starlette.middleware.base import BaseHTTPMiddleware
+import uuid
 
-INVENTORY_URL = "http://inventory-service:8001"
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        # request_idを生成してリクエストとレスポンスに付与
+        pass`,
+     answer:`from starlette.middleware.base import BaseHTTPMiddleware
+import uuid
 
-async def check_inventory(item_id: int) -> dict:
-    try:
-        async with httpx.AsyncClient(
-            base_url=INVENTORY_URL,
-            timeout=3.0
-        ) as client:
-            resp = await client.get(
-                f"/inventory/{item_id}"
-            )
-            resp.raise_for_status()
-            return resp.json()
-    except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=503,
-            detail="inventory-service timeout"
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        request_id = str(uuid.uuid4())
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+app.add_middleware(RequestIDMiddleware)`},
+    {diff:3, q:"ASGIアプリを直接実装し、/pingにGETリクエストが来たら{'ping':'pong'}をJSONで返してください。",
+     code:`import json
+
+async def app(scope, receive, send):
+    if scope["type"] == "http":
+        # /pingのGETリクエストに応答
+        pass`,
+     answer:`import json
+
+async def app(scope, receive, send):
+    if scope["type"] != "http":
+        return
+    path = scope["path"]
+    method = scope["method"]
+    if path == "/ping" and method == "GET":
+        body = json.dumps({"ping": "pong"}).encode()
+        await send({"type":"http.response.start","status":200,
+                    "headers":[[b"content-type",b"application/json"]]})
+        await send({"type":"http.response.body","body":body})`}
+  ],
+  ch2: [
+    {diff:2, q:"CQRSパターンのコマンドハンドラを実装してください。CreateOrderCommandを受け取り、OrderCreatedEventを発行します。",
+     code:`from dataclasses import dataclass
+from typing import Protocol
+
+@dataclass
+class CreateOrderCommand:
+    user_id: str
+    items: list[dict]
+
+class EventBus(Protocol):
+    async def publish(self, event: object) -> None: ...
+
+async def handle_create_order(cmd: CreateOrderCommand, bus: EventBus):
+    # バリデーション → 集約生成 → イベント発行`,
+     answer:`@dataclass
+class OrderCreatedEvent:
+    order_id: str
+    user_id: str
+    items: list[dict]
+
+async def handle_create_order(cmd: CreateOrderCommand, bus: EventBus):
+    if not cmd.items:
+        raise ValueError("注文には最低1つの商品が必要です")
+    order_id = str(uuid.uuid4())
+    event = OrderCreatedEvent(
+        order_id=order_id,
+        user_id=cmd.user_id,
+        items=cmd.items,
+    )
+    await bus.publish(event)
+    return order_id`},
+    {diff:3, q:"イベントソーシングのイベントストアをSQLiteで実装してください。append_event()とget_events()を実装してください。",
+     code:`import sqlite3, json
+from dataclasses import dataclass
+
+@dataclass
+class DomainEvent:
+    aggregate_id: str
+    event_type: str
+    payload: dict
+
+class EventStore:
+    def __init__(self, db_path: str): ...
+    async def append_event(self, event: DomainEvent) -> None: ...
+    async def get_events(self, aggregate_id: str) -> list[DomainEvent]: ...`,
+     answer:`class EventStore:
+    def __init__(self, db_path: str):
+        self.conn = sqlite3.connect(db_path)
+        self.conn.execute("""CREATE TABLE IF NOT EXISTS events(
+            id INTEGER PRIMARY KEY,
+            aggregate_id TEXT, event_type TEXT,
+            payload TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+
+    async def append_event(self, event: DomainEvent) -> None:
+        self.conn.execute(
+            "INSERT INTO events(aggregate_id,event_type,payload) VALUES(?,?,?)",
+            (event.aggregate_id, event.event_type, json.dumps(event.payload))
         )
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"upstream error: {e.response.status_code}"
-        )`
-  }, {
-    diff: 3,
-    q: "tenacity を使って Circuit Breaker パターンを実装してください。\n・3回連続失敗でOpen状態（60秒間リクエストを遮断）\n・wait_exponential でリトライ間隔を指数バックオフ\n\nポイント: @retry デコレータの設定、stop/wait/retry の組み合わせ。",
-    code: `# app/clients/resilient.py
-from tenacity import retry, stop_after_attempt, wait_exponential`,
-    answer: `from tenacity import (
-    retry, stop_after_attempt,
-    wait_exponential, retry_if_exception_type,
-    CircuitBreaker,
-)
-import httpx
+        self.conn.commit()
 
-circuit_breaker = CircuitBreaker(
-    fail_max=3,
-    reset_timeout=60,
-)
-
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
-    retry=retry_if_exception_type(httpx.TransportError),
-    reraise=True,
-)
-async def call_with_retry(url: str) -> dict:
-    async with httpx.AsyncClient(timeout=3.0) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        return resp.json()`
-  }],
-  ch2: [{
-    diff: 2,
-    q: "aiokafka を使って注文イベントをProduceする関数と、Consumeするバックグラウンドタスクを書いてください。\nFastAPIのlifespanで起動・停止を管理すること。\n\nポイント: AIOKafkaProducer/Consumer の lifespan 管理。",
-    code: `# app/events/kafka.py
-# lifespan で producer/consumer を起動`,
-    answer: `import json
-import asyncio
-from contextlib import asynccontextmanager
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
+    async def get_events(self, aggregate_id: str) -> list[DomainEvent]:
+        rows = self.conn.execute(
+            "SELECT aggregate_id,event_type,payload FROM events WHERE aggregate_id=?",
+            (aggregate_id,)).fetchall()
+        return [DomainEvent(r[0], r[1], json.loads(r[2])) for r in rows]`}
+  ],
+  ch3: [
+    {diff:2, q:"aiokafkaを使ってFastAPIのlifespan内でKafkaプロデューサーを起動・停止してください。",
+     code:`from contextlib import asynccontextmanager
+from aiokafka import AIOKafkaProducer
 from fastapi import FastAPI
-
-producer: AIOKafkaProducer | None = None
-
-async def produce_order_event(order: dict):
-    await producer.send_and_wait(
-        "orders",
-        json.dumps(order).encode()
-    )
-
-async def consume_orders():
-    consumer = AIOKafkaConsumer(
-        "orders",
-        bootstrap_servers="kafka:9092",
-        group_id="order-processor",
-    )
-    await consumer.start()
-    try:
-        async for msg in consumer:
-            data = json.loads(msg.value)
-            print(f"Processing order: {data}")
-    finally:
-        await consumer.stop()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global producer
+    # プロデューサーを起動してapp.stateに格納
+    # yieldの後にstop
+    pass`,
+     answer:`@asynccontextmanager
+async def lifespan(app: FastAPI):
     producer = AIOKafkaProducer(
-        bootstrap_servers="kafka:9092"
+        bootstrap_servers='localhost:9092',
+        value_serializer=lambda v: json.dumps(v).encode()
     )
     await producer.start()
-    task = asyncio.create_task(consume_orders())
+    app.state.kafka_producer = producer
     yield
-    task.cancel()
-    await producer.stop()`
-  }, {
-    diff: 3,
-    q: "Outbox パターンを実装してください。\n注文の作成とイベントの記録を同一トランザクションで行い、別のバックグラウンドタスクがOutboxテーブルを読んでKafkaに送信します。\n\nポイント: トランザクション整合性、at-least-once delivery。",
-    code: `# OutboxEvent モデルと publish_outbox タスクを実装`,
-    answer: `# models/outbox.py
-from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
-from sqlalchemy import String, Text, Boolean
-from datetime import datetime
+    await producer.stop()
 
-class OutboxEvent(Base):
-    __tablename__ = "outbox_events"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    topic: Mapped[str] = mapped_column(String(100))
-    payload: Mapped[str] = mapped_column(Text)
-    published: Mapped[bool] = mapped_column(default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now()
-    )
+app = FastAPI(lifespan=lifespan)`},
+    {diff:3, q:"Kafkaコンシューマーグループを使って、order-eventsトピックを並列消費するWorkerクラスを実装してください。",
+     code:`from aiokafka import AIOKafkaConsumer
 
-# routers/orders.py
-@router.post("/orders", status_code=201)
-async def create_order(
-    body: OrderCreate,
-    db: AsyncSession = Depends(get_db),
-):
-    order = Order(**body.model_dump())
-    db.add(order)
-    event = OutboxEvent(
-        topic="orders",
-        payload=json.dumps({"order_id": order.id}),
-    )
-    db.add(event)
-    await db.flush()
-    return order
+class OrderEventWorker:
+    def __init__(self, group_id: str, num_workers: int): ...
+    async def start(self) -> None: ...
+    async def stop(self) -> None: ...`,
+     answer:`class OrderEventWorker:
+    def __init__(self, group_id: str, num_workers: int):
+        self.group_id = group_id
+        self.num_workers = num_workers
+        self._consumers: list[AIOKafkaConsumer] = []
 
-# tasks/outbox_publisher.py
-async def publish_outbox(session, producer):
-    stmt = select(OutboxEvent).where(
-        OutboxEvent.published == False
-    ).limit(100)
-    result = await session.execute(stmt)
-    for ev in result.scalars():
-        await producer.send_and_wait(
-            ev.topic, ev.payload.encode()
-        )
-        ev.published = True
-    await session.commit()`
-  }],
-  ch3: [{
-    diff: 2,
-    q: "scikit-learnモデルをlifespanでロードし、バッチ推論エンドポイントを実装してください。\n入力は最大100件のリストを受け取り、予測結果のリストを返すこと。\n\nポイント: lifespan でのモデルロード、Pydantic でのバリデーション。",
-    code: `# app/main.py + app/routers/predict.py
-# モデルはjoblib.load("model.pkl")で読み込む`,
-    answer: `import joblib
-import numpy as np
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
-
-ml_models = {}
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    ml_models["classifier"] = joblib.load("model.pkl")
-    yield
-    ml_models.clear()
-
-app = FastAPI(lifespan=lifespan)
-
-class PredictRequest(BaseModel):
-    features: list[list[float]] = Field(
-        max_length=100,
-        description="最大100件の特徴量リスト"
-    )
-
-class PredictResponse(BaseModel):
-    predictions: list[int]
-    probabilities: list[list[float]]
-
-@app.post("/predict", response_model=PredictResponse)
-async def predict(body: PredictRequest):
-    model = ml_models["classifier"]
-    X = np.array(body.features)
-    preds = model.predict(X).tolist()
-    probs = model.predict_proba(X).tolist()
-    return PredictResponse(
-        predictions=preds, probabilities=probs
-    )`
-  }, {
-    diff: 3,
-    q: "モデルバージョニングエンドポイントを実装してください。\n・GET /models → 利用可能なバージョン一覧\n・POST /models/{version}/predict → 指定バージョンで推論\n・PUT /models/active → アクティブバージョンを切り替え（ダウンタイムなし）\n\nポイント: 複数モデルの同時保持、スレッドセーフな切り替え。",
-    code: `# モデルレジストリと切り替えロジックを実装`,
-    answer: `import asyncio
-import joblib
-from fastapi import APIRouter, HTTPException
-
-router = APIRouter(prefix="/models", tags=["ml"])
-
-class ModelRegistry:
-    def __init__(self):
-        self._models: dict[str, object] = {}
-        self._active: str | None = None
-        self._lock = asyncio.Lock()
-
-    async def load(self, version: str, path: str):
-        import asyncio
-        loop = asyncio.get_event_loop()
-        model = await loop.run_in_executor(
-            None, joblib.load, path
-        )
-        async with self._lock:
-            self._models[version] = model
-
-    async def set_active(self, version: str):
-        if version not in self._models:
-            raise ValueError(f"{version} not loaded")
-        async with self._lock:
-            self._active = version
-
-    def predict(self, version: str, X):
-        model = self._models.get(version)
-        if not model:
-            raise HTTPException(404, "model not found")
-        return model.predict(X).tolist()
-
-registry = ModelRegistry()
-
-@router.get("")
-async def list_models():
-    return {"versions": list(registry._models.keys()),
-            "active": registry._active}
-
-@router.put("/active")
-async def set_active(version: str):
-    await registry.set_active(version)
-    return {"active": version}`
-  }],
-  ch4: [{
-    diff: 2,
-    q: "OpenTelemetry を FastAPI に統合し、全リクエストにトレースを付与してください。\nJaegerにOTLPでエクスポートすること。\n\nポイント: FastAPIInstrumentor, OTLPSpanExporter の設定。",
-    code: `# app/core/telemetry.py
-# pip install opentelemetry-sdk opentelemetry-instrumentation-fastapi`,
-    answer: `# app/core/telemetry.py
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import (
-    BatchSpanProcessor,
-)
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-    OTLPSpanExporter,
-)
-from opentelemetry.instrumentation.fastapi import (
-    FastAPIInstrumentor,
-)
-
-def setup_tracing(app, service_name: str, endpoint: str):
-    provider = TracerProvider()
-    exporter = OTLPSpanExporter(endpoint=endpoint)
-    provider.add_span_processor(
-        BatchSpanProcessor(exporter)
-    )
-    trace.set_tracer_provider(provider)
-    FastAPIInstrumentor.instrument_app(app)
-
-# app/main.py:
-# setup_tracing(
-#   app,
-#   service_name="my-fastapi",
-#   endpoint="http://jaeger:4317",
-# )`
-  }, {
-    diff: 2,
-    q: "structlog を設定し、リクエストIDとトレースIDをすべてのログに自動付与するミドルウェアを実装してください。\n\nポイント: structlog の contextvars、OpenTelemetry との連携。",
-    code: `# app/middleware/logging.py
-# request_id, trace_id を全ログに含める`,
-    answer: `import time
-import uuid
-import structlog
-from opentelemetry import trace
-from starlette.middleware.base import BaseHTTPMiddleware
-
-structlog.configure(
-    processors=[
-        structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.JSONRenderer(),
-    ],
-)
-
-logger = structlog.get_logger()
-
-class ObservabilityMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        request_id = str(uuid.uuid4())[:8]
-        span = trace.get_current_span()
-        trace_id = format(
-            span.get_span_context().trace_id, "032x"
-        )
-        structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(
-            request_id=request_id,
-            trace_id=trace_id,
-        )
-        start = time.perf_counter()
-        response = await call_next(request)
-        elapsed = time.perf_counter() - start
-        logger.info(
-            "request",
-            method=request.method,
-            path=request.url.path,
-            status=response.status_code,
-            duration_ms=round(elapsed * 1000, 2),
-        )
-        return response`
-  }],
-  ch5: [{
-    diff: 2,
-    q: "FastAPIアプリにグレースフルシャットダウンを実装してください。\nSIGTERMを受け取った際に、処理中のリクエストを完了させてから終了すること。\n\nポイント: lifespan でのシグナルハンドリング、asyncio.Event。",
-    code: `# app/main.py
-# SIGTERM で graceful shutdown`,
-    answer: `import asyncio
-import signal
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-
-shutdown_event = asyncio.Event()
-
-def handle_sigterm(*args):
-    shutdown_event.set()
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGTERM, handle_sigterm)
-    yield
-    # SIGTERMを受信したら最大30秒待機
-    try:
-        await asyncio.wait_for(
-            shutdown_event.wait(), timeout=30.0
-        )
-    except asyncio.TimeoutError:
-        pass
-
-app = FastAPI(lifespan=lifespan)
-
-@app.get("/health/live")
-def liveness():
-    return {"status": "alive"}
-
-@app.get("/health/ready")
-async def readiness():
-    if shutdown_event.is_set():
-        from fastapi import HTTPException
-        raise HTTPException(503, "shutting down")
-    return {"status": "ready"}`
-  }, {
-    diff: 3,
-    q: "Kubernetes HPA 用にカスタムメトリクスを公開してください。\nPrometheusで /metrics を公開し、「キュー内の待機リクエスト数」をゲージで記録すること。\n\nポイント: prometheus_client, カスタムゲージメトリクス。",
-    code: `# app/metrics.py + app/routers/metrics.py`,
-    answer: `# app/metrics.py
-from prometheus_client import (
-    Gauge, Counter, Histogram, generate_latest
-)
-
-QUEUE_DEPTH = Gauge(
-    "app_queue_depth",
-    "Number of requests waiting in queue",
-)
-REQUEST_COUNT = Counter(
-    "app_requests_total",
-    "Total requests",
-    ["method", "path", "status"],
-)
-REQUEST_DURATION = Histogram(
-    "app_request_duration_seconds",
-    "Request duration",
-    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 5.0],
-)
-
-# app/routers/metrics.py
-from fastapi import APIRouter
-from fastapi.responses import Response
-from app.metrics import generate_latest
-
-router = APIRouter()
-
-@router.get("/metrics", include_in_schema=False)
-def metrics():
-    return Response(
-        content=generate_latest(),
-        media_type="text/plain; version=0.0.4",
-    )
-
-# HPA manifest (概要):
-# metrics:
-# - type: External
-#   external:
-#     metric:
-#       name: app_queue_depth
-#     target:
-#       type: Value
-#       value: "10"`
-  }],
-  ch6: [{
-    diff: 2,
-    q: "slowapi を使ってレート制限を実装してください。\n・認証済みユーザ: 1000リクエスト/分\n・未認証ユーザ: 60リクエスト/分\n・制限超過時は429 + Retry-Afterヘッダを返す\n\nポイント: slowapi の key_func、カスタムエラーハンドラ。",
-    code: `# app/core/rate_limit.py
-# pip install slowapi`,
-    answer: `from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from fastapi import FastAPI, Request
-
-def get_user_key(request: Request) -> str:
-    # JWTがあればユーザIDを、なければIPを使う
-    token = request.headers.get("Authorization")
-    if token:
-        # decode して user_id を返す実装
-        return f"user:{token[:20]}"
-    return get_remote_address(request)
-
-limiter = Limiter(key_func=get_user_key)
-
-def setup_rate_limit(app: FastAPI):
-    app.state.limiter = limiter
-    app.add_exception_handler(
-        RateLimitExceeded,
-        _rate_limit_exceeded_handler
-    )
-
-# 使用例:
-# @router.get("/items")
-# @limiter.limit("60/minute")  # 未認証
-# async def list_items(request: Request): ...`
-  }, {
-    diff: 3,
-    q: "AWS Secrets Manager から秘密情報を取得し、FastAPIのSettingsにキャッシュする仕組みを実装してください。\n・起動時に一度だけ取得\n・TTL付きキャッシュ（1時間ごとに再取得）\n\nポイント: aioboto3、TTLキャッシュ、lifespan統合。",
-    code: `# app/core/secrets.py
-# pip install aioboto3`,
-    answer: `import json
-import time
-import aioboto3
-from functools import lru_cache
-
-_cache: dict = {}
-_cache_time: float = 0
-CACHE_TTL = 3600  # 1時間
-
-async def get_secret(secret_name: str) -> dict:
-    global _cache, _cache_time
-    now = time.time()
-    if _cache and (now - _cache_time) < CACHE_TTL:
-        return _cache
-
-    session = aioboto3.Session()
-    async with session.client(
-        "secretsmanager",
-        region_name="ap-northeast-1"
-    ) as client:
-        resp = await client.get_secret_value(
-            SecretId=secret_name
-        )
-        _cache = json.loads(resp["SecretString"])
-        _cache_time = now
-        return _cache
-
-# lifespan での使用:
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     secrets = await get_secret("prod/myapp")
-#     settings.SECRET_KEY = secrets["SECRET_KEY"]
-#     settings.DB_PASSWORD = secrets["DB_PASSWORD"]
-#     yield`
-  }],
-  ch7: [{
-    diff: 2,
-    q: "FastAPIアプリのマルチステージDockerfileを書いてください。\n・ステージ1でpipインストール\n・ステージ2は最小イメージ・非rootユーザ\n・ヘルスチェック命令を含める\n\nポイント: レイヤーキャッシュ、イメージサイズ削減、セキュリティ。",
-    code: `# Dockerfile (マルチステージ)`,
-    answer: `# Dockerfile
-FROM python:3.12-slim AS builder
-WORKDIR /build
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir --prefix=/install .
-
-FROM python:3.12-slim AS runtime
-RUN groupadd -r app && useradd -r -g app app
-WORKDIR /app
-COPY --from=builder /install /usr/local
-COPY ./app ./app
-
-HEALTHCHECK --interval=30s --timeout=5s \\
-  --start-period=10s --retries=3 \\
-  CMD python -c "import urllib.request; \\
-    urllib.request.urlopen('http://localhost:8000/health')"
-
-USER app
-EXPOSE 8000
-CMD ["gunicorn", "app.main:app", \\
-     "-k", "uvicorn.workers.UvicornWorker", \\
-     "-c", "gunicorn.conf.py"]`
-  }, {
-    diff: 3,
-    q: "GitHub Actions CI/CD パイプラインを実装してください。\n・ruff lint → pytest → docker build → ECRプッシュ → helmアップグレード\n・mainブランチへのpush時のみデプロイ\n\nポイント: ジョブ間の依存、OIDC認証、Helm。",
-    code: `# .github/workflows/ci-cd.yml`,
-    answer: `# .github/workflows/ci-cd.yml
-name: CI/CD
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  lint-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install -e ".[dev]"
-      - run: ruff check .
-      - run: pytest -v --tb=short
-
-  build-push:
-    needs: lint-test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ap-northeast-1
-      - run: |
-          aws ecr get-login-password | docker login \\
-            --username AWS \\
-            --password-stdin ${{ secrets.ECR_REGISTRY }}
-          docker build -t ${{ secrets.ECR_REGISTRY }}/myapp:${{ github.sha }} .
-          docker push ${{ secrets.ECR_REGISTRY }}/myapp:${{ github.sha }}
-
-  deploy:
-    needs: build-push
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: |
-          helm upgrade --install myapp ./helm/myapp \\
-            --set image.tag=${{ github.sha }} \\
-            --namespace production --wait`
-  }],
-  ch8: [{
-    diff: 2,
-    q: "orjsonを使ってJSONシリアライズを高速化し、ORJSONResponseをデフォルトレスポンスクラスにしてください。\nカスタムエンコーダ（datetimeをISO8601）も追加すること。\n\nポイント: ORJSONResponse、default_response_class。",
-    code: `# app/main.py
-# pip install orjson`,
-    answer: `import orjson
-from datetime import datetime
-from fastapi import FastAPI
-from fastapi.responses import ORJSONResponse
-
-def default_encoder(obj):
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    raise TypeError(f"Not serializable: {type(obj)}")
-
-class CustomORJSONResponse(ORJSONResponse):
-    def render(self, content) -> bytes:
-        return orjson.dumps(
-            content,
-            default=default_encoder,
-            option=(
-                orjson.OPT_NON_STR_KEYS |
-                orjson.OPT_SERIALIZE_NUMPY
-            ),
-        )
-
-app = FastAPI(
-    default_response_class=CustomORJSONResponse
-)
-
-# ベンチマーク比較（参考値）:
-# json: ~2.0ms for 10k items
-# orjson: ~0.3ms for 10k items (約7倍高速)`
-  }, {
-    diff: 3,
-    q: "py-spy を使って本番環境のFastAPIプロセスをプロファイリングし、ホットスポットを特定する手順を書いてください。\nasyncpg を使った生SQLクエリとSQLAlchemy ORMの速度比較コードも示すこと。\n\nポイント: py-spy のオーバーヘッドなし計測、asyncpg vs ORM。",
-    code: `# プロファイリング手順 + asyncpg vs ORM 比較`,
-    answer: `# 1. py-spy でプロファイル（本番プロセスに対して）
-# pip install py-spy
-# sudo py-spy top --pid $(pgrep -f uvicorn)
-# sudo py-spy record -o profile.svg --pid $(pgrep -f uvicorn)
-
-# 2. asyncpg (生SQL) vs SQLAlchemy ORM 比較
-import asyncpg
-import time
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from app.models.todo import Todo
-
-# asyncpg 生SQL（最速）
-async def fetch_todos_raw(conn: asyncpg.Connection):
-    return await conn.fetch(
-        "SELECT id, title, is_done FROM todos LIMIT 1000"
-    )
-
-# SQLAlchemy ORM（使いやすいが若干オーバーヘッド）
-async def fetch_todos_orm(db: AsyncSession):
-    result = await db.execute(
-        select(Todo).limit(1000)
-    )
-    return result.scalars().all()
-
-# asyncpg: ~5ms / 1000件
-# SQLAlchemy ORM: ~15ms / 1000件
-# 差異: ORMのオブジェクト生成コスト
-
-# 3. uvloop で更に高速化
-# pip install uvloop
-# import uvloop
-# uvloop.install()  # main.py の先頭で`
-  }]
-};
-
-/* ── Chapter data ── */
-const chapters = [{
-  id: "ch1",
-  num: 1,
-  title: "マイクロサービスアーキテクチャ",
-  est: "65分",
-  goal: "モノリスをマイクロサービスに分割する戦略とトレードオフを理解し、API Gateway・サービス間通信（httpx/gRPC）・Circuit Breaker パターンを FastAPI で実装できるようになる。",
-  sections: [{
-    title: "サービス分割戦略とトレードオフ",
-    body: "マイクロサービスアーキテクチャは、大きなアプリケーションを「独立してデプロイ可能な小さなサービス」に分割するアプローチです。各サービスはビジネスドメインに沿って分割し、自身のデータストアを持ちます。これにより、チームが独立して開発・デプロイできる組織スケーラビリティが生まれます。\n\n一方でトレードオフも明確です。分散システムの複雑性（ネットワーク遅延、部分的障害）、運用コストの増加、分散トランザクションの難しさが生じます。ドメイン境界が明確になる前に早期に分割すると「分散モノリス」になるリスクがあります。モノリスから始めて、必要に応じて段階的に分割するストラテジー・ファーストアプローチが実務では主流です。",
-    table: T.serviceDecomposition,
-    afterTable: "API Gatewayは全サービスへの単一入口として機能し、認証・ロギング・レート制限を集中管理します。Kong や Traefik が広く使われています。FastAPI で簡易的な API Gateway を実装することも可能ですが、本番ではOSSの専用ツールを選ぶのが無難です。"
-  }, {
-    title: "サービス間通信: httpx と gRPC",
-    body: "マイクロサービス間の通信には REST（HTTP/JSON）と gRPC（HTTP/2 + Protocol Buffers）の2択が主流です。REST は理解しやすく既存のツールと相性が良い一方、gRPC はバイナリプロトコルによる高速性と強い型定義が特長です。同期呼び出しが多い内部通信には gRPC、外部公開 API には REST というハイブリッド構成がよく見られます。\n\nFastAPI から他サービスを呼ぶには httpx.AsyncClient を使います。セッションの作成・破棄コストを避けるため、アプリ全体で AsyncClient のインスタンスを共有する「クライアントシングルトン」パターンが推奨されます。",
-    code: `# app/core/http_client.py
-import httpx
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-
-http_client: httpx.AsyncClient | None = None
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global http_client
-    http_client = httpx.AsyncClient(
-        timeout=httpx.Timeout(5.0),
-        limits=httpx.Limits(
-            max_connections=100,
-            max_keepalive_connections=20,
-        ),
-    )
-    yield
-    await http_client.aclose()
-
-app = FastAPI(lifespan=lifespan)`,
-    afterCode: "ポイント: Limits でコネクションプールを設定することで、外部サービスへの接続数を制御できます。設定しないとコネクションが無制限に張られ、外部サービスに負荷をかける恐れがあります。"
-  }, {
-    title: "Circuit Breaker パターン",
-    body: "マイクロサービス環境では、1つのサービス障害が連鎖してシステム全体がダウンする「カスケード障害」が起きやすいです。Circuit Breaker パターンはこれを防ぐために、障害を検知したら一定時間リクエストを遮断し、依存サービスの回復を待つ仕組みです。\n\ntenacity ライブラリを使うとリトライとバックオフを組み合わせた耐障害性パターンを簡単に実装できます。Circuit Breaker の状態（Closed/Open/Half-Open）を管理し、障害時にはフォールバック処理（キャッシュ値を返す・デフォルト値を返すなど）も設計しておきましょう。",
-    table: T.circuitBreaker,
-    afterTable: "実務では Circuit Breaker の状態を Redis に保存し、複数のワーカープロセス間で共有するのが一般的です。tenacity の CircuitBreaker はシングルプロセス向けなので、分散環境では circuitbreaker ライブラリや自前実装を検討してください。"
-  }]
-}, {
-  id: "ch2",
-  num: 2,
-  title: "イベント駆動アーキテクチャ",
-  est: "65分",
-  goal: "Apache Kafka と RabbitMQ の使い分けを理解し、aiokafka/aio-pika を使った非同期メッセージングを FastAPI に統合できる。Outbox パターンと Saga パターンを用いて分散トランザクションの整合性を確保する設計ができるようになる。",
-  sections: [{
-    title: "Kafka の基本概念と aiokafka",
-    body: "Apache Kafka はリアルタイムデータパイプラインとストリーミング処理のための分散メッセージングシステムです。メッセージを「トピック」に発行し、複数のコンシューマグループが独立して読み取れる「pub/sub」モデルを採用しています。RabbitMQ との最大の違いは、メッセージが消費後も一定期間（デフォルト7日）保持されるため、コンシューマの過去の位置（オフセット）から再処理できる点です。\n\n注文イベント、在庫変更、ユーザアクションなど「後から再処理したい」「複数のコンシューマが独立して処理したい」ユースケースに向いています。一方 RabbitMQ は「キューに溜まったタスクを1つのワーカーが処理する」ジョブキュー用途に適しています。",
-    table: T.kafkaConcepts,
-    afterTable: "aiokafka は asyncio ネイティブの Kafka クライアントです。Producer・Consumer ともに FastAPI の lifespan で起動・停止を管理するのがベストプラクティスです。Consumer は asyncio.create_task() でバックグラウンドタスクとして動かします。"
-  }, {
-    title: "Outbox パターン",
-    body: "マイクロサービスで「DBに保存すると同時にイベントを発行する」という操作は、2フェーズコミット（2PC）なしには原子性を保証できません。例えば注文をDBに保存後にKafkaへ発行しようとしたとき、Kafkaへの送信が失敗すると「DBには注文があるがイベントは未発行」という不整合が起きます。\n\nOutbox パターンはこれを解決します。メインのDBトランザクション内にOutboxテーブルへのイベント記録を含め、別のバックグラウンドタスクがOutboxを読んでKafkaに送信します。送信成功後にフラグを立てることで、at-least-once delivery（少なくとも1回は届く）を保証できます。",
-    code: `# Outbox パターンの構成
-# 1. 注文作成 + Outbox記録（同一トランザクション）
-async def create_order_with_event(
-    body: OrderCreate, db: AsyncSession
-):
-    order = Order(**body.model_dump())
-    db.add(order)
-    await db.flush()  # IDを取得
-
-    event = OutboxEvent(
-        topic="orders.created",
-        payload=json.dumps({
-            "order_id": order.id,
-            "user_id": order.user_id,
-        }),
-    )
-    db.add(event)
-    # db.commit() は get_db が行う
-
-# 2. Outbox Publisher（バックグラウンドタスク）
-async def outbox_publisher(db_factory, producer):
-    while True:
-        async with db_factory() as db:
-            stmt = (
-                select(OutboxEvent)
-                .where(OutboxEvent.published == False)
-                .limit(10).with_for_update(skip_locked=True)
+    async def start(self) -> None:
+        for _ in range(self.num_workers):
+            consumer = AIOKafkaConsumer(
+                "order-events",
+                bootstrap_servers="localhost:9092",
+                group_id=self.group_id,
             )
-            events = (await db.execute(stmt)).scalars()
-            for ev in events:
-                await producer.send_and_wait(
-                    ev.topic, ev.payload.encode()
-                )
-                ev.published = True
-            await db.commit()
-        await asyncio.sleep(1)`,
-    afterCode: "ポイント: with_for_update(skip_locked=True) で複数のPublisherが同じイベントを処理しないようにします。コンシューマ側での冪等性（同じメッセージを2回処理しても副作用がない）も合わせて設計しておきましょう。"
-  }, {
-    title: "Saga パターン",
-    body: "分散トランザクション（複数のサービスにまたがる一連の操作）を管理するパターンが Saga です。例えば「注文 → 在庫引き当て → 決済 → 配送」という4ステップがあり、途中で失敗した場合に「補償トランザクション（Compensating Transaction）」でロールバックします。\n\nCoreography（振り付け）方式では各サービスがイベントを受け取って次の処理を実行し、失敗時は補償イベントを発行します。Orchestration（指揮）方式では中央の Saga Orchestrator がステップを管理します。Choreography はサービス間の結合度が低い一方、全体フローの把握が難しい。Orchestration は管理しやすいが、Orchestrator への依存が生まれます。",
-    table: T.sagaPatterns,
-    afterTable: "Saga パターンの補償トランザクションは「取り消し可能」「再試行可能」「無視可能」の3種類に分類されます。決済のキャンセルは補償が必要ですが、ログの記録は失敗しても無視できます。補償ロジックの設計が Saga 実装の核心部分です。"
-  }]
-}, {
-  id: "ch3",
-  num: 3,
-  title: "MLモデルサービング",
-  est: "65分",
-  goal: "機械学習モデルを FastAPI で本番サービングするための実装パターン（lifespan でのロード・バッチ推論・モデルバージョニング）を習得する。GPU 割り当てと asyncio の関係を理解し、スループットを最大化する設計ができるようになる。",
-  sections: [{
-    title: "lifespan によるモデルロード戦略",
-    body: "MLモデルを FastAPI でサービングする際、最も重要な設計判断の一つが「いつモデルをロードするか」です。FastAPI の lifespan（コンテキストマネージャ）を使うことで、アプリケーション起動時に一度だけモデルをロードし、全リクエストで共有できます。これにより1リクエストごとのロードコスト（ディスクI/O・メモリ確保）を回避できます。\n\nlarge な LLM や深層学習モデルは GPU メモリに乗るまで数秒〜数十秒かかります。lifespan でロードしておけば、最初のリクエストを受ける前に準備が完了します。Kubernetes の readiness probe と組み合わせることで、モデルロード中のポッドにはトラフィックが流れないようにできます。",
-    table: T.mlLoadStrategy,
-    code: `# app/core/model_store.py
-import asyncio
-import joblib
-from pathlib import Path
+            await consumer.start()
+            self._consumers.append(consumer)
+            asyncio.create_task(self._consume(consumer))
 
-_models: dict[str, object] = {}
+    async def _consume(self, consumer):
+        async for msg in consumer:
+            data = json.loads(msg.value)
+            await self._handle(data)
 
-async def load_model(name: str, path: Path):
-    loop = asyncio.get_event_loop()
-    # CPUバウンドなロードはrun_in_executorで
-    model = await loop.run_in_executor(
-        None, joblib.load, path
-    )
-    _models[name] = model
+    async def stop(self):
+        for c in self._consumers:
+            await c.stop()`}
+  ],
+  ch4: [
+    {diff:2, q:"FastAPIのエンドポイントからTorchServeの推論APIにHTTPリクエストを送るクライアント関数を実装してください。",
+     code:`import httpx
+from fastapi import FastAPI
+
+async def predict_with_torchserve(
+    model_name: str, payload: dict
+) -> dict:
+    # TorchServeのREST API (http://localhost:8080/predictions/{model_name})
+    # にPOSTしてレスポンスを返す`,
+     answer:`async def predict_with_torchserve(
+    model_name: str, payload: dict
+) -> dict:
+    url = f"http://localhost:8080/predictions/{model_name}"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()`},
+    {diff:3, q:"モデル推論エンドポイントにリクエストキューイングを実装し、同時実行数を制限してください（asyncio.Semaphoreを使用）。",
+     code:`import asyncio
+from fastapi import FastAPI, HTTPException
+
+MAX_CONCURRENT = 4
+semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+
+@app.post("/predict")
+async def predict(payload: dict):
+    # semaphoreで同時実行数を制限
+    # タイムアウト付きで取得できなければ503を返す`,
+     answer:`@app.post("/predict")
+async def predict(payload: dict):
+    try:
+        await asyncio.wait_for(semaphore.acquire(), timeout=5.0)
+    except asyncio.TimeoutError:
+        raise HTTPException(503, "サービスが混雑しています。しばらく後に再試行してください。")
+    try:
+        result = await predict_with_torchserve("my_model", payload)
+        return result
+    finally:
+        semaphore.release()`}
+  ],
+  ch5: [
+    {diff:2, q:"MangumでFastAPIアプリをAWS Lambda用にラップし、SAMテンプレートの最小構成を書いてください。",
+     code:`# app.py
+from fastapi import FastAPI
+from mangum import Mangum
+
+app = FastAPI()
+
+@app.get("/")
+def root():
+    return {"hello": "world"}
+
+# LambdaハンドラーをMangumで作成
+handler = ...`,
+     answer:`# app.py
+from fastapi import FastAPI
+from mangum import Mangum
+
+app = FastAPI(root_path="/prod")  # API Gatewayのステージ名
+
+@app.get("/")
+def root():
+    return {"hello": "world"}
+
+handler = Mangum(app, lifespan="off")
+
+# template.yaml (SAM)
+# Resources:
+#   FastAPIFunction:
+#     Type: AWS::Serverless::Function
+#     Properties:
+#       Handler: app.handler
+#       Runtime: python3.12
+#       Events:
+#         Api: {Type: Api, Properties: {Path: "/{proxy+}", Method: ANY}}`},
+    {diff:3, q:"Lambda関数のコールドスタートを削減するため、グローバルスコープで初期化すべきリソースと、ハンドラ内で初期化すべきリソースを分けて実装してください。",
+     code:`import boto3
+from fastapi import FastAPI
+
+# グローバルスコープ (コールドスタート時のみ実行)
+# ハンドラスコープ (毎リクエスト実行)`,
+     answer:`import boto3
+import json
+from mangum import Mangum
+from fastapi import FastAPI
+
+# グローバルスコープ: 初期化コストが高いが再利用できるもの
+app = FastAPI()
+s3_client = boto3.client("s3")      # 接続を再利用
+_model_cache = {}                    # モデルをキャッシュ
 
 def get_model(name: str):
-    if name not in _models:
-        raise KeyError(f"Model '{name}' not loaded")
-    return _models[name]`,
-    afterCode: "注意: joblib.load や torch.load は CPUバウンド処理なので、asyncio のイベントループをブロックします。必ず run_in_executor() でスレッドプールで実行してください。GPU上での推論はGILの外で動くため asyncio とは比較的相性が良いですが、バッチサイズの最適化が重要です。"
-  }, {
-    title: "バッチ推論 API の設計",
-    body: "単一サンプルをリクエストごとに推論するよりも、複数サンプルをまとめてバッチ推論する方がスループットが高くなります。特に GPU を使う場合、バッチサイズを増やすほど GPU 並列処理の効率が上がります。一方でバッチが大きすぎるとレイテンシが増加し、メモリも圧迫します。\n\nバッチ推論 API では入力の最大件数を Pydantic の Field で制限し、NumPy 配列への変換をエンドポイント内で行います。asyncio.to_thread() を使うと、推論処理をスレッドプールで実行しながらイベントループをブロックしないようにできます。",
-    code: `import asyncio
-import numpy as np
-from fastapi import APIRouter
-from pydantic import BaseModel, Field
-from app.core.model_store import get_model
+    if name not in _model_cache:
+        # 初回のみS3からダウンロード
+        _model_cache[name] = load_model_from_s3(name)
+    return _model_cache[name]
 
-router = APIRouter()
+@app.post("/predict/{model_name}")
+async def predict(model_name: str, data: dict):
+    model = get_model(model_name)  # キャッシュから取得
+    return {"result": model.predict(data)}
 
-class BatchRequest(BaseModel):
-    features: list[list[float]] = Field(
-        max_length=100
-    )
+handler = Mangum(app)`}
+  ],
+  ch6: [
+    {diff:2, q:"Nginxをリバースプロキシとして使い、FastAPIに転送する最小限のnginx.confを書いてください。upstream設定とlocation設定を含めてください。",
+     code:`# /etc/nginx/conf.d/fastapi.conf
+upstream fastapi_backend {
+    # FastAPIが8000番でリッスン、3インスタンス
+}
 
-@router.post("/predict/batch")
-async def batch_predict(body: BatchRequest):
-    model = get_model("classifier")
-    X = np.array(body.features)
+server {
+    listen 80;
+    # location / の設定
+}`,
+     answer:`upstream fastapi_backend {
+    server 127.0.0.1:8000;
+    server 127.0.0.1:8001;
+    server 127.0.0.1:8002;
+    keepalive 32;
+}
 
-    # 推論はスレッドプールで実行
-    predictions = await asyncio.to_thread(
-        model.predict, X
-    )
-    probabilities = await asyncio.to_thread(
-        model.predict_proba, X
-    )
-    return {
-        "predictions": predictions.tolist(),
-        "probabilities": probabilities.tolist(),
-        "batch_size": len(body.features),
-    }`,
-    afterCode: "ポイント: asyncio.to_thread() は Python 3.9+ で使えます。内部的に loop.run_in_executor(None, ...) と同じです。GPU推論の場合は torch.inference_mode() コンテキストを必ず使い、grad計算を無効化してメモリと速度を最適化しましょう。"
-  }]
-}, {
-  id: "ch4",
-  num: 4,
-  title: "可観測性（Observability）",
-  est: "60分",
-  goal: "OpenTelemetry のトレーシング・メトリクス・ログの三本柱を FastAPI に統合し、Prometheus + Grafana でダッシュボードを構築できる。structlog で構造化ログを出力し、障害発生時の原因調査ができる可観測性基盤を構築できるようになる。",
-  sections: [{
-    title: "OpenTelemetry トレーシング",
-    body: "可観測性（Observability）とは、システムの外部出力（ログ・メトリクス・トレース）からシステムの内部状態を推測できることです。マイクロサービスでは1つのリクエストが複数のサービスをまたぐため、「どのサービスのどの処理が遅いのか」をトレースなしに把握することは非常に困難です。\n\nOpenTelemetry（OTel）は CNCF が標準化したテレメトリ収集のフレームワークで、ベンダー非依存の API・SDK を提供しています。FastAPIInstrumentor を使えば、全エンドポイントへのトレースを自動的に付与できます。Jaeger や Zipkin、Datadog など複数のバックエンドに同じコードでエクスポートできるのが最大のメリットです。",
-    table: T.otelComponents,
-    code: `# app/core/telemetry.py
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-    OTLPSpanExporter,
-)
-from opentelemetry.instrumentation.fastapi import (
-    FastAPIInstrumentor,
-)
-from opentelemetry.instrumentation.sqlalchemy import (
-    SQLAlchemyInstrumentor,
-)
+server {
+    listen 80;
+    server_name api.example.com;
 
-def setup_tracing(app, service_name: str):
-    provider = TracerProvider()
-    exporter = OTLPSpanExporter(
-        endpoint="http://otel-collector:4317"
-    )
-    provider.add_span_processor(
-        BatchSpanProcessor(exporter)
-    )
-    trace.set_tracer_provider(provider)
-    FastAPIInstrumentor.instrument_app(app)
-    SQLAlchemyInstrumentor().instrument(
-        engine=engine
-    )`,
-    afterCode: "ポイント: SQLAlchemyInstrumentor を追加すると、全SQLクエリにもスパンが付きます。N+1クエリやスロークエリの発見に役立ちます。本番では BatchSpanProcessor を使い、スパンをバッファリングしてからまとめてエクスポートしてください。"
-  }, {
-    title: "Prometheus メトリクスと Grafana",
-    body: "トレースが「個別リクエストの詳細」を記録するのに対し、メトリクスは「集計値の時系列データ」を記録します。エラー率・レイテンシのパーセンタイル（p50/p95/p99）・スループット（RPS）の3指標は「SLO（サービスレベル目標）」の基本セットです。\n\nPrometheus は prometheus_client ライブラリで Python から簡単に統合できます。FastAPI ミドルウェアでリクエストごとに Counter・Histogram を更新し、/metrics エンドポイントで公開します。Grafana でダッシュボードを作成し、アラートを設定することで、SLO 違反を事前に検知できる監視体制が構築できます。",
-    code: `# app/middleware/metrics.py
+    location / {
+        proxy_pass http://fastapi_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";  # keepaliveのため
+    }
+}`},
+    {diff:3, q:"FastAPIにAPI Gatewayとしての機能を持たせるミドルウェアを実装してください。レートリミット（IPごとに1分間60リクエスト）を実装してください。",
+     code:`from starlette.middleware.base import BaseHTTPMiddleware
+from collections import defaultdict
 import time
-from prometheus_client import Counter, Histogram
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, max_requests=60, window=60):
+        super().__init__(app)
+        # カウンターとウィンドウの管理
+
+    async def dispatch(self, request, call_next):
+        # IPを取得してレートチェック`,
+     answer:`from starlette.middleware.base import BaseHTTPMiddleware
+from collections import defaultdict
+import time
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, max_requests=60, window=60):
+        super().__init__(app)
+        self.max_requests = max_requests
+        self.window = window
+        self.requests: dict[str, list[float]] = defaultdict(list)
+
+    async def dispatch(self, request, call_next):
+        ip = request.client.host
+        now = time.time()
+        # 古いリクエストを削除
+        self.requests[ip] = [t for t in self.requests[ip] if now - t < self.window]
+        if len(self.requests[ip]) >= self.max_requests:
+            from starlette.responses import JSONResponse
+            return JSONResponse({"detail":"Rate limit exceeded"}, status_code=429)
+        self.requests[ip].append(now)
+        return await call_next(request)`}
+  ],
+  ch7: [
+    {diff:2, q:"FastAPIにプラグインシステムを実装してください。Pluginプロトコルクラスを定義し、PluginManagerでプラグインを動的に登録・実行できるようにしてください。",
+     code:`from typing import Protocol
+from fastapi import FastAPI
+
+class Plugin(Protocol):
+    name: str
+    async def on_startup(self, app: FastAPI) -> None: ...
+    async def on_request(self, request, call_next): ...
+
+class PluginManager:
+    def register(self, plugin: Plugin) -> None: ...
+    async def run_startup(self, app: FastAPI) -> None: ...`,
+     answer:`from typing import Protocol
+from fastapi import FastAPI
+
+class Plugin(Protocol):
+    name: str
+    async def on_startup(self, app: FastAPI) -> None: ...
+    async def on_request(self, request, call_next): ...
+
+class PluginManager:
+    def __init__(self):
+        self._plugins: list[Plugin] = []
+
+    def register(self, plugin: Plugin) -> None:
+        self._plugins.append(plugin)
+        print(f"Plugin registered: {plugin.name}")
+
+    async def run_startup(self, app: FastAPI) -> None:
+        for plugin in self._plugins:
+            await plugin.on_startup(app)
+
+plugin_manager = PluginManager()
+
+class LoggingPlugin:
+    name = "logging"
+    async def on_startup(self, app): print("Logging plugin started")
+    async def on_request(self, request, call_next):
+        print(f"Request: {request.method} {request.url}")
+        return await call_next(request)`},
+    {diff:3, q:"依存性注入コンテナをFastAPIと統合してください。サービスのライフサイクル（singleton/transient）を管理できるContainerクラスを実装してください。",
+     code:`from typing import TypeVar, Type, Callable
+T = TypeVar('T')
+
+class Container:
+    def register_singleton(self, interface: Type[T], factory: Callable[[], T]) -> None: ...
+    def register_transient(self, interface: Type[T], factory: Callable[[], T]) -> None: ...
+    def resolve(self, interface: Type[T]) -> T: ...`,
+     answer:`class Container:
+    def __init__(self):
+        self._singletons: dict = {}
+        self._transients: dict = {}
+        self._instances: dict = {}
+
+    def register_singleton(self, interface, factory):
+        self._singletons[interface] = factory
+
+    def register_transient(self, interface, factory):
+        self._transients[interface] = factory
+
+    def resolve(self, interface):
+        if interface in self._singletons:
+            if interface not in self._instances:
+                self._instances[interface] = self._singletons[interface]()
+            return self._instances[interface]
+        if interface in self._transients:
+            return self._transients[interface]()
+        raise KeyError(f"Not registered: {interface}")
+
+container = Container()
+# 使用例
+# container.register_singleton(DatabaseService, lambda: DatabaseService(url))
+# db = container.resolve(DatabaseService)`}
+  ],
+  ch8: [
+    {diff:2, q:"cProfileとsnakevizを使ってFastAPIエンドポイントのプロファイリングを行うためのミドルウェアを実装してください。",
+     code:`import cProfile, pstats, io
 from starlette.middleware.base import BaseHTTPMiddleware
 
-REQUESTS = Counter(
-    "http_requests_total",
-    "Total HTTP requests",
-    ["method", "path", "status"],
-)
-DURATION = Histogram(
-    "http_request_duration_seconds",
-    "HTTP request duration",
-    ["method", "path"],
-    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 5.0],
-)
+class ProfilingMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, profile_path: str = "/profile"):
+        # /profileへのリクエストのみプロファイリング
+        pass`,
+     answer:`import cProfile, pstats, io
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import PlainTextResponse
 
-EXCLUDE_PATHS = {"/metrics", "/health"}
+class ProfilingMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, profile_path="/profile"):
+        super().__init__(app)
+        self.profile_path = profile_path
 
-class MetricsMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        if request.url.path in EXCLUDE_PATHS:
+        if not request.url.path.startswith(self.profile_path):
             return await call_next(request)
-        start = time.perf_counter()
+        profiler = cProfile.Profile()
+        profiler.enable()
         response = await call_next(request)
-        duration = time.perf_counter() - start
-        REQUESTS.labels(
-            request.method,
-            request.url.path,
-            response.status_code,
-        ).inc()
-        DURATION.labels(
-            request.method, request.url.path
-        ).observe(duration)
-        return response`,
-    afterCode: "Grafanaダッシュボードの定番クエリ例: エラー率 = rate(http_requests_total{status=~'5..'}[5m]) / rate(http_requests_total[5m])、p99レイテンシ = histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))"
-  }]
-}, {
-  id: "ch5",
-  num: 5,
-  title: "高可用性とスケーリング",
-  est: "60分",
-  goal: "Gunicorn + Uvicorn のマルチワーカー構成を理解し、Kubernetes HPA による自動スケーリングを設定できる。グレースフルシャットダウンとヘルスチェックを実装し、ダウンタイムなしのデプロイメントを実現できるようになる。",
-  sections: [{
-    title: "Gunicorn + Uvicorn マルチワーカー",
-    body: "Python の GIL（Global Interpreter Lock）により、1つのプロセスでは同時にCPU処理を行えるスレッドは1つだけです。CPUバウンドな処理のスケールには「マルチプロセス」が必要です。Gunicorn を「プロセスマネージャ」として使い、各ワーカープロセスで Uvicorn を動かすのが本番環境の標準構成です。\n\nUvicornWorker を Gunicorn のワーカークラスとして使うことで、各プロセスが asyncio で I/O 多重化を行いながら、プロセス単位での並列処理も実現できます。ワーカー数は「CPUコア数 × 2 + 1」が一般的な出発点ですが、I/O 待ち時間の多い API はそれ以上に増やせる場合もあります。",
-    code: `# gunicorn.conf.py
+        profiler.disable()
+        sio = io.StringIO()
+        ps = pstats.Stats(profiler, stream=sio).sort_stats("cumulative")
+        ps.print_stats(20)
+        return PlainTextResponse(sio.getvalue())`},
+    {diff:3, q:"uvicornをGunicornワーカーとして起動し、本番環境に最適化された設定を記述してください。CPUコア数に基づいてワーカー数を自動計算してください。",
+     code:`# gunicorn_config.py
+import multiprocessing
+
+# ワーカー数: (CPUコア数 * 2) + 1 が目安
+workers = ...
+worker_class = ...
+# その他の本番設定`,
+     answer:`# gunicorn_config.py
 import multiprocessing
 
 workers = multiprocessing.cpu_count() * 2 + 1
 worker_class = "uvicorn.workers.UvicornWorker"
 bind = "0.0.0.0:8000"
-timeout = 120
-graceful_timeout = 30
+timeout = 30
 keepalive = 5
+max_requests = 1000        # ワーカーのメモリリーク対策
+max_requests_jitter = 100  # 同時再起動を防ぐランダム幅
+preload_app = True         # フォーク前にアプリをロード（メモリ共有）
 accesslog = "-"
 errorlog = "-"
 loglevel = "info"
 
 # 起動コマンド:
-# gunicorn app.main:app -c gunicorn.conf.py
+# gunicorn -c gunicorn_config.py app:app`}
+  ],
+};
 
-# Dockerfile CMD:
-# CMD ["gunicorn", "app.main:app",
-#      "-c", "gunicorn.conf.py"]`,
-    afterCode: "注意: --preload オプションを使うとワーカーフォーク前にアプリをロードするため、モデルのメモリをCOW（Copy-on-Write）で共有できます。MLサービングでは特に効果的ですが、lifespan との相性確認が必要です。"
-  }, {
-    title: "Kubernetes HPA と ヘルスチェック",
-    body: "Kubernetes の Horizontal Pod Autoscaler（HPA）は、CPU使用率やカスタムメトリクスに基づいて Pod 数を自動調整します。負荷が増えたら Pod を増やし、下がったら減らすことでコストと性能のバランスを保ちます。\n\nHPA が正常に機能するためには、Pod の Liveness Probe（死活監視）と Readiness Probe（準備完了確認）が適切に設定されている必要があります。Liveness は「プロセスが生きているか」、Readiness は「トラフィックを受け入れられる状態か」を確認します。グレースフルシャットダウン中の Pod には Readiness が失敗するよう実装し、ロードバランサからの切り離しをスムーズに行います。",
-    table: T.k8sResources,
-    afterTable: "HPA のスケールアウトは比較的素早く（デフォルト15秒ごとに評価）、スケールインは緩やか（5分間評価）に設計されています。急激なスパイクに対応するために、VPA（Vertical Pod Autoscaler）や KEDA（Kubernetes Event Driven Autoscaling）との組み合わせも検討してください。"
-  }]
-}, {
-  id: "ch6",
-  num: 6,
-  title: "セキュリティの深化",
-  est: "60分",
-  goal: "slowapi でレート制限を実装し、OWASP Top 10 の各脅威に対する FastAPI の対策を説明できる。AWS Secrets Manager / HashiCorp Vault から秘密情報を安全に取得する仕組みを構築し、セキュリティヘッダを適切に設定できるようになる。",
-  sections: [{
-    title: "Rate Limiting と OWASP Top 10",
-    body: "レート制限（Rate Limiting）は、単一クライアントからの過剰なリクエストを防ぐセキュリティ・安定性のための機能です。slowapi は Flask-Limiter の asyncio 対応版で、FastAPI に容易に統合できます。エンドポイント単位・ユーザ単位・IPアドレス単位など柔軟なキー設定が可能です。\n\nOWASP Top 10 は Web アプリケーションの重大セキュリティリスクのランキングです。FastAPI はその設計上、Pydantic によるインジェクション防止・型安全なルーティングなど多くの対策が組み込まれていますが、アクセス制御の実装・秘密管理・セキュリティヘッダは開発者が明示的に実装する必要があります。",
-    table: T.owaspTop10,
-    afterTable: "セキュリティヘッダは Starlette の SecurityHeadersMiddleware または trustedhost ミドルウェアで追加できます。Content-Security-Policy・X-Content-Type-Options・Strict-Transport-Security の3つを最低限設定しましょう。本番では securityheaders.com でスコアをチェックすることをお勧めします。"
-  }, {
-    title: "秘密管理: Vault と AWS Secrets Manager",
-    body: "データベースのパスワード・API キー・JWT シークレットなどの秘密情報を環境変数や設定ファイルにハードコードするのは危険です。コードレポジトリへの誤コミット・コンテナイメージへの埋め込みというリスクがあります。Secrets Manager を使うことで、秘密情報をコードから完全に分離し、ローテーション（定期的な自動更新）も実現できます。\n\nFastAPI アプリケーションでは、lifespan でアプリケーション起動時にシークレットを取得してメモリにキャッシュするパターンが一般的です。TTL キャッシュを設けることで、シークレットローテーション後も一定時間内に新しい値に切り替わります。",
-    code: `# app/core/secrets.py
-import json, time
-import aioboto3
+const chapters = [
+  {id:"ch1", num:1, title:"ASGIプロトコルとStarlette内部構造", est:"70分",
+   goal:"ASGIのscope/receive/send三要素を理解し、Starletteのルーティング・ミドルウェアの仕組みを説明できる。生のASGIアプリを実装できる。",
+   sections:[
+     {title:"ASGIプロトコルの仕組み", body:`ASGIはAsynchronous Server Gateway Interfaceの略で、Pythonの非同期Webサーバーとアプリケーション間の標準インターフェースです。古いWSGIと違い、WebSocket・HTTP/2・SSEなど非同期接続を標準でサポートします。FastAPIはASGIアプリケーションであり、その下にStarletteが、さらにその下にuvicornがあります。
 
-_cache: dict = {}
-_cache_at: float = 0.0
-TTL = 3600  # 1時間
+ASGIアプリはasync def app(scope, receive, send)というシグネチャを持つ非同期関数または呼び出し可能オブジェクトです。scopeは接続の情報（HTTP/WebSocket・パス・メソッド・ヘッダーなど）を持つ辞書です。receiveはクライアントからのイベントを受け取るコルーチン、sendはクライアントへイベントを送るコルーチンです。
 
-async def get_secrets(name: str) -> dict:
-    global _cache, _cache_at
-    if _cache and time.time() - _cache_at < TTL:
-        return _cache
-    session = aioboto3.Session()
-    async with session.client(
-        "secretsmanager",
-        region_name="ap-northeast-1",
-    ) as client:
-        resp = await client.get_secret_value(
-            SecretId=name
-        )
-    _cache = json.loads(resp["SecretString"])
-    _cache_at = time.time()
-    return _cache
+FastAPIのRouterやミドルウェアは全てこの三要素を抽象化したラッパーです。uvicornはHTTPリクエストをASGIのscope・receive・sendに変換してFastAPIに渡します。低レベルを理解することで、パフォーマンスの問題やデバッグが格段に楽になります。`,
+      code:`# 生のASGIアプリ実装
+import json
 
-# lifespan での初期化:
-# secrets = await get_secrets("prod/myapp/v1")
-# settings.db_password = secrets["DB_PASSWORD"]`,
-    afterCode: "Kubernetes 環境では External Secrets Operator を使うと、Kubernetes Secret を Vault/AWS Secrets Manager から自動同期できます。アプリケーションコードでの Secrets Manager 呼び出しが不要になり、よりクリーンな構成になります。"
-  }]
-}, {
-  id: "ch7",
-  num: 7,
-  title: "CI/CDとDevOps",
-  est: "60分",
-  goal: "マルチステージ Docker ビルドで最小・セキュアなイメージを作成し、GitHub Actions で lint → test → build → deploy のパイプラインを構築できる。Helm Chart で Kubernetes マニフェストを管理し、ArgoCD を使った GitOps デプロイメントの概念を理解できるようになる。",
-  sections: [{
-    title: "Dockerマルチステージビルドと最適化",
-    body: "マルチステージビルドは Dockerfile の中で複数の FROM を使い、最終的なイメージには実行に必要なファイルだけを含める手法です。ビルドツールや開発用ライブラリをインストールしたレイヤーを捨て、実行バイナリやアプリケーションコードだけをコピーすることで、イメージサイズを大幅に削減できます（典型的に 1GB → 100MB 台）。\n\nイメージサイズの削減はセキュリティ面でも有効です。不要なツール（curl・bash など）が含まれていないイメージは、コンテナ侵害時の攻撃者の「横展開」を困難にします。非rootユーザでの実行とあわせて、Defense-in-Depth（多層防御）を実現します。",
-    code: `# Dockerfile
-FROM python:3.12-slim AS builder
-WORKDIR /build
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir --prefix=/install .
+async def simple_app(scope, receive, send):
+    """HTTPのみ対応する最小ASGIアプリ"""
+    if scope["type"] != "http":
+        return
 
-FROM python:3.12-slim AS runtime
-RUN groupadd -r app && useradd -r -g app app
-WORKDIR /app
-COPY --from=builder /install /usr/local
-COPY ./app ./app
+    # リクエストボディを受け取る
+    body = b""
+    while True:
+        event = await receive()
+        body += event.get("body", b"")
+        if not event.get("more_body", False):
+            break
 
-HEALTHCHECK --interval=30s --timeout=5s \\
-  --start-period=15s --retries=3 \\
-  CMD python -c "import urllib.request; \\
-    urllib.request.urlopen('http://localhost:8000/health')"
+    # レスポンスを送る
+    path = scope["path"]
+    response_data = {"path": path, "method": scope["method"]}
+    response_body = json.dumps(response_data).encode()
 
-USER app
-EXPOSE 8000
-CMD ["gunicorn", "app.main:app", \\
-     "-k", "uvicorn.workers.UvicornWorker", \\
-     "-c", "gunicorn.conf.py"]`,
-    afterCode: "ポイント: COPY pyproject.toml を先にコピーして pip install するレイヤーを分けることで、アプリコードの変更時に依存関係のインストールレイヤーがキャッシュから再利用されます。大規模なプロジェクトではビルド時間が数分から数秒に短縮できます。"
-  }, {
-    title: "Helm Chart と GitOps",
-    body: "Helm は Kubernetes のパッケージマネージャで、YAML テンプレートと values.yaml を組み合わせて「チャート」を作成します。同じチャートを開発・ステージング・本番環境に対して異なる values で適用できるため、環境ごとのマニフェスト管理が容易になります。\n\nArgoCD は GitOps ツールで「Git リポジトリが真実の源泉（Source of Truth）」という考え方を実装しています。Git のマニフェストと Kubernetes クラスタの状態を常に同期させ、差分が生じたら自動的に（または手動承認後に）適用します。CI でビルドしたイメージタグを Git に push すると、ArgoCD が自動的に Kubernetes を更新するパイプラインが実現できます。",
-    table: T.helmFiles,
-    afterTable: "GitOps の利点は「クラスタへの直接アクセス権を人が持たなくてよい」点にもあります。デプロイは Git への pull request → マージ → ArgoCD の同期、という監査可能なフローに統一できます。ArgoCD の代替として Flux CD も広く使われています。"
-  }]
-}, {
-  id: "ch8",
-  num: 8,
-  title: "パフォーマンスチューニング",
-  est: "60分",
-  goal: "uvloop・orjson・asyncpg などの高速化ライブラリを適切に組み合わせ、py-spy/memray でプロファイリングしてボトルネックを特定・改善できる。SQLAlchemy ORM と asyncpg 生クエリの使い分けを判断でき、FastAPI アプリケーションのレイテンシと RPS を最適化できるようになる。",
-  sections: [{
-    title: "uvloop と orjson による基盤高速化",
-    body: "uvloop は Python 標準の asyncio イベントループを libuv（Node.js が使う高性能非同期 I/O ライブラリ）ベースの実装に差し替えます。コードの変更なしにイベントループ処理が 2〜4 倍高速化し、高負荷時のレイテンシが改善します。Uvicorn は --loop uvloop オプションで uvloop を使えます。\n\norjson は Python の標準 json モジュールの高速代替で、Rust で実装されています。FastAPI の ORJSONResponse を使うことで、JSONシリアライズのコストを 5〜10 倍削減できます。特にレスポンスに大きな配列やネストした辞書を含む API では効果が顕著です。datetime の自動シリアライズや NumPy 配列のサポートも標準 json にない特長です。",
-    code: `# 1. uvloop のインストールと有効化
-# pip install uvloop
-# uvicorn app.main:app --loop uvloop
+    await send({
+        "type": "http.response.start",
+        "status": 200,
+        "headers": [
+            [b"content-type", b"application/json"],
+            [b"content-length", str(len(response_body)).encode()],
+        ],
+    })
+    await send({
+        "type": "http.response.body",
+        "body": response_body,
+    })`,
+      afterCode:"uvicornで生のASGIアプリを起動: uvicorn app:simple_app --reload。FastAPIはこのsimple_appと全く同じインターフェースを実装したクラスです。"},
+     {title:"Starletteミドルウェアスタック", body:`Starletteのミドルウェアはオニオンアーキテクチャで動作します。リクエストは外側から内側に向かってミドルウェアを通過し、レスポンスは内側から外側に向かって戻ります。app.add_middleware()で追加した順の逆順で実行されます。
 
-# 2. orjson によるレスポンス高速化
-import orjson
-from fastapi.responses import ORJSONResponse
+BaseHTTPMiddlewareはASGIミドルウェアを簡単に書けるヘルパークラスです。ただし、すべてのリクエストボディをメモリにバッファリングするためStreamingResponseとの相性が悪いという既知の問題があります。パフォーマンスが重要な場合は生のASGIミドルウェア（__init__・__call__を持つクラス）を書きます。
+
+ミドルウェアの追加順序に注意してください。後からadd_middleware()したものが外側（先に実行）になります。認証ミドルウェアはレートリミットより内側に置き、認証前にレートリミットを行う設計が一般的です。`,
+      code:`from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
+import time, logging
+
+# 方法1: BaseHTTPMiddleware（シンプルだが制限あり）
+class TimingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        elapsed = time.perf_counter() - start
+        response.headers["X-Process-Time"] = f"{elapsed:.3f}s"
+        return response
+
+# 方法2: 生のASGIミドルウェア（高パフォーマンス）
+class RawTimingMiddleware:
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] == "http":
+            start = time.perf_counter()
+            async def send_wrapper(message):
+                if message["type"] == "http.response.start":
+                    elapsed = time.perf_counter() - start
+                    headers = list(message.get("headers", []))
+                    headers.append([b"x-process-time", f"{elapsed:.3f}s".encode()])
+                    message = {**message, "headers": headers}
+                await send(message)
+            await self.app(scope, receive, send_wrapper)
+        else:
+            await self.app(scope, receive, send)`,
+      afterCode:"生のASGIミドルウェアはBaseHTTPMiddlewareと異なり、ストリーミングレスポンスも正しく処理できます。大量のトラフィックがある本番環境では生のASGIミドルウェアが推奨されます。"}
+   ]},
+  {id:"ch2", num:2, title:"CQRSパターンとイベントソーシング", est:"70分",
+   goal:"CQRSのコマンド・クエリ分離の原則を理解し、イベントソーシングでシステムの状態変化を永続化できる。集約ルートとドメインイベントを実装できる。",
+   sections:[
+     {title:"CQRSの設計と実装", body:`CQRS（Command Query Responsibility Segregation）はコマンド（状態変更）とクエリ（参照）を分離するアーキテクチャパターンです。Djangoのビュー関数が読み書き両方を担当するのとは対照的に、CQRSではコマンド用のライトモデルとクエリ用のリードモデルを完全に分離します。
+
+コマンドは「何をしたいか」を表すデータ構造です。CreateOrderCommand・UpdateUserCommandのように命令形で名付けます。コマンドハンドラはコマンドを受け取りビジネスロジックを実行してドメインイベントを発行します。Pythonのdataclassがコマンドの定義に最適です。
+
+クエリはリードモデルから効率的にデータを取得します。ライトモデルとは別のデータストア（例: Elasticsearchやリードレプリカ）を使うこともあります。FastAPIではコマンド用のPOST/PUT/DELETEエンドポイントとクエリ用のGETエンドポイントをRouter単位で分離します。`,
+      code:`from dataclasses import dataclass, field
+from typing import Protocol
+import uuid, datetime
+
+# コマンド定義
+@dataclass
+class CreateOrderCommand:
+    user_id: str
+    items: list[dict]
+    command_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+# ドメインイベント
+@dataclass
+class OrderCreatedEvent:
+    aggregate_id: str
+    user_id: str
+    items: list[dict]
+    occurred_at: datetime.datetime = field(
+        default_factory=datetime.datetime.utcnow)
+
+# コマンドバス
+class CommandBus:
+    def __init__(self):
+        self._handlers: dict = {}
+
+    def register(self, command_type, handler):
+        self._handlers[command_type] = handler
+
+    async def dispatch(self, command):
+        handler = self._handlers.get(type(command))
+        if not handler:
+            raise ValueError(f"No handler for {type(command)}")
+        return await handler(command)`,
+      afterCode:"CommandBusはMediatrパターンの実装です。Pythonライブラリではpyfastcqrsやpymediatorが同様の機能を提供します。DIコンテナと組み合わせると依存性の管理が容易になります。"},
+     {title:"イベントソーシングの実装", body:`イベントソーシングは、システムの状態をデータベースに直接保存するのではなく、状態変化のイベントをシーケンシャルに保存するパターンです。Pythonのgitリポジトリがコミット履歴を保持するのと同じ発想です。「現在の状態」はイベントを最初から再生（リプレイ）することで復元できます。
+
+集約（Aggregate）はドメインオブジェクトの一貫性の境界です。OrderAggregate内でOrderCreated・ItemAdded・OrderCancelledなどのイベントを発行し、それを基に状態を構築します。外から直接フィールドを変更するのではなく、必ずコマンドメソッドを通じて変更します。
+
+スナップショットは最適化技術で、全イベントを最初から再生するコストを削減します。例えば1000イベントを500イベントごとにスナップショットを取れば、最大で500イベントのリプレイで済みます。`,
+      code:`from dataclasses import dataclass, field
+from typing import Any
+import json
+
+@dataclass
+class Order:
+    """注文集約"""
+    id: str
+    user_id: str
+    items: list[dict] = field(default_factory=list)
+    status: str = "pending"
+    _events: list = field(default_factory=list, repr=False)
+
+    @classmethod
+    def create(cls, user_id: str, items: list[dict]) -> "Order":
+        order = cls(id=str(uuid.uuid4()), user_id=user_id)
+        event = OrderCreatedEvent(
+            aggregate_id=order.id, user_id=user_id, items=items)
+        order._apply(event)
+        order._events.append(event)
+        return order
+
+    def cancel(self):
+        if self.status != "pending":
+            raise ValueError("キャンセルできるのはpending状態のみです")
+        event = {"type": "OrderCancelled", "aggregate_id": self.id}
+        self._apply(event)
+        self._events.append(event)
+
+    def _apply(self, event):
+        if isinstance(event, OrderCreatedEvent):
+            self.items = event.items
+            self.status = "pending"
+        elif isinstance(event, dict) and event["type"] == "OrderCancelled":
+            self.status = "cancelled"
+
+    def pop_events(self) -> list:
+        events, self._events = self._events, []
+        return events`,
+      afterCode:"pop_events()で未コミットのイベントを取り出してイベントストアに保存します。集約はイベントを自分で管理し、外部から直接stateを変更できないようにすることが重要です。"}
+   ]},
+  {id:"ch3", num:3, title:"Kafkaとメッセージキュー統合", est:"65分",
+   goal:"aiokafkaでFastAPIアプリからKafkaにメッセージを発行・消費し、デッドレターキューと再試行ロジックを実装できる。",
+   sections:[
+     {title:"aiokafkaの基本とFastAPI統合", body:`Kafkaは高スループット・永続的なメッセージキューです。RabbitMQと異なり、メッセージを一定期間保持（デフォルト7日）し、複数のコンシューマーが独立して読み取れます。Pythonのaiokafkaは非同期のKafkaクライアントで、FastAPIのasync/awaitと完全に統合できます。
+
+FastAPIのlifespan（コンテキストマネージャー形式のstartup/shutdown）を使ってKafkaの接続管理をします。yieldの前がstartup、後がshutdownです。プロデューサーとコンシューマーをapp.stateに格納することで、依存性注入を通じてエンドポイントから参照できます。
+
+メッセージのシリアライズにはJSONが一般的ですが、大量データの場合はMsgpackやAvroを使います。Avroは「スキーマ付きJSON」とも言え、Schema Registryと組み合わせてスキーマの進化を管理できます。`,
+      code:`from contextlib import asynccontextmanager
+from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
+from fastapi import FastAPI, Depends
+import asyncio, json
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # プロデューサー起動
+    producer = AIOKafkaProducer(
+        bootstrap_servers='localhost:9092',
+        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+        key_serializer=lambda k: k.encode('utf-8') if k else None,
+    )
+    await producer.start()
+    app.state.producer = producer
+
+    # コンシューマータスクをバックグラウンドで起動
+    consumer_task = asyncio.create_task(consume_events(app))
+    yield
+    consumer_task.cancel()
+    await producer.stop()
+
+async def consume_events(app: FastAPI):
+    consumer = AIOKafkaConsumer(
+        "order-events",
+        bootstrap_servers='localhost:9092',
+        group_id="fastapi-consumer-group",
+        auto_offset_reset="earliest",
+    )
+    await consumer.start()
+    try:
+        async for msg in consumer:
+            data = json.loads(msg.value)
+            await handle_order_event(data)
+    finally:
+        await consumer.stop()`,
+      afterCode:"asyncio.create_task()でコンシューマーをバックグラウンドで実行します。タスクのキャンセルはconsumer_task.cancel()で行い、finallyブロックでconsumer.stop()を確実に呼びます。"},
+     {title:"デッドレターキューと再試行ロジック", body:`メッセージ処理は必ず失敗する可能性があります。外部APIの障害・データ不整合・バグなどで処理できなかったメッセージをデッドレターキュー（DLQ）に送り、後で調査・再処理できるようにします。これはPythonのCeleryのtask_rejectsルーティングに相当します。
+
+再試行ロジックは指数バックオフを使います。最初の失敗後1秒、次は2秒、4秒と待ち時間を増やします。Kafkaには組み込みの再試行機能はないため、自前で実装します。失敗カウンタをメッセージのヘッダーに埋め込み、最大試行回数に達したらDLQに送ります。
+
+テナシティ（tenacity）ライブラリを使うと再試行ロジックをシンプルに書けます。@retry(wait=wait_exponential(), stop=stop_after_attempt(3))のデコレータで宣言的に設定できます。`,
+      code:`import asyncio
+from tenacity import retry, wait_exponential, stop_after_attempt, RetryError
+
+MAX_RETRIES = 3
+
+async def handle_with_retry(producer, message: dict, topic: str = "order-events"):
+    """再試行付きメッセージ処理"""
+    retry_count = message.get("_retry_count", 0)
+
+    try:
+        await process_message(message)
+    except Exception as e:
+        if retry_count >= MAX_RETRIES:
+            # 最大試行回数超過 → DLQへ
+            dlq_message = {
+                **message,
+                "_error": str(e),
+                "_failed_at": datetime.datetime.utcnow().isoformat(),
+                "_original_topic": topic,
+            }
+            await producer.send(f"{topic}-dlq", dlq_message)
+            print(f"DLQに送信: {dlq_message}")
+            return
+
+        # 再試行: 指数バックオフ
+        wait_seconds = 2 ** retry_count
+        await asyncio.sleep(wait_seconds)
+        retry_message = {**message, "_retry_count": retry_count + 1}
+        await producer.send(topic, retry_message)
+        print(f"再試行 {retry_count + 1}/{MAX_RETRIES}: {wait_seconds}秒後")`,
+      afterCode:"DLQのメッセージは監視ツールで定期的に確認し、根本原因を修正後に再処理（replay）します。Kafkaのメッセージ保持期間内であれば、オフセットを巻き戻して再処理することもできます。"}
+   ]},
+  {id:"ch4", num:4, title:"MLサービング（TorchServe・Triton）", est:"65分",
+   goal:"TorchServeまたはTriton Inference ServerをFastAPIから呼び出し、バッチ推論・キューイング・モデルバージョン管理を実装できる。",
+   sections:[
+     {title:"MLサービングアーキテクチャ", body:`MLモデルをAPIとして公開する方法は大きく3つあります。FastAPI内に直接モデルをロードする方法（シンプルだがスケールしにくい）、TorchServeやTriton Inference Serverなど専用サービングサーバーを使う方法（高スループット・GPU最適化）、BentoML・Rayなどのフレームワークを使う方法です。
+
+TorchServeはPyTorchが公式に提供するサービングサーバーです。モデルアーカイブ（.mar）形式にパッケージして管理API・推論APIを分離して公開します。GPU割り当て・バッチ推論・A/Bテストをサポートします。FastAPIはリクエストを受け取り、TorchServeのREST APIにプロキシするゲートウェイとして機能します。
+
+Triton Inference ServerはNVIDIAが開発し、TensorFlow・PyTorch・ONNX・TensorRTなど複数のフレームワークをサポートします。動的バッチング・モデルアンサンブル・シーケンスバッチング（RNN用）などの高度な機能を持ちます。gRPCとREST両方のインターフェースを提供します。`,
+      code:`import httpx
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import asyncio
+
+app = FastAPI()
+
+class PredictionRequest(BaseModel):
+    model_name: str
+    instances: list[list[float]]  # バッチ入力
+
+class PredictionResponse(BaseModel):
+    predictions: list[float]
+    model_version: str
+
+TORCHSERVE_URL = "http://localhost:8080"
+
+@app.post("/predict", response_model=PredictionResponse)
+async def predict(req: PredictionRequest):
+    url = f"{TORCHSERVE_URL}/predictions/{req.model_name}"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(url, json={"instances": req.instances})
+            response.raise_for_status()
+            data = response.json()
+            return PredictionResponse(
+                predictions=data["predictions"],
+                model_version=response.headers.get("X-Model-Version", "unknown")
+            )
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(502, f"モデルサーバーエラー: {e.response.status_code}")
+        except httpx.TimeoutException:
+            raise HTTPException(504, "推論タイムアウト")`,
+      afterCode:"httpxの非同期クライアントを使うことで、TorchServeへのリクエスト中もFastAPIのイベントループをブロックせず、他のリクエストを処理できます。"},
+     {title:"バッチ推論とキューイング", body:`単一リクエストを個別に推論するより、複数リクエストをまとめてバッチ処理する方がGPU効率が高まります。Dynamic Batchingは個別のリクエストをある時間（例: 10ms）待ってからまとめてGPUに送る技術です。TorchServeとTritonは内部でこれをサポートします。
+
+FastAPI側でもキューイングを実装できます。asyncio.Queueを使ってリクエストを貯め、バックグラウンドワーカーがバッチとして処理します。リクエストごとにFutureを作成し、処理完了時にresult()をセットして待機している呼び出し元に結果を返します。
+
+GPUサーバーへのリクエストは同時実行数を制限することが重要です。asyncio.Semaphoreで制限しないとGPUメモリが枯渇します。一般的にGPUサーバー1台あたり4〜8の同時推論リクエストが目安です。`,
+      code:`import asyncio
+from dataclasses import dataclass
+
+@dataclass
+class BatchRequest:
+    instances: list
+    future: asyncio.Future
+
+BATCH_SIZE = 32
+BATCH_TIMEOUT = 0.01  # 10ms
+
+class BatchProcessor:
+    def __init__(self):
+        self._queue: asyncio.Queue[BatchRequest] = asyncio.Queue()
+        self._task: asyncio.Task | None = None
+
+    async def start(self):
+        self._task = asyncio.create_task(self._batch_loop())
+
+    async def predict(self, instances: list) -> list:
+        future = asyncio.get_event_loop().create_future()
+        await self._queue.put(BatchRequest(instances, future))
+        return await future
+
+    async def _batch_loop(self):
+        while True:
+            batch: list[BatchRequest] = []
+            try:
+                req = await asyncio.wait_for(self._queue.get(), BATCH_TIMEOUT)
+                batch.append(req)
+                while len(batch) < BATCH_SIZE:
+                    try:
+                        req = self._queue.get_nowait()
+                        batch.append(req)
+                    except asyncio.QueueEmpty:
+                        break
+            except asyncio.TimeoutError:
+                continue
+            if batch:
+                all_instances = [i for r in batch for i in r.instances]
+                results = await self._run_inference(all_instances)
+                # 各リクエストに結果を返す
+                idx = 0
+                for req in batch:
+                    n = len(req.instances)
+                    req.future.set_result(results[idx:idx+n])
+                    idx += n`,
+      afterCode:"Dynamic Batchingにより、個別リクエストの低レイテンシとGPUの高スループットを両立できます。BATCH_TIMEOUTを短くするとレイテンシが改善し、長くするとスループットが向上します。"}
+   ]},
+  {id:"ch5", num:5, title:"サーバレスデプロイ（AWS Lambda・Mangum）", est:"60分",
+   goal:"MangumでFastAPIをAWS Lambdaにデプロイし、コールドスタートの最小化・環境変数管理・SAMでのIaC化ができる。",
+   sections:[
+     {title:"MangumとASGI-Lambda変換", body:`MangumはASGIアプリをAWS Lambdaのイベント形式に変換するアダプターです。API Gateway（REST API・HTTP API・ALB）からのイベントをASGIのscope/receive/sendに変換し、FastAPIの応答をLambdaのレスポンス形式に戻します。これはWSGIとLambdaの変換を行うZappaに相当するASGI版です。
+
+Lambdaのコールドスタートとはコンテナの初回起動時間のことで、Pythonでは1〜3秒かかることがあります。グローバルスコープでDBコネクション・ML モデル・ライブラリのインポートを済ませておくことで、2回目以降のウォームスタートでは初期化コストを省けます。Provisioned Concurrencyを使うとコールドスタートを完全になくせますが費用がかかります。
+
+LambdaのメモリはデフォルトでCPU性能にも影響します。512MBより1769MB（実質1vCPU相当）に設定するとPythonの処理が2〜3倍速くなることがあります。費用対効果を計測しながら最適なメモリサイズを選びます。`,
+      code:`# app.py
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from mangum import Mangum
+import os
+
+# グローバルスコープ: Lambdaコンテナ間で再利用される
+DATABASE_URL = os.environ["DATABASE_URL"]
+_db_pool = None  # 遅延初期化
+
+async def get_db_pool():
+    global _db_pool
+    if _db_pool is None:
+        import asyncpg
+        _db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
+    return _db_pool
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ウォームアップ: DBプールを事前に作成
+    await get_db_pool()
+    yield
 
 app = FastAPI(
-    default_response_class=ORJSONResponse
+    title="Serverless API",
+    lifespan=lifespan,
+    root_path=os.environ.get("API_GATEWAY_STAGE", ""),
 )
 
-# エンドポイント単位でも指定可能
-@app.get("/items", response_class=ORJSONResponse)
-async def list_items():
-    return [{"id": i} for i in range(1000)]
+@app.get("/health")
+async def health():
+    return {"status": "ok", "region": os.environ.get("AWS_REGION")}
 
-# カスタムオプション（NumPy, datetime等）
-from fastapi.responses import Response
+# LambdaハンドラーのエントリーポイントはManagumでラップ
+handler = Mangum(app, lifespan="auto")`,
+      afterCode:"lifespan='auto'はLambdaの呼び出しごとにlifespanを実行します。コールドスタートを考慮するなら'off'にしてグローバルスコープで初期化するほうが高速です。"},
+     {title:"SAMとCI/CDパイプライン", body:`AWS SAM（Serverless Application Model）はLambda・API Gateway・DynamoDBなどのAWSリソースをコードで管理するフレームワークです。CloudFormationのラッパーで、AWSリソースをYAMLで宣言的に定義できます。PythonのTerraformやpulumiに相当しますが、AWSに特化しています。
 
-class FastResponse(Response):
-    media_type = "application/json"
-    def render(self, content) -> bytes:
-        return orjson.dumps(
-            content,
-            option=orjson.OPT_SERIALIZE_NUMPY,
-        )`,
-    afterCode: "ポイント: ORJSONResponse は標準の JSONResponse と完全に互換性があります。まず default_response_class で全体に適用し、ベンチマークで効果を確認してください。locust や k6 で負荷テストを行い、変更前後の RPS とレイテンシを数値で比較しましょう。"
-  }, {
-    title: "asyncpg vs SQLAlchemy と プロファイリング",
-    body: "SQLAlchemy ORM は開発生産性が高い一方、オブジェクトへのマッピングコストがあります。高スループットが求められるクリティカルパス（1秒間に数千件のクエリが走るエンドポイントなど）では、asyncpg で直接 SQL を書く方が 2〜5 倍高速になることがあります。パフォーマンスと保守性のバランスを考え、ほとんどのエンドポイントは ORM を使い、ボトルネックになった箇所だけ生クエリに切り替えるのが現実的な戦略です。\n\npy-spy は本番プロセスへのアタッチが可能なプロファイラで、アプリを再起動せずにCPUホットスポットを可視化できます。memray はメモリプロファイラで、メモリリークや大量アロケーションの特定に役立ちます。まずプロファイルして、推測ではなくデータに基づいて最適化箇所を決めるのが原則です。",
-    table: T.profileTools,
-    code: `# py-spy による本番プロファイル
-# pip install py-spy
-# sudo py-spy top --pid $(pgrep -f uvicorn)
-# sudo py-spy record -o profile.svg --pid <PID>
+SAM CLIはローカルでLambdaをエミュレートできます。sam local start-apiでAPI Gatewayをローカル起動し、実際のLambdaに近い環境でデバッグできます。sam buildでDockerを使ったビルドも可能で、ネイティブ拡張ライブラリ（numpy・scipy）を含む場合に重要です。
 
-# asyncpg 生クエリ（最速）
-import asyncpg
+Lambda Layersを使うと依存ライブラリを関数コードから分離できます。ライブラリを含むLayerを1つ作り、複数のLambda関数で共有することでデプロイパッケージのサイズを削減します。FastAPIとその依存関係（starlette・pydantic・uvicorn）だけで50MB程度になります。`,
+      code:`# template.yaml (SAM)
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
 
-async def get_items_fast(pool: asyncpg.Pool):
-    return await pool.fetch(
-        "SELECT id, name, price FROM items LIMIT 1000"
-    )
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 1769  # 1vCPU相当
+    Environment:
+      Variables:
+        DATABASE_URL: !Sub "{{resolve:ssm:/myapp/database_url}}"
 
-# SQLAlchemy ORM（推奨デフォルト）
-from sqlalchemy import select
-from app.models import Item
+Resources:
+  FastAPIFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: app.handler
+      Runtime: python3.12
+      Layers:
+        - !Ref DependencyLayer
+      Events:
+        Root:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
 
-async def get_items_orm(db: AsyncSession):
-    result = await db.execute(select(Item).limit(1000))
-    return result.scalars().all()
+  DependencyLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: dependencies/
+      CompatibleRuntimes: [python3.12]
+    Metadata:
+      BuildMethod: python3.12`,
+      afterCode:"!Sub '{{resolve:ssm:...}}'でSSM Parameter Storeから秘密情報を取得します。DATABASE_URLやAPIキーをコードやtemplate.yamlに直接書かないことが重要です。"}
+   ]},
+  {id:"ch6", num:6, title:"API Gateway・サービスメッシュ", est:"65分",
+   goal:"NginxやTraefikをリバースプロキシとして設定し、FastAPIへのIPレートリミット・認証・サーキットブレーカーをミドルウェアで実装できる。",
+   sections:[
+     {title:"Nginxリバースプロキシとロードバランシング", body:`本番のFastAPIはNginxをリバースプロキシの前に置くのが一般的な構成です。NginxはSSL終端・静的ファイル配信・ロードバランシング・接続数制限を担当し、FastAPIはビジネスロジックに集中できます。Djangoをgunicornでデプロイするのと同じ考え方ですが、ASGIとuvicornを使う点が異なります。
 
-# asyncpg コネクションプール（lifespan で管理）
-# pool = await asyncpg.create_pool(
-#     DATABASE_URL, min_size=5, max_size=20
-# )`,
-    afterCode: "memray の使用例: memray run -o output.bin -m uvicorn app.main:app でアプリを起動し、memray flamegraph output.bin で HTML レポートを生成します。本番では py-spy のオーバーヘッド（< 1%）は許容範囲ですが、memray はオーバーヘッドが大きいため本番での直接使用は避け、ステージング環境で計測してください。"
-  }]
-}];
+Nginxのworker_processesとworker_connectionsの積が同時接続数の上限です。upstream keepaliveを設定してFastAPIとの接続を再利用することでオーバーヘッドを削減できます。proxy_buffering offを設定するとストリーミングレスポンス（SSE）が正しく動作します。
 
-/* ── UI Components ── */
-function DataTable({ data }) {
-  if (!data) return null;
-  const { h, r } = data;
-  return React.createElement('div', { style: { overflowX: 'auto', margin: '16px 0' } },
-    React.createElement('table', {
-      style: {
-        width: '100%', borderCollapse: 'collapse',
-        fontSize: '14px', fontFamily: "'Noto Sans JP', sans-serif",
-      }
-    },
-      React.createElement('thead', null,
-        React.createElement('tr', null,
-          h.map((col, i) => React.createElement('th', {
-            key: i,
-            style: {
-              background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-              color: '#fff', padding: '10px 14px',
-              textAlign: 'left', fontWeight: 700,
-              fontSize: '13px',
-            }
-          }, col))
-        )
-      ),
-      React.createElement('tbody', null,
-        r.map((row, i) => React.createElement('tr', {
-          key: i,
-          style: { background: i % 2 === 0 ? '#f8f7ff' : '#fff' }
-        },
-          row.map((cell, j) => React.createElement('td', {
-            key: j,
-            style: {
-              padding: '9px 14px',
-              borderBottom: '1px solid #e5e7eb',
-              fontSize: '13px', color: '#374151',
-            }
-          }, cell))
-        ))
-      )
-    )
-  );
-}
+Traefikはコンテナ環境（Kubernetes・Docker Swarm）向けの動的リバースプロキシです。コンテナのラベルからルーティングを自動検出し、Let's EncryptのSSL証明書を自動取得・更新します。Nginxの静的設定と異なり、サービスの追加・削除に動的に対応します。`,
+      code:`# docker-compose.yml
+version: '3.8'
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on: [api1, api2]
 
-function Code({ children }) {
-  return React.createElement('pre', {
-    style: {
-      background: '#1e1b4b', color: '#e0e7ff',
-      borderRadius: '10px', padding: '18px 20px',
-      fontSize: '13px', fontFamily: "'JetBrains Mono', monospace",
-      overflowX: 'auto', margin: '14px 0',
-      lineHeight: 1.65,
-    }
-  }, React.createElement('code', null, children));
-}
+  api1:
+    build: .
+    command: uvicorn app:app --host 0.0.0.0 --port 8000
+    environment:
+      - DATABASE_URL=postgresql://...
 
-function Exercise({ ex, chId, idx }) {
-  const [open, setOpen] = useState(false);
-  const stars = '⭐'.repeat(ex.diff);
-  return React.createElement('div', {
-    key: `${chId}-ex-${idx}`,
-    style: {
-      border: '1.5px solid #c7d2fe', borderRadius: '12px',
-      marginBottom: '16px', overflow: 'hidden',
-    }
-  },
-    React.createElement('div', {
-      style: {
-        background: '#f5f3ff', padding: '14px 18px',
-        fontWeight: 700, color: '#4338ca', fontSize: '15px',
-      }
-    }, `演習 ${idx + 1} ${stars}`),
-    React.createElement('div', { style: { padding: '16px 18px' } },
-      React.createElement('p', {
-        style: {
-          fontSize: '14px', color: '#374151',
-          whiteSpace: 'pre-wrap', lineHeight: 1.7,
-        }
-      }, ex.q),
-      ex.code && React.createElement(Code, null, ex.code),
-      React.createElement('button', {
-        onClick: () => setOpen(o => !o),
-        style: {
-          marginTop: '10px', background: open ? '#6366f1' : '#fff',
-          color: open ? '#fff' : '#6366f1',
-          border: '1.5px solid #6366f1', borderRadius: '8px',
-          padding: '7px 18px', cursor: 'pointer',
-          fontWeight: 700, fontSize: '14px', transition: 'all 0.15s',
-        }
-      }, open ? '解答を隠す' : '解答を見る'),
-      open && React.createElement('div', { style: { marginTop: '10px' } },
-        React.createElement(Code, null, ex.answer)
-      )
-    )
-  );
-}
+  api2:
+    build: .
+    command: uvicorn app:app --host 0.0.0.0 --port 8000
 
-function Section({ sec, chId }) {
-  const [open, setOpen] = useState(false);
-  return React.createElement('div', {
-    key: `${chId}-${sec.title}`,
-    style: {
-      borderBottom: '1px solid #e5e7eb',
-    }
-  },
-    React.createElement('button', {
-      onClick: () => setOpen(o => !o),
-      style: {
-        width: '100%', textAlign: 'left',
-        background: 'none', border: 'none',
-        padding: '16px 20px', cursor: 'pointer',
-        display: 'flex', justifyContent: 'space-between',
-        alignItems: 'center',
-        fontSize: '15px', fontWeight: 700, color: '#1e1b4b',
-      }
-    },
-      React.createElement('span', null, sec.title),
-      React.createElement('span', {
-        style: {
-          transform: open ? 'rotate(90deg)' : 'none',
-          transition: 'transform 0.2s', fontSize: '18px', color: '#6366f1',
-        }
-      }, '›')
-    ),
-    open && React.createElement('div', {
-      style: { padding: '4px 20px 20px' }
-    },
-      sec.body && sec.body.split('\n\n').map((para, i) =>
-        React.createElement('p', {
-          key: i,
-          style: {
-            fontSize: '14px', color: '#374151',
-            lineHeight: 1.8, marginBottom: '12px',
-          }
-        }, para)
-      ),
-      sec.table && React.createElement(DataTable, { data: sec.table }),
-      sec.afterTable && React.createElement('p', {
-        style: {
-          fontSize: '13.5px', color: '#6b7280',
-          lineHeight: 1.75, margin: '8px 0 4px',
-          padding: '10px 14px',
-          background: '#f0fdf4', borderLeft: '3px solid #34d399',
-          borderRadius: '4px',
-        }
-      }, sec.afterTable),
-      sec.code && React.createElement(Code, null, sec.code),
-      sec.afterCode && React.createElement('p', {
-        style: {
-          fontSize: '13.5px', color: '#6b7280',
-          lineHeight: 1.75, margin: '4px 0 8px',
-          padding: '10px 14px',
-          background: '#eff6ff', borderLeft: '3px solid #60a5fa',
-          borderRadius: '4px',
-        }
-      }, sec.afterCode)
-    )
-  );
-}
+# nginx.conf
+# upstream fastapi {
+#     server api1:8000;
+#     server api2:8000;
+#     keepalive 32;
+# }
+# limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;
+# location /api/ {
+#     limit_req zone=api burst=20 nodelay;
+#     proxy_pass http://fastapi/;
+# }`,
+      afterCode:"limit_req_zoneとlimit_reqでNginxレベルのレートリミットを実装できます。Nginxはリクエストがアプリに到達する前にレートオーバーを403で返すため、FastAPIのCPUを節約できます。"},
+     {title:"サーキットブレーカーとサービスヘルス管理", body:`サーキットブレーカーは外部サービス（DB・API）の障害を検知し、障害中のリクエストを即座に失敗させるパターンです。障害が伝播してシステム全体がダウンするカスケード障害を防ぎます。Pythonのpycircuitbreakerまたはtenacityで実装できます。
 
-/* ── Main App ── */
+サーキットブレーカーには3つの状態があります。CLOSEDは正常状態で全リクエストを通します。OPENは障害状態で全リクエストを即座に拒否します（fallbackを返す）。HALF_OPENは回復を試みる状態で、一部のリクエストを通して成否を確認します。
+
+FastAPIの/healthエンドポイントでDB・Redis・外部APIの疎通を確認するヘルスチェックを実装します。Kubernetes LivenessProbe・ReadinessProbeでこのエンドポイントを監視すれば、障害時に自動的にポッドを再起動・切り離しできます。`,
+      code:`from enum import Enum
+import asyncio, time
+
+class CircuitState(Enum):
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
+class CircuitBreaker:
+    def __init__(self, failure_threshold=5, recovery_timeout=30.0):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failure_count = 0
+        self.last_failure_time = 0.0
+        self.state = CircuitState.CLOSED
+
+    async def call(self, func, *args, **kwargs):
+        if self.state == CircuitState.OPEN:
+            if time.time() - self.last_failure_time > self.recovery_timeout:
+                self.state = CircuitState.HALF_OPEN
+            else:
+                raise Exception("Circuit breaker is OPEN")
+
+        try:
+            result = await func(*args, **kwargs)
+            if self.state == CircuitState.HALF_OPEN:
+                self.state = CircuitState.CLOSED
+                self.failure_count = 0
+            return result
+        except Exception as e:
+            self.failure_count += 1
+            self.last_failure_time = time.time()
+            if self.failure_count >= self.failure_threshold:
+                self.state = CircuitState.OPEN
+            raise`,
+      afterCode:"CircuitBreakerをFastAPIの依存性注入（Depends）で管理すると、エンドポイントごとに独立したブレーカーを設定できます。障害状態を監視するPrometheus metricsと組み合わせると運用監視が容易になります。"}
+   ]},
+  {id:"ch7", num:7, title:"カスタムミドルウェア・プラグインシステム", est:"60分",
+   goal:"FastAPI用のカスタムミドルウェアを設計・実装し、プラグインアーキテクチャでアプリの機能を動的に拡張できる。",
+   sections:[
+     {title:"高度なミドルウェア設計", body:`本番FastAPIでは複数のミドルウェアを組み合わせます。リクエストID付与・ロギング・認証・レートリミット・トレーシングがよくある組み合わせです。ミドルウェアの実行順序はadd_middleware()の逆順なので、外側から内側（認証よりレートリミットが先）という設計を意識します。
+
+OpenTelemetryミドルウェアを使うとDistributed Tracingが実現できます。各リクエストにtrace-idを付与し、Jaeger・Zipkin・Datadogでリクエストが複数のサービスをまたいでどう流れるかを可視化できます。Pythonのlogging.setLogRecordFactory()でtrace-idをログに自動付与すると、ログとトレースを相関させられます。
+
+Prometheusメトリクスミドルウェアは、リクエスト数・レイテンシ・エラー率などをPrometheusのフォーマットで公開します。prometheus-fastapi-instrumentatorライブラリを使うと数行で実装できます。Grafanaでダッシュボードを作成して本番を監視します。`,
+      code:`from starlette.types import ASGIApp, Scope, Receive, Send
+import time, logging, uuid
+
+logger = logging.getLogger(__name__)
+
+class ObservabilityMiddleware:
+    """リクエストID・ロギング・メトリクスを統合したミドルウェア"""
+    def __init__(self, app: ASGIApp):
+        self.app = app
+        self._request_count = 0
+        self._error_count = 0
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request_id = str(uuid.uuid4())
+        start_time = time.perf_counter()
+        self._request_count += 1
+        status_code = 200
+
+        async def send_wrapper(message):
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+                if status_code >= 500:
+                    self._error_count += 1
+                headers = list(message.get("headers", []))
+                headers.append([b"x-request-id", request_id.encode()])
+                message = {**message, "headers": headers}
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        finally:
+            elapsed = time.perf_counter() - start_time
+            path = scope.get("path", "")
+            method = scope.get("method", "")
+            logger.info(f"{method} {path} {status_code} {elapsed:.3f}s [{request_id}]")`,
+      afterCode:"生のASGIミドルウェア（__call__メソッド）はBaseHTTPMiddlewareと異なり、StreamingResponseやWebSocketも正しく処理できます。本番環境の高トラフィックな場合は生のASGIミドルウェアが推奨されます。"},
+     {title:"プラグインシステムの設計", body:`大規模なFastAPIアプリは機能をプラグインとして分離することで保守性が向上します。Djangoのdjango.apps.AppConfigに相当するプラグインシステムをFastAPIで実装できます。各プラグインはルーター・ミドルウェア・依存性・スタートアップロジックをまとめたモジュールとして定義します。
+
+Pythonのentry_points（setuptools）を使うと、外部パッケージとしてプラグインを配布できます。pip install my-fastapi-pluginするだけでアプリが機能を検出・登録します。大規模なFastAPIフレームワークであるLitestarはこのアプローチを採用しています。
+
+プラグインの依存性注入はFastAPIのProviderパターンで管理します。プラグインが提供するサービスをDependsで注入できるようにすることで、疎結合を維持しつつ機能を拡張できます。`,
+      code:`from abc import ABC, abstractmethod
+from fastapi import FastAPI, APIRouter
+from typing import Sequence
+
+class FastAPIPlugin(ABC):
+    """プラグインの基底クラス"""
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+
+    def get_router(self) -> APIRouter | None:
+        return None
+
+    async def on_startup(self, app: FastAPI) -> None:
+        pass
+
+    async def on_shutdown(self, app: FastAPI) -> None:
+        pass
+
+class PluginRegistry:
+    def __init__(self):
+        self._plugins: list[FastAPIPlugin] = []
+
+    def register(self, plugin: FastAPIPlugin) -> "PluginRegistry":
+        self._plugins.append(plugin)
+        return self  # メソッドチェーン用
+
+    def apply(self, app: FastAPI) -> None:
+        for plugin in self._plugins:
+            router = plugin.get_router()
+            if router:
+                app.include_router(router)
+        # lifespanにフックを追加
+        original_lifespan = app.router.lifespan_context
+        # ... lifespanのラップ処理
+
+registry = PluginRegistry()`,
+      afterCode:"FastAPIPlugin基底クラスを継承してプラグインを作ることで、アプリのコアを変更せずに機能を追加できます。テストではモックプラグインに差し替えることもできます。"}
+   ]},
+  {id:"ch8", num:8, title:"パフォーマンスプロファイリング・本番最適化", est:"65分",
+   goal:"cProfile・py-spy・locustを使ってFastAPIアプリのボトルネックを特定し、データベースクエリ・非同期処理・uvicorn設定を最適化できる。",
+   sections:[
+     {title:"プロファイリングとボトルネット分析", body:`パフォーマンス最適化の第一原則は「計測してから最適化する」ことです。直感に頼った最適化はしばしば間違った場所に注力します。FastAPIのプロファイリングにはcProfile・py-spy・memory_profilerを使います。
+
+py-spyはサンプリング型プロファイラーで、本番環境で動作中のプロセスに対してもプロファイリングできます。プロセスIDを指定するだけで実行でき、フレームグラフ（flamegraph）でCPU時間の内訳を視覚化します。Djangoのdjango-silk・django-debug-toolbarに相当するインサイトを非同期アプリで得られます。
+
+Locustは負荷テストツールで、Pythonで書いたユーザーシナリオで実際のAPIに負荷をかけます。レスポンスタイム・スループット（req/s）・エラー率を計測し、スケールの限界を見つけます。k6やGatlingと比べてPythonで書けるのが強みです。`,
+      code:`# locustfile.py: 負荷テスト
+from locust import HttpUser, task, between
+
+class TodoAPIUser(HttpUser):
+    wait_time = between(0.1, 0.5)
+
+    def on_start(self):
+        """セッション開始時にトークン取得"""
+        response = self.client.post("/auth/token",
+            data={"username": "test", "password": "test"})
+        self.token = response.json()["access_token"]
+
+    @task(3)  # 重み: GETを3回、POSTを1回の割合で実行
+    def get_todos(self):
+        self.client.get("/api/todos",
+            headers={"Authorization": f"Bearer {self.token}"})
+
+    @task(1)
+    def create_todo(self):
+        self.client.post("/api/todos",
+            json={"text": "テストTodo", "priority": "medium"},
+            headers={"Authorization": f"Bearer {self.token}"})
+
+# 実行: locust -f locustfile.py --host=http://localhost:8000
+# Webダッシュボード: http://localhost:8089`,
+      afterCode:"locustはWebダッシュボードからユーザー数・スパン率をリアルタイムで調整できます。段階的に負荷を増やしてレスポンスタイムが急増する変曲点がシステムの限界です。"},
+     {title:"本番環境のuvicorn・DB最適化", est:"60分",
+      body:`uvicornのワーカー数はCPUコア数×2+1が目安ですが、I/O待ちが多いFastAPIはより多くのワーカーを使えます。GunicornでuvicornワーカーをプロセスとしてフォークすることでCPUコアを並列活用します。各ワーカーは独立したPythonプロセスなのでGIL（Global Interpreter Lock）の制約を受けません。
+
+SQLAlchemyのConnectionPoolをチューニングすることでDB接続のオーバーヘッドを削減できます。pool_size（常時保持する接続数）・max_overflow（一時的な上限）・pool_timeout（接続待機タイムアウト）の設定が重要です。Djangoのpersistent_connectionsに相当します。
+
+N+1クエリ問題はORMを使う際の典型的な落とし穴です。SQLAlchemyのselectinload・joinedloadでリレーションを事前に取得し、ループ内でのクエリを排除します。SQLAlchemy EventシステムでSQLのloggingを有効にしてどのクエリが実行されているかを確認します。`,
+      code:`# gunicorn_config.py
+import multiprocessing
+
+# ワーカー数: I/O bound なので CPUコア数 * 2 + 1 が目安
+workers = multiprocessing.cpu_count() * 2 + 1
+worker_class = "uvicorn.workers.UvicornWorker"
+worker_connections = 1000
+bind = "unix:/tmp/fastapi.sock"  # Unixソケットが最速
+timeout = 30
+keepalive = 5
+max_requests = 1000       # メモリリーク対策で定期再起動
+max_requests_jitter = 100
+
+# database.py: SQLAlchemy接続プール設定
+from sqlalchemy.ext.asyncio import create_async_engine
+
+engine = create_async_engine(
+    DATABASE_URL,
+    pool_size=10,        # 常時接続数
+    max_overflow=20,     # 最大追加接続数 (合計30)
+    pool_timeout=30,     # 接続取得タイムアウト(秒)
+    pool_recycle=1800,   # 接続を30分で再作成（MySQLの8時間問題対策）
+    echo=False,          # 本番ではSQLログを無効に
+)`,
+      afterCode:"Unixソケット（unix:/tmp/fastapi.sock）はTCPより低レイテンシで接続できます。NginxとFastAPIが同じサーバーにある場合はUnixソケットを使うのが最適です。本番ではHTTPS終端はNginxに任せましょう。"}
+   ]},
+];
+
 function FastAPIAdvancedCourse() {
-  const [currentCh, setCurrentCh] = useState(0);
-  const [chOpen, setChOpen] = useState(false);
-  const ch = chapters[currentCh];
-  const exList = EX[ch.id] || [];
-  const totalChapters = chapters.length;
-  const totalExercises = Object.values(EX).reduce((s, arr) => s + arr.length, 0);
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
 
-  function goTo(idx) {
-    setCurrentCh(idx);
-    setChOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  return React.createElement('div', {
-    style: { minHeight: '100vh', background: 'linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%)' }
-  },
-    // Hero
-    React.createElement('div', {
-      style: {
-        background: 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 60%,#9333ea 100%)',
-        padding: '60px 20px 50px', textAlign: 'center', color: '#fff',
-      }
-    },
-      React.createElement('div', {
-        style: {
-          display: 'inline-block', background: 'rgba(255,255,255,0.15)',
-          borderRadius: '999px', padding: '4px 18px',
-          fontSize: '13px', fontWeight: 700, marginBottom: '18px',
-          letterSpacing: '0.05em',
-        }
-      }, 'FastAPI 上級コース'),
-      React.createElement('h1', {
-        style: { fontSize: 'clamp(24px,5vw,42px)', fontWeight: 900, marginBottom: '12px' }
-      }, 'FastAPI 上級'),
-      React.createElement('p', {
-        style: { fontSize: '16px', opacity: 0.88, maxWidth: '680px', margin: '0 auto 24px', lineHeight: 1.7 }
-      }, 'マイクロサービスアーキテクチャ・イベント駆動・MLサービング・可観測性・高可用性・セキュリティ・CI/CD・パフォーマンスチューニングを習得し、FastAPIで本番グレードのシステムを設計・構築・運用できるエンジニアを目指します。中級コースを完了した方を対象とし、実務のアーキテクチャ判断と実装の両方を深く学びます。'),
-      React.createElement('div', {
-        style: { display: 'flex', justifyContent: 'center', gap: '24px', flexWrap: 'wrap' }
-      },
-        [
-          ['📚', `${totalChapters} 章`],
-          ['✏️', `${totalExercises} 演習`],
-          ['⏱️', '約 8 時間'],
-        ].map(([icon, label]) =>
-          React.createElement('div', {
-            key: label,
-            style: {
-              background: 'rgba(255,255,255,0.18)', borderRadius: '12px',
-              padding: '10px 22px', fontSize: '15px', fontWeight: 700,
-            }
-          }, `${icon} ${label}`)
+  return React.createElement("div", {style:{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"}},
+    React.createElement("div", {style:{maxWidth:1100,margin:"0 auto",padding:"20px 14px"}},
+      React.createElement("div", {style:{background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",borderRadius:16,padding:"24px 20px",marginBottom:16,position:"relative",overflow:"hidden"}},
+        React.createElement("div", {style:{position:"absolute",top:-30,right:-10,fontSize:140,opacity:0.05}}, "🚀"),
+        React.createElement("div", {style:{fontSize:11,fontWeight:700,color:"#a5b4fc",textTransform:"uppercase",letterSpacing:2,marginBottom:4}}, "Python開発者のための"),
+        React.createElement("h1", {style:{margin:0,fontSize:22,fontWeight:900,color:"#fff"}}, "FastAPI 上級コース"),
+        React.createElement("p", {style:{margin:"6px 0 0",fontSize:12.5,color:"#c4b5fd"}}, "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問"),
+        React.createElement("p", {style:{margin:"10px 0 0",fontSize:12,color:"#ddd6fe",lineHeight:1.8}}, "ASGI内部・CQRS・Kafka・MLサービング・サーバレス・API Gatewayを習得し、エンタープライズ品質のAPI基盤を設計できる力をつけます。"),
+        React.createElement("div", {style:{marginTop:14,display:"flex",gap:3}},
+          chapters.map((_,i) => React.createElement("div", {key:i, onClick:()=>{setCh(i);setMenuOpen(false);}, style:{flex:1,height:5,borderRadius:3,background:i<=ch?"#818cf8":"rgba(255,255,255,0.15)",cursor:"pointer"}}))
         )
-      )
-    ),
-
-    // Main content
-    React.createElement('div', { style: { maxWidth: '1100px', margin: '0 auto', padding: '30px 16px 60px' } },
-      React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'flex-start' } },
-
-        // Sidebar
-        React.createElement('div', {
-          style: {
-            width: '230px', flexShrink: 0,
-            background: '#fff', borderRadius: '16px',
-            padding: '16px 12px', boxShadow: '0 2px 12px rgba(99,102,241,0.1)',
-            position: 'sticky', top: '72px',
-          }
-        },
-          React.createElement('p', {
-            style: { fontSize: '11px', fontWeight: 700, color: '#9ca3af', padding: '0 8px 10px', letterSpacing: '0.06em' }
-          }, 'CHAPTERS'),
-          chapters.map((c, i) =>
-            React.createElement('button', {
-              key: c.id,
-              onClick: () => goTo(i),
-              style: {
-                width: '100%', textAlign: 'left',
-                background: i === currentCh ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'none',
-                color: i === currentCh ? '#fff' : '#374151',
-                border: 'none', borderRadius: '10px',
-                padding: '9px 12px', cursor: 'pointer',
-                fontSize: '13px', fontWeight: i === currentCh ? 700 : 500,
-                marginBottom: '2px', transition: 'all 0.15s',
-              }
-            }, `${c.num}. ${c.title}`)
-          )
+      ),
+      React.createElement("div", {style:{marginBottom:14}},
+        React.createElement("button", {onClick:()=>setMenuOpen(!menuOpen), style:{width:"100%",padding:"10px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",fontSize:14,fontWeight:700,color:"#1e1b4b",cursor:"pointer",display:"flex",justifyContent:"space-between"}},
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", {style:{fontSize:12,color:"#9ca3af"}}, menuOpen?"▲":"▼")
         ),
-
-        // Chapter area
-        React.createElement('div', { style: { flex: 1, minWidth: 0 } },
-
-          // Chapter header
-          React.createElement('div', {
-            style: {
-              background: '#fff', borderRadius: '16px',
-              padding: '24px 28px', marginBottom: '20px',
-              boxShadow: '0 2px 12px rgba(99,102,241,0.08)',
-            }
-          },
-            React.createElement('div', {
-              style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }
-            },
-              React.createElement('span', {
-                style: {
-                  background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                  color: '#fff', borderRadius: '8px',
-                  padding: '3px 12px', fontSize: '12px', fontWeight: 700,
-                }
-              }, `Chapter ${ch.num}`),
-              React.createElement('span', {
-                style: { fontSize: '13px', color: '#9ca3af' }
-              }, `推定学習時間: ${ch.est}`)
-            ),
-            React.createElement('h2', {
-              style: { fontSize: '22px', fontWeight: 900, color: '#1e1b4b', marginBottom: '14px' }
-            }, ch.title),
-            React.createElement('div', {
-              style: {
-                background: 'linear-gradient(135deg,#ede9fe,#ddd6fe)',
-                border: '1.5px solid #c4b5fd', borderRadius: '10px',
-                padding: '12px 16px',
-              }
-            },
-              React.createElement('p', {
-                style: { fontSize: '13px', fontWeight: 700, color: '#5b21b6', marginBottom: '4px' }
-              }, '🎯 この章のゴール'),
-              React.createElement('p', {
-                style: { fontSize: '13.5px', color: '#4c1d95', lineHeight: 1.7 }
-              }, ch.goal)
-            )
-          ),
-
-          // Sections
-          React.createElement('div', {
-            style: {
-              background: '#fff', borderRadius: '16px',
-              boxShadow: '0 2px 12px rgba(99,102,241,0.08)',
-              marginBottom: '20px', overflow: 'hidden',
-            }
-          },
-            ch.sections.map(sec =>
-              React.createElement(Section, { key: `${ch.id}-${sec.title}`, sec, chId: ch.id })
-            )
-          ),
-
-          // Exercises
-          exList.length > 0 && React.createElement('div', {
-            style: {
-              background: '#fff', borderRadius: '16px',
-              boxShadow: '0 2px 12px rgba(99,102,241,0.08)',
-              padding: '24px 24px', marginBottom: '20px',
-            }
-          },
-            React.createElement('h3', {
-              style: { fontSize: '17px', fontWeight: 800, color: '#1e1b4b', marginBottom: '16px' }
-            }, '演習問題'),
-            exList.map((ex, idx) =>
-              React.createElement(Exercise, { key: `${ch.id}-ex-${idx}`, ex, chId: ch.id, idx })
-            )
-          ),
-
-          // Chapter navigation
-          React.createElement('div', {
-            style: { display: 'flex', justifyContent: 'space-between', gap: '12px' }
-          },
-            React.createElement('button', {
-              onClick: () => currentCh > 0 && goTo(currentCh - 1),
-              disabled: currentCh === 0,
-              style: {
-                padding: '10px 22px', borderRadius: '10px',
-                border: '1.5px solid #c7d2fe', background: currentCh === 0 ? '#f3f4f6' : '#fff',
-                color: currentCh === 0 ? '#9ca3af' : '#4338ca',
-                fontWeight: 700, fontSize: '14px', cursor: currentCh === 0 ? 'default' : 'pointer',
-              }
-            }, '← 前の章'),
-            currentCh < totalChapters - 1
-              ? React.createElement('button', {
-                  onClick: () => goTo(currentCh + 1),
-                  style: {
-                    padding: '10px 22px', borderRadius: '10px',
-                    background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                    color: '#fff', border: 'none',
-                    fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                  }
-                }, '次の章 →')
-              : React.createElement('a', {
-                  href: '../index.html',
-                  style: {
-                    padding: '10px 22px', borderRadius: '10px',
-                    background: 'linear-gradient(135deg,#059669,#10b981)',
-                    color: '#fff', border: 'none',
-                    fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                    textDecoration: 'none', display: 'inline-block',
-                  }
-                }, '🎉 コース完了 — ホームへ')
-          ),
-
-          // Footer
-          React.createElement('p', {
-            style: {
-              textAlign: 'center', fontSize: '12px', color: '#9ca3af',
-              marginTop: '32px',
-            }
-          }, 'fastapi.tiangolo.com ・ FastAPI 0.115 時点')
+        menuOpen && React.createElement("div", {style:{marginTop:4,border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden",background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}},
+          chapters.map((c,i) => React.createElement("button", {key:c.id, onClick:()=>{setCh(i);setMenuOpen(false);}, style:{width:"100%",padding:"10px 16px",border:"none",borderBottom:i<chapters.length-1?"1px solid #f3f4f6":"none",background:i===ch?"#eef2ff":"#fff",fontSize:13,fontWeight:i===ch?700:500,color:i===ch?"#4338ca":"#374151",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10}},
+            React.createElement("span", {style:{width:22,height:22,borderRadius:"50%",background:i===ch?"#6366f1":"#e5e7eb",color:i===ch?"#fff":"#6b7280",fontWeight:800,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}, c.num),
+            React.createElement("span", {style:{flex:1}}, c.title),
+            EX[c.id] && React.createElement("span", {style:{fontSize:11,color:"#f59e0b",fontWeight:700}}, EX[c.id].length, "問")
+          ))
         )
-      )
+      ),
+      React.createElement("div", {style:{display:"flex",alignItems:"center",gap:10,marginBottom:12}},
+        React.createElement("span", {style:{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",fontWeight:900,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", {style:{fontWeight:800,fontSize:18,color:"#1e1b4b"}}, chapter.title),
+          React.createElement("div", {style:{fontSize:12,color:"#6b7280"}}, "目安: ", chapter.est, exercises.length>0?" ・ 演習"+exercises.length+"問":"")
+        )
+      ),
+      chapter.goal && React.createElement("div", {style:{background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",border:"1px solid #c7d2fe",borderLeft:"4px solid #6366f1",borderRadius:10,padding:"12px 16px",marginBottom:14}},
+        React.createElement("div", {style:{fontSize:11,fontWeight:800,color:"#4338ca",letterSpacing:1,marginBottom:6}}, "🎯 この章のゴール"),
+        React.createElement("div", {style:{fontSize:13.5,color:"#1e1b4b",lineHeight:1.8,whiteSpace:"pre-line"}}, chapter.goal)
+      ),
+      React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:8}},
+        chapter.sections.map((sec,i) => React.createElement(Section, {key:ch+"-"+i, section:sec, idx:i, defaultOpen:false}))
+      ),
+      exercises.length>0 && React.createElement("div", {style:{marginTop:20}},
+        React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}},
+          React.createElement("span", {style:{background:"#f59e0b",color:"#fff",fontWeight:800,fontSize:13,padding:"4px 14px",borderRadius:8}}, "🏋️ 演習問題"),
+          React.createElement("span", {style:{fontSize:13,color:"#92400e"}}, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex,i) => React.createElement(Exercise, {key:ch+"-"+i, ex, idx:i}))
+      ),
+      React.createElement("div", {style:{display:"flex",justifyContent:"space-between",marginTop:20,gap:10}},
+        ch>0 ? React.createElement("button", {onClick:()=>{setCh(ch-1);window.scrollTo(0,0);}, style:{flex:1,padding:"12px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",cursor:"pointer",fontWeight:600,fontSize:13,color:"#6b7280"}}, "← Ch.", chapters[ch-1].num) : React.createElement("div", {style:{flex:1}}),
+        ch<chapters.length-1 ? React.createElement("button", {onClick:()=>{setCh(ch+1);window.scrollTo(0,0);}, style:{flex:1,padding:"12px 16px",border:"none",borderRadius:10,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff"}}, "Ch.", chapters[ch+1].num, " →")
+        : React.createElement("a", {href:"../index.html", style:{flex:1,padding:"12px 16px",borderRadius:10,background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none"}}, "🎉 コース完了！")
+      ),
+      React.createElement("p", {style:{textAlign:"center",fontSize:11,color:"#9ca3af",marginTop:20}}, "fastapi.tiangolo.com ・ FastAPI 0.100+ 時点")
     )
   );
 }

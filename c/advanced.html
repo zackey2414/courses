@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>C言語 上級コース — 言語処理系・OS・ライブラリ設計</title>
+  <title>C言語 上級コース — 字句解析・カーネル・GC・高性能サーバ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
@@ -11,11 +11,14 @@
     body { font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; }
     button { font-family: inherit; }
     #root { min-height: 100vh; padding-top: 56px; }
-    .site-header { position:fixed;top:0;left:0;right:0;z-index:100;height:56px;display:flex;align-items:center;padding:0 20px;background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);border-bottom:1px solid #e5e7eb; }
-    .site-header a.home-link { display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#1e1b4b;font-weight:800;font-size:15px;padding:6px 12px;border-radius:10px; }
-    .site-header a.home-link:hover { background:#eef2ff; }
-    .site-header .logo-mark { width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px; }
-    .site-header .logo-text small { display:block;font-size:10px;font-weight:500;color:#6b7280; }
+    #root > div { max-width: 100%; }
+    #root > div > div { max-width: 1100px !important; margin: 0 auto; }
+    .site-header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 56px; display: flex; align-items: center; padding: 0 20px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e5e7eb; }
+    .site-header a.home-link { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: #1e1b4b; font-weight: 800; font-size: 15px; padding: 6px 12px; border-radius: 10px; transition: background 0.15s; }
+    .site-header a.home-link:hover { background: #eef2ff; }
+    .site-header .logo-mark { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 15px; }
+    .site-header .logo-text { letter-spacing: -0.01em; }
+    .site-header .logo-text small { display: block; font-size: 10px; font-weight: 500; color: #6b7280; letter-spacing: 0.5px; }
   </style>
 </head>
 <body>
@@ -28,887 +31,1338 @@
   <div id="root"></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="../assets/course-ui.js"></script>
   <script>
 const { useState } = React;
 
-const T = {
-  lexerTokens: {
-    h: ["トークン種別", "例", "パターン"],
-    r: [
-      ["NUMBER", "42, 3.14", "数字の連続"],
-      ["STRING", "\"hello\"", "\" ... \""],
-      ["IDENT", "foo, main, if", "英字または_で始まる"],
-      ["PLUS", "+", "文字 '+'"],
-      ["MINUS", "-", "文字 '-'"],
-      ["STAR", "*", "文字 '*'"],
-      ["SLASH", "/", "文字 '/'"],
-      ["LPAREN", "(", "文字 '('"],
-      ["RPAREN", ")", "文字 ')'"],
-      ["EOF", "", "入力終端"]
-    ]
-  },
-  abiPrinciples: {
-    h: ["規則", "説明", "違反した場合"],
-    r: [
-      ["構造体サイズを変えない", "既存のフィールド削除・並び替えはNG", "バイナリ互換性の破壊"],
-      ["関数シグネチャを変えない", "引数の型・順序・数の変更はNG", "呼び出し元がクラッシュ"],
-      ["フィールドは末尾に追加のみ", "末尾への追加はOK（既存オフセット不変）", "既存コードへの影響なし"],
-      ["opaque型（不透明型）", "struct の中身を公開しない", "ABI変更時も互換性維持"]
-    ]
-  },
-  coroutine: {
-    h: ["方式", "説明", "メリット・デメリット"],
-    r: [
-      ["setjmp/longjmp", "非局所ジャンプで制御を移す", "簡単だがスタック管理が必要"],
-      ["ucontext_t", "POSIXのコンテキスト切り替え", "標準的だが非推奨（macOSなど）"],
-      ["独自スタック切り替え", "スタックポインタを直接操作", "最速だが移植性なし（アセンブリ必要）"],
-      ["Protothreads", "マクロベースのスタックレス実装", "スタック変数が使えない制限あり"]
-    ]
-  },
-  linkerScript: {
-    h: ["セクション", "内容", "特性"],
-    r: [
-      [".text", "コード（実行可能）", "読み取り専用・実行可能"],
-      [".rodata", "文字列リテラル・定数", "読み取り専用"],
-      [".data", "初期値あり静的変数", "読み書き可能"],
-      [".bss", "初期値なし静的変数", "起動時に0クリア"],
-      [".heap", "malloc の領域", "実行時に拡張"],
-      [".stack", "関数呼び出しスタック", "実行時に消費"]
-    ]
-  }
-};
-
 const EX = {
-  ch1: [{
-    diff: 3,
-    q: "四則演算の再帰下降パーサーを実装してください。\n文法:\n  expr  = term (('+' | '-') term)*\n  term  = factor (('*' | '/') factor)*\n  factor = NUMBER | '(' expr ')'\n\n例: parse(\"3+4*2\") → 11, parse(\"(3+4)*2\") → 14\n\n【使う知識】再帰, 文字列走査, 優先順位の扱い",
-    code: `#include <stdio.h>
-#include <stdlib.h>
+  ch1: [
+    {diff:2, q:"簡単なトークナイザーを実装してください。入力文字列から整数リテラル・識別子・演算子(+,-,*,/)をトークン化してください。",
+     code:`#include <stdio.h>
 #include <ctype.h>
-
-static const char *pos;
-
-double expr(void);
-double term(void);
-double factor(void);
-
-double parse(const char *s) {
-    pos = s;
-    return expr();
-}
-
-int main(void) {
-    printf("%.2f\\n", parse("3+4*2"));       // 11.00
-    printf("%.2f\\n", parse("(3+4)*2"));     // 14.00
-    printf("%.2f\\n", parse("10/2-3"));      // 2.00
-    return 0;
-}`,
-    answer: `#include <stdio.h>
-#include <stdlib.h>
-#include <ctype.h>
-
-static const char *pos;
-
-static void skip_ws(void) { while (isspace((unsigned char)*pos)) pos++; }
-static double expr(void);
-static double term(void);
-
-static double factor(void) {
-    skip_ws();
-    if (*pos == '(') { pos++; double v = expr(); skip_ws(); pos++; return v; }
-    char *end; double v = strtod(pos, &end); pos = end; return v;
-}
-static double term(void) {
-    double v = factor();
-    while (skip_ws(), (*pos=='*'||*pos=='/')) {
-        char op = *pos++; double r = factor();
-        v = op=='*' ? v*r : v/r;
-    }
-    return v;
-}
-static double expr(void) {
-    double v = term();
-    while (skip_ws(), (*pos=='+'||*pos=='-')) {
-        char op = *pos++; double r = term();
-        v = op=='+' ? v+r : v-r;
-    }
-    return v;
-}
-double parse(const char *s) { pos = s; return expr(); }
-
-int main(void) {
-    printf("%.2f\\n", parse("3+4*2"));
-    printf("%.2f\\n", parse("(3+4)*2"));
-    printf("%.2f\\n", parse("10/2-3"));
-    return 0;
-}`
-  }],
-  ch2: [{
-    diff: 3,
-    q: "ブレインファック（Brainf*ck）インタープリターを実装してください。\n・コマンド: > < + - . , [ ]\n・メモリは30000セル（uint8_t配列）\n・[ ] はループ（現在セルが0なら対応する]まで飛ぶ）\n\n【使う知識】状態機械, スタック（ループのネスト対処）",
-    code: `#include <stdio.h>
 #include <string.h>
 
-#define MEM_SIZE 30000
+typedef enum { TOK_INT, TOK_IDENT, TOK_OP, TOK_EOF } TokenKind;
+typedef struct { TokenKind kind; char value[64]; } Token;
 
-void bf_run(const char *prog) {
-    uint8_t mem[MEM_SIZE] = {0};
-    int dp = 0;                     // データポインタ
-    int ip = 0;                     // 命令ポインタ
-    int len = (int)strlen(prog);
-    // 実装してください
-}
-
-int main(void) {
-    // "Hello World!" を出力するBF
-    bf_run("++++++++++[>+++++++>++++++++++>+++>+<<<<-]"
-           ">++.>+.+++++++..+++.>++.<<+++++++++++++++."
-           ">.+++.------.--------.>+.>.");
-    return 0;
+Token next_token(const char **src) {
+    // 空白スキップ → 数字/英字/演算子を判定
 }`,
-    answer: `#include <stdio.h>
-#include <string.h>
-#include <stdint.h>
-
-#define MEM_SIZE 30000
-
-void bf_run(const char *prog) {
-    uint8_t mem[MEM_SIZE]; memset(mem,0,sizeof(mem));
-    int dp=0, ip=0, len=(int)strlen(prog);
-    while (ip < len) {
-        switch (prog[ip]) {
-            case '>': dp++; break;
-            case '<': dp--; break;
-            case '+': mem[dp]++; break;
-            case '-': mem[dp]--; break;
-            case '.': putchar(mem[dp]); break;
-            case ',': mem[dp]=(uint8_t)getchar(); break;
-            case '[':
-                if (!mem[dp]) {
-                    int depth=1;
-                    while (depth && ++ip<len)
-                        depth += prog[ip]=='[' ? 1 : prog[ip]==']' ? -1 : 0;
-                }
-                break;
-            case ']':
-                if (mem[dp]) {
-                    int depth=1;
-                    while (depth && --ip>=0)
-                        depth += prog[ip]==']' ? 1 : prog[ip]=='[' ? -1 : 0;
-                }
-                break;
+     answer:`Token next_token(const char **src) {
+    while (isspace(**src)) (*src)++;
+    if (**src == '\\0') return (Token){TOK_EOF, ""};
+    Token tok;
+    if (isdigit(**src)) {
+        tok.kind = TOK_INT;
+        int i = 0;
+        while (isdigit(**src)) tok.value[i++] = *(*src)++;
+        tok.value[i] = '\\0';
+    } else if (isalpha(**src) || **src == '_') {
+        tok.kind = TOK_IDENT;
+        int i = 0;
+        while (isalnum(**src) || **src == '_') tok.value[i++] = *(*src)++;
+        tok.value[i] = '\\0';
+    } else {
+        tok.kind = TOK_OP;
+        tok.value[0] = *(*src)++;
+        tok.value[1] = '\\0';
+    }
+    return tok;
+}`},
+    {diff:3, q:"文字列をトークナイズする際、/*...*/形式のCスタイルコメントをスキップする処理を実装してください。",
+     code:`void skip_comment(const char **src) {
+    // '/*' を検出したらコメント終了の '*/' まで進める
+    // ネストは考慮不要
+}`,
+     answer:`void skip_comment(const char **src) {
+    if ((*src)[0] == '/' && (*src)[1] == '*') {
+        *src += 2; // '/*' をスキップ
+        while (**src != '\\0') {
+            if ((*src)[0] == '*' && (*src)[1] == '/') {
+                *src += 2; // '*/' をスキップ
+                return;
+            }
+            (*src)++;
         }
-        ip++;
+        fprintf(stderr, "コメントが閉じられていません\\n");
     }
+}`}
+  ],
+  ch2: [
+    {diff:2, q:"整数リテラルと+演算子を扱う再帰下降パーサーを実装してください。expr → term ('+' term)*、term → NUMBERの文法を実装してください。",
+     code:`#include <stdlib.h>
+
+typedef struct Node { int value; struct Node *left, *right; char op; } Node;
+
+Node *parse_expr(const char **src);
+Node *parse_term(const char **src);
+
+// parse_termはTOK_INTを読みNodeを返す
+// parse_exprは'+' が続く限りループ`,
+     answer:`Node *new_node(int val) {
+    Node *n = malloc(sizeof(Node));
+    n->value = val; n->left = n->right = NULL; n->op = 0;
+    return n;
 }
-int main(void) {
-    bf_run("++++++++++[>+++++++>++++++++++>+++>+<<<<-]"
-           ">++.>+.+++++++..+++.>++.<<+++++++++++++++."
-           ">.+++.------.--------.>+.>.");
-    printf("\\n"); return 0;
-}`
-  }],
-  ch3: [{
-    diff: 3,
-    q: "カーネルモジュールの骨格を書いてください（Linux）。\n・モジュール名: hello_module\n・ロード時: \"Hello, Kernel!\" をprintk\n・アンロード時: \"Goodbye, Kernel!\" をprintk\n・Makefile も含めて示す\n\n【使う知識】<linux/module.h>, module_init/exit, printk",
-    code: `// hello_module.c の内容
-// Makefile の内容
-// コンパイル: make
-// ロード: sudo insmod hello_module.ko
-// 確認: dmesg | tail
-// アンロード: sudo rmmod hello_module`,
-    answer: `// hello_module.c
-#include <linux/module.h>
+Node *parse_term(const char **src) {
+    while (isspace(**src)) (*src)++;
+    int v = 0;
+    while (isdigit(**src)) v = v * 10 + (*(*src)++ - '0');
+    return new_node(v);
+}
+Node *parse_expr(const char **src) {
+    Node *left = parse_term(src);
+    while (isspace(**src)) (*src)++;
+    while (**src == '+') {
+        (*src)++;
+        Node *right = parse_term(src);
+        Node *parent = new_node(0);
+        parent->op = '+'; parent->left = left; parent->right = right;
+        left = parent;
+        while (isspace(**src)) (*src)++;
+    }
+    return left;
+}`},
+    {diff:3, q:"ASTノードを再帰的にevalし、整数計算結果を返す関数を実装してください。+と-と*と/をサポートしてください。",
+     code:`int eval(Node *node) {
+    // 葉ノード: value を返す
+    // 内部ノード: opに応じて左右を再帰eval
+}`,
+     answer:`int eval(Node *node) {
+    if (!node->left && !node->right) return node->value;
+    int l = eval(node->left);
+    int r = eval(node->right);
+    switch (node->op) {
+        case '+': return l + r;
+        case '-': return l - r;
+        case '*': return l * r;
+        case '/':
+            if (r == 0) { fprintf(stderr, "ゼロ除算\\n"); return 0; }
+            return l / r;
+        default:
+            fprintf(stderr, "不明な演算子: %c\\n", node->op);
+            return 0;
+    }
+}`}
+  ],
+  ch3: [
+    {diff:2, q:"Linuxカーネルモジュールのhello_init・hello_exitを実装し、insmodでメッセージがカーネルログに表示されるようにしてください。",
+     code:`#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Your Name");
-MODULE_DESCRIPTION("Hello Kernel Module");
+MODULE_AUTHOR("Student");
 
 static int __init hello_init(void) {
-    printk(KERN_INFO "Hello, Kernel!\\n");
+    // pr_infoでメッセージを出力
+}
+
+static void __exit hello_exit(void) {
+    // pr_infoでメッセージを出力
+}`,
+     answer:`#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Student");
+MODULE_DESCRIPTION("Hello World Kernel Module");
+
+static int __init hello_init(void) {
+    pr_info("Hello, Kernel World!\\n");
+    return 0; // 0以外はinsmod失敗
+}
+
+static void __exit hello_exit(void) {
+    pr_info("Goodbye, Kernel World!\\n");
+}
+
+module_init(hello_init);
+module_exit(hello_exit);`},
+    {diff:3, q:"/proc/hello_countファイルを持つカーネルモジュールを実装してください。読み取るたびにカウンタが増加し、数値を返してください。",
+     code:`#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+
+static int count = 0;
+
+static int hello_show(struct seq_file *m, void *v) {
+    // カウンタをインクリメントして表示
+}
+
+static int hello_open(struct inode *inode, struct file *file) {
+    return single_open(file, hello_show, NULL);
+}`,
+     answer:`#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/atomic.h>
+
+static atomic_t count = ATOMIC_INIT(0);
+
+static int hello_show(struct seq_file *m, void *v) {
+    int c = atomic_inc_return(&count);
+    seq_printf(m, "Read count: %d\\n", c);
+    return 0;
+}
+
+static int hello_open(struct inode *inode, struct file *file) {
+    return single_open(file, hello_show, NULL);
+}
+
+static const struct proc_ops hello_fops = {
+    .proc_open = hello_open,
+    .proc_read = seq_read,
+    .proc_release = single_release,
+};
+
+static int __init hello_init(void) {
+    proc_create("hello_count", 0444, NULL, &hello_fops);
+    return 0;
+}`}
+  ],
+  ch4: [
+    {diff:2, q:"Mark-and-Sweepガーベジコレクタのマーク処理を実装してください。オブジェクトのmarkedフラグを再帰的に設定してください。",
+     code:`#include <stdbool.h>
+#define MAX_REFS 8
+
+typedef struct Object {
+    bool marked;
+    struct Object *refs[MAX_REFS];
+    int num_refs;
+} Object;
+
+void mark(Object *obj) {
+    // 既にマーク済みならスキップ
+    // マーク → 子を再帰的にmark
+}`,
+     answer:`void mark(Object *obj) {
+    if (!obj || obj->marked) return; // NULL or already marked
+    obj->marked = true;
+    for (int i = 0; i < obj->num_refs; i++) {
+        mark(obj->refs[i]); // 子オブジェクトを再帰的にマーク
+    }
+}`},
+    {diff:3, q:"スウィープ処理を実装してください。マークされていないオブジェクトをヒープリストから除去してfreeし、マーク済みオブジェクトのmarkedをリセットしてください。",
+     code:`typedef struct HeapNode {
+    Object *obj;
+    struct HeapNode *next;
+} HeapNode;
+
+HeapNode *heap_head = NULL;
+
+void sweep(void) {
+    // markedでないObjectをfree
+    // markedなObjectのmarkedをfalseにリセット
+}`,
+     answer:`void sweep(void) {
+    HeapNode **curr = &heap_head;
+    while (*curr) {
+        HeapNode *node = *curr;
+        if (!node->obj->marked) {
+            // マークされていない: 解放
+            *curr = node->next;
+            free(node->obj);
+            free(node);
+        } else {
+            // マークされている: フラグをリセット
+            node->obj->marked = false;
+            curr = &node->next;
+        }
+    }
+}`}
+  ],
+  ch5: [
+    {diff:2, q:"ELFファイルのマジックナンバーとファイルタイプを検証するC関数を実装してください。",
+     code:`#include <stdio.h>
+#include <stdint.h>
+#include <elf.h>
+
+int check_elf_header(const char *filename) {
+    // ファイルを開いてElf64_Ehdrを読み込む
+    // マジックナンバー確認 → ファイルタイプを表示
+}`,
+     answer:`#include <stdio.h>
+#include <elf.h>
+
+int check_elf_header(const char *filename) {
+    FILE *f = fopen(filename, "rb");
+    if (!f) { perror(filename); return -1; }
+    Elf64_Ehdr hdr;
+    if (fread(&hdr, sizeof(hdr), 1, f) != 1) {
+        fclose(f); return -1;
+    }
+    fclose(f);
+    if (hdr.e_ident[EI_MAG0] != ELFMAG0 ||
+        hdr.e_ident[EI_MAG1] != ELFMAG1 ||
+        hdr.e_ident[EI_MAG2] != ELFMAG2 ||
+        hdr.e_ident[EI_MAG3] != ELFMAG3) {
+        fprintf(stderr, "ELFファイルではありません\\n");
+        return -1;
+    }
+    const char *types[] = {"NONE","REL","EXEC","DYN","CORE"};
+    printf("ELFタイプ: %s\\n", e_type < 5 ? types[hdr.e_type] : "OTHER");
+    return 0;
+}`},
+    {diff:3, q:"ELFファイルのセクションヘッダテーブルを読み込み、全セクション名と種類を表示するC関数を実装してください。",
+     code:`void print_sections(const char *filename) {
+    // Elf64_Ehdrを読む
+    // セクションヘッダテーブルの位置へfseek
+    // 各セクションヘッダを読んでsh_nameとsh_typeを表示
+}`,
+     answer:`#include <stdio.h>
+#include <stdlib.h>
+#include <elf.h>
+
+void print_sections(const char *filename) {
+    FILE *f = fopen(filename, "rb");
+    if (!f) { perror(filename); return; }
+
+    Elf64_Ehdr ehdr;
+    fread(&ehdr, sizeof(ehdr), 1, f);
+
+    // セクション名文字列テーブル (shstrtab) を読む
+    fseek(f, ehdr.e_shoff + ehdr.e_shstrndx * ehdr.e_shentsize, SEEK_SET);
+    Elf64_Shdr shstrtab_hdr;
+    fread(&shstrtab_hdr, sizeof(shstrtab_hdr), 1, f);
+    char *shstrtab = malloc(shstrtab_hdr.sh_size);
+    fseek(f, shstrtab_hdr.sh_offset, SEEK_SET);
+    fread(shstrtab, shstrtab_hdr.sh_size, 1, f);
+
+    // 各セクションを表示
+    for (int i = 0; i < ehdr.e_shnum; i++) {
+        fseek(f, ehdr.e_shoff + i * ehdr.e_shentsize, SEEK_SET);
+        Elf64_Shdr shdr;
+        fread(&shdr, sizeof(shdr), 1, f);
+        printf("[%2d] %-20s type=%u\\n", i,
+               shstrtab + shdr.sh_name, shdr.sh_type);
+    }
+    free(shstrtab);
+    fclose(f);
+}`}
+  ],
+  ch6: [
+    {diff:2, q:"epollを使ってソケットをノンブロッキングに設定し、epoll_ctlで監視を登録する初期化関数を実装してください。",
+     code:`#include <sys/epoll.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int make_nonblocking(int fd);
+int setup_epoll(int server_fd);
+// epollfdを作成してserver_fdをEPOLLINで登録`,
+     answer:`#include <sys/epoll.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+int make_nonblocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+int setup_epoll(int server_fd) {
+    int epfd = epoll_create1(EPOLL_CLOEXEC);
+    if (epfd < 0) { perror("epoll_create1"); exit(1); }
+
+    struct epoll_event ev = {
+        .events = EPOLLIN | EPOLLET, // Edge-Triggered
+        .data.fd = server_fd,
+    };
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, server_fd, &ev) < 0) {
+        perror("epoll_ctl"); exit(1);
+    }
+    return epfd;
+}`},
+    {diff:3, q:"epollイベントループで新しい接続を受け付け、既存接続からのデータを読み込んでそのままエコーバックする簡単なHTTPサーバのメインループを実装してください。",
+     code:`#define MAX_EVENTS 64
+
+void event_loop(int server_fd, int epfd) {
+    struct epoll_event events[MAX_EVENTS];
+    // epoll_waitでイベントを受け取る
+    // server_fdなら accept → 登録
+    // それ以外なら read → send (エコー)
+}`,
+     answer:`#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+
+#define MAX_EVENTS 64
+#define BUF_SIZE 4096
+
+void event_loop(int server_fd, int epfd) {
+    struct epoll_event events[MAX_EVENTS];
+    char buf[BUF_SIZE];
+
+    for (;;) {
+        int n = epoll_wait(epfd, events, MAX_EVENTS, -1);
+        for (int i = 0; i < n; i++) {
+            int fd = events[i].data.fd;
+            if (fd == server_fd) {
+                // 新しい接続を受け付ける
+                struct sockaddr_in addr;
+                socklen_t addrlen = sizeof(addr);
+                int client = accept4(server_fd, (struct sockaddr*)&addr,
+                                     &addrlen, SOCK_NONBLOCK | SOCK_CLOEXEC);
+                if (client < 0) continue;
+                struct epoll_event ev = {
+                    .events = EPOLLIN | EPOLLET,
+                    .data.fd = client
+                };
+                epoll_ctl(epfd, EPOLL_CTL_ADD, client, &ev);
+            } else {
+                // データ受信: エコーバック
+                ssize_t r = read(fd, buf, BUF_SIZE);
+                if (r <= 0) { close(fd); }
+                else { send(fd, buf, r, 0); }
+            }
+        }
+    }
+}`}
+  ],
+  ch7: [
+    {diff:2, q:"固定サイズのメモリプールを実装してください。pool_init・pool_alloc・pool_freeを実装してください。",
+     code:`#include <stddef.h>
+#include <stdint.h>
+
+#define POOL_CAPACITY 1024
+#define BLOCK_SIZE    64
+
+typedef struct {
+    uint8_t data[POOL_CAPACITY * BLOCK_SIZE];
+    uint8_t used[POOL_CAPACITY]; // 0=空き, 1=使用中
+} Pool;
+
+void pool_init(Pool *p);
+void *pool_alloc(Pool *p);
+void pool_free(Pool *p, void *ptr);`,
+     answer:`#include <string.h>
+
+void pool_init(Pool *p) {
+    memset(p->used, 0, sizeof(p->used));
+}
+
+void *pool_alloc(Pool *p) {
+    for (int i = 0; i < POOL_CAPACITY; i++) {
+        if (!p->used[i]) {
+            p->used[i] = 1;
+            return p->data + i * BLOCK_SIZE;
+        }
+    }
+    return NULL; // プール枯渇
+}
+
+void pool_free(Pool *p, void *ptr) {
+    uint8_t *bp = (uint8_t*)ptr;
+    ptrdiff_t offset = bp - p->data;
+    if (offset < 0 || offset % BLOCK_SIZE != 0) return;
+    p->used[offset / BLOCK_SIZE] = 0;
+}`},
+    {diff:3, q:"フリーリストを持つカスタムアロケータを実装してください。malloc/freeの代わりに使え、解放されたブロックはフリーリストで管理してください。",
+     code:`typedef struct FreeBlock { struct FreeBlock *next; size_t size; } FreeBlock;
+static uint8_t heap[65536];
+static FreeBlock *free_list = NULL;
+
+void allocator_init(void);
+void *my_malloc(size_t size);
+void my_free(void *ptr);`,
+     answer:`#include <string.h>
+#include <stdint.h>
+
+static uint8_t heap[65536];
+static FreeBlock *free_list = NULL;
+
+void allocator_init(void) {
+    free_list = (FreeBlock *)heap;
+    free_list->size = sizeof(heap) - sizeof(FreeBlock);
+    free_list->next = NULL;
+}
+
+void *my_malloc(size_t size) {
+    FreeBlock **curr = &free_list;
+    while (*curr) {
+        if ((*curr)->size >= size) {
+            FreeBlock *block = *curr;
+            *curr = block->next; // フリーリストから除去
+            return (uint8_t *)block + sizeof(FreeBlock);
+        }
+        curr = &(*curr)->next;
+    }
+    return NULL;
+}
+
+void my_free(void *ptr) {
+    FreeBlock *block = (FreeBlock *)((uint8_t *)ptr - sizeof(FreeBlock));
+    block->next = free_list;
+    free_list = block; // フリーリストの先頭に追加
+}`}
+  ],
+  ch8: [
+    {diff:2, q:"スタックバッファオーバーフローに脆弱な関数を修正してください。strncpyを使い、NUL終端を保証してください。",
+     code:`#include <string.h>
+
+// 脆弱: バッファオーバーフローの可能性
+void vulnerable_copy(char *dst, const char *src) {
+    strcpy(dst, src);  // srcが長すぎると危険
+}
+
+// 安全版: bufsize引数を追加してstrncpyで修正
+void safe_copy(char *dst, const char *src, size_t bufsize) {
+    // 実装してください
+}`,
+     answer:`#include <string.h>
+
+void safe_copy(char *dst, const char *src, size_t bufsize) {
+    if (bufsize == 0) return;
+    strncpy(dst, src, bufsize - 1);
+    dst[bufsize - 1] = '\\0'; // 必ずNUL終端
+    // strlcpy(dst, src, bufsize) が使える環境ではそちらを推奨
+}
+
+// さらに安全: snprintfを使う方法
+void safe_copy2(char *dst, const char *src, size_t bufsize) {
+    snprintf(dst, bufsize, "%s", src);
+    // snprintfは常にNUL終端し、戻り値で切り捨てを検知できる
+}`},
+    {diff:3, q:"整数オーバーフローに対して安全なメモリ確保関数を実装してください。count * sizeが桁あふれする場合はNULLを返してください。",
+     code:`#include <stdlib.h>
+#include <stdint.h>
+
+// count個のsize-byteオブジェクトを確保
+// count * size がオーバーフローする場合はNULLを返す
+void *safe_calloc(size_t count, size_t size) {
+    // オーバーフローチェック → calloc
+}`,
+     answer:`#include <stdlib.h>
+#include <stdint.h>
+
+void *safe_calloc(size_t count, size_t size) {
+    // SIZE_MAXを超えるか確認
+    if (size != 0 && count > SIZE_MAX / size) {
+        return NULL; // 整数オーバーフローを防止
+    }
+    return calloc(count, size);
+}
+
+// C23のckd_mul（checked multiply）を使う方法
+#ifdef __STDC_VERSION__
+void *safe_calloc_c23(size_t count, size_t size) {
+    size_t total;
+    if (__builtin_mul_overflow(count, size, &total)) {
+        return NULL;
+    }
+    return malloc(total);
+}
+#endif`}
+  ],
+};
+
+const chapters = [
+  {id:"ch1", num:1, title:"字句解析器（Lexer）実装", est:"70分",
+   goal:"C言語でトークナイザーを実装し、キーワード・識別子・整数リテラル・演算子・文字列リテラルを正しく認識できる。複数文字トークン（==、<=）の処理もできる。",
+   sections:[
+     {title:"字句解析の仕組みとトークン設計", body:`字句解析（Lexing）はソースコード文字列を意味のある最小単位「トークン」に分割する処理です。Pythonのtokenizeモジュールが行う処理と同等ですが、Cでは自前で実装します。コンパイラの最初のフェーズで、構文解析（Parsing）に先立って行われます。
+
+トークンの種類はenumで定義するのが定石です。キーワード（if・while・return）・識別子（変数名・関数名）・リテラル（整数・文字列・文字）・演算子（+・==・&&）・区切り文字（;・{・}）が主なカテゴリです。各トークンは種類と値（文字列表現）をペアで保持します。
+
+字句解析器の実装パターンは「1文字先読みしながら状態遷移する」オートマトンです。現在位置のポインタを進めながら、文字の種類（isdigit・isalpha・ispunct）に応じてトークン種別を判定します。複数文字の演算子（!=・<=・>>）は先読みが必要です。`,
+      code:`#include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+#include <stdlib.h>
+
+typedef enum {
+    TK_INT, TK_FLOAT, TK_STRING, TK_IDENT, TK_KEYWORD,
+    TK_PLUS, TK_MINUS, TK_STAR, TK_SLASH,
+    TK_EQ, TK_NEQ, TK_LT, TK_LE, TK_GT, TK_GE,
+    TK_LPAREN, TK_RPAREN, TK_LBRACE, TK_RBRACE,
+    TK_SEMI, TK_EOF
+} TokenKind;
+
+typedef struct {
+    TokenKind kind;
+    char value[256];
+    int line;
+} Token;
+
+static const char *KEYWORDS[] = {
+    "if", "else", "while", "for", "return", "int", "void", NULL
+};
+
+int is_keyword(const char *s) {
+    for (int i = 0; KEYWORDS[i]; i++)
+        if (strcmp(s, KEYWORDS[i]) == 0) return 1;
+    return 0;
+}`,
+      afterCode:"トークンに行番号（line）を記録しておくと、構文エラーのメッセージで「どの行か」を表示できます。多くの本格的なコンパイラはファイル名・行・カラムの3情報を持ちます。"},
+     {title:"Lexerの実装：ポインタ操作と先読み", body:`字句解析器の実装はポインタ操作の集積です。入力文字列をconst char *srcとして受け取り、srcを読み進めながらトークンを生成します。strtol()やstrtod()などのCスタンダードライブラリ関数を活用すると数値リテラルの解析が楽になります。
+
+文字列リテラルの処理はエスケープシーケンス（\n・\t・\\・\"）の処理が必要で、字句解析の中でも複雑な部分です。終端の"を見つけるまで読み進め、バックスラッシュを見つけたら次の文字をエスケープとして処理します。
+
+字句解析は構文解析から分離しておくべきです。next_token()を呼ぶたびに次のトークンを返すプル型のインターフェースが標準的です。コメントのスキップも字句解析レベルで行います。//から行末まで、/*から*/まではトークンとして返さずに読み飛ばします。`,
+      code:`Token lex_next(const char **src, int *line) {
+    // 空白・コメントをスキップ
+    while (**src) {
+        if (isspace(**src)) {
+            if (**src == '\\n') (*line)++;
+            (*src)++; continue;
+        }
+        if ((*src)[0]=='/' && (*src)[1]=='/') {
+            while (**src && **src != '\\n') (*src)++;
+            continue;
+        }
+        break;
+    }
+    if (!**src) return (Token){TK_EOF, "", *line};
+
+    Token tok = {.line = *line};
+
+    // 整数リテラル
+    if (isdigit(**src)) {
+        tok.kind = TK_INT;
+        char *end;
+        long v = strtol(*src, &end, 0);
+        snprintf(tok.value, sizeof(tok.value), "%ld", v);
+        *src = end;
+        return tok;
+    }
+
+    // 識別子・キーワード
+    if (isalpha(**src) || **src == '_') {
+        int i = 0;
+        while (isalnum(**src) || **src == '_')
+            tok.value[i++] = *(*src)++;
+        tok.value[i] = '\\0';
+        tok.kind = is_keyword(tok.value) ? TK_KEYWORD : TK_IDENT;
+        return tok;
+    }
+
+    // 2文字演算子
+    if ((*src)[0]=='=' && (*src)[1]=='=') {
+        *src += 2; tok.kind = TK_EQ; strcpy(tok.value,"=="); return tok;
+    }
+    // 1文字トークン
+    tok.value[0] = *(*src)++; tok.value[1] = '\\0';
+    switch (tok.value[0]) {
+        case '+': tok.kind = TK_PLUS; break;
+        case '-': tok.kind = TK_MINUS; break;
+        case ';': tok.kind = TK_SEMI; break;
+        default:  tok.kind = TK_EOF; break;
+    }
+    return tok;
+}`,
+      afterCode:"strtol()の第3引数に0を渡すと、0xプレフィックスで16進数、0プレフィックスで8進数を自動判別します。Pythonのint('0xff', 0)と同じ挙動です。"}
+   ]},
+  {id:"ch2", num:2, title:"構文解析器（Parser）とAST", est:"70分",
+   goal:"再帰下降法でCの算術式・比較式・if文・while文を解析し、ASTを生成してevalまたはコード生成に渡せる形にできる。",
+   sections:[
+     {title:"再帰下降法とBNF文法", body:`再帰下降法はBNF（バッカス・ナウア記法）の各非終端記号を1つの関数として実装する構文解析手法です。expr → term ('+' term)*のような文法規則を、parse_expr関数として直接実装します。Pythonのrecipaの再帰的な定義と同じ考え方ですが、Cの関数ポインタと相互再帰を使います。
+
+演算子の優先順位は文法の階層で表現します。加減算より乗除算が先に評価されるためには、expr（加減算レベル）→ term（乗除算レベル）→ factor（括弧・リテラル）のように階層化します。各レベルの関数が低優先度の関数を呼び出し、高優先度の関数から始まって末端に達します。
+
+左再帰（expr → expr '+' term）はCの再帰呼び出しで直接表現できません。左再帰はwhileループに変換します（BNFのExtended BNF、EBNFで言えばexpr → term ('+' term)*）。これはほぼ全ての再帰下降パーサーで使うテクニックです。`,
+      code:`// BNF:
+// expr   → term (('+'|'-') term)*
+// term   → factor (('*'|'/') factor)*
+// factor → NUMBER | '(' expr ')' | IDENT
+
+#include <stdlib.h>
+#include <stdio.h>
+
+typedef enum { ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM, ND_VAR } NodeKind;
+typedef struct Node {
+    NodeKind kind;
+    struct Node *left, *right;
+    int ival;
+    char name[64];
+} Node;
+
+static Token current;
+static const char *src_ptr;
+static int line = 1;
+
+void advance(void) { current = lex_next(&src_ptr, &line); }
+int consume(TokenKind k) {
+    if (current.kind == k) { advance(); return 1; }
+    return 0;
+}
+
+Node *parse_factor(void) {
+    if (current.kind == TK_INT) {
+        Node *n = calloc(1, sizeof(Node));
+        n->kind = ND_NUM;
+        n->ival = atoi(current.value);
+        advance();
+        return n;
+    }
+    if (consume(TK_LPAREN)) {
+        Node *n = parse_expr();
+        if (!consume(TK_RPAREN))
+            fprintf(stderr, "行%d: ')' がありません\\n", line);
+        return n;
+    }
+    fprintf(stderr, "行%d: 式が期待されます\\n", line);
+    return NULL;
+}`,
+      afterCode:"calloc(1, sizeof(Node))はmallocと異なり、全バイトを0に初期化します。NULLポインタのデフォルト値として安全で、初期化忘れによるバグを防ぎます。"},
+     {title:"ASTの評価とコード生成", body:`ASTを再帰的に評価（eval）することで、インタプリタを実装できます。ND_NUMノードはival値を返し、ND_ADDノードは左右のevalの和を返します。Pythonのast.literal_eval()と同じ原理ですが、自分で実装します。
+
+コード生成はASTを受け取り、ターゲットアーキテクチャの命令列を出力します。シンプルなスタックマシン向けのコード生成ならND_NUMで「定数をプッシュ」、ND_ADDで「2値をポップして加算してプッシュ」という命令を出力します。最終的にCのprintf("push %d\\n", n->ival)のような形で擬似アセンブリを出力します。
+
+変数スコープは環境（Environment）として実装します。名前から値へのマッピングをハッシュテーブルや連結リストで管理し、ブロックスコープのネストに対応するには親環境へのポインタを持つチェーン構造にします。PythonのchainMapと同じ考え方です。`,
+      code:`int eval(Node *node) {
+    if (!node) return 0;
+    switch (node->kind) {
+        case ND_NUM: return node->ival;
+        case ND_ADD: return eval(node->left) + eval(node->right);
+        case ND_SUB: return eval(node->left) - eval(node->right);
+        case ND_MUL: return eval(node->left) * eval(node->right);
+        case ND_DIV: {
+            int r = eval(node->right);
+            if (r == 0) { fprintf(stderr, "ゼロ除算\\n"); return 0; }
+            return eval(node->left) / r;
+        }
+        default:
+            fprintf(stderr, "不明なノード種別: %d\\n", node->kind);
+            return 0;
+    }
+}
+
+// スタックマシン向けコード生成
+void codegen(Node *node) {
+    if (node->kind == ND_NUM) {
+        printf("  push %d\\n", node->ival);
+        return;
+    }
+    codegen(node->left);
+    codegen(node->right);
+    switch (node->kind) {
+        case ND_ADD: printf("  add\\n"); break;
+        case ND_SUB: printf("  sub\\n"); break;
+        case ND_MUL: printf("  mul\\n"); break;
+        case ND_DIV: printf("  div\\n"); break;
+        default: break;
+    }
+}`,
+      afterCode:"ASTの解放（メモリ管理）を忘れずに実装しましょう。free_node(node)を再帰的に呼んで左→右→自身の順に解放します。Valgrindでメモリリークを確認するのが定番です。"}
+   ]},
+  {id:"ch3", num:3, title:"Linuxカーネルモジュール開発", est:"65分",
+   goal:"Linuxカーネルモジュールのビルド・ロード・アンロードができ、/proc・/sysfsのインターフェースを実装してユーザー空間と通信できる。",
+   sections:[
+     {title:"カーネルモジュールの基礎", body:`Linuxカーネルモジュールはカーネルに動的にロードできるコードです。デバイスドライバ・ファイルシステム・ネットワークプロトコルなどの機能を、カーネルを再ビルドせずに追加できます。Pythonのdlopen/dlopenに相当するカーネルレベルの動的ロードです。
+
+カーネルモジュールはユーザー空間プログラムと大きく異なります。malloc/freeの代わりにkmalloc/kfree、printfの代わりにprintk/pr_infoを使います。例外処理（try/catch）がなく、クラッシュすればカーネルパニックで全システムが停止します。Pythonのようなガーベジコレクションがなく、メモリ管理は完全に手動です。
+
+MODULE_LICENSE("GPL")は必須で、GPLライセンスでないモジュールはGPLのみで利用可能なカーネルシンボルを使えません。__init・__exit属性はロード時・アンロード時に使われるコードをカーネルが特定のメモリセクションに配置し、初期化後に解放できるようにします。`,
+      code:`/* hello_module.c */
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/slab.h>  /* kmalloc/kfree */
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Your Name");
+MODULE_DESCRIPTION("Hello kernel module");
+MODULE_VERSION("1.0");
+
+static char *name = "World";
+module_param(name, charp, 0444);  /* insmodで--name=Xxxとして渡せる */
+MODULE_PARM_DESC(name, "名前 (デフォルト: World)");
+
+static int __init hello_init(void) {
+    pr_info("Hello, %s! (kernel module loaded)\\n", name);
+    /* カーネルメモリ確保 */
+    char *buf = kmalloc(64, GFP_KERNEL);
+    if (!buf) return -ENOMEM;
+    snprintf(buf, 64, "Hello from %s", name);
+    pr_info("buf: %s\\n", buf);
+    kfree(buf);
     return 0;
 }
 
 static void __exit hello_exit(void) {
-    printk(KERN_INFO "Goodbye, Kernel!\\n");
+    pr_info("Goodbye, %s!\\n", name);
 }
 
 module_init(hello_init);
-module_exit(hello_exit);
+module_exit(hello_exit);`,
+      afterCode:"GFP_KERNELはスリープ可能なメモリ確保フラグです。割り込みコンテキストやスピンロック保持中にはGFP_ATOMICを使います（スリープ不可）。メモリが確保できない場合は必ず-ENOMEMを返してください。"},
+     {title:"/proc・/sysfsインターフェース", body:`カーネルモジュールとユーザー空間の通信には/proc・/sysfs・ioctl・netlink等の方法があります。/procはテキストベースの情報交換に、/sysfsはデバイス属性の読み書きに使います。proc_createとseq_fileを使うと読みやすいprocエントリが作れます。
 
-// Makefile
-obj-m += hello_module.o
+seq_file APIはカーネルの大量データを分割してユーザー空間に送るための仕組みです。seq_printfでバッファに書き込むと、readシステムコールが何度呼ばれても正しくページングされます。単純な1回読みはsingle_open()・single_release()で簡単に実装できます。
 
-all:
-\tmake -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+/sysfsエントリはKOBJECTを通じてオブジェクトと関連付けられます。sysfs_create_file()でデバイスの属性ファイルを作成し、show()/store()関数で読み書きを制御します。Pythonでいえばプロパティのゲッター・セッターに相当します。`,
+      code:`#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/uaccess.h>
 
-clean:
-\tmake -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean`
-  }],
-  ch4: [{
-    diff: 3,
-    q: "共有ライブラリ（.so）を作成してください。\n・libmath.c: add, mul, factorial 関数を実装\n・libmath.h: 宣言とインクルードガード\n・main.c: dlopen/dlsym で動的ロード\n\n【使う知識】-shared -fPIC, dlopen, dlsym, dlerror",
-    code: `// libmath.h
-// libmath.c
-// main.c（dlopen版）
-// コンパイル:
-// gcc -shared -fPIC -o libmath.so libmath.c
-// gcc main.c -ldl -o main
-// LD_LIBRARY_PATH=. ./main`,
-    answer: `// libmath.h
-#ifndef LIBMATH_H
-#define LIBMATH_H
-int  add(int a, int b);
-int  mul(int a, int b);
-long factorial(int n);
-#endif
+static unsigned long access_count = 0;
+static char message[256] = "Hello from kernel!";
 
-// libmath.c
-#include "libmath.h"
-int  add(int a, int b) { return a+b; }
-int  mul(int a, int b) { return a*b; }
-long factorial(int n)  { return n<=1 ? 1 : n*factorial(n-1); }
+/* seq_file: 読み取りハンドラ */
+static int info_show(struct seq_file *m, void *v) {
+    access_count++;
+    seq_printf(m, "Message: %s\\n", message);
+    seq_printf(m, "Access count: %lu\\n", access_count);
+    seq_printf(m, "Kernel version: %s\\n", UTS_RELEASE);
+    return 0;
+}
 
-// main.c (動的ロード版)
+static int info_open(struct inode *inode, struct file *file) {
+    return single_open(file, info_show, NULL);
+}
+
+static const struct proc_ops info_fops = {
+    .proc_open    = info_open,
+    .proc_read    = seq_read,
+    .proc_lseek   = seq_lseek,
+    .proc_release = single_release,
+};
+
+static int __init mod_init(void) {
+    /* /proc/hello_info を作成 */
+    if (!proc_create("hello_info", 0444, NULL, &info_fops)) {
+        return -ENOMEM;
+    }
+    pr_info("procfs entry created\\n");
+    return 0;
+}
+
+static void __exit mod_exit(void) {
+    remove_proc_entry("hello_info", NULL);
+    pr_info("procfs entry removed\\n");
+}`,
+      afterCode:"proc_opsはLinux 5.6以降の新しいAPIです。古いカーネルでは struct file_operations を使います。カーネルバージョンの確認はLINUX_VERSION_CODEマクロとKERNEL_VERSION()マクロを使います。"}
+   ]},
+  {id:"ch4", num:4, title:"ガーベジコレクタ実装", est:"70分",
+   goal:"Mark-and-SweepガーベジコレクタをCで実装し、ルートセットからの到達可能性でメモリを管理できる。停止世界（Stop-the-World）GCの仕組みを説明できる。",
+   sections:[
+     {title:"GCの設計とオブジェクトヘッダ", body:`ガーベジコレクタ（GC）は不要になったメモリを自動的に解放する仕組みです。Pythonの参照カウント方式（CPython）とは異なり、ここでは到達可能性（Reachability）に基づくMark-and-Sweep方式を実装します。「ルートセット（スタック上のポインタ・グローバル変数）から到達できないオブジェクト」を解放します。
+
+全てのGC管理オブジェクトは共通のヘッダを持ちます。markedフラグ（マーク済みか）・sizeフィールド（オブジェクトサイズ）・nextポインタ（全オブジェクトの連結リスト）が最低限必要です。GCはこの連結リスト（ヒープリスト）を走査してスウィープします。
+
+GC_malloc()はmallocをラップして確保したオブジェクトをヒープリストに登録します。GCがないC言語でmalloc/freeを管理するのとは全く異なり、freeを呼ぶ責任がなくなります。代わりにGCが自動的に不要なメモリを解放します。`,
+      code:`#include <stdlib.h>
 #include <stdio.h>
-#include <dlfcn.h>
-
-int main(void) {
-    void *lib = dlopen("./libmath.so", RTLD_LAZY);
-    if (!lib) { fprintf(stderr, "%s\\n", dlerror()); return 1; }
-
-    typedef int (*AddFn)(int,int);
-    typedef long (*FactFn)(int);
-
-    AddFn  add  = (AddFn) dlsym(lib, "add");
-    FactFn fact = (FactFn)dlsym(lib, "factorial");
-
-    printf("add(3,4)=%d\\n", add(3,4));
-    printf("10!=%ld\\n", fact(10));
-
-    dlclose(lib); return 0;
-}`
-  }],
-  ch5: [{
-    diff: 3,
-    q: "シンプルなガベージコレクター（マーク&スイープ）を実装してください。\n・gc_alloc(size): GC管理下でメモリ確保\n・gc_add_root(ptr): ルートとして登録\n・gc_collect(): マークフェーズ→スイープフェーズ\n\n【使う知識】マーク&スイープアルゴリズム, フリーリスト",
-    code: `#include <stdio.h>
-#include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 
-#define MAX_OBJECTS 256
-#define MAX_ROOTS    32
+#define MAX_ROOTS 256
+#define MAX_REFS  8
 
-typedef struct GCObject {
-    void  *data;
+typedef struct Object {
+    bool marked;
     size_t size;
-    int    marked;
-    struct GCObject *next;
-} GCObject;
+    struct Object *next; // ヒープ連結リスト
+    int num_refs;
+    struct Object *refs[MAX_REFS]; // 子オブジェクトへのポインタ
+    char data[]; // 可変長データ
+} Object;
 
-static GCObject *heap_list = NULL;
-static void     *roots[MAX_ROOTS];
-static int       root_count = 0;
+static Object *heap_head = NULL;
+static Object *roots[MAX_ROOTS];
+static int num_roots = 0;
 
-void* gc_alloc(size_t size);
-void  gc_add_root(void *ptr);
-void  gc_collect(void);
-void  gc_shutdown(void);
+Object *gc_alloc(size_t data_size) {
+    Object *obj = malloc(sizeof(Object) + data_size);
+    if (!obj) return NULL;
+    memset(obj, 0, sizeof(Object));
+    obj->size = data_size;
+    obj->next = heap_head;
+    heap_head = obj;
+    return obj;
+}
 
-int main(void) {
-    int *a = gc_alloc(sizeof(int)); *a = 42;
-    int *b = gc_alloc(sizeof(int)); *b = 99;
-    gc_add_root(a);  // a はルート（到達可能）
-    // b はルートに登録しない（到達不可能）
-    gc_collect();    // b が回収されるはず
-    printf("a=%d\\n", *a);
-    gc_shutdown();
-    return 0;
+void gc_add_root(Object *obj) {
+    if (num_roots < MAX_ROOTS)
+        roots[num_roots++] = obj;
+}
+
+void gc_add_ref(Object *parent, Object *child) {
+    if (parent->num_refs < MAX_REFS)
+        parent->refs[parent->num_refs++] = child;
 }`,
-    answer: `#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+      afterCode:"Object構造体のdata[]は柔軟配列メンバー（C99以降）です。sizeof(Object) + data_sizeのメモリを確保することで、ヘッダとデータを隣接したメモリに配置でき、キャッシュ効率が良くなります。"},
+     {title:"Mark・Sweepの実装", body:`Markフェーズはルートセットから出発してグラフを深さ優先探索し、到達したオブジェクトにmarkedフラグを立てます。既にマーク済みのオブジェクトを再訪しないことが重要で、循環参照があってもこのチェックがあれば無限ループになりません。Pythonのdfs関数と全く同じアルゴリズムです。
 
-typedef struct GCObj { void *data; size_t size; int marked; struct GCObj *next; } GCObj;
+Sweepフェーズはヒープリストを先頭から末尾まで走査します。markedでないオブジェクトはアクセス不能（ゴミ）なのでfreeします。markedなオブジェクトはmarkedをfalseにリセットして次のGCサイクルに備えます。連結リストの「前のノードのnextを変える」操作はダブルポインタ（**curr）で実装します。
 
-static GCObj *heap_list = NULL;
-static void  *roots[32]; static int root_count=0;
-
-void* gc_alloc(size_t sz) {
-    GCObj *o = malloc(sizeof(GCObj));
-    o->data = malloc(sz); o->size=sz; o->marked=0;
-    o->next = heap_list; heap_list = o;
-    return o->data;
-}
-void gc_add_root(void *p) { if(root_count<32) roots[root_count++]=p; }
-
-static void mark_obj(void *ptr) {
-    for (GCObj *o=heap_list; o; o=o->next)
-        if (o->data==ptr) { o->marked=1; break; }
-}
-void gc_collect(void) {
-    // Mark
-    for (int i=0;i<root_count;i++) mark_obj(roots[i]);
-    // Sweep
-    GCObj **p = &heap_list;
-    int freed=0;
-    while (*p) {
-        if (!(*p)->marked) {
-            GCObj *dead = *p; *p = dead->next;
-            free(dead->data); free(dead); freed++;
-        } else { (*p)->marked=0; p=&(*p)->next; }
-    }
-    printf("[GC] freed %d objects\\n", freed);
-}
-void gc_shutdown(void) {
-    for (GCObj *o=heap_list,*n; o; o=n) { n=o->next; free(o->data); free(o); }
-}
-int main(void) {
-    int *a=gc_alloc(sizeof(int)); *a=42;
-    int *b=gc_alloc(sizeof(int)); *b=99;
-    gc_add_root(a);
-    gc_collect();
-    printf("a=%d\\n",*a);
-    gc_shutdown(); return 0;
-}`
-  }],
-  ch6: [{
-    diff: 3,
-    q: "C言語でオブジェクト指向を模倣してください（vtable方式）。\n・Shape「クラス」: area(), describe() の仮想関数\n・Circle, Rectangle の「サブクラス」を実装\n・Shape*配列に混在させてポリモーフィズムを実現\n\n【使う知識】関数ポインタ構造体（vtable）, void*によるthisポインタ",
-    code: `#include <stdio.h>
-#include <stdlib.h>
-
-// 仮想関数テーブル（vtable）
-typedef struct {
-    double (*area)(void *self);
-    void   (*describe)(void *self);
-    void   (*destroy)(void *self);
-} ShapeVtable;
-
-typedef struct { const ShapeVtable *vt; } Shape;
-
-// Circleの実装
-// Rectangleの実装
-// main でShape*配列を作って仮想呼び出し`,
-    answer: `#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-
-typedef struct { double(*area)(void*); void(*describe)(void*); void(*destroy)(void*); } Vtbl;
-typedef struct { const Vtbl *vt; } Shape;
-
-// Circle
-typedef struct { const Vtbl *vt; double r; } Circle;
-static double circle_area(void *s) { Circle *c=s; return M_PI*c->r*c->r; }
-static void circle_desc(void *s) { Circle *c=s; printf("Circle(r=%.2f, area=%.2f)\\n",c->r,circle_area(s)); }
-static void circle_del(void *s) { free(s); }
-static const Vtbl circle_vt = {circle_area, circle_desc, circle_del};
-Circle* new_circle(double r) { Circle *c=malloc(sizeof(Circle)); c->vt=&circle_vt; c->r=r; return c; }
-
-// Rectangle
-typedef struct { const Vtbl *vt; double w,h; } Rect;
-static double rect_area(void *s) { Rect *r=s; return r->w*r->h; }
-static void rect_desc(void *s) { Rect *r=s; printf("Rect(%.2fx%.2f, area=%.2f)\\n",r->w,r->h,rect_area(s)); }
-static void rect_del(void *s) { free(s); }
-static const Vtbl rect_vt = {rect_area, rect_desc, rect_del};
-Rect* new_rect(double w, double h) { Rect *r=malloc(sizeof(Rect)); r->vt=&rect_vt; r->w=w; r->h=h; return r; }
-
-int main(void) {
-    Shape *shapes[] = {(Shape*)new_circle(5.0),(Shape*)new_rect(3.0,4.0),(Shape*)new_circle(2.5)};
-    for (int i=0;i<3;i++) shapes[i]->vt->describe(shapes[i]);
-    for (int i=0;i<3;i++) shapes[i]->vt->destroy(shapes[i]);
-    return 0;
-}`
-  }],
-  ch7: [{
-    diff: 3,
-    q: "コルーチン（協調的マルチタスク）をsetjmp/longjmpで実装してください。\n・coroutine_t: コンテキスト（jmp_buf + スタック）\n・yield(): 制御を次のコルーチンに渡す\n・2つのコルーチンが交互に実行される例を示す\n\n【使う知識】setjmp, longjmp, スタック操作",
-    code: `#include <stdio.h>
-#include <setjmp.h>
-#include <stdlib.h>
-
-// 2つのコルーチンが交互に実行されて
-// A: step 1, B: step 1, A: step 2, B: step 2 ... と出力される
-// setjmp/longjmpを使った実装`,
-    answer: `#include <stdio.h>
-#include <setjmp.h>
-#include <stdlib.h>
-#include <string.h>
-
-// 注意: これはPOSIX ucontext_tなしの簡易デモ
-// 実際のコルーチンはucontext_tまたはプラットフォーム固有のAPIを推奨
-
-#define STACK_SIZE 65536
-
-typedef struct {
-    jmp_buf ctx;
-    char   *stack;
-    int     done;
-    void  (*fn)(void);
-} Coro;
-
-static Coro *coros[2];
-static int   current = 0;
-
-void yield(void) {
-    int other = 1 - current;
-    if (!setjmp(coros[current]->ctx)) {
-        current = other;
-        longjmp(coros[other]->ctx, 1);
-    }
+Stop-the-WorldはGC実行中にユーザープログラムの実行を停止することです。マーク中に別スレッドがオブジェクトグラフを変更するとマーク結果が正しくなくなるためです。Pythonのstop-the-worldもCPythonのGILと組み合わせてこの問題を解決しています。`,
+      code:`/* Mark: ルートセットからDFS */
+static void mark(Object *obj) {
+    if (!obj || obj->marked) return;
+    obj->marked = true;
+    for (int i = 0; i < obj->num_refs; i++)
+        mark(obj->refs[i]);
 }
 
-void coro_a(void) {
-    for (int i=1;i<=3;i++) { printf("A: step %d\\n",i); yield(); }
-}
-void coro_b(void) {
-    for (int i=1;i<=3;i++) { printf("B: step %d\\n",i); yield(); }
-}
-
-int main(void) {
-    // 簡易版: 手動でコンテキストを管理する例
-    printf("[注意] フル実装にはucontext_tを推奨\\n");
-    // 概念デモ: 交互実行のシミュレート
-    for (int i=1;i<=3;i++) { printf("A: step %d\\n",i); printf("B: step %d\\n",i); }
-    return 0;
-}`
-  }],
-  ch8: [{
-    diff: 3,
-    q: "独自のメモリアロケータ（best-fit方式）を実装してください。\n・固定バッファ（例: 64KB）をプールとして使用\n・free リストで空き領域を管理\n・best-fit: 要求サイズに最も近い空きブロックを選択\n・分割と合体（coalescing）を実装\n\n【使う知識】フリーリスト, メタデータヘッダ, ポインタ演算",
-    code: `#include <stdio.h>
-#include <string.h>
-#include <stddef.h>
-
-#define POOL_SIZE (64 * 1024)
-
-static char pool[POOL_SIZE];
-
-typedef struct Block {
-    size_t        size;   // このブロックのデータ部サイズ
-    int           free;   // 空きなら1
-    struct Block *next;   // 次のブロックへのポインタ
-} Block;
-
-void  my_init(void);
-void* my_malloc(size_t size);
-void  my_free(void *ptr);
-void  my_dump(void);   // デバッグ用: ブロック一覧表示
-
-int main(void) {
-    my_init();
-    void *a = my_malloc(100); printf("alloc 100: %p\\n", a);
-    void *b = my_malloc(200); printf("alloc 200: %p\\n", b);
-    void *c = my_malloc( 50); printf("alloc  50: %p\\n", c);
-    my_free(b);  // 中間を解放
-    void *d = my_malloc(150); printf("alloc 150: %p\\n", d);  // bの場所に入るはず
-    my_dump();
-    return 0;
-}`,
-    answer: `#include <stdio.h>
-#include <string.h>
-#include <stddef.h>
-
-#define POOL_SIZE (64*1024)
-static char pool[POOL_SIZE];
-
-typedef struct Block { size_t size; int free; struct Block *next; } Block;
-#define HEADER sizeof(Block)
-
-void my_init(void) {
-    Block *b = (Block*)pool;
-    b->size = POOL_SIZE - HEADER; b->free = 1; b->next = NULL;
-}
-
-void* my_malloc(size_t req) {
-    Block *best=NULL, *b=(Block*)pool;
-    while (b) {
-        if (b->free && b->size >= req)
-            if (!best || b->size < best->size) best=b;
-        b=b->next;
-    }
-    if (!best) return NULL;
-    if (best->size >= req + HEADER + 8) {
-        Block *split = (Block*)((char*)best + HEADER + req);
-        split->size = best->size - req - HEADER;
-        split->free = 1; split->next = best->next;
-        best->size = req; best->next = split;
-    }
-    best->free = 0;
-    return (char*)best + HEADER;
-}
-
-void my_free(void *ptr) {
-    Block *b = (Block*)((char*)ptr - HEADER); b->free = 1;
-    // Coalesce
-    Block *p = (Block*)pool;
-    while (p && p->next) {
-        if (p->free && p->next->free) {
-            p->size += HEADER + p->next->size; p->next = p->next->next;
-        } else p=p->next;
-    }
-}
-
-void my_dump(void) {
-    Block *b=(Block*)pool; int i=0;
-    while(b) { printf("[%d] size=%zu %s\\n",i++,(size_t)b->size,b->free?"free":"used"); b=b->next; }
-}
-
-int main(void) {
-    my_init();
-    void *a=my_malloc(100),*b=my_malloc(200),*c=my_malloc(50);
-    printf("a=%p b=%p c=%p\\n",a,b,c);
-    my_free(b);
-    void *d=my_malloc(150); printf("d=%p\\n",d);
-    my_dump(); return 0;
-}`
-  }],
-  ch9: [{
-    diff: 3,
-    q: "ELFバイナリの基本構造を読み解いてください。\n・自分のプログラム（/proc/self/exe）のELFヘッダを読む\n・マジックナンバー確認、エントリポイント、セクション数を表示\n\n【使う知識】<elf.h>, fread, Elf64_Ehdr",
-    code: `#include <stdio.h>
-#include <stdint.h>
-#include <elf.h>
-
-int main(void) {
-    FILE *fp = fopen("/proc/self/exe", "rb");
-    if (!fp) { perror("fopen"); return 1; }
-
-    Elf64_Ehdr hdr;
-    fread(&hdr, sizeof(hdr), 1, fp);
-    fclose(fp);
-
-    // マジックナンバーを確認
-    // エントリポイントを表示
-    // セクション数を表示
-    return 0;
-}`,
-    answer: `#include <stdio.h>
-#include <elf.h>
-
-int main(void) {
-    FILE *fp = fopen("/proc/self/exe", "rb");
-    if (!fp) { perror("fopen"); return 1; }
-    Elf64_Ehdr h; fread(&h, sizeof(h), 1, fp); fclose(fp);
-
-    printf("Magic: %02x %02x %02x %02x\\n",
-           h.e_ident[0],h.e_ident[1],h.e_ident[2],h.e_ident[3]);
-    printf("Class: %s\\n", h.e_ident[EI_CLASS]==ELFCLASS64?"ELF64":"ELF32");
-    printf("Entry: 0x%lx\\n", (unsigned long)h.e_entry);
-    printf("Sections: %d\\n", h.e_shnum);
-    printf("Prog headers: %d\\n", h.e_phnum);
-    return 0;
-}`
-  }],
-  ch10: [{
-    diff: 3,
-    q: "C言語でハッシュマップベースの設定ファイルパーサーを実装してください。\nINI形式のファイルを読み込んで値を取得できるようにする:\n[server]\nhost=localhost\nport=8080\n\nini_get(config, \"server.host\") → \"localhost\"\n\n【使う知識】文字列操作, ハッシュマップ, セクション管理",
-    code: `#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-
-typedef struct { char key[128]; char value[256]; } KVPair;
-typedef struct { KVPair pairs[256]; int count; } Config;
-
-void config_load(Config *cfg, const char *filename);
-const char* config_get(const Config *cfg, const char *key);
-
-int main(void) {
-    Config cfg; config_load(&cfg, "config.ini");
-    printf("host=%s\\n", config_get(&cfg, "server.host"));
-    printf("port=%s\\n", config_get(&cfg, "server.port"));
-    return 0;
-}`,
-    answer: `#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <ctype.h>
-
-typedef struct { char key[128]; char value[256]; } KVPair;
-typedef struct { KVPair pairs[256]; int count; } Config;
-
-static void trim(char *s) {
-    char *e = s + strlen(s) - 1;
-    while (e>=s && isspace((unsigned char)*e)) *e--=0;
-    while (*s && isspace((unsigned char)*s)) memmove(s,s+1,strlen(s));
-}
-
-void config_load(Config *cfg, const char *fn) {
-    FILE *fp = fopen(fn,"r"); if(!fp) return;
-    cfg->count=0;
-    char line[512], section[64]="";
-    while (fgets(line,sizeof(line),fp)) {
-        trim(line);
-        if (!*line || *line==';' || *line=='#') continue;
-        if (*line=='[') {
-            char *e=strchr(line,']'); if(e) *e=0;
-            strncpy(section,line+1,sizeof(section)-1);
+/* Sweep: マークされていないオブジェクトを解放 */
+static void sweep(void) {
+    Object **curr = &heap_head;
+    int freed = 0, kept = 0;
+    while (*curr) {
+        Object *obj = *curr;
+        if (!obj->marked) {
+            *curr = obj->next; // リストから除去
+            free(obj);
+            freed++;
         } else {
-            char *eq=strchr(line,'='); if(!eq) continue;
-            *eq=0; trim(line); trim(eq+1);
-            if (cfg->count<256) {
-                snprintf(cfg->pairs[cfg->count].key,128,"%s.%s",section,line);
-                strncpy(cfg->pairs[cfg->count].value,eq+1,255);
-                cfg->count++;
-            }
+            obj->marked = false; // フラグをリセット
+            curr = &obj->next;
+            kept++;
         }
     }
-    fclose(fp);
+    printf("GC: freed=%d kept=%d\\n", freed, kept);
 }
 
-const char* config_get(const Config *cfg, const char *key) {
-    for (int i=0;i<cfg->count;i++)
-        if (strcmp(cfg->pairs[i].key,key)==0) return cfg->pairs[i].value;
-    return NULL;
-}
-
-int main(void) {
-    // まずconfig.iniを作成
-    FILE *f=fopen("config.ini","w");
-    fprintf(f,"[server]\\nhost=localhost\\nport=8080\\n");
-    fclose(f);
-    Config cfg; config_load(&cfg,"config.ini");
-    printf("host=%s\\n",config_get(&cfg,"server.host"));
-    printf("port=%s\\n",config_get(&cfg,"server.port"));
-    return 0;
-}`
-  }],
-  ch11: [{
-    diff: 3,
-    q: "C言語でシンプルなHTTPサーバーを実装してください。\n・GETリクエストのみ対応\n・/ → \"Hello from C HTTP Server!\"\n・/time → 現在時刻（asctime）\n・その他 → 404\n\n【使う知識】ソケット, HTTP/1.0パース, strstr, time()",
-    code: `#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <time.h>
-
-#define PORT 8080
-
-void handle_client(int cli);
-
-int main(void) {
-    int srv = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in addr = {AF_INET, htons(PORT), {INADDR_ANY}};
-    int opt=1; setsockopt(srv,SOL_SOCKET,SO_REUSEADDR,&opt,sizeof(opt));
-    bind(srv,(struct sockaddr*)&addr,sizeof(addr));
-    listen(srv,5);
-    printf("HTTP server on port %d\\n", PORT);
-    while(1) { int cli=accept(srv,NULL,NULL); handle_client(cli); close(cli); }
+void gc_collect(void) {
+    /* Mark phase */
+    for (int i = 0; i < num_roots; i++)
+        mark(roots[i]);
+    /* Sweep phase */
+    sweep();
 }`,
-    answer: `#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <time.h>
+      afterCode:"このGCは深さ優先再帰でMarkしているため、深いオブジェクトグラフではスタックオーバーフローが起きます。本番品質のGCでは自前のスタックかキューを使って非再帰的にMarkします。世代別GC・インクリメンタルGCはさらに高度な技術です。"}
+   ]},
+  {id:"ch5", num:5, title:"ELFバイナリ解析", est:"65分",
+   goal:"ELFファイルフォーマットを理解し、Cプログラムでヘッダ・セクション・シンボルテーブルを解析して表示できる。readelfコマンドの基本機能を再現できる。",
+   sections:[
+     {title:"ELFフォーマットの構造", body:`ELF（Executable and Linkable Format）はLinux/Unixの標準実行形式・オブジェクトファイル形式です。Windows の PEフォーマット、macOSのMach-Oフォーマットに相当します。Pythonのpickleのように、バイナリ形式でデータを構造化して格納します。
 
-#define PORT 8080
+ELFファイルはELFヘッダ・プログラムヘッダテーブル（実行時用）・セクションヘッダテーブル（リンク時用）・セクションデータから構成されます。ELFヘッダの先頭16バイト（e_ident）はマジックナンバー（0x7f ELF）・クラス（32/64ビット）・エンディアン・バージョンを含みます。
 
-void handle_client(int cli) {
-    char buf[4096]; int n=recv(cli,buf,sizeof(buf)-1,0); if(n<=0) return;
-    buf[n]=0;
-    char method[8],path[256];
-    sscanf(buf,"%7s %255s",method,path);
+<elf.h>ヘッダにはElf64_Ehdr（ELFヘッダ）・Elf64_Shdr（セクションヘッダ）・Elf64_Sym（シンボル）などの構造体が定義されています。Cの構造体が実際のバイナリ配置を直接表現しているため、正確なオフセット計算なしにバイナリを解釈できます。これはPythonのstructモジュールで手動フォーマットを書くより格段に楽です。`,
+      code:`#include <stdio.h>
+#include <stdlib.h>
+#include <elf.h>
 
-    char body[1024], response[2048];
-    if (strcmp(path,"/")==0) {
-        strcpy(body,"Hello from C HTTP Server!");
-    } else if (strcmp(path,"/time")==0) {
-        time_t t=time(NULL); char *ts=asctime(localtime(&t)); ts[strlen(ts)-1]=0;
-        snprintf(body,sizeof(body),"Current time: %s",ts);
-    } else {
-        snprintf(response,sizeof(response),"HTTP/1.0 404 Not Found\\r\\nContent-Length:9\\r\\n\\r\\nNot Found");
-        send(cli,response,strlen(response),0); return;
+void print_elf_info(const char *filename) {
+    FILE *f = fopen(filename, "rb");
+    if (!f) { perror(filename); return; }
+
+    Elf64_Ehdr ehdr;
+    if (fread(&ehdr, sizeof(ehdr), 1, f) != 1) {
+        fprintf(stderr, "ELFヘッダ読み込みエラー\\n");
+        fclose(f); return;
     }
-    snprintf(response,sizeof(response),
-        "HTTP/1.0 200 OK\\r\\nContent-Type: text/plain\\r\\nContent-Length: %zu\\r\\n\\r\\n%s",
-        strlen(body),body);
-    send(cli,response,strlen(response),0);
-}
 
-int main(void) {
-    int srv=socket(AF_INET,SOCK_STREAM,0);
-    int opt=1; setsockopt(srv,SOL_SOCKET,SO_REUSEADDR,&opt,sizeof(opt));
-    struct sockaddr_in addr={AF_INET,htons(PORT),{INADDR_ANY}};
-    bind(srv,(struct sockaddr*)&addr,sizeof(addr));
-    listen(srv,5);
-    printf("http://localhost:%d\\n",PORT);
-    while(1){int cli=accept(srv,NULL,NULL);handle_client(cli);close(cli);}
-}`
-  }],
-  ch12: [{
-    diff: 3,
-    q: "ライブラリのAPIを設計してください（公開APIの安定化）。\nopaque型を使って内部実装を隠蔽し、外部からはhandle（void*）でのみ操作できる文字列バッファライブラリを実装してください。\n\n・strbuf_new(), strbuf_append(), strbuf_get(), strbuf_free()\n・内部構造を公開しない（前方宣言のみ）\n\n【使う知識】opaque型, 前方宣言, ABI安定性",
-    code: `// strbuf.h（公開API）
-#ifndef STRBUF_H
-#define STRBUF_H
+    /* マジックナンバー確認 */
+    if (ehdr.e_ident[EI_MAG0] != ELFMAG0 ||
+        ehdr.e_ident[EI_MAG1] != ELFMAG1) {
+        fprintf(stderr, "ELFファイルではありません\\n");
+        fclose(f); return;
+    }
 
-typedef struct StrBuf StrBuf;  // 前方宣言（内部は非公開）
+    static const char *types[] = {
+        "NONE", "REL", "EXEC", "DYN", "CORE"
+    };
+    printf("ELFタイプ  : %s\\n",
+           ehdr.e_type < 5 ? types[ehdr.e_type] : "OTHER");
+    printf("アーキテクチャ: %u\\n", ehdr.e_machine);
+    printf("エントリポイント: 0x%lx\\n", ehdr.e_entry);
+    printf("セクション数: %u\\n", ehdr.e_shnum);
+    printf("プログラムヘッダ数: %u\\n", ehdr.e_phnum);
+    fclose(f);
+}`,
+      afterCode:"e_machine値は0x3E（62）がx86-64、0xB7がAArch64（ARM64）、0xF3がRISC-Vです。/usr/include/elf.hのEM_*マクロで定義されています。"},
+     {title:"シンボルテーブルの解析", body:`シンボルテーブル（.symtabセクション）は関数名・グローバル変数名とそのアドレスのマッピングを格納します。デバッガがブレークポイントを関数名で設定できるのもこのテーブルがあるためです。Pythonのinspect.getmembers()が返す情報に相当します。
 
-StrBuf*     strbuf_new(void);
-void        strbuf_append(StrBuf *sb, const char *s);
-const char* strbuf_get(const StrBuf *sb);
-int         strbuf_len(const StrBuf *sb);
-void        strbuf_free(StrBuf *sb);
+各シンボルはElf64_Sym構造体で表現されます。st_nameはシンボル名文字列テーブル（.strtab）へのオフセット、st_valueはアドレス、st_sizeはサイズ、st_infoはシンボルの種類（関数・変数・ファイル）とバインディング（ローカル・グローバル・弱い）を格納します。
 
-#endif
+動的リンクに使われる.dynsymは.symtabのサブセットで、共有ライブラリからエクスポートされるシンボルのみ含みます。nm、objdump -tコマンドはシンボルテーブルを表示するツールで、自分で実装してみることでELFの理解が深まります。`,
+      code:`void print_symbols(const char *filename) {
+    FILE *f = fopen(filename, "rb");
+    if (!f) { perror(filename); return; }
 
-// strbuf.c（内部実装）
-// main.c（利用例）`,
-    answer: `// strbuf.h
-#ifndef STRBUF_H
-#define STRBUF_H
-typedef struct StrBuf StrBuf;
-StrBuf*     strbuf_new(void);
-void        strbuf_append(StrBuf *sb, const char *s);
-const char* strbuf_get(const StrBuf *sb);
-int         strbuf_len(const StrBuf *sb);
-void        strbuf_free(StrBuf *sb);
-#endif
+    Elf64_Ehdr ehdr;
+    fread(&ehdr, sizeof(ehdr), 1, f);
 
-// strbuf.c
-#include "strbuf.h"
+    /* セクションヘッダテーブルを読み込む */
+    Elf64_Shdr *shdrs = malloc(ehdr.e_shnum * sizeof(Elf64_Shdr));
+    fseek(f, ehdr.e_shoff, SEEK_SET);
+    fread(shdrs, sizeof(Elf64_Shdr), ehdr.e_shnum, f);
+
+    /* セクション名テーブル (shstrtab) */
+    char *shstrtab = malloc(shdrs[ehdr.e_shstrndx].sh_size);
+    fseek(f, shdrs[ehdr.e_shstrndx].sh_offset, SEEK_SET);
+    fread(shstrtab, shdrs[ehdr.e_shstrndx].sh_size, 1, f);
+
+    /* .symtab を探してシンボルを表示 */
+    for (int i = 0; i < ehdr.e_shnum; i++) {
+        if (shdrs[i].sh_type != SHT_SYMTAB) continue;
+
+        /* 対応する文字列テーブル */
+        Elf64_Shdr *strtab_hdr = &shdrs[shdrs[i].sh_link];
+        char *strtab = malloc(strtab_hdr->sh_size);
+        fseek(f, strtab_hdr->sh_offset, SEEK_SET);
+        fread(strtab, strtab_hdr->sh_size, 1, f);
+
+        int nsym = shdrs[i].sh_size / sizeof(Elf64_Sym);
+        Elf64_Sym *syms = malloc(shdrs[i].sh_size);
+        fseek(f, shdrs[i].sh_offset, SEEK_SET);
+        fread(syms, sizeof(Elf64_Sym), nsym, f);
+
+        for (int j = 0; j < nsym; j++) {
+            if (syms[j].st_name == 0) continue;
+            printf("0x%016lx  %s\\n",
+                   syms[j].st_value, strtab + syms[j].st_name);
+        }
+        free(strtab); free(syms);
+    }
+    free(shdrs); free(shstrtab); fclose(f);
+}`,
+      afterCode:"shdrs[i].sh_linkはリンクされたセクションのインデックスです。.symtabの場合は対応する.strtabのインデックスになっています。SHT_RELAの場合は対象セクションのインデックスです。"}
+   ]},
+  {id:"ch6", num:6, title:"高性能HTTPサーバ（epoll）", est:"70分",
+   goal:"epollを使ったノンブロッキングI/OでHTTP/1.1サーバを実装し、1000以上の同時接続をC10K問題を意識して処理できる。",
+   sections:[
+     {title:"C10K問題とepollの仕組み", body:`C10K問題とは「1台のサーバで10000同時接続を処理できるか」という課題で、2000年代初頭に定式化されました。伝統的なスレッド/プロセスモデル（接続ごとに1スレッド）では、10000スレッドのコンテキストスワップオーバーヘッドが無視できないレベルになります。これを解決するためにepoll（Linux）・kqueue（FreeBSD/macOS）・IOCP（Windows）が開発されました。
+
+epollはLinux固有のI/O多重化APIです。epoll_create1()でepollファイルディスクリプタを作成し、epoll_ctl()で監視したいfdを登録・削除し、epoll_wait()で「準備できたfd」のリストを受け取ります。Pythonのselectorsモジュールのselect.DefaultSelectorが内部でepollを使っています。
+
+Level-Triggered（LT、デフォルト）とEdge-Triggered（ET、EPOLLETフラグ）の2モードがあります。LTは「fdがまだ読み取り可能」なら毎回通知し、ETは「fdの状態が変化した瞬間」だけ通知します。ETはより高性能ですが、「一度のwakeupで全データを読み切る」実装が必要です。`,
+      code:`#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
-struct StrBuf {       // 定義はここだけ（.cファイル）
-    char  *data;
-    int    len;
-    int    cap;
-};
+#define MAX_EVENTS 1024
+#define PORT 8080
 
-StrBuf* strbuf_new(void) {
-    StrBuf *sb=malloc(sizeof(StrBuf));
-    sb->cap=64; sb->data=malloc(sb->cap); sb->data[0]=0; sb->len=0;
-    return sb;
-}
-void strbuf_append(StrBuf *sb, const char *s) {
-    int add=(int)strlen(s);
-    if (sb->len+add+1 > sb->cap) {
-        while (sb->cap < sb->len+add+1) sb->cap*=2;
-        sb->data=realloc(sb->data,sb->cap);
+int create_server_socket(void) {
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+    if (fd < 0) { perror("socket"); exit(1); }
+
+    int opt = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT),
+        .sin_addr.s_addr = INADDR_ANY,
+    };
+    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        perror("bind"); exit(1);
     }
-    memcpy(sb->data+sb->len,s,add+1); sb->len+=add;
+    if (listen(fd, SOMAXCONN) < 0) { perror("listen"); exit(1); }
+    return fd;
+}`,
+      afterCode:"SO_REUSEPORTはLinux 3.9以降で使え、複数プロセスが同じポートでlistenしてカーネルが負荷分散します。nginxがこれを使って複数workerで受け付けを分担しています。"},
+     {title:"HTTPリクエスト解析とレスポンス生成", body:`HTTP/1.1のリクエスト解析はヘッダの終端（\\r\\n\\r\\n）を検出するだけでも基本的な動作が実現できます。メソッド（GET・POST）・URIパス・Hostヘッダを抽出し、静的ファイルを返すシンプルなサーバが実装できます。Pythonのhttp.serverモジュールと同じことをCで手動実装します。
+
+send()・write()は全バイトを一度に送信できる保証がありません。返り値が要求バイト数より少ない場合は残りを再度送信する必要があります。この「繰り返し送信」処理をwrite_allまたはsend_allとして実装するのがCのネットワークプログラミングの基本パターンです。
+
+HTTP Keep-Aliveは同一TCP接続上で複数のHTTPリクエストを処理する機能です。接続ごとに状態（ヘッダを読み込み中か・ボディを読み込み中か・レスポンスを送信中か）を管理する構造体が必要です。この接続状態の管理がHTTPサーバ実装の核心部分です。`,
+      code:`#include <sys/sendfile.h>
+
+#define BUF_SIZE 8192
+
+typedef struct {
+    int fd;
+    char buf[BUF_SIZE];
+    int buf_len;
+    enum { STATE_READING_HEADER, STATE_WRITING } state;
+} Connection;
+
+ssize_t write_all(int fd, const void *buf, size_t len) {
+    size_t sent = 0;
+    while (sent < len) {
+        ssize_t r = send(fd, (const char*)buf + sent, len - sent, MSG_NOSIGNAL);
+        if (r <= 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
+            return -1;
+        }
+        sent += r;
+    }
+    return sent;
 }
-const char* strbuf_get(const StrBuf *sb) { return sb->data; }
-int strbuf_len(const StrBuf *sb) { return sb->len; }
-void strbuf_free(StrBuf *sb) { free(sb->data); free(sb); }
 
-// main.c
-// #include "strbuf.h"
-// StrBuf *sb = strbuf_new();
-// strbuf_append(sb, "Hello, "); strbuf_append(sb, "World!");
-// printf("%s\\n", strbuf_get(sb)); strbuf_free(sb);`
-  }]
-};
+void handle_request(int client_fd, const char *req, int req_len) {
+    /* GETリクエストのパス抽出（最小実装） */
+    char path[256] = "/";
+    sscanf(req, "GET %255s HTTP", path);
 
-const chapters = [
-  { id:"ch1", num:1, title:"レキサーとパーサー — 言語処理の基礎", est:"60分",
-    goal:"トークナイザー（字句解析器）と再帰下降パーサーを実装できる。四則演算の文法をBNFで理解し、再帰関数でパーサーを書けるようになることがゴール。",
-    sections:[
-      { title:"字句解析（レキサー）", body:"プログラミング言語の処理系は「ソースコード（文字列）→トークン列→AST（抽象構文木）→実行/コード生成」という流れで動きます。レキサーは最初の段階で、文字のストリームを意味のある単位（トークン）に切り分けます。\n\nPythonの tokenize モジュールが行うのと同じ処理をCで実装します。状態機械で「今何を読んでいるか（数字？文字列？演算子？）」を追跡しながら文字を消費していきます。", table:T.lexerTokens, afterTable:"実際のコンパイラのレキサーは正規表現エンジン（DFA）で実装されることが多いですが、手書きの状態機械の方が理解しやすく、コンパイラコンパイラ（Flex/Bison）の理解にも繋がります。"},
-      { title:"再帰下降パーサー", body:"パーサーは「トークン列」を「AST（木構造）」に変換します。再帰下降パーサーは最もシンプルなパーサーの実装方法で、文法の各規則を関数として実装します。\n\n優先順位の扱いは「低い優先順位の規則が高い優先順位の規則を呼ぶ」という階層構造で表現します。+/- は */÷ より優先順位が低いので、expr関数がterm関数を呼び、term関数がfactor関数を呼ぶ階層になります。", code:`// BNF文法:\n// expr   = term (('+' | '-') term)*\n// term   = factor (('*' | '/') factor)*\n// factor = NUMBER | '(' expr ')'\n\n// これを再帰下降パーサーで実装すると:\ndouble expr(void)   { /* '+'/'-' を処理 */ return term(); }\ndouble term(void)   { /* '*'/'/' を処理 */ return factor(); }\ndouble factor(void) { /* 数値か '(' expr ')' */ }`, afterCode:"この構造は優先順位を自然に表現します。カッコで囲む '(' expr ')' は再帰的に expr を呼ぶため、どんに深くネストしても正しく処理されます。"}
-    ]
-  },
-  { id:"ch2", num:2, title:"インタープリターの実装", est:"60分",
-    goal:"簡単なプログラミング言語のインタープリターをCで実装できる。AST（抽象構文木）のノード構造を設計し、evalで各ノードを評価できるようになることがゴール。",
-    sections:[
-      { title:"ASTの設計", body:"抽象構文木（AST）はソースコードの意味構造をツリーとして表現します。例えば「3 + 4 * 2」は「+ノード: 左=3, 右=*ノード: 左=4, 右=2」という木になります。\n\nCではASTのノードを union（共用体）または tagged union（タグ付き共用体）で表現するのが一般的です。ノードの種類（数値リテラル、二項演算、変数参照など）をenum で定義し、種類に応じてunionの適切なフィールドにアクセスします。", code:`typedef enum {\n    NODE_NUM,\n    NODE_BINOP,\n    NODE_VAR,\n    NODE_ASSIGN,\n} NodeType;\n\ntypedef struct Node {\n    NodeType type;\n    union {\n        double  num;           // NODE_NUM\n        struct {\n            char       op;\n            struct Node *left, *right;\n        }               binop; // NODE_BINOP\n        char            name[32]; // NODE_VAR\n    };\n} Node;`, afterCode:"この「タグ付き共用体」パターンはRustのenum（ヴァリアント）に対応します。Cにはパターンマッチがないので switch(node->type) で種類を判別します。"},
-      { title:"ブレインファック", body:"ブレインファック（Brainfuck）は8命令だけのチューリング完全言語です。シンプルさゆえにインタープリターの実装に最適な教材です。特に [ と ] のループは「現在セルが0なら対応する ] まで飛ぶ」という処理が必要で、深さ（ネストレベル）を追跡して対応するブラケットを探す処理が必要です。\n\nBFインタープリターを実装すると「言語処理系の核心（命令のフェッチ・デコード・実行）」を体験できます。CPUがプログラムを実行する仕組みとも対応しています。", code:`// BF命令と対応する操作\n// > : データポインタをインクリメント\n// < : データポインタをデクリメント\n// + : 現在セルをインクリメント\n// - : 現在セルをデクリメント\n// . : 現在セルの値をASCIIとして出力\n// , : 入力1文字を現在セルに格納\n// [ : セルが0なら対応する]へジャンプ\n// ] : セルが0でなければ対応する[へジャンプ`, afterCode:"BFはチューリング完全です。任意の計算が可能で、実際にBFでBFインタープリターを書いたり、BFコンパイラを書く人もいます（メタサーキュラーインタープリター）。"}
-    ]
-  },
-  { id:"ch3", num:3, title:"Linuxカーネルとシステムコール", est:"60分",
-    goal:"カーネルモードとユーザーモードの違いを理解し、システムコールの仕組みを把握する。Linuxカーネルモジュールの最小実装ができ、/proc ファイルシステムを通じてカーネルとユーザー空間の通信を実装できることがゴール。",
-    sections:[
-      { title:"システムコールの仕組み", body:"printf や malloc はCの標準ライブラリ関数ですが、実際にはカーネルの機能（ファイルI/O、メモリ確保）を呼び出しています。この「ユーザープログラムがカーネル機能を呼ぶ」仕組みがシステムコールです。\n\nx86_64では syscall 命令によりCPUがリング3（ユーザーモード）からリング0（カーネルモード）に切り替わります。Pythonの open() → Cの fopen() → write() システムコール → カーネルのVFS → デバイスドライバ、という階層を理解すると、パフォーマンスのボトルネックがどこにあるかの見通しが立ちます。", code:`// システムコール番号（x86_64 Linux）\n// read  = 0\n// write = 1\n// open  = 2\n// close = 3\n// mmap  = 9\n// brk   = 12\n\n// strace で確認\nstrace ./prog\n\n// write システムコールを直接呼ぶ（教育目的）\n#include <unistd.h>\nint main(void) {\n    write(1, "Hello, Syscall!\\n", 16);  // fd=1 は stdout\n    return 0;\n}`, afterTable:"strace は「プロセスが呼び出したシステムコールのトレース」ができるツールです。Pythonスクリプトに対しても使えて、ファイルアクセスやネットワーク通信の詳細が見えます。"},
-      { title:"カーネルモジュールの最小実装", body:"Linuxカーネルはモジュールという仕組みで、実行時に機能を追加できます。デバイスドライバはほぼ全てカーネルモジュールとして実装されます。最小のモジュールは「ロード時とアンロード時に printk（カーネル版printf）を呼ぶ」だけです。\n\nカーネル空間での開発はユーザー空間とは異なる制約があります。malloc の代わりに kmalloc、stdio ではなく printk、例外処理の代わりに明示的なエラー伝播など、Cの基本ルールは同じですが APIが全て異なります。", code:`// カーネルモジュールのビルドと操作\nmake                          // Makefile でビルド\nsudo insmod hello.ko          // モジュールをロード\nlsmod | grep hello            // ロード確認\ndmesg | tail -5               // printk出力を確認\nsudo rmmod hello              // アンロード\n\n// /proc でユーザー空間と通信\ncat /proc/hello               // カーネルが返す値を表示`, afterCode:"カーネルモジュールはスーパーユーザー権限が必要です。バグがあるとシステムがクラッシュします（ユーザー空間のsegfaultと違い、カーネルパニックになります）。開発にはVMを使うことを強く推奨します。"}
-    ]
-  },
-  { id:"ch4", num:4, title:"共有ライブラリと動的リンク", est:"50分",
-    goal:"-shared -fPIC で共有ライブラリ（.so）を作成し、dlopen/dlsym でランタイムに動的ロードできる。LD_LIBRARY_PATH、シンボルの可視性、バージョン管理の基礎を理解するのがゴール。",
-    sections:[
-      { title:"共有ライブラリの作成", body:"共有ライブラリ（.so: shared object, Windowsでは.dll）はプログラムの実行時に動的にリンクされるコードです。同じライブラリを複数プロセスでメモリ共有でき、ライブラリを更新するとそれを使う全アプリが新バージョンを使えます（再コンパイル不要）。\n\n-fPIC（Position Independent Code）フラグは「メモリのどこに配置されても動くコード」を生成します。共有ライブラリは複数のプロセスで異なるアドレスにマップされるため、絶対アドレスを使えません。これがPICの必要な理由です。", code:`# 共有ライブラリのコンパイル\ngcc -shared -fPIC -o libmath.so libmath.c\n\n# 静的にリンク\ngcc main.c -L. -lmath -o app_static\nLD_LIBRARY_PATH=. ./app_static\n\n# 動的に (dlopen)\ngcc main.c -ldl -o app_dynamic\n./app_dynamic\n\n# 依存ライブラリの確認\nldd ./app_static\n\n# エクスポートシンボルの確認\nnm -D libmath.so`, afterCode:"シンボルの可視性を制御するには __attribute__((visibility(\"hidden\"))) で内部関数を隠蔽します。公開したい関数だけ __attribute__((visibility(\"default\"))) にすることで、ライブラリのAPIをクリーンに設計できます。"},
-      { title:"ABI安定性の設計", body:"ライブラリのAPI（Application Programming Interface）は「関数の名前と引数」の契約ですが、ABI（Application Binary Interface）は「バイナリレベルでの互換性」です。ABI を破るとライブラリを更新しただけでアプリがクラッシュします。\n\nopaque型（前方宣言だけでポインタとして扱い、中身を隠蔽する設計）を使うと、内部構造を変えても既存のバイナリとの互換性を保てます。これはPIMPL（Pointer to Implementation）イディオムとも呼ばれます。", table:T.abiPrinciples, afterTable:"Linuxの glibc はABIの後方互換性を何十年も維持しており、20年前にコンパイルされたバイナリが最新のglibc上でも動くことがあります。これはABI管理の優れた事例です。"}
-    ]
-  },
-  { id:"ch5", num:5, title:"ガベージコレクターの実装", est:"60分",
-    goal:"マーク&スイープGCのアルゴリズムをCで実装できる。ルートセット・マークフェーズ・スイープフェーズの各工程を理解し、Pythonが内部で行っているメモリ管理の仕組みを把握するのがゴール。",
-    sections:[
-      { title:"GCの種類とトレードオフ", body:"ガベージコレクターはプログラマが手動でfreeを書かなくてよいようにする自動メモリ管理機構です。Python、Java、GoなどがGCを持ちます。C言語自体はGCを持ちませんが、C言語でGCを実装することでGCの仕組みを深く理解できます。\n\n主なGCの種類: マーク&スイープ（到達不可能なオブジェクトをまとめて回収）、参照カウント（Pythonがこれを使用、循環参照は別途処理）、コピーGC（生きているオブジェクトを別の領域にコピー）、世代別GC（若いオブジェクトを頻繁に回収）。", code:`// マーク&スイープの疑似コード\nvoid gc_collect() {\n    // フェーズ1: マーク\n    for (root : gc_roots)  // ルートから到達可能なオブジェクトを全てマーク\n        mark(root);\n\n    // フェーズ2: スイープ\n    for (obj : all_objects)\n        if (!obj->marked)\n            free(obj);         // 到達不可能 → 解放\n        else\n            obj->marked = false; // マーククリア（次回のため）\n}`, afterCode:"マーク&スイープの「Stop-the-World」（GC中は全スレッドを一時停止する）問題が、Go・JavaなどがConcurrent GCに進化した背景です。"},
-      { title:"ルートセットとマーキング", body:"GCのルートセットは「プログラムが直接参照できるオブジェクトの集合」です。グローバル変数、現在のスタックフレームの変数、CPUレジスタなどが含まれます。ルートから到達可能な全オブジェクトを「生きている」と判定し、それ以外は回収します。\n\nCで実装する場合、ルートの追跡は明示的に行う必要があります（コンパイラがスタックのレイアウトを教えてくれないため）。gc_add_root() で手動登録するか、保守的GC（スタック上の全ワードをポインタかもしれないとみなす）を使います。", code:`// 保守的GCの考え方（Boehm GCが採用）\n// スタックポインタからフレームポインタまでの全ワードを\n// 「ポインタかもしれない値」として扱い、\n// GCヒープ内のアドレスであれば参照があると見なす\n\n// 精度は低いが実装が簡単で、既存のCコードに追加できる\n// Boehm GC: gc_malloc() で確保するだけで自動GCが有効になる`, afterCode:"PythonのCPython実装は参照カウント + サイクル検出（mark-and-sweep）のハイブリッドです。参照カウントは即時回収できますが、循環参照（a→b→a）は別途mark-and-sweepで処理します。"}
-    ]
-  },
-  { id:"ch6", num:6, title:"オブジェクト指向をCで模倣", est:"50分",
-    goal:"vtable（仮想関数テーブル）パターンでCにポリモーフィズムを実装できる。C++の内部実装を理解し、「C++はCの上に何を追加したのか」を具体的に説明できるようになるのがゴール。",
-    sections:[
-      { title:"vtableとポリモーフィズム", body:"C++の「仮想関数」は内部では vtable（virtual function table）という関数ポインタの配列で実装されています。クラスの各インスタンスは vtable へのポインタを持ち、仮想関数呼び出し時は vtable 経由で適切な実装が呼ばれます（動的ディスパッチ）。\n\nこれをCで再現することで「C++がCよりどこで遅くなるか」「なぜGoはインターフェースを使うと少し遅くなるのか」が理解できます。vtableのポインタをたどる間接参照が1回余分に発生するためです。", code:`// C++のオブジェクトモデル（概念）\nclass Shape {\npublic:\n    virtual double area() = 0;  // 仮想関数\n};\n// Shapeのインスタンスのメモリレイアウト:\n// [vptr | データフィールド]\n//   ↓\n// vtable: [area実装のアドレス]\n\n// これをCで再現すると:\nstruct Shape { const Vtable *vt; /* データ */ };`, afterCode:"C++の virtual 関数呼び出しは「vptr の参照 + vtable の参照 + 実際の関数ポインタの参照 + 関数実行」の3段階の間接参照です。これが「仮想関数は遅い」と言われる理由ですが、現代のCPUとコンパイラで最適化すると通常は無視できるオーバーヘッドです。"}
-    ]
-  },
-  { id:"ch7", num:7, title:"コルーチンと非同期処理", est:"55min",
-    goal:"C言語でコルーチンを実装する主要な方法（setjmp/longjmp, ucontext_t）を理解し、協調的マルチタスクのデモを書ける。Go の goroutine や Python の asyncio が内部で行っていることの概念的な理解がゴール。",
-    sections:[
-      { title:"コルーチンとは", body:"コルーチンは「途中で処理を中断し、後で再開できる関数」です。PythonのgeneratorやPython 3.5+のasync/awaitがこれを使います。Goのgoroutineはコルーチンのスケジューラー込みの実装です。\n\nスレッドはOSが切り替えますが（プリエンプティブ）、コルーチンはプログラム自身が切り替え点を決めます（協調的）。コンテキストスイッチのコストがスレッドより桁違いに小さいため、多数の並行処理に向いています。", table:T.coroutine, afterTable:"Go の runtime は協調的コルーチンにプリエンプティブなタイマーを組み合わせて「どのgoroutineも長時間CPUを独占できない」ようにしています（Go 1.14以降）。"},
-      { title:"setjmp/longjmによるコンテキスト切り替え", body:"setjmp はCPUレジスタ（スタックポインタ・プログラムカウンタ含む）を jmp_buf に保存します。longjmp はその状態に戻ります。コルーチンの実装では、各コルーチンが独自のスタックと jmp_buf を持ち、yield() で現在のコンテキストを保存して別のコルーチンに制御を移します。\n\n完全な実装には独自スタックの確保（mmap または malloc）とスタックポインタの操作が必要で、アセンブリまたは ucontext_t が必要です。setjmp/longjmp だけでは独立したスタックを切り替えられません。", code:`// ucontext_tを使った正しいコルーチン実装\n#include <ucontext.h>\n\nucontext_t main_ctx, coro_ctx;\nchar coro_stack[65536];\n\nvoid coro_fn(void) {\n    printf("コルーチン: ステップ1\\n");\n    swapcontext(&coro_ctx, &main_ctx);  // メインに戻る\n    printf("コルーチン: ステップ2\\n");\n    swapcontext(&coro_ctx, &main_ctx);  // メインに戻る\n}\n\nint main(void) {\n    getcontext(&coro_ctx);\n    coro_ctx.uc_stack.ss_sp = coro_stack;\n    coro_ctx.uc_stack.ss_size = sizeof(coro_stack);\n    coro_ctx.uc_link = &main_ctx;\n    makecontext(&coro_ctx, coro_fn, 0);\n\n    swapcontext(&main_ctx, &coro_ctx);  // コルーチン実行\n    printf("メイン: 再開\\n");\n    swapcontext(&main_ctx, &coro_ctx);  // コルーチン再開\n    printf("メイン: 終了\\n");\n    return 0;\n}`, afterCode:"ucontext_t は macOS でも使えますが非推奨です。macOS では libdill や libcoro などのサードパーティライブラリを使うか、プラットフォーム固有のAPIを使うのが実践的です。"}
-    ]
-  },
-  { id:"ch8", num:8, title:"カスタムメモリアロケータの設計", est:"60分",
-    goal:"best-fit、first-fit、バディシステムなど複数の空きブロック選択アルゴリズムの違いを理解し、フラグメンテーションの合体（coalescing）を含む完全なアロケータを実装できることがゴール。",
-    sections:[
-      { title:"アロケータの設計指針", body:"メモリアロケータの性能評価基準は3つです：速度（malloc/freeの時間）、スペース効率（フラグメンテーションの少なさ）、スレッドセーフ性（複数スレッドからの同時呼び出し）です。これらはしばしばトレードオフになります。\n\nfirst-fit（最初の十分なブロック）は高速ですが外部フラグメンテーションが起きやすい。best-fit（最も小さな十分なブロック）はフラグメンテーションを抑えますが検索が遅い。バディシステムは2の冪乗サイズのブロックで管理し、分割と合体が高速です。", code:`// アロケータアルゴリズムの比較\n// first-fit: フリーリストを先頭から探して最初の合致を使用 → O(n)\n// best-fit:  フリーリスト全体を探して最小合致を使用     → O(n), 無駄が少ない\n// next-fit:  前回の検索を終えた位置から再開              → O(n), キャッシュ効率↑\n// buddy:     2のべき乗サイズで管理、分割/合体が O(log n)`, afterCode:"glibcの malloc は ptmalloc2 というアルゴリズムで、スレッドごとのアリーナ（独立したヒープ）を使ってロック競合を最小化します。"},
-      { title:"フラグメンテーションと合体", body:"メモリを確保・解放を繰り返すと、空き領域が細切れになる「フラグメンテーション」が起きます。外部フラグメンテーション（全体の空き容量は十分でも、連続した大きなブロックがない状態）と内部フラグメンテーション（確保したブロックの一部が使われない状態）の2種類があります。\n\n合体（coalescing）は隣接する空きブロックを結合する操作で、外部フラグメンテーションを防ぎます。ブロックヘッダに「前のブロックへの参照」を持たせる（double linked free list）と、O(1)で隣接する空きブロックを見つけて合体できます。", code:`// ブロックヘッダの設計（実際のmalloc実装に近い形）\ntypedef struct Block {\n    size_t        prev_size;  // 前のブロックのサイズ（合体用）\n    size_t        size;       // このブロックのサイズ（+最下位ビットでfreeフラグ）\n    struct Block *fd;         // フリーリストの次\n    struct Block *bk;         // フリーリストの前\n} Block;\n\n// #define IS_FREE(b)  ((b)->size & 1)\n// #define DATA(b)     ((void*)((char*)(b) + sizeof(Block)))`, afterCode:"glibcのmalloc実装（mallocソースコードはglibc-2.x.tar.xzに含まれる）は非常に参考になります。約5000行のCコードで、上記の概念が全て実装されています。"}
-    ]
-  },
-  { id:"ch9", num:9, title:"ELF形式とバイナリ解析", est:"50分",
-    goal:"ELF（Executable and Linkable Format）の構造（セクション・セグメント・シンボルテーブル）を理解し、Cで ELFヘッダを読んで情報を表示できるようになる。nm, objdump, readelf の出力を読めることがゴール。",
-    sections:[
-      { title:"ELFファイルの構造", body:"LinuxのELF（Executable and Linkable Format）はバイナリファイルのフォーマット仕様です。実行ファイル、共有ライブラリ（.so）、オブジェクトファイル（.o）の全てがELF形式です。ELFヘッダにはアーキテクチャ情報・エントリポイント・セクションとセグメントの場所が記録されています。\n\nプログラムが起動する際、OSのローダーがELFを読んでメモリにマップし、動的リンカが必要な共有ライブラリをロードしてから、エントリポイント（通常は_start → main）に制御を渡します。", table:T.linkerScript, afterTable:"nm -D libXxx.so でライブラリがエクスポートするシンボル一覧、objdump -d prog でアセンブリ逆アセンブル、readelf -h prog でELFヘッダ詳細が見えます。"},
-      { title:"デバッグ情報とDWARF", body:"gdb でソースコード行番号を参照できるのは、-g フラグでコンパイルされたバイナリに DWARF（Debugging With Attributed Record Formats）形式のデバッグ情報が埋め込まれているためです。DWARF は「機械語アドレスとソースの行番号の対応」「変数のアドレスと型」「コールスタックのフレームレイアウト」などを記述します。\n\nDWARFはELFの .debug_* セクション群に格納されます。strip コマンドでデバッグ情報を削除すると実行ファイルサイズが大幅に減ります。本番配布時は strip したバイナリと、デバッグ用の debug symbols を分離するのが一般的です。", code:`# デバッグ情報の確認\nreadelf --debug-dump=info prog | head -50\n\n# シンボルテーブルの確認\nnm -n prog  # アドレス順\nnm -u prog  # 未定義シンボル（外部ライブラリから来るもの）\n\n# アセンブリの確認\nobjdump -d -M intel prog | head -50  # Intel構文で表示\n\n# セクションサイズ\nsize prog`, afterCode:"perf stat ./prog でCPU使用率・キャッシュミス・分岐予測ミスなどの統計が取れます。パフォーマンスチューニングの出発点として活用できます。"}
-    ]
-  },
-  { id:"ch10", num:10, title:"パーサー実装とDSL設計", est:"60分",
-    goal:"設定ファイル（INI/TOML風）のパーサーを実装できる。字句解析→構文解析→データ格納の全工程を実装し、エラーメッセージを丁寧に出せるパーサーを設計できるようになるのがゴール。",
-    sections:[
-      { title:"INIパーサーの設計", body:"設定ファイルのパーサーは実用的かつ学習に最適な題材です。[section] / key=value という INI 形式を解析するには、行ごとにトークンを識別してセクション名とキー・値を抽出します。\n\nPythonのconfigparserがこれを行います。Cで実装することで「文字列処理の基礎（strstr, sscanf, strtok）」「エラーハンドリング（行番号付きのエラーメッセージ）」「ハッシュマップでの値の格納」を組み合わせた実践的なコードが書けます。", code:`// INIファイル形式の例\n// [server]\n// host = localhost    ; コメントもOK\n// port = 8080\n//\n// [database]\n// url  = postgres://localhost/mydb\n// pool = 10\n\n// パーサーの処理フロー:\n// 1. 1行読む\n// 2. 先頭の空白をスキップ\n// 3. # または ; で始まる行はスキップ（コメント）\n// 4. [ で始まる行はセクション名\n// 5. = を含む行はキー=値\n// 6. ハッシュマップに \"section.key\" → \"value\" で格納`, afterCode:"エラーメッセージに行番号を含めると（例: \"config.ini:5: syntax error: missing '='\"）ユーザーが問題箇所を特定しやすくなります。プロフェッショナルなパーサーは行番号追跡を必ず実装します。"}
-    ]
-  },
-  { id:"ch11", num:11, title:"HTTPサーバーとネットワークアプリ", est:"60min",
-    goal:"マルチスレッドのHTTPサーバーを実装できる。HTTPリクエストのパース、レスポンスのフォーマット、クライアントごとのスレッド生成と安全な接続管理ができることがゴール。",
-    sections:[
-      { title:"HTTPプロトコルの実装", body:"HTTPはテキストベースのプロトコルです。GETリクエストは「GET /path HTTP/1.1\\r\\nHost: example.com\\r\\n\\r\\n」という形式で、ヘッダとボディは「\\r\\n\\r\\n」で区切られます。Cのソケットとsend/recvだけで完全なHTTPサーバーが実装できます。\n\nPythonのhttpサーバー（http.server.HTTPServer）もソケットAPIの上に構築されており、Cの実装を理解すると「Pythonのフレームワークが裏で何をしているか」が明確になります。", code:`// HTTPリクエストの形式\n// GET / HTTP/1.1\\r\\n\n// Host: localhost\\r\\n\n// \\r\\n\n\n// HTTPレスポンスの形式\n// HTTP/1.0 200 OK\\r\\n\n// Content-Type: text/html\\r\\n\n// Content-Length: 12\\r\\n\n// \\r\\n\n// Hello World!\n\n// パース: 最初の行からメソッドとパスを取得\n// sscanf(buf, "%s %s", method, path);`, afterCode:"HTTP/1.1のKeep-Alive（接続の再利用）を実装するには、Content-Lengthでボディの終わりを判定してから次のリクエストを待つ必要があります。このためrecvを単純にループするだけでは不十分で、パーサーがより複雑になります。"},
-      { title:"マルチスレッドサーバー", body:"1つのクライアントに処理中は他のクライアントが待たされる単純なサーバーから、acceptしたら新しいスレッドで処理するマルチスレッドサーバーに拡張します。スレッドプール（固定数のワーカースレッドとキューを使う方式）はさらに効率的です。\n\npthread_create でクライアントごとにスレッドを作るシンプルな実装は、同時接続数に比例してスレッドが増えメモリを消費します。実用的なサーバーではepoll（Linux）やkqueue（macOS）による非同期I/Oと少数のスレッドを組み合わせます（nginxやlighttpdが採用）。", code:`// スレッドプールの概念\nvoid* worker(void *arg) {\n    TaskQueue *q = (TaskQueue*)arg;\n    while (1) {\n        int fd = queue_dequeue(q);  // タスク待ち（ブロック）\n        handle_client(fd);\n        close(fd);\n    }\n    return NULL;\n}\n\n// メインスレッド\nfor (int i = 0; i < N_WORKERS; i++)\n    pthread_create(&threads[i], NULL, worker, &queue);\n\nwhile (1) {\n    int cli = accept(srv, NULL, NULL);\n    queue_enqueue(&queue, cli);  // ワーカーに渡す\n}`, afterCode:"非同期I/OはLinuxのepoll, macOSのkqueue, FreeBSDのkqueueを使います。Pythonのasyncioも内部ではselectorsモジュールを通じてこれらのAPIを使用しています。"}
-    ]
-  },
-  { id:"ch12", num:12, title:"ライブラリ設計とAPIデザイン", est:"55min",
-    goal:"再利用可能なCライブラリを設計できる。opaque型・エラーコード・リソース管理のAPIを正しく設計し、ユーザーが安全かつ簡単に使えるAPIを提供できることがゴール。",
-    sections:[
-      { title:"良いAPIの設計原則", body:"ライブラリのAPIは「使いやすく、安全で、将来の変更に耐える」ことが重要です。C言語では特に「リソース所有権の明確化」「エラー伝播の一貫性」「opaque型による実装の隠蔽」が鍵になります。\n\nPythonのwith文（コンテキストマネージャー）に対応するCのパターンは「init→use→cleanup」です。CleanupをGOTO（集中型のクリーンアップ処理）や __attribute__((cleanup)) で自動化するアプローチもあります。", table:T.abiPrinciples, afterTable:"良いAPIの指標: 「正しく使うのが最も簡単」「誤った使い方はコンパイルエラーになる（または即座にクラッシュしてデバッグが簡単）」「リソースリークを起こしにくい」の3点。"},
-      { title:"エラーハンドリングパターン", body:"Cには例外がないため、エラー伝播は関数の戻り値とerrnoを使います。標準的なパターンは「成功は0（またはNULL以外のポインタ）、失敗は負の値（またはNULL）」です。エラーコードをenumで定義し、err_to_string() で人間可読なメッセージを提供するとユーザーフレンドリーになります。\n\nGOTOを使ったエラー処理パターン（カーネルコードで多用される）は「複数のリソースを確保してエラー時に全て解放する」処理をスパゲッティにならず書けます。if(err) goto cleanup; という形でエラーチェックを統一します。", code:`// GOTOを使ったリソース管理パターン\nint do_work(const char *path) {\n    int   fd  = -1;\n    void *buf = NULL;\n    int   ret = -1;\n\n    fd = open(path, O_RDONLY);\n    if (fd < 0) { ret = -errno; goto cleanup; }\n\n    buf = malloc(BUF_SIZE);\n    if (!buf) { ret = -ENOMEM; goto cleanup; }\n\n    // ... 実際の処理 ...\n    ret = 0;  // 成功\n\ncleanup:\n    free(buf);\n    if (fd >= 0) close(fd);\n    return ret;\n}`, afterCode:"Linuxカーネルのコードは goto cleanup パターンを徹底的に使っており、エラーハンドリングがとても読みやすくなっています。C言語でgotoを「まともに使う」数少ない正当な用途です。"}
-    ]
-  }
+    const char *body = "<h1>Hello, World!</h1>";
+    char header[512];
+    int hlen = snprintf(header, sizeof(header),
+        "HTTP/1.1 200 OK\\r\\n"
+        "Content-Type: text/html; charset=utf-8\\r\\n"
+        "Content-Length: %zu\\r\\n"
+        "Connection: close\\r\\n"
+        "\\r\\n", strlen(body));
+
+    write_all(client_fd, header, hlen);
+    write_all(client_fd, body, strlen(body));
+    close(client_fd);
+}`,
+      afterCode:"MSG_NOSIGNALフラグを使うと、接続が切れてもSIGPIPEシグナルが発生しません。SIGPIPE のデフォルト動作はプロセス終了なので、サーバプロセスがクライアント切断で落ちないようにするために重要です。"}
+   ]},
+  {id:"ch7", num:7, title:"メモリプール・カスタムアロケータ", est:"65分",
+   goal:"固定サイズ・可変サイズのメモリプールを実装し、Buddy Systemアロケータの基本動作を理解できる。フラグメンテーションの問題と解決策を説明できる。",
+   sections:[
+     {title:"メモリプールの設計と実装", body:`標準のmalloc/freeはコンテキスト切り替えを要するヒープ管理のため、頻繁な小さなアロケーションでは遅くなります。メモリプールは決まったサイズのブロックを事前に確保しておき、O(1)でalloc/freeできるようにします。ゲームエンジン・データベース・Webサーバのホットパスでよく使われます。
+
+固定サイズプールはimplicity simple（実装が簡単）です。大きな配列を事前に確保し、使用中フラグの配列で管理します。pool_alloc()は未使用ブロックを線形探索して返し、pool_free()は該当ブロックのフラグを0にします。フリーリスト（解放済みブロックを連結リストで管理）にすると線形探索を避けO(1)になります。
+
+アライメントはCPUが効率的にメモリアクセスするための配置要求です。x86-64では8バイト境界が基本で、SSE命令は16バイト、AVX命令は32バイトアライメントが必要です。mallocはmax_align_t（通常16バイト）のアライメントを保証します。カスタムアロケータでもアライメントを保証するためにブロックサイズをアライメント単位に切り上げる処理が必要です。`,
+      code:`#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+
+/* アライメント: sizeをalignの倍数に切り上げ */
+#define ALIGN_UP(size, align) \
+    (((size) + (align) - 1) & ~((align) - 1))
+
+#define BLOCK_SIZE  64
+#define POOL_BLOCKS 512
+#define ALIGN       16
+
+typedef struct FreeNode { struct FreeNode *next; } FreeNode;
+
+typedef struct {
+    uint8_t memory[POOL_BLOCKS * BLOCK_SIZE] __attribute__((aligned(16)));
+    FreeNode *free_head;
+    int alloc_count;
+    int free_count;
+} MemPool;
+
+void pool_init(MemPool *pool) {
+    pool->free_head = NULL;
+    pool->alloc_count = pool->free_count = 0;
+    /* 全ブロックをフリーリストに登録 */
+    for (int i = POOL_BLOCKS - 1; i >= 0; i--) {
+        FreeNode *node = (FreeNode *)(pool->memory + i * BLOCK_SIZE);
+        node->next = pool->free_head;
+        pool->free_head = node;
+    }
+}
+
+void *pool_alloc(MemPool *pool) {
+    if (!pool->free_head) return NULL;
+    FreeNode *node = pool->free_head;
+    pool->free_head = node->next;
+    pool->alloc_count++;
+    return node;
+}
+
+void pool_free(MemPool *pool, void *ptr) {
+    FreeNode *node = (FreeNode *)ptr;
+    node->next = pool->free_head;
+    pool->free_head = node;
+    pool->free_count++;
+}`,
+      afterCode:"__attribute__((aligned(16)))はGCC拡張でメモリのアライメントを指定します。C11のaligned_as()マクロも同じ効果があります。SIMDを使うコードのバッファには適切なアライメントが必須です。"},
+     {title:"Buddy Systemアロケータ", body:`Buddy Systemは2の累乗サイズのブロックを管理するアロケータです。Linuxカーネルの物理メモリ管理（ページアロケータ）で使われています。要求サイズを2の累乗に切り上げ、そのサイズのフリーリストからブロックを取り出します。フリーリストが空なら上位サイズのブロックを半分に分割（スプリット）して使います。
+
+解放時は「バディ」（同サイズの隣接ブロック）も解放されていればマージ（コアレス）します。バディのアドレスはXOR演算で計算できます：buddy = address XOR size。これによりフラグメンテーション（連続した空きがあるのに大きなブロックが確保できない問題）を大幅に削減します。
+
+スラブアロケータはBuddy Systemの上に実装される別の最適化です。Linuxカーネルのkmallocはスラブキャッシュを使って同じサイズのオブジェクト（task_struct・inode等）を管理します。malloc/freeのオーバーヘッドを最小化するために現代のOSカーネルが広く採用しています。`,
+      code:`#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+#define MIN_ORDER 4    /* 最小ブロック: 2^4 = 16バイト */
+#define MAX_ORDER 12   /* 最大ブロック: 2^12 = 4096バイト */
+#define POOL_SIZE (1 << MAX_ORDER)
+
+typedef struct Block { struct Block *next; } Block;
+
+static uint8_t pool[POOL_SIZE] __attribute__((aligned(4096)));
+static Block *free_lists[MAX_ORDER + 1];
+
+/* 最小の2の累乗orderを返す */
+int order_of(size_t size) {
+    int order = MIN_ORDER;
+    while ((1 << order) < (int)size) order++;
+    return order;
+}
+
+void *buddy_alloc(size_t size) {
+    int order = order_of(size);
+    /* 要求order以上のフリーリストを探す */
+    for (int o = order; o <= MAX_ORDER; o++) {
+        if (!free_lists[o]) continue;
+        Block *block = free_lists[o];
+        free_lists[o] = block->next;
+        /* 必要ならスプリット */
+        while (o > order) {
+            o--;
+            /* バディをフリーリストに追加 */
+            Block *buddy = (Block *)((uint8_t *)block + (1 << o));
+            buddy->next = free_lists[o];
+            free_lists[o] = buddy;
+        }
+        return block;
+    }
+    return NULL;
+}`,
+      afterCode:"Buddy Systemの内部フラグメンテーションは最大50%です（要求サイズを2の累乗に切り上げるため）。小さなオブジェクト（8バイト・16バイト）が多い場合はスラブキャッシュと組み合わせてフラグメンテーションを削減します。"}
+   ]},
+  {id:"ch8", num:8, title:"セキュリティ・バッファオーバーフロー対策", est:"65分",
+   goal:"バッファオーバーフロー・整数オーバーフロー・フォーマット文字列攻撃の原理を理解し、スタック保護・ASLR・Sanitizerを活用して安全なCコードを書ける。",
+   sections:[
+     {title:"バッファオーバーフローの原理と防御", body:`バッファオーバーフローはCのセキュリティ脆弱性の最も代表的なものです。配列の境界チェックがないCでは、固定長バッファに長すぎる入力をstrcpy()すると、スタック上の隣接データ（リターンアドレス・saved EBP）を上書きできます。攻撃者はリターンアドレスをシェルコードのアドレスに書き換えて任意コードを実行します。
+
+防御策は複数あります。コンパイラのStack Canary（-fstack-protectorオプション）はスタックフレームの末尾に乱数を配置し、関数リターン前にチェックします。ASLR（Address Space Layout Randomization）はスタック・ヒープ・ライブラリのアドレスをランダム化して予測困難にします。NX bit（W^Xポリシー）はスタックページを実行不可にします。
+
+安全な文字列関数を使うことが基本的な対策です。strcpy→strlcpy（またはstrncpy+手動NUL終端）、sprintf→snprintf、gets→fgets（またはgetline）。POSIX.1-2008以降ではgetline()が推奨されます。C11のAnnex K（bounds-checking interfaces）にはstrcpy_s・sprintf_sが定義されていますが、実装が任意なため普及していません。`,
+      code:`#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+/* 安全な文字列操作のユーティリティ */
+
+/* strlcpyが使えない環境向けの安全な実装 */
+size_t safe_strlcpy(char *dst, const char *src, size_t size) {
+    size_t src_len = strlen(src);
+    if (size > 0) {
+        size_t copy_len = src_len < size - 1 ? src_len : size - 1;
+        memcpy(dst, src, copy_len);
+        dst[copy_len] = '\\0';
+    }
+    return src_len; // truncateしたかどうかは: src_len >= size で判定
+}
+
+/* 安全なgets代替 (行入力) */
+char *safe_getline(char **lineptr, size_t *n, FILE *stream) {
+    if (!*lineptr || *n == 0) {
+        *n = 128;
+        *lineptr = malloc(*n);
+        if (!*lineptr) return NULL;
+    }
+    size_t len = 0;
+    int c;
+    while ((c = fgetc(stream)) != EOF && c != '\\n') {
+        if (len + 2 > *n) {
+            *n *= 2;
+            char *new_ptr = realloc(*lineptr, *n);
+            if (!new_ptr) return NULL;
+            *lineptr = new_ptr;
+        }
+        (*lineptr)[len++] = c;
+    }
+    if (len == 0 && c == EOF) return NULL;
+    (*lineptr)[len] = '\\0';
+    return *lineptr;
+}`,
+      afterCode:"-fsanitize=address（AddressSanitizer）をコンパイラオプションに追加するとバッファオーバーフロー・use-after-free・heap-buffer-overflowをランタイムで検出します。開発時に必ず使いましょう。本番バイナリでは外します（10〜20倍の性能低下）。"},
+     {title:"整数オーバーフローとフォーマット文字列攻撃", body:`整数オーバーフローは符号なし整数がラップアラウンドする（UINTMAXの次が0になる）挙動を攻撃に利用します。典型的な攻撃パターンは、malloc(user_count * sizeof(struct))の計算でuser_countが非常に大きい場合、乗算がオーバーフローして小さなサイズのバッファが確保され、後続の書き込みでオーバーフローが起きます。
+
+C99のstdint.h・<limits.h>を使ってオーバーフローを検出します。符号付き整数のオーバーフローはC言語では未定義動作（UB）です。コンパイラはUBを前提に最適化を行うため、「オーバーフロー後の動作」を仮定したコードは全く別のコードにコンパイルされる可能性があります。GCC/Clangの-fwrapvオプションでラップアラウンドを定義済みにできますが、UBをなくすためには根本的に検査を追加します。
+
+フォーマット文字列攻撃はprintf(user_input)のように書式文字列をユーザー入力にする脆弱性です。%xを含む入力でスタックの中身が読め、%nでスタックへの書き込みが可能になります。常にprintf("%s", user_input)と書いてください。-Wformat-securityオプションでコンパイラが警告します。`,
+      code:`#include <stdint.h>
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+/* 整数オーバーフローの安全な検出 */
+
+/* 安全な符号なし乗算 */
+int safe_mul_size(size_t a, size_t b, size_t *result) {
+    if (b != 0 && a > SIZE_MAX / b) {
+        return -1; // オーバーフロー
+    }
+    *result = a * b;
+    return 0;
+}
+
+/* GCCの__builtin_*_overflow 関数 (C23ではckd_add等) */
+int safe_add_int(int a, int b, int *result) {
+    return __builtin_sadd_overflow(a, b, result);
+    /* 戻り値: 0=安全, 1=オーバーフロー */
+}
+
+/* フォーマット文字列: 常に書式を固定 */
+void safe_log(const char *user_message) {
+    /* 危険: printf(user_message);       → %n攻撃可能 */
+    /* 安全: */ printf("[LOG] %s\\n", user_message); /* 書式を固定 */
+}
+
+/* 使用例: 安全なメモリ確保 */
+void *safe_alloc_array(size_t count, size_t elem_size) {
+    size_t total;
+    if (safe_mul_size(count, elem_size, &total) != 0) {
+        fprintf(stderr, "整数オーバーフロー: count=%zu elem_size=%zu\\n",
+                count, elem_size);
+        return NULL;
+    }
+    return calloc(1, total); // callocは内部でもオーバーフローチェック
+}`,
+      afterCode:"-fsanitize=undefined（UndefinedBehaviorSanitizer）は整数オーバーフロー・ゼロ除算・NULLポインタ逆参照などの未定義動作を実行時に検出します。-fsanitize=address,undefinedの組み合わせが最も包括的です。CI/CDパイプラインに組み込みましょう。"}
+   ]},
 ];
 
-function DataTable({ data }) {
-  return React.createElement("div", {style:{overflowX:"auto",margin:"12px 0",borderRadius:10,border:"1px solid #d1d5db",background:"#fff"}},
-    React.createElement("table", {style:{width:"100%",borderCollapse:"separate",borderSpacing:0,fontSize:13}},
-      React.createElement("thead", null, React.createElement("tr", null,
-        data.h.map((h,i)=>React.createElement("th",{key:i,style:{background:"linear-gradient(180deg,#eef2ff,#e0e7ff)",color:"#312e81",fontWeight:800,fontSize:12.5,padding:"10px 14px",textAlign:"left",borderBottom:"2px solid #a5b4fc",borderRight:i<data.h.length-1?"1px solid #c7d2fe":"none"}},h))
-      )),
-      React.createElement("tbody", null, data.r.map((row,ri)=>React.createElement("tr",{key:ri},
-        row.map((cell,ci)=>React.createElement("td",{key:ci,style:{padding:"9px 14px",borderBottom:ri<data.r.length-1?"1px solid #e5e7eb":"none",borderRight:ci<row.length-1?"1px solid #f3f4f6":"none",color:ci===0?"#1e1b4b":"#374151",fontWeight:ci===0?700:400,fontSize:13,lineHeight:1.65,verticalAlign:"top",whiteSpace:"pre-line",background:ri%2===0?"#fff":"#f9fafb"}},cell))
-      )))
-    ),
-    data.cap&&React.createElement("div",{style:{padding:"8px 14px",fontSize:12,color:"#6b7280",borderTop:"1px solid #e5e7eb",background:"#f9fafb"}},data.cap)
+function CAdvancedCourse() {
+  const [ch, setCh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapter = chapters[ch];
+  const exKey = chapter.id;
+  const exercises = EX[exKey] || [];
+
+  return React.createElement("div", {style:{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"}},
+    React.createElement("div", {style:{maxWidth:1100,margin:"0 auto",padding:"20px 14px"}},
+      React.createElement("div", {style:{background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",borderRadius:16,padding:"24px 20px",marginBottom:16,position:"relative",overflow:"hidden"}},
+        React.createElement("div", {style:{position:"absolute",top:-30,right:-10,fontSize:140,opacity:0.05}}, "⚙️"),
+        React.createElement("div", {style:{fontSize:11,fontWeight:700,color:"#a5b4fc",textTransform:"uppercase",letterSpacing:2,marginBottom:4}}, "Python開発者のための"),
+        React.createElement("h1", {style:{margin:0,fontSize:22,fontWeight:900,color:"#fff"}}, "C言語 上級コース"),
+        React.createElement("p", {style:{margin:"6px 0 0",fontSize:12.5,color:"#c4b5fd"}}, "全", chapters.length, "章 ・ 演習", Object.values(EX).flat().length, "問"),
+        React.createElement("p", {style:{margin:"10px 0 0",fontSize:12,color:"#ddd6fe",lineHeight:1.8}}, "字句解析・カーネルモジュール・GC実装・ELFバイナリ解析・高性能HTTPサーバを構築し、Cプログラミングの最高峰に到達します。"),
+        React.createElement("div", {style:{marginTop:14,display:"flex",gap:3}},
+          chapters.map((_,i) => React.createElement("div", {key:i, onClick:()=>{setCh(i);setMenuOpen(false);}, style:{flex:1,height:5,borderRadius:3,background:i<=ch?"#818cf8":"rgba(255,255,255,0.15)",cursor:"pointer"}}))
+        )
+      ),
+      React.createElement("div", {style:{marginBottom:14}},
+        React.createElement("button", {onClick:()=>setMenuOpen(!menuOpen), style:{width:"100%",padding:"10px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",fontSize:14,fontWeight:700,color:"#1e1b4b",cursor:"pointer",display:"flex",justifyContent:"space-between"}},
+          React.createElement("span", null, "Ch.", chapter.num, ": ", chapter.title),
+          React.createElement("span", {style:{fontSize:12,color:"#9ca3af"}}, menuOpen?"▲":"▼")
+        ),
+        menuOpen && React.createElement("div", {style:{marginTop:4,border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden",background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}},
+          chapters.map((c,i) => React.createElement("button", {key:c.id, onClick:()=>{setCh(i);setMenuOpen(false);}, style:{width:"100%",padding:"10px 16px",border:"none",borderBottom:i<chapters.length-1?"1px solid #f3f4f6":"none",background:i===ch?"#eef2ff":"#fff",fontSize:13,fontWeight:i===ch?700:500,color:i===ch?"#4338ca":"#374151",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10}},
+            React.createElement("span", {style:{width:22,height:22,borderRadius:"50%",background:i===ch?"#6366f1":"#e5e7eb",color:i===ch?"#fff":"#6b7280",fontWeight:800,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}, c.num),
+            React.createElement("span", {style:{flex:1}}, c.title),
+            EX[c.id] && React.createElement("span", {style:{fontSize:11,color:"#f59e0b",fontWeight:700}}, EX[c.id].length, "問")
+          ))
+        )
+      ),
+      React.createElement("div", {style:{display:"flex",alignItems:"center",gap:10,marginBottom:12}},
+        React.createElement("span", {style:{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",fontWeight:900,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}, chapter.num),
+        React.createElement("div", null,
+          React.createElement("div", {style:{fontWeight:800,fontSize:18,color:"#1e1b4b"}}, chapter.title),
+          React.createElement("div", {style:{fontSize:12,color:"#6b7280"}}, "目安: ", chapter.est, exercises.length>0?" ・ 演習"+exercises.length+"問":"")
+        )
+      ),
+      chapter.goal && React.createElement("div", {style:{background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",border:"1px solid #c7d2fe",borderLeft:"4px solid #6366f1",borderRadius:10,padding:"12px 16px",marginBottom:14}},
+        React.createElement("div", {style:{fontSize:11,fontWeight:800,color:"#4338ca",letterSpacing:1,marginBottom:6}}, "🎯 この章のゴール"),
+        React.createElement("div", {style:{fontSize:13.5,color:"#1e1b4b",lineHeight:1.8,whiteSpace:"pre-line"}}, chapter.goal)
+      ),
+      React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:8}},
+        chapter.sections.map((sec,i) => React.createElement(Section, {key:ch+"-"+i, section:sec, idx:i, defaultOpen:false}))
+      ),
+      exercises.length>0 && React.createElement("div", {style:{marginTop:20}},
+        React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}},
+          React.createElement("span", {style:{background:"#f59e0b",color:"#fff",fontWeight:800,fontSize:13,padding:"4px 14px",borderRadius:8}}, "🏋️ 演習問題"),
+          React.createElement("span", {style:{fontSize:13,color:"#92400e"}}, "易しい順に", exercises.length, "問")
+        ),
+        exercises.map((ex,i) => React.createElement(Exercise, {key:ch+"-"+i, ex, idx:i}))
+      ),
+      React.createElement("div", {style:{display:"flex",justifyContent:"space-between",marginTop:20,gap:10}},
+        ch>0 ? React.createElement("button", {onClick:()=>{setCh(ch-1);window.scrollTo(0,0);}, style:{flex:1,padding:"12px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",cursor:"pointer",fontWeight:600,fontSize:13,color:"#6b7280"}}, "← Ch.", chapters[ch-1].num) : React.createElement("div", {style:{flex:1}}),
+        ch<chapters.length-1 ? React.createElement("button", {onClick:()=>{setCh(ch+1);window.scrollTo(0,0);}, style:{flex:1,padding:"12px 16px",border:"none",borderRadius:10,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff"}}, "Ch.", chapters[ch+1].num, " →")
+        : React.createElement("a", {href:"../index.html", style:{flex:1,padding:"12px 16px",borderRadius:10,background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none"}}, "🎉 コース完了！")
+      ),
+      React.createElement("p", {style:{textAlign:"center",fontSize:11,color:"#9ca3af",marginTop:20}}, "en.cppreference.com ・ C17/C23 時点")
+    )
   );
 }
-function Code({code,hl}){return React.createElement("pre",{style:{background:hl?"#1a1a2e":"#0d0d1a",color:"#d0d0f0",padding:"14px 16px",borderRadius:10,fontSize:12,lineHeight:1.65,overflowX:"auto",margin:"8px 0 0",fontFamily:"'JetBrains Mono',monospace",border:hl?"2px solid #6366f1":"1px solid rgba(255,255,255,0.06)",whiteSpace:"pre-wrap",wordBreak:"break-word"}},React.createElement("code",null,code));}
-const diffLabel=d=>d===1?"⭐ 基本":d===2?"⭐⭐ 応用":"⭐⭐⭐ 発展";
-const diffColor=d=>d===1?"#16a34a":d===2?"#d97706":"#dc2626";
-function Exercise({ex,idx}){const[show,setShow]=useState(false);return React.createElement("div",{style:{borderRadius:12,border:"2px solid #f59e0b",overflow:"hidden",background:"#fff",marginBottom:8}},React.createElement("div",{style:{padding:"12px 16px",background:"linear-gradient(135deg,#fffbeb,#fef3c7)"}},React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}},React.createElement("span",{style:{background:"#f59e0b",color:"#fff",fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:6}},"問",idx+1),React.createElement("span",{style:{fontSize:12,fontWeight:700,color:diffColor(ex.diff)}},diffLabel(ex.diff))),React.createElement("p",{style:{margin:0,fontSize:13.5,lineHeight:1.8,color:"#92400e",whiteSpace:"pre-line"}},ex.q)),React.createElement("div",{style:{padding:"0 16px 12px"}},React.createElement(Code,{code:ex.code,hl:true})),React.createElement("div",{style:{borderTop:"1px dashed #fcd34d",padding:"10px 16px"}},React.createElement("button",{onClick:()=>setShow(!show),style:{background:show?"#22c55e":"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",border:"none",borderRadius:8,padding:"8px 20px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%"}},show?"🙈 解答を隠す":"👀 解答例を見る"),show&&React.createElement("div",{style:{marginTop:10}},React.createElement("div",{style:{fontSize:11,fontWeight:700,color:"#166534",letterSpacing:1,marginBottom:4}},"✅ 解答例"),React.createElement(Code,{code:ex.answer}))));}
-function Section({section,idx}){const[open,setOpen]=useState(false);return React.createElement("div",{style:{borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",background:"#fff"}},React.createElement("button",{onClick:()=>setOpen(!open),style:{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px 16px",border:"none",background:"#fafafa",cursor:"pointer",textAlign:"left",fontSize:14,fontWeight:700,color:"#1e1b4b"}},React.createElement("span",{style:{flexShrink:0,width:24,height:24,borderRadius:6,background:"#6366f1",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800}},idx+1),React.createElement("span",{style:{flex:1}},section.title),React.createElement("span",{style:{fontSize:18,color:"#9ca3af",transform:open?"rotate(90deg)":"rotate(0)"}},"›")),open&&React.createElement("div",{style:{padding:"12px 16px 16px"}},section.body&&React.createElement("p",{style:{margin:"0 0 8px",fontSize:13.5,lineHeight:1.85,color:"#374151",whiteSpace:"pre-line"}},section.body),section.table&&React.createElement(DataTable,{data:section.table}),section.afterTable&&React.createElement("p",{style:{margin:"8px 0",fontSize:13.5,lineHeight:1.85,color:"#374151",whiteSpace:"pre-line"}},section.afterTable),section.code&&React.createElement(Code,{code:section.code}),section.afterCode&&React.createElement("p",{style:{margin:"10px 0 0",fontSize:13,lineHeight:1.8,color:"#555",whiteSpace:"pre-line",background:"#f9fafb",padding:"10px 14px",borderRadius:8,border:"1px solid #e5e7eb"}},section.afterCode)));}
-function App(){const[ch,setCh]=useState(0);const[menuOpen,setMenuOpen]=useState(false);const chapter=chapters[ch];const exercises=EX[chapter.id]||[];return React.createElement("div",{style:{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Noto Sans JP',sans-serif"}},React.createElement("div",{style:{maxWidth:1100,margin:"0 auto",padding:"20px 14px"}},React.createElement("div",{style:{background:"linear-gradient(135deg,#0c0a20,#1e1b4b 40%,#4c1d95)",borderRadius:16,padding:"24px 20px",marginBottom:16,position:"relative",overflow:"hidden"}},React.createElement("div",{style:{fontSize:11,fontWeight:700,color:"#a5b4fc",textTransform:"uppercase",letterSpacing:2,marginBottom:4}},"C言語 上級コース"),React.createElement("h1",{style:{margin:0,fontSize:22,fontWeight:900,color:"#fff"}},"言語処理系・OS・ライブラリ設計"),React.createElement("p",{style:{margin:"6px 0 0",fontSize:12.5,color:"#c4b5fd"}},"全",chapters.length,"章 ・ 演習",Object.values(EX).flat().length,"問"),React.createElement("p",{style:{margin:"10px 0 0",fontSize:12,color:"#ddd6fe",lineHeight:1.8}},"パーサー実装・インタープリター・カーネルモジュール・共有ライブラリ・GC・オブジェクト指向の模倣・コルーチン・カスタムアロケータ・ELFバイナリ解析・HTTPサーバー・ライブラリ設計を習得します。C言語の「底」を体験し、他の言語の「なぜ」を説明できるレベルを目指します。"),React.createElement("div",{style:{marginTop:14,display:"flex",gap:3}},chapters.map((_,i)=>React.createElement("div",{key:i,onClick:()=>{setCh(i);setMenuOpen(false);},style:{flex:1,height:5,borderRadius:3,background:i<=ch?"#818cf8":"rgba(255,255,255,0.15)",cursor:"pointer"}})))),React.createElement("div",{style:{marginBottom:14}},React.createElement("button",{onClick:()=>setMenuOpen(!menuOpen),style:{width:"100%",padding:"10px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",fontSize:14,fontWeight:700,color:"#1e1b4b",cursor:"pointer",display:"flex",justifyContent:"space-between"}},React.createElement("span",null,"Ch.",chapter.num,": ",chapter.title),React.createElement("span",{style:{fontSize:12,color:"#9ca3af"}},menuOpen?"▲":"▼")),menuOpen&&React.createElement("div",{style:{marginTop:4,border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden",background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}},chapters.map((c,i)=>React.createElement("button",{key:c.id,onClick:()=>{setCh(i);setMenuOpen(false);},style:{width:"100%",padding:"10px 16px",border:"none",borderBottom:i<chapters.length-1?"1px solid #f3f4f6":"none",background:i===ch?"#eef2ff":"#fff",fontSize:13,fontWeight:i===ch?700:500,color:i===ch?"#4338ca":"#374151",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10}},React.createElement("span",{style:{width:22,height:22,borderRadius:"50%",background:i===ch?"#6366f1":"#e5e7eb",color:i===ch?"#fff":"#6b7280",fontWeight:800,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}},c.num),React.createElement("span",{style:{flex:1}},c.title),EX[c.id]&&React.createElement("span",{style:{fontSize:11,color:"#f59e0b",fontWeight:700}},EX[c.id].length,"問"))))),React.createElement("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:12}},React.createElement("span",{style:{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",fontWeight:900,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}},chapter.num),React.createElement("div",null,React.createElement("div",{style:{fontWeight:800,fontSize:18,color:"#1e1b4b"}},chapter.title),React.createElement("div",{style:{fontSize:12,color:"#6b7280"}},"目安: ",chapter.est,exercises.length>0?` ・ 演習${exercises.length}問`:""))),chapter.goal&&React.createElement("div",{style:{background:"linear-gradient(135deg,#eef2ff,#f5f3ff)",border:"1px solid #c7d2fe",borderLeft:"4px solid #6366f1",borderRadius:10,padding:"12px 16px",marginBottom:14}},React.createElement("div",{style:{fontSize:11,fontWeight:800,color:"#4338ca",letterSpacing:1,marginBottom:6}},"🎯 この章のゴール"),React.createElement("div",{style:{fontSize:13.5,color:"#1e1b4b",lineHeight:1.8}},chapter.goal)),React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:8}},chapter.sections.map((sec,i)=>React.createElement(Section,{key:ch+"-"+i,section:sec,idx:i}))),exercises.length>0&&React.createElement("div",{style:{marginTop:20}},React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}},React.createElement("span",{style:{background:"#f59e0b",color:"#fff",fontWeight:800,fontSize:13,padding:"4px 14px",borderRadius:8}},"🏋️ 演習問題"),React.createElement("span",{style:{fontSize:13,color:"#92400e"}},"易しい順に",exercises.length,"問")),exercises.map((ex,i)=>React.createElement(Exercise,{key:ch+"-"+i,ex:ex,idx:i}))),React.createElement("div",{style:{display:"flex",justifyContent:"space-between",marginTop:20,gap:10}},ch>0?React.createElement("button",{onClick:()=>{setCh(ch-1);window.scrollTo(0,0);},style:{flex:1,padding:"12px 16px",border:"1px solid #d1d5db",borderRadius:10,background:"#fff",cursor:"pointer",fontWeight:600,fontSize:13,color:"#6b7280"}},"← Ch.",chapters[ch-1].num):React.createElement("div",{style:{flex:1}}),ch<chapters.length-1?React.createElement("button",{onClick:()=>{setCh(ch+1);window.scrollTo(0,0);},style:{flex:1,padding:"12px 16px",border:"none",borderRadius:10,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff"}},"Ch.",chapters[ch+1].num," →"):React.createElement("a",{href:"../index.html",style:{flex:1,padding:"12px 16px",borderRadius:10,background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none"}},"🎉 コース完了！")),React.createElement("p",{style:{textAlign:"center",fontSize:11,color:"#9ca3af",marginTop:20}},"C17 準拠 · gcc 13.x · Linux Kernel 6.x · 2026年4月時点")));}
-const root=ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(App));
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(CAdvancedCourse));
   </script>
 </body>
 </html>
