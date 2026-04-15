@@ -576,7 +576,7 @@ int main() {
     for (const auto& t : todos) std::cout << t << std::endl;
     return 0;
 }`,afterCode:"`emplace_back` は引数を直接構造体のコンストラクタに転送します（インプレース構築）。`push_back` が一度Todoを構築してからコピー/ムーブするのに対し、emplace_backは余分なコピーを避けられます。"},
-     {title:"TodoManagerクラスの骨格",body:`構造体とロジックを分離するためにTodoManagerクラスを作ります。データ(todos配列)とそれを操作するメソッドをひとつのクラスにカプセル化することで、main関数はコマンド振り分けだけに集中できます。これはPythonの「クラスにデータとメソッドをまとめる」設計と同じですが、C++ではアクセス制御が強制されます。\n\n\`next_id\` を private に持つことで、IDの自動インクリメントをクラス内部に隠蔽します。外部からIDを設定できなくすることで、重複IDの問題を防ぎます。\n\nC++のメンバ変数初期化には初期化子リスト(`: member(value)`)を使うのが効率的です。特に const メンバや参照メンバは初期化子リストでしか初期化できません。クラス内での直接初期化(\`int next_id = 1;`)はC++11以降で使えるメンバ初期化子(member initializer)です。`,code:\`class TodoManager {
+     {title:"TodoManagerクラスの骨格",body:`構造体とロジックを分離するためにTodoManagerクラスを作ります。データ(todos配列)とそれを操作するメソッドをひとつのクラスにカプセル化することで、main関数はコマンド振り分けだけに集中できます。これはPythonの「クラスにデータとメソッドをまとめる」設計と同じですが、C++ではアクセス制御が強制されます。\n\n\`next_id\` を private に持つことで、IDの自動インクリメントをクラス内部に隠蔽します。外部からIDを設定できなくすることで、重複IDの問題を防ぎます。\n\nC++のメンバ変数初期化には初期化子リスト(\`: member(value)\`)を使うのが効率的です。特に const メンバや参照メンバは初期化子リストでしか初期化できません。クラス内での直接初期化(\`int next_id = 1;\`)はC++11以降で使えるメンバ初期化子(member initializer)です。`,code:\`class TodoManager {
     std::vector<Todo> todos;
     int next_id = 1; // メンバ初期化子 (C++11)
 
@@ -630,7 +630,7 @@ std::vector<Todo> pending() const {
   {id:"ch3",num:3,title:"ソートと統計",est:"50分",
    goal:"std::sort にカスタムコンパレータを渡せる。count_if, accumulate を使って集計処理を実装できる。stable_sort と sort の違いを説明できる。",
    sections:[
-     {title:"ソートと集計",body:`\`std::sort\` はC++のデフォルトソートで、実装はイントロソート（クイックソート + ヒープソート + 挿入ソートのハイブリッド）です。第3引数にコンパレータ(ラムダ)を渡すことでカスタムソートができます。Pythonの \`sorted(key=...)\` に相当しますが、C++のコンパレータは \`(a, b) → bool\` で「aがbより前にくるか」を返します。\n\n\`stable_sort\` は同値要素の相対順序を保持します。例えば優先度でソートして、同じ優先度の中では元の挿入順を保ちたい場合に使います。実装はマージソートベースのためO(n log² n)ですが、安定性が重要な場面で使います。\n\n集計処理は \`count_if\`（条件カウント）と \`accumulate\`（累積演算）が基本です。Pythonの \`sum()`, `len([x for x in xs if cond])\` に相当します。`,table:T.sortAlgo,code:`void sort_by_priority() {
+     {title:"ソートと集計",body:`\`std::sort\` はC++のデフォルトソートで、実装はイントロソート（クイックソート + ヒープソート + 挿入ソートのハイブリッド）です。第3引数にコンパレータ(ラムダ)を渡すことでカスタムソートができます。Pythonの \`sorted(key=...)\` に相当しますが、C++のコンパレータは \`(a, b) → bool\` で「aがbより前にくるか」を返します。\n\n\`stable_sort\` は同値要素の相対順序を保持します。例えば優先度でソートして、同じ優先度の中では元の挿入順を保ちたい場合に使います。実装はマージソートベースのためO(n log² n)ですが、安定性が重要な場面で使います。\n\n集計処理は \`count_if\`（条件カウント）と \`accumulate\`（累積演算）が基本です。Pythonの \`sum()\`, \`len([x for x in xs if cond])\` に相当します。`,table:T.sortAlgo,code:`void sort_by_priority() {
     std::stable_sort(todos.begin(), todos.end(),
         [](const Todo& a, const Todo& b) { return a.priority < b.priority; });
 }
@@ -664,7 +664,7 @@ std::vector<Todo> search(const std::string& keyword) const {
   {id:"ch4",num:4,title:"ファイル永続化 (CSV)",est:"55分",
    goal:"ofstream/ifstream でCSVの読み書きができる。istringstream でCSV行をパースできる。ファイルエラーを適切に処理できる。",
    sections:[
-     {title:"CSV読み書きの実装",body:`Todoアプリが終了するたびにデータが消えては困るので、ファイルへの永続化を実装します。フォーマットはCSV（カンマ区切り）を使います。\n\n書き込みは \`std::ofstream\` を使います。ファイルを開いてCSV行を出力し、スコープを抜けると自動クローズ（RAII）されます。Pythonの \`with open("f", "w") as f:\` に相当しますが、\`close()\` を明示的に呼ばなくて良い点が便利です。\n\nCSVの読み込みは \`std::getline\` と \`std::istringstream\` を組み合わせます。行全体を文字列で読み、それを \`istringstream\` に渡して `,` 区切りで分解します。\`std::stoi`, `std::stod`, `std::stol\` でテキストを数値に変換します。`,table:T.fileMode,code:`#include <fstream>
+     {title:"CSV読み書きの実装",body:`Todoアプリが終了するたびにデータが消えては困るので、ファイルへの永続化を実装します。フォーマットはCSV（カンマ区切り）を使います。\n\n書き込みは \`std::ofstream\` を使います。ファイルを開いてCSV行を出力し、スコープを抜けると自動クローズ（RAII）されます。Pythonの \`with open("f", "w") as f:\` に相当しますが、\`close()\` を明示的に呼ばなくて良い点が便利です。\n\nCSVの読み込みは \`std::getline\` と \`std::istringstream\` を組み合わせます。行全体を文字列で読み、それを \`istringstream\` に渡して \`,\` 区切りで分解します。\`std::stoi\`, \`std::stod\`, \`std::stol\` でテキストを数値に変換します。`,table:T.fileMode,code:`#include <fstream>
 #include <sstream>
 
 void save(const std::string& path) const {
@@ -751,7 +751,7 @@ void load(const std::string& path) {
   {id:"ch6",num:6,title:"演算子オーバーロード",est:"50分",
    goal:"operator<<, operator<, operator==, operator[] を定義できる。メンバ関数とフレンド関数のどちらで定義すべきかを説明できる。",
    sections:[
-     {title:"演算子オーバーロードの設計",body:`C++では `+`, \`-`, `<<`, `[]\` などの演算子を自分のクラスに対して定義できます。これにより \`std::cout << todo\` や \`manager[0]\` のような自然な構文が使えます。Pythonの \`__add__`, `__str__`, `__getitem__\` に相当します。\n\n\`operator<<\` と \`operator>>\` はストリームとの入出力用で、フレンド関数として定義するのが慣習です。なぜなら左辺が \`std::ostream\`（クラス外の型）だからです。メンバ関数では \`todo.operator<<(cout)\` という順序になってしまいます。\n\n\`operator<\` はSTLのソートアルゴリズムが使う比較演算子です。\`std::sort\` のデフォルトは \`operator<\` を使うため、これを定義すれば カスタムコンパレータなしでソートできます。`,table:T.operatorOverload,code:`// Todo のコンパレータ系演算子
+     {title:"演算子オーバーロードの設計",body:`C++では `+`, \`-\`, `<<`, \`[]\` などの演算子を自分のクラスに対して定義できます。これにより \`std::cout << todo\` や \`manager[0]\` のような自然な構文が使えます。Pythonの \`__add__\`, \`__str__\`, \`__getitem__\` に相当します。\n\n\`operator<<\` と \`operator>>\` はストリームとの入出力用で、フレンド関数として定義するのが慣習です。なぜなら左辺が \`std::ostream\`（クラス外の型）だからです。メンバ関数では \`todo.operator<<(cout)\` という順序になってしまいます。\n\n\`operator<\` はSTLのソートアルゴリズムが使う比較演算子です。\`std::sort\` のデフォルトは \`operator<\` を使うため、これを定義すれば カスタムコンパレータなしでソートできます。`,table:T.operatorOverload,code:`// Todo のコンパレータ系演算子
 struct Todo {
     int id;
     std::string title;
