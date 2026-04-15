@@ -852,7 +852,7 @@ fn main() {
     let z: i64 = 1_000_000; // アンダースコアで可読性向上
     println!("{}", z);
 }`,afterCode:"rustup はRustのバージョン管理ツールです。`rustup update stable` で最新安定版に更新、`rustup doc` でオフラインドキュメントを開けます。"},
-     {title:"Cargoエコシステム",body:`CargoはRustのビルドシステム+パッケージマネージャです。Pythonのpip + setuptools + venv + pytest の役割をすべて担います。`cargo new` でプロジェクト作成、`cargo add` で依存追加、`cargo run` でビルド+実行、`cargo test` でテスト実行、`cargo build --release` で最適化ビルドを行います。\n\n依存ライブラリ（クレートと呼ぶ）は crates.io で公開されています。Cargo.toml に依存を書くだけで、初回ビルド時に自動ダウンロードされます。Cargo.lock でバージョンが固定されます。\n\nRustの標準ライブラリは意図的に小さく設計されています。ネットワーク・非同期・シリアライゼーション等は高品質なサードパーティクレートに任せています。tokio（非同期）・serde（シリアライゼーション）・reqwest（HTTP）・clap（CLI）が定番です。`,code:`# Cargo.toml
+     {title:"Cargoエコシステム",body:`CargoはRustのビルドシステム+パッケージマネージャです。Pythonのpip + setuptools + venv + pytest の役割をすべて担います。\`cargo new\` でプロジェクト作成、\`cargo add\` で依存追加、\`cargo run\` でビルド+実行、\`cargo test\` でテスト実行、\`cargo build --release\` で最適化ビルドを行います。\n\n依存ライブラリ（クレートと呼ぶ）は crates.io で公開されています。Cargo.toml に依存を書くだけで、初回ビルド時に自動ダウンロードされます。Cargo.lock でバージョンが固定されます。\n\nRustの標準ライブラリは意図的に小さく設計されています。ネットワーク・非同期・シリアライゼーション等は高品質なサードパーティクレートに任せています。tokio（非同期）・serde（シリアライゼーション）・reqwest（HTTP）・clap（CLI）が定番です。`,code:`# Cargo.toml
 [package]
 name = "my_project"
 version = "0.1.0"
@@ -879,7 +879,7 @@ pretty_assertions = "1.3"
   {id:"ch2",num:2,title:"所有権・借用・ライフタイム入門",est:"60分",
    goal:"所有権の3ルールを暗記し、moveとcopyの違いを説明できる。&TとString・&strの違いを理解し、基本的な借用エラーを解決できる。",
    sections:[
-     {title:"所有権システム",body:`所有権（Ownership）はRustが他の言語と最も異なる部分です。Pythonでは変数は値への「参照」ですが、Rustでは変数は値の「所有者」です。所有者が1人しかいないため、所有者がスコープを抜けると自動的にメモリが解放されます。\n\nPythonの `a = b` はどちらも同じオブジェクトを参照しますが、Rustの `let a = b;`（CopyでないString等の場合）はbの所有権をaに移動（move）します。以降、bは使えません。これが「所有権の移動（move semantics）」です。\n\nCopy トレイトを実装した型（i32, f64, bool, char 等）は自動的にコピーされるため移動しません。String や Vec などのヒープを使う型は Move になります。`,table:T.ownershipRules,code:`fn main() {
+     {title:"所有権システム",body:`所有権（Ownership）はRustが他の言語と最も異なる部分です。Pythonでは変数は値への「参照」ですが、Rustでは変数は値の「所有者」です。所有者が1人しかいないため、所有者がスコープを抜けると自動的にメモリが解放されます。\n\nPythonの \`a = b\` はどちらも同じオブジェクトを参照しますが、Rustの \`let a = b;\`（CopyでないString等の場合）はbの所有権をaに移動（move）します。以降、bは使えません。これが「所有権の移動（move semantics）」です。\n\nCopy トレイトを実装した型（i32, f64, bool, char 等）は自動的にコピーされるため移動しません。String や Vec などのヒープを使う型は Move になります。`,table:T.ownershipRules,code:`fn main() {
     // String は所有権あり (Heap確保)
     let s1 = String::from("hello");
     let s2 = s1;       // 所有権が s1 から s2 に移動
@@ -902,7 +902,7 @@ pretty_assertions = "1.3"
     } // s の drop が呼ばれる
     // println!("{}", s); // エラー: s はスコープ外
 }`,afterCode:"Python の `id()` で変数が同じオブジェクトを指しているか確認するように、Rustでは借用チェッカーが安全性を強制します。最初は難しく感じますが、一度慣れると 「借用エラー = 実行時にクラッシュする可能性があるバグ」 を事前に発見できる強力なツールになります。"},
-     {title:"借用と参照",body:`借用（Borrowing）は所有権を渡さずに値を参照する仕組みです。`&T` で不変参照、`&mut T` で可変参照を作ります。借用チェッカーは2つのルールを強制します: (1) 不変参照は複数同時に持てる、(2) 可変参照は1つしか持てない（かつ不変参照と共存できない）。\n\nこのルールにより、「データ競合（data race）」がコンパイル時に防がれます。PythonのGIL（Global Interpreter Lock）はデータ競合を防ぐためのランタイム機構ですが、Rustはコンパイル時に解決します。\n\n`&str` はString（ヒープ上の可変文字列）へのスライス参照です。関数が文字列を読むだけなら `&str` を受け取るのが慣用的です。`String` も `&str` も `&s` と書くことで自動的に `&str` に変換されます（Deref coercion）。`,table:T.borrowingRules,code:`fn main() {
+     {title:"借用と参照",body:`借用（Borrowing）は所有権を渡さずに値を参照する仕組みです。`&T` で不変参照、`&mut T` で可変参照を作ります。借用チェッカーは2つのルールを強制します: (1) 不変参照は複数同時に持てる、(2) 可変参照は1つしか持てない（かつ不変参照と共存できない）。\n\nこのルールにより、「データ競合（data race）」がコンパイル時に防がれます。PythonのGIL（Global Interpreter Lock）はデータ競合を防ぐためのランタイム機構ですが、Rustはコンパイル時に解決します。\n\n`&str` はString（ヒープ上の可変文字列）へのスライス参照です。関数が文字列を読むだけなら `&str` を受け取るのが慣用的です。\`String\` も `&str` も `&s` と書くことで自動的に `&str` に変換されます（Deref coercion）。`,table:T.borrowingRules,code:`fn main() {
     let mut s = String::from("hello");
 
     // 不変参照: 複数OK
@@ -928,7 +928,7 @@ pretty_assertions = "1.3"
   {id:"ch3",num:3,title:"Option<T>とResult<T,E>",est:"55分",
    goal:"Option<T>でNullableな値を安全に扱える。Result<T,E>でエラーを返せる。?演算子でエラー伝播を簡潔に書ける。",
    sections:[
-     {title:"NullセーフなOption<T>",body:``Option<T>` はRustにnullがない代わりに「値があるかもしれない」を表す列挙型です。`Some(value)` か `None` の2状態を持ちます。Pythonの `Optional[T]` に似ていますが、`None` を扱い忘れるとコンパイルエラーになる点が異なります。\n\nPythonでは `x = None; x.upper()` は実行時に `AttributeError` が発生しますが、RustではOption値にそのままメソッドを呼ぶことはできず、`match` や `if let`、`?` 演算子で明示的に処理する必要があります。\n\n便利なメソッドとして: `unwrap_or(default)` でデフォルト値、`map(f)` で中身を変換、`and_then(f)` でチェーン、`ok_or(err)` で `Result` に変換などがあります。`,code:`fn divide(a: f64, b: f64) -> Option<f64> {
+     {title:"NullセーフなOption<T>",body:`\`Option<T>\` はRustにnullがない代わりに「値があるかもしれない」を表す列挙型です。\`Some(value)\` か \`None\` の2状態を持ちます。Pythonの \`Optional[T]\` に似ていますが、\`None\` を扱い忘れるとコンパイルエラーになる点が異なります。\n\nPythonでは \`x = None; x.upper()\` は実行時に \`AttributeError\` が発生しますが、RustではOption値にそのままメソッドを呼ぶことはできず、\`match\` や \`if let\`、`?` 演算子で明示的に処理する必要があります。\n\n便利なメソッドとして: \`unwrap_or(default)\` でデフォルト値、\`map(f)\` で中身を変換、\`and_then(f)\` でチェーン、\`ok_or(err)\` で \`Result\` に変換などがあります。`,code:`fn divide(a: f64, b: f64) -> Option<f64> {
     if b == 0.0 { None } else { Some(a / b) }
 }
 
@@ -954,7 +954,7 @@ fn main() {
         .map(|x| x * 2.0); // Some(10.0)
     println!("{:?}", doubled);
 }`,afterCode:"`unwrap()` はSomeの中身を取り出しますが、Noneの場合はpanicします。本番コードでは `unwrap_or`, `map`, `?` を使いましょう。ただしテストやプロトタイプでは `unwrap()` は許容されます。"},
-     {title:"エラー型としてのResult<T,E>",body:``Result<T, E>` はRustのエラーハンドリングの中心的な型です。`Ok(value)` か `Err(error)` の2状態を持ちます。Pythonの例外(exception)と異なり、エラーは戻り値として明示的に返します。これにより、どの関数がエラーを返しうるかコンパイル時に明確です。\n\nPythonでは `try/except` でエラーを捕捉しますが、Rustでは `match` か `?` でエラーを処理します。`?` 演算子は「OkならアンラップしてOkの値を返す、ErrならそのままErrをreturnする」という糖衣構文です。Pythonで `raise` を再スローするのに相当します。\n\n複数のエラー型を扱う場合、`Box<dyn std::error::Error>` か `anyhow::Error`（crateが必要）を使います。Pythonの `Exception` の基底クラスに相当します。`,code:`use std::num::ParseIntError;
+     {title:"エラー型としてのResult<T,E>",body:`\`Result<T, E>\` はRustのエラーハンドリングの中心的な型です。\`Ok(value)\` か \`Err(error)\` の2状態を持ちます。Pythonの例外(exception)と異なり、エラーは戻り値として明示的に返します。これにより、どの関数がエラーを返しうるかコンパイル時に明確です。\n\nPythonでは \`try/except\` でエラーを捕捉しますが、Rustでは \`match\` か `?` でエラーを処理します。`?` 演算子は「OkならアンラップしてOkの値を返す、ErrならそのままErrをreturnする」という糖衣構文です。Pythonで \`raise\` を再スローするのに相当します。\n\n複数のエラー型を扱う場合、\`Box<dyn std::error::Error>\` か \`anyhow::Error\`（crateが必要）を使います。Pythonの \`Exception\` の基底クラスに相当します。`,code:`use std::num::ParseIntError;
 use std::fmt;
 
 // カスタムエラー型
@@ -992,7 +992,7 @@ fn main() {
   {id:"ch4",num:4,title:"列挙型とパターンマッチング",est:"55分",
    goal:"データを持つenum(代数的データ型)を定義できる。matchで全パターンを網羅的に処理できる。if let / while let / let else を適切に使い分けられる。",
    sections:[
-     {title:"代数的データ型としてのenum",body:`RustのenumはPythonのenumと全く異なります。Rustのenumは各バリアントが異なるデータを持てる「代数的データ型（ADT）」です。Haskellの `data` 型や ScalaのSealed classに相当します。\n\n`Option<T>` や `Result<T,E>` もRustのenumとして定義されています。`enum Option<T> { Some(T), None }` がその定義です。この設計が「Null安全」と「エラー型の明示」を自然に実現しています。\n\n`match` はすべてのパターンを「網羅的」に処理することをコンパイラが強制します。Python の `if/elif/else` と違い、処理漏れがあればコンパイルエラーになります。また `_` で残りすべてにマッチできます。`,table:T.enumVsMatch,code:`// JSONのような値を表すenum
+     {title:"代数的データ型としてのenum",body:`RustのenumはPythonのenumと全く異なります。Rustのenumは各バリアントが異なるデータを持てる「代数的データ型（ADT）」です。Haskellの \`data\` 型や ScalaのSealed classに相当します。\n\n\`Option<T>\` や \`Result<T,E>\` もRustのenumとして定義されています。\`enum Option<T> { Some(T), None }\` がその定義です。この設計が「Null安全」と「エラー型の明示」を自然に実現しています。\n\n\`match\` はすべてのパターンを「網羅的」に処理することをコンパイラが強制します。Python の \`if/elif/else\` と違い、処理漏れがあればコンパイルエラーになります。また \`_\` で残りすべてにマッチできます。`,table:T.enumVsMatch,code:`// JSONのような値を表すenum
 #[derive(Debug)]
 enum JsonValue {
     Null,
@@ -1033,7 +1033,7 @@ fn main() {
   {id:"ch5",num:5,title:"トレイトとジェネリクス",est:"60分",
    goal:"traitを定義し、impl Trait for Typeで実装できる。トレイト境界 (T: Trait) でジェネリクスを制約できる。Display, Debug, Clone, Copy, Iterator, From/Into を使いこなせる。",
    sections:[
-     {title:"traitでインターフェースを定義する",body:`traitはRustのインターフェース機構です。Pythonの抽象基底クラス（ABCとabstractmethod）に相当しますが、よりシステマティックです。\n\nRustの重要なtraitとして `Display`（println!({}) での表示）、`Debug`（println!({:?}) でのデバッグ表示）、`Clone`（clone()メソッド）、`Copy`（自動コピー）、`Iterator`（イテレータ）、`From<T>` / `Into<T>`（型変換）があります。\n\n`#[derive(Debug, Clone, PartialEq)]` のようにderive attributeを使うと、コンパイラが自動実装を生成します。多くのトレイトはderiveで実装できます。Pythonの `@dataclass(eq=True)` に似ていますが、Rustではフィールドの型もそのtraitを実装している必要があります。`,table:T.traitVsAbstract,code:`use std::fmt;
+     {title:"traitでインターフェースを定義する",body:`traitはRustのインターフェース機構です。Pythonの抽象基底クラス（ABCとabstractmethod）に相当しますが、よりシステマティックです。\n\nRustの重要なtraitとして \`Display\`（println!({}) での表示）、\`Debug\`（println!({:?}) でのデバッグ表示）、\`Clone\`（clone()メソッド）、\`Copy\`（自動コピー）、\`Iterator\`（イテレータ）、\`From<T>` / `Into<T>\`（型変換）があります。\n\n\`#[derive(Debug, Clone, PartialEq)]\` のようにderive attributeを使うと、コンパイラが自動実装を生成します。多くのトレイトはderiveで実装できます。Pythonの \`@dataclass(eq=True)\` に似ていますが、Rustではフィールドの型もそのtraitを実装している必要があります。`,table:T.traitVsAbstract,code:`use std::fmt;
 
 // traitの定義
 trait Area {
@@ -1081,7 +1081,7 @@ fn main() {
   {id:"ch6",num:6,title:"コレクションとイテレータ",est:"55分",
    goal:"Vec・HashMap・HashSetの主要操作を使いこなせる。map/filter/collect/fold のイテレータチェーンを書ける。カスタムイテレータを実装できる。",
    sections:[
-     {title:"標準コレクション",body:`Rustの標準コレクションはPythonのものと一対一で対応しています。`Vec<T>` は `list`、`HashMap<K,V>` は `dict`、`HashSet<T>` は `set`、`VecDeque<T>` は `collections.deque`、`BTreeMap<K,V>` はソート済み `dict` です。\n\nRustのコレクションは所有権モデルに従い、要素を所有します。イテレートの方法が3種類あります: `iter()` は不変参照のイテレータ、`iter_mut()` は可変参照、`into_iter()` は所有権ごと取り出すイテレータです。Pythonの `for x in xs` は Rustの `for x in xs.iter()` または `for x in &xs` に対応します。\n\nHashMapの `entry()` APIはPythonの `dict.setdefault()` より強力です。`entry(key).or_insert(default)` でキーがなければデフォルト値を挿入し、そのmutable参照を返します。`,table:T.iteratorMethods,code:`use std::collections::HashMap;
+     {title:"標準コレクション",body:`Rustの標準コレクションはPythonのものと一対一で対応しています。\`Vec<T>\` は \`list\`、\`HashMap<K,V>\` は \`dict\`、\`HashSet<T>\` は \`set\`、\`VecDeque<T>\` は \`collections.deque\`、\`BTreeMap<K,V>\` はソート済み \`dict\` です。\n\nRustのコレクションは所有権モデルに従い、要素を所有します。イテレートの方法が3種類あります: \`iter()\` は不変参照のイテレータ、\`iter_mut()\` は可変参照、\`into_iter()\` は所有権ごと取り出すイテレータです。Pythonの \`for x in xs\` は Rustの \`for x in xs.iter()\` または \`for x in &xs\` に対応します。\n\nHashMapの \`entry()\` APIはPythonの \`dict.setdefault()\` より強力です。\`entry(key).or_insert(default)\` でキーがなければデフォルト値を挿入し、そのmutable参照を返します。`,table:T.iteratorMethods,code:`use std::collections::HashMap;
 
 fn main() {
     // Vec
@@ -1113,7 +1113,7 @@ fn main() {
   {id:"ch7",num:7,title:"クロージャとfunctional programming",est:"50分",
    goal:"クロージャのキャプチャ方法(move/参照)を理解できる。Fn/FnMut/FnOnceの違いを説明できる。高階関数を使って関数型スタイルでデータを変換できる。",
    sections:[
-     {title:"クロージャとキャプチャ",body:`Rustのクロージャはラムダ式で、`|x| x * 2` のように書きます。Pythonの `lambda x: x * 2` に相当しますが、Rustのクロージャはより強力です。複数行のブロックが書け、外部変数を「キャプチャ」できます。\n\nキャプチャの仕方に3種類あります: デフォルトは可能なら不変参照でキャプチャ（Fn）、変更が必要なら可変参照（FnMut）、所有権が必要（move クロージャ）なら所有権ごと移動（FnOnce）します。\n\nスレッドに渡すクロージャは `move` が必須です。スレッドがいつ実行されるか不明なため、借用ではなく所有権を移す必要があるからです。これはコンパイラが強制するため、「後からデータが消えてクラッシュ」というバグが起きません。`,table:T.closureCapture,code:`fn apply<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(x) }
+     {title:"クロージャとキャプチャ",body:`Rustのクロージャはラムダ式で、`|x| x * 2` のように書きます。Pythonの \`lambda x: x * 2\` に相当しますが、Rustのクロージャはより強力です。複数行のブロックが書け、外部変数を「キャプチャ」できます。\n\nキャプチャの仕方に3種類あります: デフォルトは可能なら不変参照でキャプチャ（Fn）、変更が必要なら可変参照（FnMut）、所有権が必要（move クロージャ）なら所有権ごと移動（FnOnce）します。\n\nスレッドに渡すクロージャは \`move\` が必須です。スレッドがいつ実行されるか不明なため、借用ではなく所有権を移す必要があるからです。これはコンパイラが強制するため、「後からデータが消えてクラッシュ」というバグが起きません。`,table:T.closureCapture,code:`fn apply<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(x) }
 fn apply_twice<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(f(x)) }
 
 fn make_adder(n: i32) -> impl Fn(i32) -> i32 {
@@ -1143,7 +1143,7 @@ fn main() {
   {id:"ch8",num:8,title:"ライフタイムアノテーション",est:"55分",
    goal:"ライフタイムとは何かを説明できる。基本的なライフタイムアノテーション ('a) を書ける。構造体に参照フィールドを持たせるケースを実装できる。",
    sections:[
-     {title:"ライフタイムアノテーション",body:`ライフタイムはRustが借用の有効期間を追跡するための仕組みです。Pythonにはない概念で、最初は難しく感じますが、「参照が有効である期間」を明示するだけです。\n\nほとんどの場合、コンパイラが自動的にライフタイムを推論（ライフタイム省略規則）するため、アノテーションを書く必要はありません。アノテーションが必要なのは「戻り値の参照がどの引数に紐づくか曖昧な場合」です。\n\n`'a` はライフタイムの名前で、任意の名前が使えます（`'a`, `'b`, `'static` など）。`fn longest<'a>(x: &'a str, y: &'a str) -> &'a str` は「戻り値のライフタイムは x と y のうち短い方に制限される」という意味です。これにより、ダングリングポインタ（解放済みメモリへの参照）がコンパイル時に防がれます。`,code:`// ライフタイムアノテーションの例
+     {title:"ライフタイムアノテーション",body:`ライフタイムはRustが借用の有効期間を追跡するための仕組みです。Pythonにはない概念で、最初は難しく感じますが、「参照が有効である期間」を明示するだけです。\n\nほとんどの場合、コンパイラが自動的にライフタイムを推論（ライフタイム省略規則）するため、アノテーションを書く必要はありません。アノテーションが必要なのは「戻り値の参照がどの引数に紐づくか曖昧な場合」です。\n\n\`'a\` はライフタイムの名前で、任意の名前が使えます（\`'a`, `'b`, `'static\` など）。\`fn longest<'a>(x: &'a str, y: &'a str) -> &'a str\` は「戻り値のライフタイムは x と y のうち短い方に制限される」という意味です。これにより、ダングリングポインタ（解放済みメモリへの参照）がコンパイル時に防がれます。`,code:`// ライフタイムアノテーションの例
 
 // 'a: x と y の短い方のライフタイムを戻り値に適用
 fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
@@ -1184,7 +1184,7 @@ fn main() {
   {id:"ch9",num:9,title:"スマートポインタと内部可変性",est:"55分",
    goal:"Box<T>でヒープ確保・再帰型を定義できる。Rc<T>/RefCell<T>で複数所有と内部可変性を実現できる。Arc<T>/Mutex<T>でスレッド間共有ができる。dyn Traitでトレイトオブジェクトを使える。",
    sections:[
-     {title:"Box, Rc, Arc, RefCell",body:`Rustの「スマートポインタ」は参照以上の機能を持つ型です。`Box<T>` はヒープ確保、`Rc<T>` は参照カウントによる複数所有（シングルスレッド）、`Arc<T>` はスレッドセーフな参照カウントです。\n\n`RefCell<T>` は「内部可変性」を提供します。通常、不変参照があれば変更できませんが、RefCellを使うと実行時に借用チェックを行い、不変参照を通しても変更できます。コンパイル時チェックを実行時に先送りするトレードオフがあります。Pythonでは参照型なので内部可変性は当たり前ですが、Rustでは明示的に選択します。\n\n`Rc<RefCell<T>>` の組み合わせは「複数の所有者から変更できるデータ」を表現します。グラフ・ツリーなどの複雑なデータ構造に使います。スレッドをまたぐなら `Arc<Mutex<T>>` を使います。`,code:`use std::rc::Rc;
+     {title:"Box, Rc, Arc, RefCell",body:`Rustの「スマートポインタ」は参照以上の機能を持つ型です。\`Box<T>\` はヒープ確保、\`Rc<T>\` は参照カウントによる複数所有（シングルスレッド）、\`Arc<T>\` はスレッドセーフな参照カウントです。\n\n\`RefCell<T>\` は「内部可変性」を提供します。通常、不変参照があれば変更できませんが、RefCellを使うと実行時に借用チェックを行い、不変参照を通しても変更できます。コンパイル時チェックを実行時に先送りするトレードオフがあります。Pythonでは参照型なので内部可変性は当たり前ですが、Rustでは明示的に選択します。\n\n\`Rc<RefCell<T>>\` の組み合わせは「複数の所有者から変更できるデータ」を表現します。グラフ・ツリーなどの複雑なデータ構造に使います。スレッドをまたぐなら \`Arc<Mutex<T>>\` を使います。`,code:`use std::rc::Rc;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
@@ -1221,7 +1221,7 @@ fn main() {
   {id:"ch10",num:10,title:"テストとファイルI/O",est:"50分",
    goal:"#[test]と#[cfg(test)]でユニットテストを書ける。cargo testで全テストを実行できる。std::fsとBufReaderでファイルを安全に読み書きできる。",
    sections:[
-     {title:"Rustのテストシステム",body:`Rustのテストはビルドシステムに統合されています。`#[test]` アノテーションをつけた関数がテスト関数になり、`cargo test` で実行されます。Pythonの `pytest` に相当しますが、外部ツールのインストールは不要です。\n\nテストはソースコードと同じファイルに書くのがRustの慣習です。`#[cfg(test)]` ブロック内に書くとテスト時のみコンパイルされます。`assert_eq!`, `assert_ne!`, `assert!` マクロでアサーションを書きます。\n\n`#[should_panic]` アノテーションでパニックが期待されるテストを書けます。統合テストは `tests/` ディレクトリに置きます。doc-testはドキュメントのコード例をテストとして実行する強力な機能です。`,code:`pub fn add(a: i32, b: i32) -> i32 { a + b }
+     {title:"Rustのテストシステム",body:`Rustのテストはビルドシステムに統合されています。\`#[test]\` アノテーションをつけた関数がテスト関数になり、\`cargo test\` で実行されます。Pythonの \`pytest\` に相当しますが、外部ツールのインストールは不要です。\n\nテストはソースコードと同じファイルに書くのがRustの慣習です。\`#[cfg(test)]\` ブロック内に書くとテスト時のみコンパイルされます。\`assert_eq!`, `assert_ne!`, `assert!\` マクロでアサーションを書きます。\n\n\`#[should_panic]\` アノテーションでパニックが期待されるテストを書けます。統合テストは \`tests/\` ディレクトリに置きます。doc-testはドキュメントのコード例をテストとして実行する強力な機能です。`,code:`pub fn add(a: i32, b: i32) -> i32 { a + b }
 
 pub fn fibonacci(n: u64) -> u64 {
     match n {

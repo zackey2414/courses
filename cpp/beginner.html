@@ -576,7 +576,7 @@ int main() {
     for (const auto& t : todos) std::cout << t << std::endl;
     return 0;
 }`,afterCode:"`emplace_back` は引数を直接構造体のコンストラクタに転送します（インプレース構築）。`push_back` が一度Todoを構築してからコピー/ムーブするのに対し、emplace_backは余分なコピーを避けられます。"},
-     {title:"TodoManagerクラスの骨格",body:`構造体とロジックを分離するためにTodoManagerクラスを作ります。データ(todos配列)とそれを操作するメソッドをひとつのクラスにカプセル化することで、main関数はコマンド振り分けだけに集中できます。これはPythonの「クラスにデータとメソッドをまとめる」設計と同じですが、C++ではアクセス制御が強制されます。\n\n`next_id` を private に持つことで、IDの自動インクリメントをクラス内部に隠蔽します。外部からIDを設定できなくすることで、重複IDの問題を防ぎます。\n\nC++のメンバ変数初期化には初期化子リスト(`: member(value)`)を使うのが効率的です。特に const メンバや参照メンバは初期化子リストでしか初期化できません。クラス内での直接初期化(`int next_id = 1;`)はC++11以降で使えるメンバ初期化子(member initializer)です。`,code:`class TodoManager {
+     {title:"TodoManagerクラスの骨格",body:`構造体とロジックを分離するためにTodoManagerクラスを作ります。データ(todos配列)とそれを操作するメソッドをひとつのクラスにカプセル化することで、main関数はコマンド振り分けだけに集中できます。これはPythonの「クラスにデータとメソッドをまとめる」設計と同じですが、C++ではアクセス制御が強制されます。\n\n\`next_id\` を private に持つことで、IDの自動インクリメントをクラス内部に隠蔽します。外部からIDを設定できなくすることで、重複IDの問題を防ぎます。\n\nC++のメンバ変数初期化には初期化子リスト(`: member(value)`)を使うのが効率的です。特に const メンバや参照メンバは初期化子リストでしか初期化できません。クラス内での直接初期化(\`int next_id = 1;`)はC++11以降で使えるメンバ初期化子(member initializer)です。`,code:\`class TodoManager {
     std::vector<Todo> todos;
     int next_id = 1; // メンバ初期化子 (C++11)
 
@@ -597,7 +597,7 @@ public:
   {id:"ch2",num:2,title:"検索・削除・フィルタリング",est:"55分",
    goal:"find_if, remove_if, copy_if を使った検索・削除・フィルタリングを実装できる。erase-removeイディオムを説明し、正しく使える。",
    sections:[
-     {title:"erase-removeイディオムと検索",body:`vectorから条件に合う要素を削除するには「erase-removeイディオム」を使います。`std::remove_if` は条件に合う要素を末尾に集め、削除済み領域の先頭イテレータを返します。続けて `erase()` で実際にそのイテレータ以降を削除します。\n\nなぜ2ステップが必要かというと、`std::remove_if` はSTLの汎用アルゴリズムで、コンテナの内部実装を知らないためです。実際の削除はコンテナの `erase()` メソッドで行います。PythonのリストのリストComprehensionで新しいリストを作るのと違い、C++ではインプレースで削除できます。\n\n`std::find_if` は条件に合う最初の要素のイテレータを返します。見つからない場合は `end()` を返すため、必ず `it != end()` をチェックします。`,table:T.iteratorPattern,code:`// complete: IDで完了フラグを立てる
+     {title:"erase-removeイディオムと検索",body:`vectorから条件に合う要素を削除するには「erase-removeイディオム」を使います。\`std::remove_if\` は条件に合う要素を末尾に集め、削除済み領域の先頭イテレータを返します。続けて \`erase()\` で実際にそのイテレータ以降を削除します。\n\nなぜ2ステップが必要かというと、\`std::remove_if\` はSTLの汎用アルゴリズムで、コンテナの内部実装を知らないためです。実際の削除はコンテナの \`erase()\` メソッドで行います。PythonのリストのリストComprehensionで新しいリストを作るのと違い、C++ではインプレースで削除できます。\n\n\`std::find_if\` は条件に合う最初の要素のイテレータを返します。見つからない場合は \`end()\` を返すため、必ず \`it != end()\` をチェックします。`,table:T.iteratorPattern,code:`// complete: IDで完了フラグを立てる
 void complete(int id) {
     auto it = std::find_if(todos.begin(), todos.end(),
         [id](const Todo& t) { return t.id == id; });
@@ -630,7 +630,7 @@ std::vector<Todo> pending() const {
   {id:"ch3",num:3,title:"ソートと統計",est:"50分",
    goal:"std::sort にカスタムコンパレータを渡せる。count_if, accumulate を使って集計処理を実装できる。stable_sort と sort の違いを説明できる。",
    sections:[
-     {title:"ソートと集計",body:``std::sort` はC++のデフォルトソートで、実装はイントロソート（クイックソート + ヒープソート + 挿入ソートのハイブリッド）です。第3引数にコンパレータ(ラムダ)を渡すことでカスタムソートができます。Pythonの `sorted(key=...)` に相当しますが、C++のコンパレータは `(a, b) → bool` で「aがbより前にくるか」を返します。\n\n`stable_sort` は同値要素の相対順序を保持します。例えば優先度でソートして、同じ優先度の中では元の挿入順を保ちたい場合に使います。実装はマージソートベースのためO(n log² n)ですが、安定性が重要な場面で使います。\n\n集計処理は `count_if`（条件カウント）と `accumulate`（累積演算）が基本です。Pythonの `sum()`, `len([x for x in xs if cond])` に相当します。`,table:T.sortAlgo,code:`void sort_by_priority() {
+     {title:"ソートと集計",body:`\`std::sort\` はC++のデフォルトソートで、実装はイントロソート（クイックソート + ヒープソート + 挿入ソートのハイブリッド）です。第3引数にコンパレータ(ラムダ)を渡すことでカスタムソートができます。Pythonの \`sorted(key=...)\` に相当しますが、C++のコンパレータは \`(a, b) → bool\` で「aがbより前にくるか」を返します。\n\n\`stable_sort\` は同値要素の相対順序を保持します。例えば優先度でソートして、同じ優先度の中では元の挿入順を保ちたい場合に使います。実装はマージソートベースのためO(n log² n)ですが、安定性が重要な場面で使います。\n\n集計処理は \`count_if\`（条件カウント）と \`accumulate\`（累積演算）が基本です。Pythonの \`sum()`, `len([x for x in xs if cond])\` に相当します。`,table:T.sortAlgo,code:`void sort_by_priority() {
     std::stable_sort(todos.begin(), todos.end(),
         [](const Todo& a, const Todo& b) { return a.priority < b.priority; });
 }
@@ -664,7 +664,7 @@ std::vector<Todo> search(const std::string& keyword) const {
   {id:"ch4",num:4,title:"ファイル永続化 (CSV)",est:"55分",
    goal:"ofstream/ifstream でCSVの読み書きができる。istringstream でCSV行をパースできる。ファイルエラーを適切に処理できる。",
    sections:[
-     {title:"CSV読み書きの実装",body:`Todoアプリが終了するたびにデータが消えては困るので、ファイルへの永続化を実装します。フォーマットはCSV（カンマ区切り）を使います。\n\n書き込みは `std::ofstream` を使います。ファイルを開いてCSV行を出力し、スコープを抜けると自動クローズ（RAII）されます。Pythonの `with open("f", "w") as f:` に相当しますが、`close()` を明示的に呼ばなくて良い点が便利です。\n\nCSVの読み込みは `std::getline` と `std::istringstream` を組み合わせます。行全体を文字列で読み、それを `istringstream` に渡して `,` 区切りで分解します。`std::stoi`, `std::stod`, `std::stol` でテキストを数値に変換します。`,table:T.fileMode,code:`#include <fstream>
+     {title:"CSV読み書きの実装",body:`Todoアプリが終了するたびにデータが消えては困るので、ファイルへの永続化を実装します。フォーマットはCSV（カンマ区切り）を使います。\n\n書き込みは \`std::ofstream\` を使います。ファイルを開いてCSV行を出力し、スコープを抜けると自動クローズ（RAII）されます。Pythonの \`with open("f", "w") as f:\` に相当しますが、\`close()\` を明示的に呼ばなくて良い点が便利です。\n\nCSVの読み込みは \`std::getline\` と \`std::istringstream\` を組み合わせます。行全体を文字列で読み、それを \`istringstream\` に渡して `,` 区切りで分解します。\`std::stoi`, `std::stod`, `std::stol\` でテキストを数値に変換します。`,table:T.fileMode,code:`#include <fstream>
 #include <sstream>
 
 void save(const std::string& path) const {
@@ -700,7 +700,7 @@ void load(const std::string& path) {
   {id:"ch5",num:5,title:"コマンドライン引数の解析",est:"50分",
    goal:"argc/argv を正しく解析できる。stoi/stod での変換例外を処理できる。フラグ引数(--option)とポジション引数を区別して処理できる。",
    sections:[
-     {title:"argcとargvの解析",body:`C++の `main(int argc, char* argv[])` は実行時の引数を受け取ります。`argc` は引数の数（プログラム名を含む）、`argv` は文字列の配列です。Pythonの `sys.argv` と同じ概念ですが、型が `char*` の配列である点が異なります。\n\n文字列から数値への変換は `std::stoi()`（int）、`std::stod()`（double）、`std::stol()`（long）を使います。変換できない場合は `std::invalid_argument` 例外が投げられます。この例外を必ず捕捉してエラーメッセージを出しましょう。\n\n`--flag` スタイルのオプションは `argv` を順に見てプレフィクスが `--` で始まるかチェックします。C++17 の `std::string_view` を使うと効率よく文字列を検査できます。`,code:`int main(int argc, char* argv[]) {
+     {title:"argcとargvの解析",body:`C++の \`main(int argc, char* argv[])\` は実行時の引数を受け取ります。\`argc\` は引数の数（プログラム名を含む）、\`argv\` は文字列の配列です。Pythonの \`sys.argv\` と同じ概念ですが、型が \`char*\` の配列である点が異なります。\n\n文字列から数値への変換は \`std::stoi()\`（int）、\`std::stod()\`（double）、\`std::stol()\`（long）を使います。変換できない場合は \`std::invalid_argument\` 例外が投げられます。この例外を必ず捕捉してエラーメッセージを出しましょう。\n\n\`--flag\` スタイルのオプションは \`argv\` を順に見てプレフィクスが \`--\` で始まるかチェックします。C++17 の \`std::string_view\` を使うと効率よく文字列を検査できます。`,code:`int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cout << "Usage: todo <command> [args]" << std::endl;
         return 1;
@@ -751,7 +751,7 @@ void load(const std::string& path) {
   {id:"ch6",num:6,title:"演算子オーバーロード",est:"50分",
    goal:"operator<<, operator<, operator==, operator[] を定義できる。メンバ関数とフレンド関数のどちらで定義すべきかを説明できる。",
    sections:[
-     {title:"演算子オーバーロードの設計",body:`C++では `+`, `-`, `<<`, `[]` などの演算子を自分のクラスに対して定義できます。これにより `std::cout << todo` や `manager[0]` のような自然な構文が使えます。Pythonの `__add__`, `__str__`, `__getitem__` に相当します。\n\n`operator<<` と `operator>>` はストリームとの入出力用で、フレンド関数として定義するのが慣習です。なぜなら左辺が `std::ostream`（クラス外の型）だからです。メンバ関数では `todo.operator<<(cout)` という順序になってしまいます。\n\n`operator<` はSTLのソートアルゴリズムが使う比較演算子です。`std::sort` のデフォルトは `operator<` を使うため、これを定義すれば カスタムコンパレータなしでソートできます。`,table:T.operatorOverload,code:`// Todo のコンパレータ系演算子
+     {title:"演算子オーバーロードの設計",body:`C++では `+`, \`-`, `<<`, `[]\` などの演算子を自分のクラスに対して定義できます。これにより \`std::cout << todo\` や \`manager[0]\` のような自然な構文が使えます。Pythonの \`__add__`, `__str__`, `__getitem__\` に相当します。\n\n\`operator<<\` と \`operator>>\` はストリームとの入出力用で、フレンド関数として定義するのが慣習です。なぜなら左辺が \`std::ostream\`（クラス外の型）だからです。メンバ関数では \`todo.operator<<(cout)\` という順序になってしまいます。\n\n\`operator<\` はSTLのソートアルゴリズムが使う比較演算子です。\`std::sort\` のデフォルトは \`operator<\` を使うため、これを定義すれば カスタムコンパレータなしでソートできます。`,table:T.operatorOverload,code:`// Todo のコンパレータ系演算子
 struct Todo {
     int id;
     std::string title;
@@ -792,7 +792,7 @@ public:
   {id:"ch7",num:7,title:"テンプレートで汎用検索・変換",est:"55分",
    goal:"テンプレートメンバ関数を定義し、任意の条件・変換関数を受け取れる汎用APIを設計できる。std::optionalを戻り値に使って「見つからない」を型安全に表現できる。",
    sections:[
-     {title:"汎用テンプレートメンバ関数",body:`TodoManagerに特定フィールドでの検索だけを実装するとAPIが増えすぎます。テンプレートを使って「任意の条件」「任意の変換」を受け取れる汎用メソッドを設計します。\n\nこれはPythonの `list.filter(func)` や `list.map(func)` に相当します。C++ではテンプレートパラメータを使うことで、型安全なまま汎用的なコードが書けます。\n\n`std::optional<T>` を戻り値に使うと「見つかった場合はTを、見つからない場合は nullopt を返す」という意図を型で表現できます。これにより呼び出し側は戻り値が有効かどうかを `if (result)` でチェックできます。例外を使わずに「見つからない」を表現できるため、検索系の関数に適しています。`,code:`// 汎用検索 (任意の述語)
+     {title:"汎用テンプレートメンバ関数",body:`TodoManagerに特定フィールドでの検索だけを実装するとAPIが増えすぎます。テンプレートを使って「任意の条件」「任意の変換」を受け取れる汎用メソッドを設計します。\n\nこれはPythonの \`list.filter(func)\` や \`list.map(func)\` に相当します。C++ではテンプレートパラメータを使うことで、型安全なまま汎用的なコードが書けます。\n\n\`std::optional<T>\` を戻り値に使うと「見つかった場合はTを、見つからない場合は nullopt を返す」という意図を型で表現できます。これにより呼び出し側は戻り値が有効かどうかを \`if (result)\` でチェックできます。例外を使わずに「見つからない」を表現できるため、検索系の関数に適しています。`,code:`// 汎用検索 (任意の述語)
 template<typename Pred>
 std::optional<Todo> find_by(Pred pred) const {
     auto it = std::find_if(todos.begin(), todos.end(), pred);
@@ -839,7 +839,7 @@ int main() {
   {id:"ch8",num:8,title:"例外処理と堅牢なエラーハンドリング",est:"50分",
    goal:"カスタム例外クラスの階層を設計し、アプリ全体で一貫したエラーハンドリングを実装できる。例外安全なコードを書くための基本原則を説明できる。",
    sections:[
-     {title:"カスタム例外クラスの設計",body:`TodoアプリでユーザーがIDを間違えたり、ファイルが読めない場合など様々なエラーが起きます。これらをすべて `std::runtime_error` で投げると、呼び出し側で種類を区別できません。アプリ独自の例外クラス階層を設計することで、エラーの種類に応じた処理が書けます。\n\nPythonでは `class MyError(Exception): pass` で簡単に作れますが、C++でも同様に継承で作ります。`std::exception` か `std::runtime_error` を基底にして、コンストラクタで `what()` のメッセージを設定します。\n\n例外安全性の原則: (1) デストラクタで例外を投げない、(2) RAIIを使う、(3) 例外が発生しうるコードでの状態変更を最小化する。特に `noexcept` をデストラクタとムーブ操作につけることが重要です。`,code:`// カスタム例外階層
+     {title:"カスタム例外クラスの設計",body:`TodoアプリでユーザーがIDを間違えたり、ファイルが読めない場合など様々なエラーが起きます。これらをすべて \`std::runtime_error\` で投げると、呼び出し側で種類を区別できません。アプリ独自の例外クラス階層を設計することで、エラーの種類に応じた処理が書けます。\n\nPythonでは \`class MyError(Exception): pass\` で簡単に作れますが、C++でも同様に継承で作ります。\`std::exception\` か \`std::runtime_error\` を基底にして、コンストラクタで \`what()\` のメッセージを設定します。\n\n例外安全性の原則: (1) デストラクタで例外を投げない、(2) RAIIを使う、(3) 例外が発生しうるコードでの状態変更を最小化する。特に \`noexcept\` をデストラクタとムーブ操作につけることが重要です。`,code:`// カスタム例外階層
 class TodoError : public std::runtime_error {
 public:
     explicit TodoError(const std::string& msg)
@@ -877,7 +877,7 @@ void add(const std::string& title, int priority = 2) {
   {id:"ch9",num:9,title:"ヘッダー分割とMakefile",est:"55分",
    goal:"クラスをヘッダーファイルと実装ファイルに分割できる。#pragma once の役割を説明できる。Makefileで複数ファイルのビルドを管理できる。",
    sections:[
-     {title:"ヘッダーと実装の分割",body:`1ファイルで動くアプリができたので、プロジェクトをファイル分割します。C++の慣習では、クラスの「宣言」はヘッダーファイル(.h)に、「定義（実装）」は実装ファイル(.cpp)に書きます。\n\nヘッダーファイルは複数の.cppから `#include` されます。そのままでは同じ宣言が複数回読み込まれてエラーになるため、`#pragma once` か `#ifndef` インクルードガードで多重インクルードを防ぎます。\n\nMakefileを使うと変更したファイルのみ再コンパイルされる差分ビルドが実現します。大きなプロジェクトではビルド時間を大幅に短縮できます。依存関係のルールを正しく記述することが重要です。`,table:T.projectStructure,code:`// todo.h
+     {title:"ヘッダーと実装の分割",body:`1ファイルで動くアプリができたので、プロジェクトをファイル分割します。C++の慣習では、クラスの「宣言」はヘッダーファイル(.h)に、「定義（実装）」は実装ファイル(.cpp)に書きます。\n\nヘッダーファイルは複数の.cppから \`#include\` されます。そのままでは同じ宣言が複数回読み込まれてエラーになるため、\`#pragma once\` か \`#ifndef\` インクルードガードで多重インクルードを防ぎます。\n\nMakefileを使うと変更したファイルのみ再コンパイルされる差分ビルドが実現します。大きなプロジェクトではビルド時間を大幅に短縮できます。依存関係のルールを正しく記述することが重要です。`,table:T.projectStructure,code:`// todo.h
 #pragma once
 #include <string>
 #include <vector>
