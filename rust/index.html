@@ -902,7 +902,7 @@ pretty_assertions = "1.3"
     } // s の drop が呼ばれる
     // println!("{}", s); // エラー: s はスコープ外
 }`,afterCode:"Python の `id()` で変数が同じオブジェクトを指しているか確認するように、Rustでは借用チェッカーが安全性を強制します。最初は難しく感じますが、一度慣れると 「借用エラー = 実行時にクラッシュする可能性があるバグ」 を事前に発見できる強力なツールになります。"},
-     {title:"借用と参照",body:`借用（Borrowing）は所有権を渡さずに値を参照する仕組みです。`&T` で不変参照、`&mut T` で可変参照を作ります。借用チェッカーは2つのルールを強制します: (1) 不変参照は複数同時に持てる、(2) 可変参照は1つしか持てない（かつ不変参照と共存できない）。\n\nこのルールにより、「データ競合（data race）」がコンパイル時に防がれます。PythonのGIL（Global Interpreter Lock）はデータ競合を防ぐためのランタイム機構ですが、Rustはコンパイル時に解決します。\n\n`&str` はString（ヒープ上の可変文字列）へのスライス参照です。関数が文字列を読むだけなら `&str` を受け取るのが慣用的です。\`String\` も `&str` も `&s` と書くことで自動的に `&str` に変換されます（Deref coercion）。`,table:T.borrowingRules,code:`fn main() {
+     {title:"借用と参照",body:`借用（Borrowing）は所有権を渡さずに値を参照する仕組みです。\`&T\` で不変参照、\`&mut T\` で可変参照を作ります。借用チェッカーは2つのルールを強制します: (1) 不変参照は複数同時に持てる、(2) 可変参照は1つしか持てない（かつ不変参照と共存できない）。\n\nこのルールにより、「データ競合（data race）」がコンパイル時に防がれます。PythonのGIL（Global Interpreter Lock）はデータ競合を防ぐためのランタイム機構ですが、Rustはコンパイル時に解決します。\n\n\`&str\` はString（ヒープ上の可変文字列）へのスライス参照です。関数が文字列を読むだけなら \`&str\` を受け取るのが慣用的です。\`String\` も \`&str\` も \`&s\` と書くことで自動的に \`&str\` に変換されます（Deref coercion）。`,table:T.borrowingRules,code:`fn main() {
     let mut s = String::from("hello");
 
     // 不変参照: 複数OK
@@ -928,7 +928,7 @@ pretty_assertions = "1.3"
   {id:"ch3",num:3,title:"Option<T>とResult<T,E>",est:"55分",
    goal:"Option<T>でNullableな値を安全に扱える。Result<T,E>でエラーを返せる。?演算子でエラー伝播を簡潔に書ける。",
    sections:[
-     {title:"NullセーフなOption<T>",body:`\`Option<T>\` はRustにnullがない代わりに「値があるかもしれない」を表す列挙型です。\`Some(value)\` か \`None\` の2状態を持ちます。Pythonの \`Optional[T]\` に似ていますが、\`None\` を扱い忘れるとコンパイルエラーになる点が異なります。\n\nPythonでは \`x = None; x.upper()\` は実行時に \`AttributeError\` が発生しますが、RustではOption値にそのままメソッドを呼ぶことはできず、\`match\` や \`if let\`、`?` 演算子で明示的に処理する必要があります。\n\n便利なメソッドとして: \`unwrap_or(default)\` でデフォルト値、\`map(f)\` で中身を変換、\`and_then(f)\` でチェーン、\`ok_or(err)\` で \`Result\` に変換などがあります。`,code:`fn divide(a: f64, b: f64) -> Option<f64> {
+     {title:"NullセーフなOption<T>",body:`\`Option<T>\` はRustにnullがない代わりに「値があるかもしれない」を表す列挙型です。\`Some(value)\` か \`None\` の2状態を持ちます。Pythonの \`Optional[T]\` に似ていますが、\`None\` を扱い忘れるとコンパイルエラーになる点が異なります。\n\nPythonでは \`x = None; x.upper()\` は実行時に \`AttributeError\` が発生しますが、RustではOption値にそのままメソッドを呼ぶことはできず、\`match\` や \`if let\`、\`?\` 演算子で明示的に処理する必要があります。\n\n便利なメソッドとして: \`unwrap_or(default)\` でデフォルト値、\`map(f)\` で中身を変換、\`and_then(f)\` でチェーン、\`ok_or(err)\` で \`Result\` に変換などがあります。`,code:`fn divide(a: f64, b: f64) -> Option<f64> {
     if b == 0.0 { None } else { Some(a / b) }
 }
 
@@ -954,7 +954,7 @@ fn main() {
         .map(|x| x * 2.0); // Some(10.0)
     println!("{:?}", doubled);
 }`,afterCode:"`unwrap()` はSomeの中身を取り出しますが、Noneの場合はpanicします。本番コードでは `unwrap_or`, `map`, `?` を使いましょう。ただしテストやプロトタイプでは `unwrap()` は許容されます。"},
-     {title:"エラー型としてのResult<T,E>",body:`\`Result<T, E>\` はRustのエラーハンドリングの中心的な型です。\`Ok(value)\` か \`Err(error)\` の2状態を持ちます。Pythonの例外(exception)と異なり、エラーは戻り値として明示的に返します。これにより、どの関数がエラーを返しうるかコンパイル時に明確です。\n\nPythonでは \`try/except\` でエラーを捕捉しますが、Rustでは \`match\` か `?` でエラーを処理します。`?` 演算子は「OkならアンラップしてOkの値を返す、ErrならそのままErrをreturnする」という糖衣構文です。Pythonで \`raise\` を再スローするのに相当します。\n\n複数のエラー型を扱う場合、\`Box<dyn std::error::Error>\` か \`anyhow::Error\`（crateが必要）を使います。Pythonの \`Exception\` の基底クラスに相当します。`,code:`use std::num::ParseIntError;
+     {title:"エラー型としてのResult<T,E>",body:`\`Result<T, E>\` はRustのエラーハンドリングの中心的な型です。\`Ok(value)\` か \`Err(error)\` の2状態を持ちます。Pythonの例外(exception)と異なり、エラーは戻り値として明示的に返します。これにより、どの関数がエラーを返しうるかコンパイル時に明確です。\n\nPythonでは \`try/except\` でエラーを捕捉しますが、Rustでは \`match\` か \`?\` でエラーを処理します。\`?\` 演算子は「OkならアンラップしてOkの値を返す、ErrならそのままErrをreturnする」という糖衣構文です。Pythonで \`raise\` を再スローするのに相当します。\n\n複数のエラー型を扱う場合、\`Box<dyn std::error::Error>\` か \`anyhow::Error\`（crateが必要）を使います。Pythonの \`Exception\` の基底クラスに相当します。`,code:`use std::num::ParseIntError;
 use std::fmt;
 
 // カスタムエラー型
@@ -1033,7 +1033,7 @@ fn main() {
   {id:"ch5",num:5,title:"トレイトとジェネリクス",est:"60分",
    goal:"traitを定義し、impl Trait for Typeで実装できる。トレイト境界 (T: Trait) でジェネリクスを制約できる。Display, Debug, Clone, Copy, Iterator, From/Into を使いこなせる。",
    sections:[
-     {title:"traitでインターフェースを定義する",body:`traitはRustのインターフェース機構です。Pythonの抽象基底クラス（ABCとabstractmethod）に相当しますが、よりシステマティックです。\n\nRustの重要なtraitとして \`Display\`（println!({}) での表示）、\`Debug\`（println!({:?}) でのデバッグ表示）、\`Clone\`（clone()メソッド）、\`Copy\`（自動コピー）、\`Iterator\`（イテレータ）、\`From<T>` / `Into<T>\`（型変換）があります。\n\n\`#[derive(Debug, Clone, PartialEq)]\` のようにderive attributeを使うと、コンパイラが自動実装を生成します。多くのトレイトはderiveで実装できます。Pythonの \`@dataclass(eq=True)\` に似ていますが、Rustではフィールドの型もそのtraitを実装している必要があります。`,table:T.traitVsAbstract,code:`use std::fmt;
+     {title:"traitでインターフェースを定義する",body:`traitはRustのインターフェース機構です。Pythonの抽象基底クラス（ABCとabstractmethod）に相当しますが、よりシステマティックです。\n\nRustの重要なtraitとして \`Display\`（println!({}) での表示）、\`Debug\`（println!({:?}) でのデバッグ表示）、\`Clone\`（clone()メソッド）、\`Copy\`（自動コピー）、\`Iterator\`（イテレータ）、\`From<T>\` / \`Into<T>\`（型変換）があります。\n\n\`#[derive(Debug, Clone, PartialEq)]\` のようにderive attributeを使うと、コンパイラが自動実装を生成します。多くのトレイトはderiveで実装できます。Pythonの \`@dataclass(eq=True)\` に似ていますが、Rustではフィールドの型もそのtraitを実装している必要があります。`,table:T.traitVsAbstract,code:`use std::fmt;
 
 // traitの定義
 trait Area {
@@ -1113,7 +1113,7 @@ fn main() {
   {id:"ch7",num:7,title:"クロージャとfunctional programming",est:"50分",
    goal:"クロージャのキャプチャ方法(move/参照)を理解できる。Fn/FnMut/FnOnceの違いを説明できる。高階関数を使って関数型スタイルでデータを変換できる。",
    sections:[
-     {title:"クロージャとキャプチャ",body:`Rustのクロージャはラムダ式で、`|x| x * 2` のように書きます。Pythonの \`lambda x: x * 2\` に相当しますが、Rustのクロージャはより強力です。複数行のブロックが書け、外部変数を「キャプチャ」できます。\n\nキャプチャの仕方に3種類あります: デフォルトは可能なら不変参照でキャプチャ（Fn）、変更が必要なら可変参照（FnMut）、所有権が必要（move クロージャ）なら所有権ごと移動（FnOnce）します。\n\nスレッドに渡すクロージャは \`move\` が必須です。スレッドがいつ実行されるか不明なため、借用ではなく所有権を移す必要があるからです。これはコンパイラが強制するため、「後からデータが消えてクラッシュ」というバグが起きません。`,table:T.closureCapture,code:`fn apply<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(x) }
+     {title:"クロージャとキャプチャ",body:`Rustのクロージャはラムダ式で、\`|x| x * 2\` のように書きます。Pythonの \`lambda x: x * 2\` に相当しますが、Rustのクロージャはより強力です。複数行のブロックが書け、外部変数を「キャプチャ」できます。\n\nキャプチャの仕方に3種類あります: デフォルトは可能なら不変参照でキャプチャ（Fn）、変更が必要なら可変参照（FnMut）、所有権が必要（move クロージャ）なら所有権ごと移動（FnOnce）します。\n\nスレッドに渡すクロージャは \`move\` が必須です。スレッドがいつ実行されるか不明なため、借用ではなく所有権を移す必要があるからです。これはコンパイラが強制するため、「後からデータが消えてクラッシュ」というバグが起きません。`,table:T.closureCapture,code:`fn apply<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(x) }
 fn apply_twice<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(f(x)) }
 
 fn make_adder(n: i32) -> impl Fn(i32) -> i32 {
