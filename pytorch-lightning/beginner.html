@@ -118,1112 +118,113 @@ const T = {
 const EX = {
 ch1:[
   {diff:1,q:"vanilla PyTorch の以下の学習ループの問題点を3つ挙げ、PyTorch Lightning でどう解決されるかコメントで説明してください。",
-code:`# vanilla PyTorch の学習ループ
-model = MyModel().to('cuda')
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-for epoch in range(10):
-    for x, y in train_loader:
-        x, y = x.to('cuda'), y.to('cuda')
-        optimizer.zero_grad()
-        loss = F.cross_entropy(model(x), y)
-        loss.backward()
-        optimizer.step()
-    print(f"Epoch {epoch}: done")`,
-answer:`# 問題点と Lightning での解決:
-#
-# 1. デバイス転送の手動管理
-#    x.to('cuda'), y.to('cuda') を毎バッチ書く必要がある
-#    → Lightning: Trainer が自動で適切なデバイスに転送
-#
-# 2. ボイラープレートの繰り返し
-#    zero_grad → forward → loss → backward → step を毎回手書き
-#    → Lightning: training_step で loss を返すだけで OK
-#
-# 3. ロギング・チェックポイントがない
-#    print のみで損失推移の記録やモデル保存ができていない
-#    → Lightning: self.log() + ModelCheckpoint で自動管理`},
+code:"# vanilla PyTorch の学習ループ\nmodel = MyModel().to('cuda')\noptimizer = torch.optim.Adam(model.parameters(), lr=0.001)\n\nfor epoch in range(10):\n    for x, y in train_loader:\n        x, y = x.to('cuda'), y.to('cuda')\n        optimizer.zero_grad()\n        loss = F.cross_entropy(model(x), y)\n        loss.backward()\n        optimizer.step()\n    print(f\"Epoch {epoch}: done\")",
+answer:"# 問題点と Lightning での解決:\n#\n# 1. デバイス転送の手動管理\n#    x.to('cuda'), y.to('cuda') を毎バッチ書く必要がある\n#    → Lightning: Trainer が自動で適切なデバイスに転送\n#\n# 2. ボイラープレートの繰り返し\n#    zero_grad → forward → loss → backward → step を毎回手書き\n#    → Lightning: training_step で loss を返すだけで OK\n#\n# 3. ロギング・チェックポイントがない\n#    print のみで損失推移の記録やモデル保存ができていない\n#    → Lightning: self.log() + ModelCheckpoint で自動管理"},
   {diff:1,q:"PyTorch Lightning をインストールし、バージョンを確認するコードを書いてください。また seed_everything で再現性を確保してください。",
-code:`# pip install lightning でインストール済みとする
-# バージョン確認と再現性確保のコードを書く`,
-answer:`import lightning as L
-
-# バージョン確認
-print(f"Lightning version: {L.__version__}")
-
-# 再現性の確保（乱数シードを固定）
-L.seed_everything(42, workers=True)
-# workers=True で DataLoader の worker の seed も固定`},
+code:"# pip install lightning でインストール済みとする\n# バージョン確認と再現性確保のコードを書く",
+answer:"import lightning as L\n\n# バージョン確認\nprint(f\"Lightning version: {L.__version__}\")\n\n# 再現性の確保（乱数シードを固定）\nL.seed_everything(42, workers=True)\n# workers=True で DataLoader の worker の seed も固定"},
   {diff:2,q:"以下の vanilla PyTorch のモデルと学習ループを、LightningModule に書き換えてください。損失は self.log で記録すること。",
-code:`import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class SimpleNet(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc1 = nn.Linear(784, 128)
-        self.fc2 = nn.Linear(128, 10)
-
-    def forward(self, x):
-        return self.fc2(F.relu(self.fc1(x)))
-
-model = SimpleNet().to('cuda')
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-for epoch in range(10):
-    for x, y in train_loader:
-        x, y = x.to('cuda'), y.to('cuda')
-        optimizer.zero_grad()
-        loss = F.cross_entropy(model(x), y)
-        loss.backward()
-        optimizer.step()`,
-answer:`import lightning as L
-import torch.nn as nn
-import torch.nn.functional as F
-import torch
-
-class SimpleNet(L.LightningModule):
-    def __init__(self, lr=1e-3):
-        super().__init__()
-        self.save_hyperparameters()
-        self.fc1 = nn.Linear(784, 128)
-        self.fc2 = nn.Linear(128, 10)
-
-    def forward(self, x):
-        return self.fc2(F.relu(self.fc1(x)))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
-
-model = SimpleNet()
-trainer = L.Trainer(max_epochs=10, accelerator="auto")
-trainer.fit(model, train_loader)`},
+code:"import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass SimpleNet(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc1 = nn.Linear(784, 128)\n        self.fc2 = nn.Linear(128, 10)\n\n    def forward(self, x):\n        return self.fc2(F.relu(self.fc1(x)))\n\nmodel = SimpleNet().to('cuda')\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\nfor epoch in range(10):\n    for x, y in train_loader:\n        x, y = x.to('cuda'), y.to('cuda')\n        optimizer.zero_grad()\n        loss = F.cross_entropy(model(x), y)\n        loss.backward()\n        optimizer.step()",
+answer:"import lightning as L\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport torch\n\nclass SimpleNet(L.LightningModule):\n    def __init__(self, lr=1e-3):\n        super().__init__()\n        self.save_hyperparameters()\n        self.fc1 = nn.Linear(784, 128)\n        self.fc2 = nn.Linear(128, 10)\n\n    def forward(self, x):\n        return self.fc2(F.relu(self.fc1(x)))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss\n\n    def configure_optimizers(self):\n        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)\n\nmodel = SimpleNet()\ntrainer = L.Trainer(max_epochs=10, accelerator=\"auto\")\ntrainer.fit(model, train_loader)"},
 ],
 ch2:[
   {diff:1,q:"以下の要件を満たす LightningModule を作成してください。\n・2層全結合（784→256→10）、ReLU\n・training_step で cross_entropy を計算し self.log で記録\n・configure_optimizers で SGD（lr=0.01, momentum=0.9）を返す",
-code:`import lightning as L
-import torch.nn as nn
-
-class MNISTClassifier(L.LightningModule):
-    # ここに実装してください
-    pass`,
-answer:`import lightning as L
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class MNISTClassifier(L.LightningModule):
-    def __init__(self, lr=0.01):
-        super().__init__()
-        self.save_hyperparameters()
-        self.fc1 = nn.Linear(784, 256)
-        self.fc2 = nn.Linear(256, 10)
-
-    def forward(self, x):
-        x = x.view(x.size(0), -1)
-        return self.fc2(F.relu(self.fc1(x)))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
-        acc = (logits.argmax(dim=1) == y).float().mean()
-        self.log("train_loss", loss, prog_bar=True)
-        self.log("train_acc", acc, prog_bar=True)
-        return loss
-
-    def configure_optimizers(self):
-        return torch.optim.SGD(
-            self.parameters(), lr=self.hparams.lr, momentum=0.9
-        )`},
+code:"import lightning as L\nimport torch.nn as nn\n\nclass MNISTClassifier(L.LightningModule):\n    # ここに実装してください\n    pass",
+answer:"import lightning as L\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass MNISTClassifier(L.LightningModule):\n    def __init__(self, lr=0.01):\n        super().__init__()\n        self.save_hyperparameters()\n        self.fc1 = nn.Linear(784, 256)\n        self.fc2 = nn.Linear(256, 10)\n\n    def forward(self, x):\n        x = x.view(x.size(0), -1)\n        return self.fc2(F.relu(self.fc1(x)))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        logits = self(x)\n        loss = F.cross_entropy(logits, y)\n        acc = (logits.argmax(dim=1) == y).float().mean()\n        self.log(\"train_loss\", loss, prog_bar=True)\n        self.log(\"train_acc\", acc, prog_bar=True)\n        return loss\n\n    def configure_optimizers(self):\n        return torch.optim.SGD(\n            self.parameters(), lr=self.hparams.lr, momentum=0.9\n        )"},
   {diff:2,q:"validation_step と on_validation_epoch_end を実装し、エポックごとの検証精度を計算・ログする LightningModule を書いてください。",
-code:`class MyModel(L.LightningModule):
-    def __init__(self):
-        super().__init__()
-        self.model = nn.Sequential(
-            nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 10)
-        )
-        self.validation_step_outputs = []
-    # validation_step と on_validation_epoch_end を実装`,
-answer:`import torch
-import torch.nn.functional as F
-
-class MyModel(L.LightningModule):
-    def __init__(self):
-        super().__init__()
-        self.model = nn.Sequential(
-            nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 10)
-        )
-        self.validation_step_outputs = []
-
-    def forward(self, x):
-        return self.model(x.view(x.size(0), -1))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
-        acc = (logits.argmax(dim=1) == y).float().mean()
-        self.validation_step_outputs.append({"val_loss": loss, "val_acc": acc})
-        return loss
-
-    def on_validation_epoch_end(self):
-        avg_loss = torch.stack([x["val_loss"] for x in self.validation_step_outputs]).mean()
-        avg_acc  = torch.stack([x["val_acc"]  for x in self.validation_step_outputs]).mean()
-        self.log("val_loss", avg_loss, prog_bar=True)
-        self.log("val_acc",  avg_acc,  prog_bar=True)
-        self.validation_step_outputs.clear()
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-3)`},
+code:"class MyModel(L.LightningModule):\n    def __init__(self):\n        super().__init__()\n        self.model = nn.Sequential(\n            nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 10)\n        )\n        self.validation_step_outputs = []\n    # validation_step と on_validation_epoch_end を実装",
+answer:"import torch\nimport torch.nn.functional as F\n\nclass MyModel(L.LightningModule):\n    def __init__(self):\n        super().__init__()\n        self.model = nn.Sequential(\n            nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 10)\n        )\n        self.validation_step_outputs = []\n\n    def forward(self, x):\n        return self.model(x.view(x.size(0), -1))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss\n\n    def validation_step(self, batch, batch_idx):\n        x, y = batch\n        logits = self(x)\n        loss = F.cross_entropy(logits, y)\n        acc = (logits.argmax(dim=1) == y).float().mean()\n        self.validation_step_outputs.append({\"val_loss\": loss, \"val_acc\": acc})\n        return loss\n\n    def on_validation_epoch_end(self):\n        avg_loss = torch.stack([x[\"val_loss\"] for x in self.validation_step_outputs]).mean()\n        avg_acc  = torch.stack([x[\"val_acc\"]  for x in self.validation_step_outputs]).mean()\n        self.log(\"val_loss\", avg_loss, prog_bar=True)\n        self.log(\"val_acc\",  avg_acc,  prog_bar=True)\n        self.validation_step_outputs.clear()\n\n    def configure_optimizers(self):\n        return torch.optim.Adam(self.parameters(), lr=1e-3)"},
   {diff:3,q:"CosineAnnealingLR を configure_optimizers で返す LightningModule を書いてください。optimizer とスケジューラを辞書形式で返すこと。",
-code:`# configure_optimizers で optimizer + CosineAnnealingLR を返す
-# T_max=10 で設定`,
-answer:`import lightning as L
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class ModelWithScheduler(L.LightningModule):
-    def __init__(self, lr=1e-3):
-        super().__init__()
-        self.save_hyperparameters()
-        self.net = nn.Sequential(
-            nn.Linear(784, 256), nn.ReLU(),
-            nn.Dropout(0.2), nn.Linear(256, 10)
-        )
-
-    def forward(self, x):
-        return self.net(x.view(x.size(0), -1))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {"scheduler": scheduler, "interval": "epoch", "frequency": 1},
-        }`},
+code:"# configure_optimizers で optimizer + CosineAnnealingLR を返す\n# T_max=10 で設定",
+answer:"import lightning as L\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass ModelWithScheduler(L.LightningModule):\n    def __init__(self, lr=1e-3):\n        super().__init__()\n        self.save_hyperparameters()\n        self.net = nn.Sequential(\n            nn.Linear(784, 256), nn.ReLU(),\n            nn.Dropout(0.2), nn.Linear(256, 10)\n        )\n\n    def forward(self, x):\n        return self.net(x.view(x.size(0), -1))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss\n\n    def configure_optimizers(self):\n        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)\n        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)\n        return {\n            \"optimizer\": optimizer,\n            \"lr_scheduler\": {\"scheduler\": scheduler, \"interval\": \"epoch\", \"frequency\": 1},\n        }"},
 ],
 ch3:[
   {diff:1,q:"MNIST データセットを扱う LightningDataModule を作成してください。\n・prepare_data でダウンロード\n・setup で train/val 分割（50000/10000）\n・batch_size=64, num_workers=4",
-code:`import lightning as L
-from torchvision import datasets, transforms
-
-class MNISTDataModule(L.LightningDataModule):
-    # ここに実装してください
-    pass`,
-answer:`import lightning as L
-from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, transforms
-
-class MNISTDataModule(L.LightningDataModule):
-    def __init__(self, data_dir="./data", batch_size=64, num_workers=4):
-        super().__init__()
-        self.save_hyperparameters()
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,))
-        ])
-
-    def prepare_data(self):
-        datasets.MNIST(self.hparams.data_dir, train=True,  download=True)
-        datasets.MNIST(self.hparams.data_dir, train=False, download=True)
-
-    def setup(self, stage=None):
-        if stage == "fit" or stage is None:
-            full = datasets.MNIST(self.hparams.data_dir, train=True, transform=self.transform)
-            self.train_ds, self.val_ds = random_split(full, [50000, 10000])
-        if stage == "test" or stage is None:
-            self.test_ds = datasets.MNIST(self.hparams.data_dir, train=False, transform=self.transform)
-
-    def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size=self.hparams.batch_size,
-                          shuffle=True, num_workers=self.hparams.num_workers)
-
-    def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers)
-
-    def test_dataloader(self):
-        return DataLoader(self.test_ds, batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers)`},
+code:"import lightning as L\nfrom torchvision import datasets, transforms\n\nclass MNISTDataModule(L.LightningDataModule):\n    # ここに実装してください\n    pass",
+answer:"import lightning as L\nfrom torch.utils.data import DataLoader, random_split\nfrom torchvision import datasets, transforms\n\nclass MNISTDataModule(L.LightningDataModule):\n    def __init__(self, data_dir=\"./data\", batch_size=64, num_workers=4):\n        super().__init__()\n        self.save_hyperparameters()\n        self.transform = transforms.Compose([\n            transforms.ToTensor(),\n            transforms.Normalize((0.1307,), (0.3081,))\n        ])\n\n    def prepare_data(self):\n        datasets.MNIST(self.hparams.data_dir, train=True,  download=True)\n        datasets.MNIST(self.hparams.data_dir, train=False, download=True)\n\n    def setup(self, stage=None):\n        if stage == \"fit\" or stage is None:\n            full = datasets.MNIST(self.hparams.data_dir, train=True, transform=self.transform)\n            self.train_ds, self.val_ds = random_split(full, [50000, 10000])\n        if stage == \"test\" or stage is None:\n            self.test_ds = datasets.MNIST(self.hparams.data_dir, train=False, transform=self.transform)\n\n    def train_dataloader(self):\n        return DataLoader(self.train_ds, batch_size=self.hparams.batch_size,\n                          shuffle=True, num_workers=self.hparams.num_workers)\n\n    def val_dataloader(self):\n        return DataLoader(self.val_ds, batch_size=self.hparams.batch_size,\n                          num_workers=self.hparams.num_workers)\n\n    def test_dataloader(self):\n        return DataLoader(self.test_ds, batch_size=self.hparams.batch_size,\n                          num_workers=self.hparams.num_workers)"},
   {diff:2,q:"CSV ファイルからデータを読み込む LightningDataModule を書いてください。\n・pandas で CSV 読み込み\n・train 80% / val 10% / test 10% に分割\n・カスタム Dataset クラスも定義すること",
-code:`# CSV: features列（数値）, label列（整数）
-# sklearn の train_test_split を使用`,
-answer:`import lightning as L
-import pandas as pd
-import torch
-from torch.utils.data import Dataset, DataLoader
-from sklearn.model_selection import train_test_split
-
-class CSVDataset(Dataset):
-    def __init__(self, features, labels):
-        self.features = torch.tensor(features, dtype=torch.float32)
-        self.labels   = torch.tensor(labels,   dtype=torch.long)
-
-    def __len__(self): return len(self.labels)
-    def __getitem__(self, idx): return self.features[idx], self.labels[idx]
-
-class CSVDataModule(L.LightningDataModule):
-    def __init__(self, csv_path, batch_size=32, num_workers=2):
-        super().__init__()
-        self.save_hyperparameters()
-
-    def setup(self, stage=None):
-        df = pd.read_csv(self.hparams.csv_path)
-        X = df.drop("label", axis=1).values
-        y = df["label"].values
-        X_tr, X_tmp, y_tr, y_tmp = train_test_split(X, y, test_size=0.2, random_state=42)
-        X_val, X_te, y_val, y_te = train_test_split(X_tmp, y_tmp, test_size=0.5, random_state=42)
-        if stage in ("fit", None):
-            self.train_ds = CSVDataset(X_tr, y_tr)
-            self.val_ds   = CSVDataset(X_val, y_val)
-        if stage in ("test", None):
-            self.test_ds  = CSVDataset(X_te, y_te)
-
-    def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size=self.hparams.batch_size, shuffle=True,
-                          num_workers=self.hparams.num_workers)
-
-    def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers)
-
-    def test_dataloader(self):
-        return DataLoader(self.test_ds, batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers)`},
+code:"# CSV: features列（数値）, label列（整数）\n# sklearn の train_test_split を使用",
+answer:"import lightning as L\nimport pandas as pd\nimport torch\nfrom torch.utils.data import Dataset, DataLoader\nfrom sklearn.model_selection import train_test_split\n\nclass CSVDataset(Dataset):\n    def __init__(self, features, labels):\n        self.features = torch.tensor(features, dtype=torch.float32)\n        self.labels   = torch.tensor(labels,   dtype=torch.long)\n\n    def __len__(self): return len(self.labels)\n    def __getitem__(self, idx): return self.features[idx], self.labels[idx]\n\nclass CSVDataModule(L.LightningDataModule):\n    def __init__(self, csv_path, batch_size=32, num_workers=2):\n        super().__init__()\n        self.save_hyperparameters()\n\n    def setup(self, stage=None):\n        df = pd.read_csv(self.hparams.csv_path)\n        X = df.drop(\"label\", axis=1).values\n        y = df[\"label\"].values\n        X_tr, X_tmp, y_tr, y_tmp = train_test_split(X, y, test_size=0.2, random_state=42)\n        X_val, X_te, y_val, y_te = train_test_split(X_tmp, y_tmp, test_size=0.5, random_state=42)\n        if stage in (\"fit\", None):\n            self.train_ds = CSVDataset(X_tr, y_tr)\n            self.val_ds   = CSVDataset(X_val, y_val)\n        if stage in (\"test\", None):\n            self.test_ds  = CSVDataset(X_te, y_te)\n\n    def train_dataloader(self):\n        return DataLoader(self.train_ds, batch_size=self.hparams.batch_size, shuffle=True,\n                          num_workers=self.hparams.num_workers)\n\n    def val_dataloader(self):\n        return DataLoader(self.val_ds, batch_size=self.hparams.batch_size,\n                          num_workers=self.hparams.num_workers)\n\n    def test_dataloader(self):\n        return DataLoader(self.test_ds, batch_size=self.hparams.batch_size,\n                          num_workers=self.hparams.num_workers)"},
   {diff:3,q:"Data Augmentation を含む CIFAR-10 の LightningDataModule を作成してください。\n・学習時: RandomHorizontalFlip, RandomCrop(32, padding=4), ColorJitter\n・検証/テスト時: Normalize のみ",
-code:`# train と val/test で異なる transform を使い分ける
-# CIFAR-10: 32x32 RGB画像, 10クラス`,
-answer:`import lightning as L
-from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, transforms
-
-class CIFAR10DataModule(L.LightningDataModule):
-    def __init__(self, data_dir="./data", batch_size=128, num_workers=4):
-        super().__init__()
-        self.save_hyperparameters()
-        self.train_transform = transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomCrop(32, padding=4),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914,0.4822,0.4465),(0.2470,0.2435,0.2616)),
-        ])
-        self.val_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914,0.4822,0.4465),(0.2470,0.2435,0.2616)),
-        ])
-
-    def prepare_data(self):
-        datasets.CIFAR10(self.hparams.data_dir, train=True,  download=True)
-        datasets.CIFAR10(self.hparams.data_dir, train=False, download=True)
-
-    def setup(self, stage=None):
-        if stage in ("fit", None):
-            self.train_ds = datasets.CIFAR10(self.hparams.data_dir, train=True,
-                                             transform=self.train_transform)
-            self.val_ds   = datasets.CIFAR10(self.hparams.data_dir, train=False,
-                                             transform=self.val_transform)
-        if stage in ("test", None):
-            self.test_ds  = datasets.CIFAR10(self.hparams.data_dir, train=False,
-                                             transform=self.val_transform)
-
-    def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size=self.hparams.batch_size,
-                          shuffle=True, num_workers=self.hparams.num_workers, pin_memory=True)
-
-    def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers, pin_memory=True)
-
-    def test_dataloader(self):
-        return DataLoader(self.test_ds, batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers, pin_memory=True)`},
+code:"# train と val/test で異なる transform を使い分ける\n# CIFAR-10: 32x32 RGB画像, 10クラス",
+answer:"import lightning as L\nfrom torch.utils.data import DataLoader, random_split\nfrom torchvision import datasets, transforms\n\nclass CIFAR10DataModule(L.LightningDataModule):\n    def __init__(self, data_dir=\"./data\", batch_size=128, num_workers=4):\n        super().__init__()\n        self.save_hyperparameters()\n        self.train_transform = transforms.Compose([\n            transforms.RandomHorizontalFlip(),\n            transforms.RandomCrop(32, padding=4),\n            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),\n            transforms.ToTensor(),\n            transforms.Normalize((0.4914,0.4822,0.4465),(0.2470,0.2435,0.2616)),\n        ])\n        self.val_transform = transforms.Compose([\n            transforms.ToTensor(),\n            transforms.Normalize((0.4914,0.4822,0.4465),(0.2470,0.2435,0.2616)),\n        ])\n\n    def prepare_data(self):\n        datasets.CIFAR10(self.hparams.data_dir, train=True,  download=True)\n        datasets.CIFAR10(self.hparams.data_dir, train=False, download=True)\n\n    def setup(self, stage=None):\n        if stage in (\"fit\", None):\n            self.train_ds = datasets.CIFAR10(self.hparams.data_dir, train=True,\n                                             transform=self.train_transform)\n            self.val_ds   = datasets.CIFAR10(self.hparams.data_dir, train=False,\n                                             transform=self.val_transform)\n        if stage in (\"test\", None):\n            self.test_ds  = datasets.CIFAR10(self.hparams.data_dir, train=False,\n                                             transform=self.val_transform)\n\n    def train_dataloader(self):\n        return DataLoader(self.train_ds, batch_size=self.hparams.batch_size,\n                          shuffle=True, num_workers=self.hparams.num_workers, pin_memory=True)\n\n    def val_dataloader(self):\n        return DataLoader(self.val_ds, batch_size=self.hparams.batch_size,\n                          num_workers=self.hparams.num_workers, pin_memory=True)\n\n    def test_dataloader(self):\n        return DataLoader(self.test_ds, batch_size=self.hparams.batch_size,\n                          num_workers=self.hparams.num_workers, pin_memory=True)"},
 ],
 ch4:[
   {diff:1,q:"以下の条件で Trainer を作成し、学習を実行するコードを書いてください。\n・最大20エポック\n・GPU 使用（利用可能な場合）\n・fast_dev_run でまず1バッチだけ試す",
-code:`# model と datamodule は定義済みとする
-# まず fast_dev_run で動作確認 → 本番学習`,
-answer:`import lightning as L
-
-model = MyModel()
-dm = MyDataModule()
-
-# Step 1: fast_dev_run で動作確認（1バッチだけ）
-debug_trainer = L.Trainer(fast_dev_run=True, accelerator="auto")
-debug_trainer.fit(model, dm)
-print("動作確認 OK!")
-
-# Step 2: 本番学習
-trainer = L.Trainer(
-    max_epochs=20,
-    accelerator="auto",
-    devices="auto",
-    enable_checkpointing=True,
-)
-trainer.fit(model, dm)`},
+code:"# model と datamodule は定義済みとする\n# まず fast_dev_run で動作確認 → 本番学習",
+answer:"import lightning as L\n\nmodel = MyModel()\ndm = MyDataModule()\n\n# Step 1: fast_dev_run で動作確認（1バッチだけ）\ndebug_trainer = L.Trainer(fast_dev_run=True, accelerator=\"auto\")\ndebug_trainer.fit(model, dm)\nprint(\"動作確認 OK!\")\n\n# Step 2: 本番学習\ntrainer = L.Trainer(\n    max_epochs=20,\n    accelerator=\"auto\",\n    devices=\"auto\",\n    enable_checkpointing=True,\n)\ntrainer.fit(model, dm)"},
   {diff:2,q:"勾配クリッピング・勾配蓄積・混合精度を設定した Trainer を作成してください。\n・勾配ノルムを1.0でクリッピング\n・4バッチ分の勾配を蓄積\n・FP16 混合精度を有効化",
-code:`# Trainer の引数で設定する
-# gradient_clip_val, accumulate_grad_batches, precision`,
-answer:`import lightning as L
-
-trainer = L.Trainer(
-    max_epochs=50,
-    accelerator="auto",
-    devices="auto",
-    # 勾配クリッピング: ノルムが1.0を超えたらスケーリング
-    gradient_clip_val=1.0,
-    gradient_clip_algorithm="norm",
-    # 勾配蓄積: 4バッチ分蓄積 → 実効バッチサイズ4倍
-    accumulate_grad_batches=4,
-    # 混合精度: FP16 で高速化
-    precision="16-mixed",
-    log_every_n_steps=10,
-)
-
-trainer.fit(MyModel(), MyDataModule())
-# 実効バッチサイズ = batch_size * accumulate_grad_batches`},
+code:"# Trainer の引数で設定する\n# gradient_clip_val, accumulate_grad_batches, precision",
+answer:"import lightning as L\n\ntrainer = L.Trainer(\n    max_epochs=50,\n    accelerator=\"auto\",\n    devices=\"auto\",\n    # 勾配クリッピング: ノルムが1.0を超えたらスケーリング\n    gradient_clip_val=1.0,\n    gradient_clip_algorithm=\"norm\",\n    # 勾配蓄積: 4バッチ分蓄積 → 実効バッチサイズ4倍\n    accumulate_grad_batches=4,\n    # 混合精度: FP16 で高速化\n    precision=\"16-mixed\",\n    log_every_n_steps=10,\n)\n\ntrainer.fit(MyModel(), MyDataModule())\n# 実効バッチサイズ = batch_size * accumulate_grad_batches"},
   {diff:2,q:"学習を途中から再開（resume）するコードを書いてください。\n・チェックポイントが存在すれば ckpt_path を渡して fit\n・存在しなければ最初から学習",
-code:`# ckpt_path を使って学習を再開する
-# チェックポイントの有無をチェックして分岐`,
-answer:`import lightning as L
-from pathlib import Path
-
-model = MyModel()
-dm = MyDataModule()
-
-trainer = L.Trainer(max_epochs=100, accelerator="auto")
-
-ckpt_path = Path("lightning_logs/version_0/checkpoints/last.ckpt")
-
-if ckpt_path.exists():
-    print(f"チェックポイントから再開: {ckpt_path}")
-    trainer.fit(model, dm, ckpt_path=str(ckpt_path))
-else:
-    print("最初から学習を開始")
-    trainer.fit(model, dm)
-
-# ckpt_path を指定すると以下が復元される:
-# - モデルの重み / オプティマイザ状態 / エポック数・ステップ数`},
+code:"# ckpt_path を使って学習を再開する\n# チェックポイントの有無をチェックして分岐",
+answer:"import lightning as L\nfrom pathlib import Path\n\nmodel = MyModel()\ndm = MyDataModule()\n\ntrainer = L.Trainer(max_epochs=100, accelerator=\"auto\")\n\nckpt_path = Path(\"lightning_logs/version_0/checkpoints/last.ckpt\")\n\nif ckpt_path.exists():\n    print(f\"チェックポイントから再開: {ckpt_path}\")\n    trainer.fit(model, dm, ckpt_path=str(ckpt_path))\nelse:\n    print(\"最初から学習を開始\")\n    trainer.fit(model, dm)\n\n# ckpt_path を指定すると以下が復元される:\n# - モデルの重み / オプティマイザ状態 / エポック数・ステップ数"},
 ],
 ch5:[
   {diff:1,q:"ModelCheckpoint と EarlyStopping を組み合わせて Trainer に設定してください。\n・val_loss が最小のモデルを上位3つ保存\n・val_loss が5エポック改善しなければ学習停止",
-code:`# ModelCheckpoint と EarlyStopping の設定
-# callbacks リストとして Trainer に渡す`,
-answer:`import lightning as L
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
-
-checkpoint_cb = ModelCheckpoint(
-    dirpath="checkpoints/",
-    filename="best-{epoch:02d}-{val_loss:.4f}",
-    monitor="val_loss",
-    mode="min",
-    save_top_k=3,
-    save_last=True,
-    verbose=True,
-)
-
-early_stop_cb = EarlyStopping(
-    monitor="val_loss",
-    patience=5,
-    mode="min",
-    min_delta=0.001,
-    verbose=True,
-)
-
-trainer = L.Trainer(
-    max_epochs=100,
-    callbacks=[checkpoint_cb, early_stop_cb],
-    accelerator="auto",
-)
-
-trainer.fit(model, dm)
-print(f"Best model: {checkpoint_cb.best_model_path}")`},
+code:"# ModelCheckpoint と EarlyStopping の設定\n# callbacks リストとして Trainer に渡す",
+answer:"import lightning as L\nfrom lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping\n\ncheckpoint_cb = ModelCheckpoint(\n    dirpath=\"checkpoints/\",\n    filename=\"best-{epoch:02d}-{val_loss:.4f}\",\n    monitor=\"val_loss\",\n    mode=\"min\",\n    save_top_k=3,\n    save_last=True,\n    verbose=True,\n)\n\nearly_stop_cb = EarlyStopping(\n    monitor=\"val_loss\",\n    patience=5,\n    mode=\"min\",\n    min_delta=0.001,\n    verbose=True,\n)\n\ntrainer = L.Trainer(\n    max_epochs=100,\n    callbacks=[checkpoint_cb, early_stop_cb],\n    accelerator=\"auto\",\n)\n\ntrainer.fit(model, dm)\nprint(f\"Best model: {checkpoint_cb.best_model_path}\")"},
   {diff:2,q:"LearningRateMonitor を設定し、学習率の変化を TensorBoard に記録してください。\nオプティマイザには ReduceLROnPlateau を使うこと。",
-code:`# LearningRateMonitor + ReduceLROnPlateau の組み合わせ
-# configure_optimizers の返り値の書き方に注意`,
-answer:`import lightning as L
-import torch
-from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
-
-class MyModel(L.LightningModule):
-    def __init__(self, lr=1e-3):
-        super().__init__()
-        self.save_hyperparameters()
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.5, patience=3, min_lr=1e-6
-        )
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "monitor": "val_loss",  # ReduceLROnPlateau は monitor 必須
-                "interval": "epoch",
-                "frequency": 1,
-            },
-        }
-
-lr_monitor = LearningRateMonitor(logging_interval="epoch")
-
-trainer = L.Trainer(
-    max_epochs=50,
-    callbacks=[lr_monitor, ModelCheckpoint(monitor="val_loss")],
-    accelerator="auto",
-)
-# tensorboard --logdir lightning_logs で学習率の推移を確認`},
+code:"# LearningRateMonitor + ReduceLROnPlateau の組み合わせ\n# configure_optimizers の返り値の書き方に注意",
+answer:"import lightning as L\nimport torch\nfrom lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint\n\nclass MyModel(L.LightningModule):\n    def __init__(self, lr=1e-3):\n        super().__init__()\n        self.save_hyperparameters()\n\n    def configure_optimizers(self):\n        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)\n        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(\n            optimizer, mode=\"min\", factor=0.5, patience=3, min_lr=1e-6\n        )\n        return {\n            \"optimizer\": optimizer,\n            \"lr_scheduler\": {\n                \"scheduler\": scheduler,\n                \"monitor\": \"val_loss\",  # ReduceLROnPlateau は monitor 必須\n                \"interval\": \"epoch\",\n                \"frequency\": 1,\n            },\n        }\n\nlr_monitor = LearningRateMonitor(logging_interval=\"epoch\")\n\ntrainer = L.Trainer(\n    max_epochs=50,\n    callbacks=[lr_monitor, ModelCheckpoint(monitor=\"val_loss\")],\n    accelerator=\"auto\",\n)\n# tensorboard --logdir lightning_logs で学習率の推移を確認"},
   {diff:3,q:"カスタムコールバックを作成してください。\n・各エポック開始時に現在の学習率を表示\n・検証ロスが改善したらメッセージを表示\n・学習終了時に総学習時間と最終メトリクスを表示",
-code:`from lightning.pytorch.callbacks import Callback
-# カスタムコールバックを実装`,
-answer:`import time
-from lightning.pytorch.callbacks import Callback
-
-class TrainingMonitor(Callback):
-    def __init__(self):
-        super().__init__()
-        self.start_time = None
-        self.best_val_loss = float("inf")
-
-    def on_fit_start(self, trainer, pl_module):
-        self.start_time = time.time()
-        print("=" * 50)
-        print(f"学習開始 | 最大エポック数: {trainer.max_epochs}")
-        print("=" * 50)
-
-    def on_train_epoch_start(self, trainer, pl_module):
-        for i, opt in enumerate(trainer.optimizers):
-            for pg in opt.param_groups:
-                print(f"Epoch {trainer.current_epoch} - LR: {pg['lr']:.2e}")
-
-    def on_validation_epoch_end(self, trainer, pl_module):
-        val_loss = trainer.callback_metrics.get("val_loss")
-        if val_loss is not None and val_loss < self.best_val_loss:
-            delta = self.best_val_loss - val_loss
-            self.best_val_loss = val_loss.item()
-            print(f"  val_loss 改善! {val_loss:.4f} (delta: {delta:.4f})")
-
-    def on_fit_end(self, trainer, pl_module):
-        elapsed = time.time() - self.start_time
-        mins, secs = divmod(elapsed, 60)
-        print("=" * 50)
-        print(f"学習完了! 所要時間: {int(mins)}分{int(secs)}秒")
-        print(f"ベスト val_loss: {self.best_val_loss:.4f}")
-        print("=" * 50)
-
-trainer = L.Trainer(max_epochs=20, callbacks=[TrainingMonitor()])`},
+code:"from lightning.pytorch.callbacks import Callback\n# カスタムコールバックを実装",
+answer:"import time\nfrom lightning.pytorch.callbacks import Callback\n\nclass TrainingMonitor(Callback):\n    def __init__(self):\n        super().__init__()\n        self.start_time = None\n        self.best_val_loss = float(\"inf\")\n\n    def on_fit_start(self, trainer, pl_module):\n        self.start_time = time.time()\n        print(\"=\" * 50)\n        print(f\"学習開始 | 最大エポック数: {trainer.max_epochs}\")\n        print(\"=\" * 50)\n\n    def on_train_epoch_start(self, trainer, pl_module):\n        for i, opt in enumerate(trainer.optimizers):\n            for pg in opt.param_groups:\n                print(f\"Epoch {trainer.current_epoch} - LR: {pg['lr']:.2e}\")\n\n    def on_validation_epoch_end(self, trainer, pl_module):\n        val_loss = trainer.callback_metrics.get(\"val_loss\")\n        if val_loss is not None and val_loss < self.best_val_loss:\n            delta = self.best_val_loss - val_loss\n            self.best_val_loss = val_loss.item()\n            print(f\"  val_loss 改善! {val_loss:.4f} (delta: {delta:.4f})\")\n\n    def on_fit_end(self, trainer, pl_module):\n        elapsed = time.time() - self.start_time\n        mins, secs = divmod(elapsed, 60)\n        print(\"=\" * 50)\n        print(f\"学習完了! 所要時間: {int(mins)}分{int(secs)}秒\")\n        print(f\"ベスト val_loss: {self.best_val_loss:.4f}\")\n        print(\"=\" * 50)\n\ntrainer = L.Trainer(max_epochs=20, callbacks=[TrainingMonitor()])"},
 ],
 ch6:[
   {diff:1,q:"self.log() を使って以下のメトリクスを記録する training_step と validation_step を実装してください。\n・train_loss, train_acc（学習時）\n・val_loss, val_acc（検証時）\nprog_bar と on_epoch を適切に設定すること。",
-code:`def training_step(self, batch, batch_idx):
-    # self.log でメトリクスを記録
-    pass
-
-def validation_step(self, batch, batch_idx):
-    # self.log でメトリクスを記録
-    pass`,
-answer:`def training_step(self, batch, batch_idx):
-    x, y = batch
-    logits = self(x)
-    loss = F.cross_entropy(logits, y)
-    acc = (logits.argmax(dim=1) == y).float().mean()
-    # on_step=True: ステップごとにログ（学習時デフォルト）
-    # on_epoch=True: エポックごとにも集計
-    self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
-    self.log("train_acc",  acc,  prog_bar=True, on_step=False, on_epoch=True)
-    return loss
-
-def validation_step(self, batch, batch_idx):
-    x, y = batch
-    logits = self(x)
-    loss = F.cross_entropy(logits, y)
-    acc = (logits.argmax(dim=1) == y).float().mean()
-    # 検証メトリクスはエポックごとに集計（デフォルト）
-    self.log("val_loss", loss, prog_bar=True)
-    self.log("val_acc",  acc,  prog_bar=True)
-    return loss`},
+code:"def training_step(self, batch, batch_idx):\n    # self.log でメトリクスを記録\n    pass\n\ndef validation_step(self, batch, batch_idx):\n    # self.log でメトリクスを記録\n    pass",
+answer:"def training_step(self, batch, batch_idx):\n    x, y = batch\n    logits = self(x)\n    loss = F.cross_entropy(logits, y)\n    acc = (logits.argmax(dim=1) == y).float().mean()\n    # on_step=True: ステップごとにログ（学習時デフォルト）\n    # on_epoch=True: エポックごとにも集計\n    self.log(\"train_loss\", loss, prog_bar=True, on_step=True, on_epoch=True)\n    self.log(\"train_acc\",  acc,  prog_bar=True, on_step=False, on_epoch=True)\n    return loss\n\ndef validation_step(self, batch, batch_idx):\n    x, y = batch\n    logits = self(x)\n    loss = F.cross_entropy(logits, y)\n    acc = (logits.argmax(dim=1) == y).float().mean()\n    # 検証メトリクスはエポックごとに集計（デフォルト）\n    self.log(\"val_loss\", loss, prog_bar=True)\n    self.log(\"val_acc\",  acc,  prog_bar=True)\n    return loss"},
   {diff:2,q:"TensorBoardLogger と CSVLogger の両方を同時に使う設定を書いてください。\n・TensorBoard: logs/tb ディレクトリに保存\n・CSV: logs/csv ディレクトリに保存\n・Trainer に複数ロガーを渡す",
-code:`# 複数ロガーを同時に使用する設定
-# from lightning.pytorch.loggers import ...`,
-answer:`import lightning as L
-from lightning.pytorch.loggers import TensorBoardLogger, CSVLogger
-
-tb_logger = TensorBoardLogger(save_dir="logs", name="tb")
-csv_logger = CSVLogger(save_dir="logs", name="csv")
-
-# 複数ロガーをリストで渡す
-trainer = L.Trainer(
-    max_epochs=20,
-    logger=[tb_logger, csv_logger],
-    accelerator="auto",
-)
-
-# self.log() で記録した値は両方のロガーに送られる
-# TensorBoard: tensorboard --logdir logs/tb
-# CSV: logs/csv/version_0/metrics.csv で確認`},
+code:"# 複数ロガーを同時に使用する設定\n# from lightning.pytorch.loggers import ...",
+answer:"import lightning as L\nfrom lightning.pytorch.loggers import TensorBoardLogger, CSVLogger\n\ntb_logger = TensorBoardLogger(save_dir=\"logs\", name=\"tb\")\ncsv_logger = CSVLogger(save_dir=\"logs\", name=\"csv\")\n\n# 複数ロガーをリストで渡す\ntrainer = L.Trainer(\n    max_epochs=20,\n    logger=[tb_logger, csv_logger],\n    accelerator=\"auto\",\n)\n\n# self.log() で記録した値は両方のロガーに送られる\n# TensorBoard: tensorboard --logdir logs/tb\n# CSV: logs/csv/version_0/metrics.csv で確認"},
   {diff:3,q:"torchmetrics を使って Precision, Recall, F1Score をエポックごとにログする LightningModule を書いてください。10クラス分類タスクを想定してください。",
-code:`# torchmetrics の MulticlassPrecision 等を使用
-# average='macro' でマクロ平均`,
-answer:`import lightning as L
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchmetrics
-
-class MetricsModel(L.LightningModule):
-    def __init__(self, num_classes=10, lr=1e-3):
-        super().__init__()
-        self.save_hyperparameters()
-        self.net = nn.Sequential(
-            nn.Linear(784, 256), nn.ReLU(), nn.Linear(256, num_classes)
-        )
-        nc = num_classes
-        self.val_precision = torchmetrics.Precision(task="multiclass", num_classes=nc, average="macro")
-        self.val_recall    = torchmetrics.Recall(   task="multiclass", num_classes=nc, average="macro")
-        self.val_f1        = torchmetrics.F1Score(  task="multiclass", num_classes=nc, average="macro")
-
-    def forward(self, x):
-        return self.net(x.view(x.size(0), -1))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
-        preds = logits.argmax(dim=1)
-        self.val_precision(preds, y)
-        self.val_recall(preds, y)
-        self.val_f1(preds, y)
-        self.log("val_loss", loss, prog_bar=True)
-        self.log("val_precision", self.val_precision, on_epoch=True)
-        self.log("val_recall",    self.val_recall,    on_epoch=True)
-        self.log("val_f1",        self.val_f1,        prog_bar=True, on_epoch=True)
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)`},
+code:"# torchmetrics の MulticlassPrecision 等を使用\n# average='macro' でマクロ平均",
+answer:"import lightning as L\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport torchmetrics\n\nclass MetricsModel(L.LightningModule):\n    def __init__(self, num_classes=10, lr=1e-3):\n        super().__init__()\n        self.save_hyperparameters()\n        self.net = nn.Sequential(\n            nn.Linear(784, 256), nn.ReLU(), nn.Linear(256, num_classes)\n        )\n        nc = num_classes\n        self.val_precision = torchmetrics.Precision(task=\"multiclass\", num_classes=nc, average=\"macro\")\n        self.val_recall    = torchmetrics.Recall(   task=\"multiclass\", num_classes=nc, average=\"macro\")\n        self.val_f1        = torchmetrics.F1Score(  task=\"multiclass\", num_classes=nc, average=\"macro\")\n\n    def forward(self, x):\n        return self.net(x.view(x.size(0), -1))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss\n\n    def validation_step(self, batch, batch_idx):\n        x, y = batch\n        logits = self(x)\n        loss = F.cross_entropy(logits, y)\n        preds = logits.argmax(dim=1)\n        self.val_precision(preds, y)\n        self.val_recall(preds, y)\n        self.val_f1(preds, y)\n        self.log(\"val_loss\", loss, prog_bar=True)\n        self.log(\"val_precision\", self.val_precision, on_epoch=True)\n        self.log(\"val_recall\",    self.val_recall,    on_epoch=True)\n        self.log(\"val_f1\",        self.val_f1,        prog_bar=True, on_epoch=True)\n\n    def configure_optimizers(self):\n        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)"},
 ],
 ch7:[
   {diff:1,q:"configure_optimizers で OneCycleLR スケジューラを返す LightningModule を書いてください。\n・max_lr=0.01, total_steps は trainer.estimated_stepping_batches を使う",
-code:`# OneCycleLR: steps_per_epoch * max_epochs = total_steps
-# Lightning では trainer.estimated_stepping_batches で取得可能`,
-answer:`import lightning as L
-import torch
-import torch.nn.functional as F
-
-class OneCycleModel(L.LightningModule):
-    def __init__(self, lr=0.01):
-        super().__init__()
-        self.save_hyperparameters()
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(784, 256), torch.nn.ReLU(),
-            torch.nn.Linear(256, 10)
-        )
-
-    def forward(self, x):
-        return self.net(x.view(x.size(0), -1))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)
-        # estimated_stepping_batches: エポック数 * バッチ数を自動計算
-        total_steps = self.trainer.estimated_stepping_batches
-        scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            optimizer, max_lr=self.hparams.lr, total_steps=total_steps
-        )
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {"scheduler": scheduler, "interval": "step"},
-        }`},
+code:"# OneCycleLR: steps_per_epoch * max_epochs = total_steps\n# Lightning では trainer.estimated_stepping_batches で取得可能",
+answer:"import lightning as L\nimport torch\nimport torch.nn.functional as F\n\nclass OneCycleModel(L.LightningModule):\n    def __init__(self, lr=0.01):\n        super().__init__()\n        self.save_hyperparameters()\n        self.net = torch.nn.Sequential(\n            torch.nn.Linear(784, 256), torch.nn.ReLU(),\n            torch.nn.Linear(256, 10)\n        )\n\n    def forward(self, x):\n        return self.net(x.view(x.size(0), -1))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss\n\n    def configure_optimizers(self):\n        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)\n        # estimated_stepping_batches: エポック数 * バッチ数を自動計算\n        total_steps = self.trainer.estimated_stepping_batches\n        scheduler = torch.optim.lr_scheduler.OneCycleLR(\n            optimizer, max_lr=self.hparams.lr, total_steps=total_steps\n        )\n        return {\n            \"optimizer\": optimizer,\n            \"lr_scheduler\": {\"scheduler\": scheduler, \"interval\": \"step\"},\n        }"},
   {diff:2,q:"ウォームアップ付きのコサインスケジューラを実装してください。\n・最初の warmup_steps ステップは線形で学習率を増加\n・その後コサインで減衰",
-code:`# get_cosine_schedule_with_warmup は transformers ライブラリにあるが
-# torch の LambdaLR で自前実装する`,
-answer:`import lightning as L
-import torch
-import math
-
-class WarmupCosineModel(L.LightningModule):
-    def __init__(self, lr=1e-3, warmup_steps=100):
-        super().__init__()
-        self.save_hyperparameters()
-        self.net = torch.nn.Linear(784, 10)
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = torch.nn.functional.cross_entropy(self.net(x.view(x.size(0),-1)), y)
-        self.log("train_loss", loss)
-        return loss
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.hparams.lr)
-        total_steps = self.trainer.estimated_stepping_batches
-        warmup = self.hparams.warmup_steps
-
-        def lr_lambda(step):
-            if step < warmup:
-                return step / max(1, warmup)  # 線形ウォームアップ
-            progress = (step - warmup) / max(1, total_steps - warmup)
-            return 0.5 * (1 + math.cos(math.pi * progress))  # コサイン減衰
-
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {"scheduler": scheduler, "interval": "step"},
-        }`},
+code:"# get_cosine_schedule_with_warmup は transformers ライブラリにあるが\n# torch の LambdaLR で自前実装する",
+answer:"import lightning as L\nimport torch\nimport math\n\nclass WarmupCosineModel(L.LightningModule):\n    def __init__(self, lr=1e-3, warmup_steps=100):\n        super().__init__()\n        self.save_hyperparameters()\n        self.net = torch.nn.Linear(784, 10)\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = torch.nn.functional.cross_entropy(self.net(x.view(x.size(0),-1)), y)\n        self.log(\"train_loss\", loss)\n        return loss\n\n    def configure_optimizers(self):\n        optimizer = torch.optim.AdamW(self.parameters(), lr=self.hparams.lr)\n        total_steps = self.trainer.estimated_stepping_batches\n        warmup = self.hparams.warmup_steps\n\n        def lr_lambda(step):\n            if step < warmup:\n                return step / max(1, warmup)  # 線形ウォームアップ\n            progress = (step - warmup) / max(1, total_steps - warmup)\n            return 0.5 * (1 + math.cos(math.pi * progress))  # コサイン減衰\n\n        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)\n        return {\n            \"optimizer\": optimizer,\n            \"lr_scheduler\": {\"scheduler\": scheduler, \"interval\": \"step\"},\n        }"},
   {diff:3,q:"複数のオプティマイザ（Generator と Discriminator 用）を configure_optimizers で返すコードを書いてください。\n・GAN 的な設定を想定\n・それぞれ異なる学習率を使用",
-code:`# configure_optimizers でリストを返すと複数オプティマイザになる
-# training_step の optimizer_idx で分岐`,
-answer:`import lightning as L
-import torch
-import torch.nn as nn
-
-class SimpleGAN(L.LightningModule):
-    def __init__(self, latent_dim=100, lr_g=2e-4, lr_d=2e-4):
-        super().__init__()
-        self.save_hyperparameters()
-        self.automatic_optimization = False  # 手動最適化モード
-
-        self.generator = nn.Sequential(
-            nn.Linear(latent_dim, 256), nn.ReLU(),
-            nn.Linear(256, 784), nn.Tanh()
-        )
-        self.discriminator = nn.Sequential(
-            nn.Linear(784, 256), nn.LeakyReLU(0.2),
-            nn.Linear(256, 1), nn.Sigmoid()
-        )
-
-    def training_step(self, batch, batch_idx):
-        opt_g, opt_d = self.optimizers()
-        real, _ = batch
-        bs = real.size(0)
-
-        # Discriminator の更新
-        noise = torch.randn(bs, self.hparams.latent_dim, device=self.device)
-        fake = self.generator(noise).detach()
-        loss_d = (
-            -torch.log(self.discriminator(real.view(bs, -1)) + 1e-8).mean()
-            -torch.log(1 - self.discriminator(fake) + 1e-8).mean()
-        )
-        opt_d.zero_grad(); self.manual_backward(loss_d); opt_d.step()
-
-        # Generator の更新
-        noise = torch.randn(bs, self.hparams.latent_dim, device=self.device)
-        loss_g = -torch.log(self.discriminator(self.generator(noise)) + 1e-8).mean()
-        opt_g.zero_grad(); self.manual_backward(loss_g); opt_g.step()
-
-        self.log("loss_g", loss_g, prog_bar=True)
-        self.log("loss_d", loss_d, prog_bar=True)
-
-    def configure_optimizers(self):
-        opt_g = torch.optim.Adam(self.generator.parameters(),     lr=self.hparams.lr_g, betas=(0.5, 0.999))
-        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.hparams.lr_d, betas=(0.5, 0.999))
-        return [opt_g, opt_d]`},
+code:"# configure_optimizers でリストを返すと複数オプティマイザになる\n# training_step の optimizer_idx で分岐",
+answer:"import lightning as L\nimport torch\nimport torch.nn as nn\n\nclass SimpleGAN(L.LightningModule):\n    def __init__(self, latent_dim=100, lr_g=2e-4, lr_d=2e-4):\n        super().__init__()\n        self.save_hyperparameters()\n        self.automatic_optimization = False  # 手動最適化モード\n\n        self.generator = nn.Sequential(\n            nn.Linear(latent_dim, 256), nn.ReLU(),\n            nn.Linear(256, 784), nn.Tanh()\n        )\n        self.discriminator = nn.Sequential(\n            nn.Linear(784, 256), nn.LeakyReLU(0.2),\n            nn.Linear(256, 1), nn.Sigmoid()\n        )\n\n    def training_step(self, batch, batch_idx):\n        opt_g, opt_d = self.optimizers()\n        real, _ = batch\n        bs = real.size(0)\n\n        # Discriminator の更新\n        noise = torch.randn(bs, self.hparams.latent_dim, device=self.device)\n        fake = self.generator(noise).detach()\n        loss_d = (\n            -torch.log(self.discriminator(real.view(bs, -1)) + 1e-8).mean()\n            -torch.log(1 - self.discriminator(fake) + 1e-8).mean()\n        )\n        opt_d.zero_grad(); self.manual_backward(loss_d); opt_d.step()\n\n        # Generator の更新\n        noise = torch.randn(bs, self.hparams.latent_dim, device=self.device)\n        loss_g = -torch.log(self.discriminator(self.generator(noise)) + 1e-8).mean()\n        opt_g.zero_grad(); self.manual_backward(loss_g); opt_g.step()\n\n        self.log(\"loss_g\", loss_g, prog_bar=True)\n        self.log(\"loss_d\", loss_d, prog_bar=True)\n\n    def configure_optimizers(self):\n        opt_g = torch.optim.Adam(self.generator.parameters(),     lr=self.hparams.lr_g, betas=(0.5, 0.999))\n        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.hparams.lr_d, betas=(0.5, 0.999))\n        return [opt_g, opt_d]"},
 ],
 ch8:[
   {diff:1,q:"GPU と混合精度を使う Trainer を設定してください。\n・accelerator='gpu'\n・precision='16-mixed'\n・利用可能なすべての GPU を使用",
-code:`# GPU + AMP (Automatic Mixed Precision) の設定
-# devices と accelerator の指定方法`,
-answer:`import lightning as L
-
-trainer = L.Trainer(
-    max_epochs=30,
-    accelerator="gpu",       # GPU を使用
-    devices="auto",          # 利用可能な全 GPU
-    precision="16-mixed",    # FP16 自動混合精度
-
-    # ログとチェックポイント
-    log_every_n_steps=10,
-    enable_checkpointing=True,
-)
-
-model = MyModel()
-dm = MyDataModule()
-trainer.fit(model, dm)
-
-# M1/M2 Mac の場合:
-# trainer = L.Trainer(accelerator="mps", devices=1, precision="16-mixed")`},
+code:"# GPU + AMP (Automatic Mixed Precision) の設定\n# devices と accelerator の指定方法",
+answer:"import lightning as L\n\ntrainer = L.Trainer(\n    max_epochs=30,\n    accelerator=\"gpu\",       # GPU を使用\n    devices=\"auto\",          # 利用可能な全 GPU\n    precision=\"16-mixed\",    # FP16 自動混合精度\n\n    # ログとチェックポイント\n    log_every_n_steps=10,\n    enable_checkpointing=True,\n)\n\nmodel = MyModel()\ndm = MyDataModule()\ntrainer.fit(model, dm)\n\n# M1/M2 Mac の場合:\n# trainer = L.Trainer(accelerator=\"mps\", devices=1, precision=\"16-mixed\")"},
   {diff:2,q:"2つの GPU で DDP を使う Trainer の設定を書いてください。\n・sync_batchnorm を有効化\n・マルチGPU時のメトリクス同期（sync_dist=True）も示すこと",
-code:`# 2GPU で DDP 学習するための Trainer 設定
-# training_step での sync_dist も忘れずに`,
-answer:`import lightning as L
-
-trainer = L.Trainer(
-    max_epochs=50,
-    accelerator="gpu",
-    devices=2,               # 2GPU 使用
-    strategy="ddp",          # Distributed Data Parallel
-    sync_batchnorm=True,     # BatchNorm を GPU 間で同期
-    precision="16-mixed",
-)
-
-# LightningModule 側: sync_dist=True で全 GPU 間でメトリクスを平均
-class MyModel(L.LightningModule):
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        # sync_dist=True: DDP 時にすべての GPU で平均を取る
-        self.log("train_loss", loss, prog_bar=True, sync_dist=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("val_loss", loss, prog_bar=True, sync_dist=True)
-
-# 実行コマンド（torchrun は不要、Lightning が自動管理）:
-# python train.py
-# → 内部で自動的に 2 プロセスが起動される`},
+code:"# 2GPU で DDP 学習するための Trainer 設定\n# training_step での sync_dist も忘れずに",
+answer:"import lightning as L\n\ntrainer = L.Trainer(\n    max_epochs=50,\n    accelerator=\"gpu\",\n    devices=2,               # 2GPU 使用\n    strategy=\"ddp\",          # Distributed Data Parallel\n    sync_batchnorm=True,     # BatchNorm を GPU 間で同期\n    precision=\"16-mixed\",\n)\n\n# LightningModule 側: sync_dist=True で全 GPU 間でメトリクスを平均\nclass MyModel(L.LightningModule):\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        # sync_dist=True: DDP 時にすべての GPU で平均を取る\n        self.log(\"train_loss\", loss, prog_bar=True, sync_dist=True)\n        return loss\n\n    def validation_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"val_loss\", loss, prog_bar=True, sync_dist=True)\n\n# 実行コマンド（torchrun は不要、Lightning が自動管理）:\n# python train.py\n# → 内部で自動的に 2 プロセスが起動される"},
   {diff:3,q:"BFloat16 と FSDP を使って大規模モデルを学習するコードを書いてください。\n・4GPU 使用\n・自動ラッピングポリシーを設定",
-code:`# FSDP で大規模モデルを学習
-# FSDPStrategy のインポートと設定`,
-answer:`import lightning as L
-import torch
-import torch.nn as nn
-from lightning.pytorch.strategies import FSDPStrategy
-
-fsdp_strategy = FSDPStrategy(
-    # 指定モジュールを自動シャーディング
-    auto_wrap_policy={nn.TransformerEncoderLayer, nn.Linear},
-    # アクティベーションチェックポイント: メモリ節約
-    activation_checkpointing_policy={nn.TransformerEncoderLayer},
-    sharding_strategy="FULL_SHARD",
-)
-
-trainer = L.Trainer(
-    max_epochs=20,
-    accelerator="gpu",
-    devices=4,
-    strategy=fsdp_strategy,
-    precision="bf16-mixed",  # FSDP では BF16 が推奨
-)
-
-class LargeTransformer(L.LightningModule):
-    def __init__(self):
-        super().__init__()
-        self.encoder = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=1024, nhead=16, batch_first=True),
-            num_layers=24,
-        )
-        self.head = nn.Linear(1024, 1000)
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        out = self.encoder(x)
-        loss = nn.functional.cross_entropy(self.head(out[:,0]), y)
-        self.log("train_loss", loss, prog_bar=True, sync_dist=True)
-        return loss
-
-    def configure_optimizers(self):
-        return torch.optim.AdamW(self.parameters(), lr=1e-4)`},
+code:"# FSDP で大規模モデルを学習\n# FSDPStrategy のインポートと設定",
+answer:"import lightning as L\nimport torch\nimport torch.nn as nn\nfrom lightning.pytorch.strategies import FSDPStrategy\n\nfsdp_strategy = FSDPStrategy(\n    # 指定モジュールを自動シャーディング\n    auto_wrap_policy={nn.TransformerEncoderLayer, nn.Linear},\n    # アクティベーションチェックポイント: メモリ節約\n    activation_checkpointing_policy={nn.TransformerEncoderLayer},\n    sharding_strategy=\"FULL_SHARD\",\n)\n\ntrainer = L.Trainer(\n    max_epochs=20,\n    accelerator=\"gpu\",\n    devices=4,\n    strategy=fsdp_strategy,\n    precision=\"bf16-mixed\",  # FSDP では BF16 が推奨\n)\n\nclass LargeTransformer(L.LightningModule):\n    def __init__(self):\n        super().__init__()\n        self.encoder = nn.TransformerEncoder(\n            nn.TransformerEncoderLayer(d_model=1024, nhead=16, batch_first=True),\n            num_layers=24,\n        )\n        self.head = nn.Linear(1024, 1000)\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        out = self.encoder(x)\n        loss = nn.functional.cross_entropy(self.head(out[:,0]), y)\n        self.log(\"train_loss\", loss, prog_bar=True, sync_dist=True)\n        return loss\n\n    def configure_optimizers(self):\n        return torch.optim.AdamW(self.parameters(), lr=1e-4)"},
 ],
 ch9:[
   {diff:1,q:"timm を使って ResNet-50 で CIFAR-10 をファインチューニングする LightningModule を書いてください。\n・最終層のみ学習（backbone を freeze）\n・torchvision の CIFAR-10 を想定",
-code:`import timm
-import lightning as L
-
-class FineTunedResNet(L.LightningModule):
-    # timm で resnet50 を読み込み、最終層のみ学習
-    pass`,
-answer:`import timm
-import lightning as L
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class FineTunedResNet(L.LightningModule):
-    def __init__(self, num_classes=10, lr=1e-3):
-        super().__init__()
-        self.save_hyperparameters()
-        # pretrained=True で ImageNet 事前学習済み重みをロード
-        self.backbone = timm.create_model("resnet50", pretrained=True, num_classes=0)
-        feat_dim = self.backbone.num_features  # 2048
-
-        # backbone を freeze（最終層のみ学習）
-        for param in self.backbone.parameters():
-            param.requires_grad = False
-
-        self.head = nn.Linear(feat_dim, num_classes)
-
-    def forward(self, x):
-        features = self.backbone(x)  # (B, feat_dim)
-        return self.head(features)
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        acc = (self(x).argmax(dim=1) == y).float().mean()
-        self.log("train_loss", loss, prog_bar=True)
-        self.log("train_acc",  acc,  prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        self.log("val_loss", F.cross_entropy(logits, y), prog_bar=True)
-        self.log("val_acc",  (logits.argmax(dim=1) == y).float().mean(), prog_bar=True)
-
-    def configure_optimizers(self):
-        # head のパラメータのみ最適化
-        return torch.optim.Adam(self.head.parameters(), lr=self.hparams.lr)`},
+code:"import timm\nimport lightning as L\n\nclass FineTunedResNet(L.LightningModule):\n    # timm で resnet50 を読み込み、最終層のみ学習\n    pass",
+answer:"import timm\nimport lightning as L\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass FineTunedResNet(L.LightningModule):\n    def __init__(self, num_classes=10, lr=1e-3):\n        super().__init__()\n        self.save_hyperparameters()\n        # pretrained=True で ImageNet 事前学習済み重みをロード\n        self.backbone = timm.create_model(\"resnet50\", pretrained=True, num_classes=0)\n        feat_dim = self.backbone.num_features  # 2048\n\n        # backbone を freeze（最終層のみ学習）\n        for param in self.backbone.parameters():\n            param.requires_grad = False\n\n        self.head = nn.Linear(feat_dim, num_classes)\n\n    def forward(self, x):\n        features = self.backbone(x)  # (B, feat_dim)\n        return self.head(features)\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        acc = (self(x).argmax(dim=1) == y).float().mean()\n        self.log(\"train_loss\", loss, prog_bar=True)\n        self.log(\"train_acc\",  acc,  prog_bar=True)\n        return loss\n\n    def validation_step(self, batch, batch_idx):\n        x, y = batch\n        logits = self(x)\n        self.log(\"val_loss\", F.cross_entropy(logits, y), prog_bar=True)\n        self.log(\"val_acc\",  (logits.argmax(dim=1) == y).float().mean(), prog_bar=True)\n\n    def configure_optimizers(self):\n        # head のパラメータのみ最適化\n        return torch.optim.Adam(self.head.parameters(), lr=self.hparams.lr)"},
   {diff:2,q:"段階的なファインチューニング（Gradual Unfreezing）を実装してください。\n・最初の5エポックは head のみ学習\n・5エポック後に backbone を unfreeze して全体を学習",
-code:`# on_train_epoch_start を使って段階的に unfreeze
-# freeze するエポック数を引数で指定`,
-answer:`import lightning as L
-import timm
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class GradualUnfreezeModel(L.LightningModule):
-    def __init__(self, num_classes=10, freeze_epochs=5, lr_head=1e-3, lr_backbone=1e-4):
-        super().__init__()
-        self.save_hyperparameters()
-        self.backbone = timm.create_model("efficientnet_b0", pretrained=True, num_classes=0)
-        self.head = nn.Linear(self.backbone.num_features, num_classes)
-        # 最初は backbone を freeze
-        for p in self.backbone.parameters():
-            p.requires_grad = False
-
-    def on_train_epoch_start(self):
-        if self.current_epoch == self.hparams.freeze_epochs:
-            print(f"\nEpoch {self.current_epoch}: backbone を unfreeze します")
-            for p in self.backbone.parameters():
-                p.requires_grad = True
-            # オプティマイザを更新（backbone 用の param_group を追加）
-            self.optimizers().add_param_group({
-                "params": self.backbone.parameters(),
-                "lr": self.hparams.lr_backbone,
-            })
-
-    def forward(self, x):
-        return self.head(self.backbone(x))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        self.log("val_loss", F.cross_entropy(logits, y), prog_bar=True)
-        self.log("val_acc",  (logits.argmax(dim=1) == y).float().mean(), prog_bar=True)
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.head.parameters(), lr=self.hparams.lr_head)`},
+code:"# on_train_epoch_start を使って段階的に unfreeze\n# freeze するエポック数を引数で指定",
+answer:"import lightning as L\nimport timm\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass GradualUnfreezeModel(L.LightningModule):\n    def __init__(self, num_classes=10, freeze_epochs=5, lr_head=1e-3, lr_backbone=1e-4):\n        super().__init__()\n        self.save_hyperparameters()\n        self.backbone = timm.create_model(\"efficientnet_b0\", pretrained=True, num_classes=0)\n        self.head = nn.Linear(self.backbone.num_features, num_classes)\n        # 最初は backbone を freeze\n        for p in self.backbone.parameters():\n            p.requires_grad = False\n\n    def on_train_epoch_start(self):\n        if self.current_epoch == self.hparams.freeze_epochs:\n            print(f\"\nEpoch {self.current_epoch}: backbone を unfreeze します\")\n            for p in self.backbone.parameters():\n                p.requires_grad = True\n            # オプティマイザを更新（backbone 用の param_group を追加）\n            self.optimizers().add_param_group({\n                \"params\": self.backbone.parameters(),\n                \"lr\": self.hparams.lr_backbone,\n            })\n\n    def forward(self, x):\n        return self.head(self.backbone(x))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss\n\n    def validation_step(self, batch, batch_idx):\n        x, y = batch\n        logits = self(x)\n        self.log(\"val_loss\", F.cross_entropy(logits, y), prog_bar=True)\n        self.log(\"val_acc\",  (logits.argmax(dim=1) == y).float().mean(), prog_bar=True)\n\n    def configure_optimizers(self):\n        return torch.optim.Adam(self.head.parameters(), lr=self.hparams.lr_head)"},
   {diff:3,q:"Layer-wise Learning Rate Decay（LLRD）を実装してください。\n・backbone の各層に異なる学習率を設定\n・深い層ほど高い学習率、浅い層ほど低い学習率",
-code:`# LLRD: 各層の param_group を手動で作成
-# decay_factor で学習率を層ごとに掛け合わせる`,
-answer:`import timm
-import lightning as L
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class LLRDModel(L.LightningModule):
-    def __init__(self, num_classes=10, base_lr=1e-3, decay_factor=0.9):
-        super().__init__()
-        self.save_hyperparameters()
-        self.backbone = timm.create_model("resnet50", pretrained=True, num_classes=0)
-        self.head = nn.Linear(self.backbone.num_features, num_classes)
-
-    def forward(self, x):
-        return self.head(self.backbone(x))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        self.log("val_loss", F.cross_entropy(logits, y), prog_bar=True)
-        self.log("val_acc",  (logits.argmax(dim=1)==y).float().mean(), prog_bar=True)
-
-    def configure_optimizers(self):
-        # ResNet50 の各 layer にに異なる LR を設定
-        layers = [
-            self.backbone.layer4, self.backbone.layer3,
-            self.backbone.layer2, self.backbone.layer1,
-            self.backbone.conv1,
-        ]
-        param_groups = [{"params": self.head.parameters(), "lr": self.hparams.base_lr}]
-        for i, layer in enumerate(layers):
-            lr = self.hparams.base_lr * (self.hparams.decay_factor ** (i + 1))
-            param_groups.append({"params": layer.parameters(), "lr": lr})
-            print(f"Layer {i+1} LR: {lr:.2e}")
-
-        return torch.optim.AdamW(param_groups, weight_decay=1e-4)`},
+code:"# LLRD: 各層の param_group を手動で作成\n# decay_factor で学習率を層ごとに掛け合わせる",
+answer:"import timm\nimport lightning as L\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass LLRDModel(L.LightningModule):\n    def __init__(self, num_classes=10, base_lr=1e-3, decay_factor=0.9):\n        super().__init__()\n        self.save_hyperparameters()\n        self.backbone = timm.create_model(\"resnet50\", pretrained=True, num_classes=0)\n        self.head = nn.Linear(self.backbone.num_features, num_classes)\n\n    def forward(self, x):\n        return self.head(self.backbone(x))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss\n\n    def validation_step(self, batch, batch_idx):\n        x, y = batch\n        logits = self(x)\n        self.log(\"val_loss\", F.cross_entropy(logits, y), prog_bar=True)\n        self.log(\"val_acc\",  (logits.argmax(dim=1)==y).float().mean(), prog_bar=True)\n\n    def configure_optimizers(self):\n        # ResNet50 の各 layer にに異なる LR を設定\n        layers = [\n            self.backbone.layer4, self.backbone.layer3,\n            self.backbone.layer2, self.backbone.layer1,\n            self.backbone.conv1,\n        ]\n        param_groups = [{\"params\": self.head.parameters(), \"lr\": self.hparams.base_lr}]\n        for i, layer in enumerate(layers):\n            lr = self.hparams.base_lr * (self.hparams.decay_factor ** (i + 1))\n            param_groups.append({\"params\": layer.parameters(), \"lr\": lr})\n            print(f\"Layer {i+1} LR: {lr:.2e}\")\n\n        return torch.optim.AdamW(param_groups, weight_decay=1e-4)"},
 ],
 ch10:[
   {diff:1,q:"trainer.test() を使ってテストセットで評価するコードを書いてください。\n・最良のチェックポイントから重みをロードして評価\n・テスト結果を表示する",
-code:`# trainer.test() でテストセット評価
-# ckpt_path="best" を使う`,
-answer:`import lightning as L
-from lightning.pytorch.callbacks import ModelCheckpoint
-
-checkpoint_cb = ModelCheckpoint(
-    monitor="val_loss",
-    mode="min",
-    save_top_k=1,
-    dirpath="checkpoints/",
-)
-
-trainer = L.Trainer(
-    max_epochs=30,
-    accelerator="auto",
-    callbacks=[checkpoint_cb],
-)
-
-model = MyModel()
-dm = MyDataModule()
-
-# 学習
-trainer.fit(model, dm)
-
-# テスト: ckpt_path="best" で最良モデルを自動ロード
-results = trainer.test(model, dm, ckpt_path="best")
-print(f"Test results: {results}")
-
-# LightningModule 側に test_step が必要:
-# def test_step(self, batch, batch_idx):
-#     x, y = batch
-#     logits = self(x)
-#     self.log("test_loss", F.cross_entropy(logits, y))
-#     self.log("test_acc",  (logits.argmax(dim=1)==y).float().mean())`},
+code:"# trainer.test() でテストセット評価\n# ckpt_path=\"best\" を使う",
+answer:"import lightning as L\nfrom lightning.pytorch.callbacks import ModelCheckpoint\n\ncheckpoint_cb = ModelCheckpoint(\n    monitor=\"val_loss\",\n    mode=\"min\",\n    save_top_k=1,\n    dirpath=\"checkpoints/\",\n)\n\ntrainer = L.Trainer(\n    max_epochs=30,\n    accelerator=\"auto\",\n    callbacks=[checkpoint_cb],\n)\n\nmodel = MyModel()\ndm = MyDataModule()\n\n# 学習\ntrainer.fit(model, dm)\n\n# テスト: ckpt_path=\"best\" で最良モデルを自動ロード\nresults = trainer.test(model, dm, ckpt_path=\"best\")\nprint(f\"Test results: {results}\")\n\n# LightningModule 側に test_step が必要:\n# def test_step(self, batch, batch_idx):\n#     x, y = batch\n#     logits = self(x)\n#     self.log(\"test_loss\", F.cross_entropy(logits, y))\n#     self.log(\"test_acc\",  (logits.argmax(dim=1)==y).float().mean())"},
   {diff:2,q:"predict_step を実装し、trainer.predict() で新しいデータの予測を行うコードを書いてください。\n・predict_step でソフトマックス確率を返す\n・DataLoader を直接渡す",
-code:`# predict_step の実装と trainer.predict() の使い方
-# 結果はリストのリストとして返ってくる`,
-answer:`import lightning as L
-import torch
-import torch.nn.functional as F
-
-class PredictableModel(L.LightningModule):
-    def __init__(self):
-        super().__init__()
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(784, 256), torch.nn.ReLU(),
-            torch.nn.Linear(256, 10)
-        )
-
-    def forward(self, x):
-        return self.net(x.view(x.size(0), -1))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss)
-        return loss
-
-    def predict_step(self, batch, batch_idx):
-        # batch は (x,) または (x, y) どちらでも対応
-        x = batch[0] if isinstance(batch, (list, tuple)) else batch
-        logits = self(x)
-        probs = F.softmax(logits, dim=1)
-        return probs  # (batch_size, num_classes) の確率テンソル
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-3)
-
-# 推論実行
-model = PredictableModel.load_from_checkpoint("checkpoints/best.ckpt")
-trainer = L.Trainer(accelerator="auto")
-
-# predict_dataloader を渡す
-predictions = trainer.predict(model, dataloaders=predict_loader)
-
-# predictions は List[Tensor] (バッチごと)
-import torch
-all_probs = torch.cat(predictions, dim=0)  # (N, num_classes)
-all_preds = all_probs.argmax(dim=1)        # (N,)
-print(f"予測クラス: {all_preds[:10]}")`},
+code:"# predict_step の実装と trainer.predict() の使い方\n# 結果はリストのリストとして返ってくる",
+answer:"import lightning as L\nimport torch\nimport torch.nn.functional as F\n\nclass PredictableModel(L.LightningModule):\n    def __init__(self):\n        super().__init__()\n        self.net = torch.nn.Sequential(\n            torch.nn.Linear(784, 256), torch.nn.ReLU(),\n            torch.nn.Linear(256, 10)\n        )\n\n    def forward(self, x):\n        return self.net(x.view(x.size(0), -1))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss)\n        return loss\n\n    def predict_step(self, batch, batch_idx):\n        # batch は (x,) または (x, y) どちらでも対応\n        x = batch[0] if isinstance(batch, (list, tuple)) else batch\n        logits = self(x)\n        probs = F.softmax(logits, dim=1)\n        return probs  # (batch_size, num_classes) の確率テンソル\n\n    def configure_optimizers(self):\n        return torch.optim.Adam(self.parameters(), lr=1e-3)\n\n# 推論実行\nmodel = PredictableModel.load_from_checkpoint(\"checkpoints/best.ckpt\")\ntrainer = L.Trainer(accelerator=\"auto\")\n\n# predict_dataloader を渡す\npredictions = trainer.predict(model, dataloaders=predict_loader)\n\n# predictions は List[Tensor] (バッチごと)\nimport torch\nall_probs = torch.cat(predictions, dim=0)  # (N, num_classes)\nall_preds = all_probs.argmax(dim=1)        # (N,)\nprint(f\"予測クラス: {all_preds[:10]}\")"},
   {diff:3,q:"学習済み LightningModule を TorchScript に変換してデプロイする手順を示してください。\n・torch.jit.script と trace の両方を試す\n・変換後のモデルで推論する",
-code:`# 学習済みモデルを TorchScript に変換
-# script: 制御フロー対応 / trace: 固定入力形状向け`,
-answer:`import lightning as L
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class ScriptableModel(L.LightningModule):
-    def __init__(self, num_classes=10):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(784, 256), nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(256, num_classes)
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # 型アノテーションが TorchScript では必要
-        return self.net(x.view(x.size(0), -1))
-
-    def predict_step(self, batch, batch_idx):
-        x = batch[0]
-        return F.softmax(self(x), dim=1)
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss)
-        return loss
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-3)
-
-# 学習済みモデルのロード
-model = ScriptableModel.load_from_checkpoint("checkpoints/best.ckpt")
-model.eval()
-
-# 方法1: torch.jit.script（制御フロー対応）
-scripted = torch.jit.script(model)
-scripted.save("model_scripted.pt")
-
-# 方法2: torch.jit.trace（固定形状向け）
-example_input = torch.randn(1, 784)
-traced = torch.jit.trace(model, example_input)
-traced.save("model_traced.pt")
-
-# デプロイ先での推論（Python 不要）
-loaded = torch.jit.load("model_scripted.pt")
-loaded.eval()
-with torch.no_grad():
-    x = torch.randn(32, 784)
-    probs = F.softmax(loaded(x), dim=1)
-    preds = probs.argmax(dim=1)
-    print(f"Predictions: {preds}")`},
+code:"# 学習済みモデルを TorchScript に変換\n# script: 制御フロー対応 / trace: 固定入力形状向け",
+answer:"import lightning as L\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass ScriptableModel(L.LightningModule):\n    def __init__(self, num_classes=10):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(784, 256), nn.ReLU(),\n            nn.Dropout(0.2),\n            nn.Linear(256, num_classes)\n        )\n\n    def forward(self, x: torch.Tensor) -> torch.Tensor:\n        # 型アノテーションが TorchScript では必要\n        return self.net(x.view(x.size(0), -1))\n\n    def predict_step(self, batch, batch_idx):\n        x = batch[0]\n        return F.softmax(self(x), dim=1)\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss)\n        return loss\n\n    def configure_optimizers(self):\n        return torch.optim.Adam(self.parameters(), lr=1e-3)\n\n# 学習済みモデルのロード\nmodel = ScriptableModel.load_from_checkpoint(\"checkpoints/best.ckpt\")\nmodel.eval()\n\n# 方法1: torch.jit.script（制御フロー対応）\nscripted = torch.jit.script(model)\nscripted.save(\"model_scripted.pt\")\n\n# 方法2: torch.jit.trace（固定形状向け）\nexample_input = torch.randn(1, 784)\ntraced = torch.jit.trace(model, example_input)\ntraced.save(\"model_traced.pt\")\n\n# デプロイ先での推論（Python 不要）\nloaded = torch.jit.load(\"model_scripted.pt\")\nloaded.eval()\nwith torch.no_grad():\n    x = torch.randn(32, 784)\n    probs = F.softmax(loaded(x), dim=1)\n    preds = probs.argmax(dim=1)\n    print(f\"Predictions: {preds}\")"},
 ],
 };
 
@@ -1232,885 +233,161 @@ const chapters = [
 goal:"raw PyTorchの定型コードの問題点を理解し、PyTorch Lightning をインストールして LightningModule の基本構造を説明できる。",
 sections:[
 {title:"raw PyTorch の課題と Lightning の解決策",
-body:`機械学習の研究や実装を PyTorch で行うとき、毎回書かなければならないコードがあります。デバイスへの転送（.to('cuda')）、ゼロ勾配初期化（optimizer.zero_grad()）、バックプロパゲーション（loss.backward()）、そしてパラメータ更新（optimizer.step()）——これらはどのモデルでも同じパターンです。
-
-PyTorch Lightning は「研究コード」と「エンジニアリングコード」を明確に分離します。モデルの構造・損失関数・最適化戦略などの本質的な部分はあなたが書き、学習ループの実行・GPU管理・チェックポイント保存・ロギングなどのインフラ部分は Trainer が担います。Keras の使いやすさを保ちながら PyTorch の柔軟性を失わない設計が特徴です。
-
-Python 開発者から見ると「PyTorch の薄いラッパー」のように見えますが、実際は分散学習・混合精度・チェックポイント・ロギングなどの本番運用に必要な機能が全て統合されています。`,
+body:"機械学習の研究や実装を PyTorch で行うとき、毎回書かなければならないコードがあります。デバイスへの転送（.to('cuda')）、ゼロ勾配初期化（optimizer.zero_grad()）、バックプロパゲーション（loss.backward()）、そしてパラメータ更新（optimizer.step()）——これらはどのモデルでも同じパターンです。\n\nPyTorch Lightning は「研究コード」と「エンジニアリングコード」を明確に分離します。モデルの構造・損失関数・最適化戦略などの本質的な部分はあなたが書き、学習ループの実行・GPU管理・チェックポイント保存・ロギングなどのインフラ部分は Trainer が担います。Keras の使いやすさを保ちながら PyTorch の柔軟性を失わない設計が特徴です。\n\nPython 開発者から見ると「PyTorch の薄いラッパー」のように見えますが、実際は分散学習・混合精度・チェックポイント・ロギングなどの本番運用に必要な機能が全て統合されています。",
 table:T.rawVsLightning,
-afterTable:`特に重要なのは「マルチGPU」と「再現性」の列です。raw PyTorch でマルチGPU学習を実装しようとすると torch.distributed を使った複雑なセットアップが必要ですが、Lightning では Trainer(devices=4, strategy='ddp') の一行で済みます。`},
+afterTable:"特に重要なのは「マルチGPU」と「再現性」の列です。raw PyTorch でマルチGPU学習を実装しようとすると torch.distributed を使った複雑なセットアップが必要ですが、Lightning では Trainer(devices=4, strategy='ddp') の一行で済みます。"},
 {title:"インストールと基本構造",
-body:`PyTorch Lightning は 2022年より lightning パッケージに統合されました。以前は pytorch-lightning という別パッケージでしたが、現在は pip install lightning で統一してインストールします。
-
-LightningModule は nn.Module を継承しているため、既存の PyTorch モデルを最小限の変更で移行できます。必須メソッドは training_step と configure_optimizers の2つだけで、その他のメソッドは必要に応じて追加します。save_hyperparameters() を呼ぶと、コンストラクタの引数が self.hparams に保存され、チェックポイントからの復元時に自動的に渡されます。`,
-code:`import lightning as L
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class MNISTLitModel(L.LightningModule):
-    def __init__(self, hidden_dim=128, lr=1e-3):
-        super().__init__()
-        self.save_hyperparameters()  # self.hparams.hidden_dim, self.hparams.lr で参照可能
-        self.fc1 = nn.Linear(784, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, 10)
-
-    def forward(self, x):
-        x = x.view(x.size(0), -1)  # (B, 1, 28, 28) → (B, 784)
-        return self.fc2(F.relu(self.fc1(x)))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss  # ← これだけ。backward() は自動
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
-
-# 学習実行
-model  = MNISTLitModel()
-trainer = L.Trainer(max_epochs=5, accelerator="auto")
-trainer.fit(model, train_dataloader, val_dataloader)`,
-afterCode:`forward() メソッドは推論時（model(x)）に呼ばれます。training_step 内では self(x) と書くと forward() を呼び出します。Trainer は training_step の返り値（loss）を使って自動的に backward() と optimizer.step() を実行するため、あなたのコードに書く必要はありません。`},
+body:"PyTorch Lightning は 2022年より lightning パッケージに統合されました。以前は pytorch-lightning という別パッケージでしたが、現在は pip install lightning で統一してインストールします。\n\nLightningModule は nn.Module を継承しているため、既存の PyTorch モデルを最小限の変更で移行できます。必須メソッドは training_step と configure_optimizers の2つだけで、その他のメソッドは必要に応じて追加します。save_hyperparameters() を呼ぶと、コンストラクタの引数が self.hparams に保存され、チェックポイントからの復元時に自動的に渡されます。",
+code:"import lightning as L\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass MNISTLitModel(L.LightningModule):\n    def __init__(self, hidden_dim=128, lr=1e-3):\n        super().__init__()\n        self.save_hyperparameters()  # self.hparams.hidden_dim, self.hparams.lr で参照可能\n        self.fc1 = nn.Linear(784, hidden_dim)\n        self.fc2 = nn.Linear(hidden_dim, 10)\n\n    def forward(self, x):\n        x = x.view(x.size(0), -1)  # (B, 1, 28, 28) → (B, 784)\n        return self.fc2(F.relu(self.fc1(x)))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss  # ← これだけ。backward() は自動\n\n    def configure_optimizers(self):\n        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)\n\n# 学習実行\nmodel  = MNISTLitModel()\ntrainer = L.Trainer(max_epochs=5, accelerator=\"auto\")\ntrainer.fit(model, train_dataloader, val_dataloader)",
+afterCode:"forward() メソッドは推論時（model(x)）に呼ばれます。training_step 内では self(x) と書くと forward() を呼び出します。Trainer は training_step の返り値（loss）を使って自動的に backward() と optimizer.step() を実行するため、あなたのコードに書く必要はありません。"},
 {title:"再現性の確保",
-body:`機械学習の実験は乱数に依存するため、同じコードを実行しても結果が変わることがあります。seed_everything() は Python の random モジュール・NumPy・PyTorch のすべての乱数シードを一括で設定します。workers=True を渡すと DataLoader の worker プロセスのシードも固定されます。
-
-Trainer の deterministic=True オプションを使うと CUDA の決定論的アルゴリズムが使用されますが、一部の操作で速度が低下する場合があります。研究での厳密な再現性が必要な場合は有効にしますが、通常の開発では seed_everything() だけで十分です。`,
-code:`import lightning as L
-
-# バージョン確認
-print(L.__version__)
-
-# 再現性の確保
-L.seed_everything(42, workers=True)
-
-# 決定論的モードは Trainer に設定
-trainer = L.Trainer(
-    max_epochs=10,
-    accelerator="auto",
-    deterministic=True,  # 完全再現性（一部操作が遅くなる場合あり）
-)`,
-afterCode:`seed_everything() は学習開始前に1回呼べば十分です。実験ごとに異なるシードを試して結果の安定性を確認する「複数シードでの評価」も研究では重要なプラクティスです。`},
+body:"機械学習の実験は乱数に依存するため、同じコードを実行しても結果が変わることがあります。seed_everything() は Python の random モジュール・NumPy・PyTorch のすべての乱数シードを一括で設定します。workers=True を渡すと DataLoader の worker プロセスのシードも固定されます。\n\nTrainer の deterministic=True オプションを使うと CUDA の決定論的アルゴリズムが使用されますが、一部の操作で速度が低下する場合があります。研究での厳密な再現性が必要な場合は有効にしますが、通常の開発では seed_everything() だけで十分です。",
+code:"import lightning as L\n\n# バージョン確認\nprint(L.__version__)\n\n# 再現性の確保\nL.seed_everything(42, workers=True)\n\n# 決定論的モードは Trainer に設定\ntrainer = L.Trainer(\n    max_epochs=10,\n    accelerator=\"auto\",\n    deterministic=True,  # 完全再現性（一部操作が遅くなる場合あり）\n)",
+afterCode:"seed_everything() は学習開始前に1回呼べば十分です。実験ごとに異なるシードを試して結果の安定性を確認する「複数シードでの評価」も研究では重要なプラクティスです。"},
 ]},
 {id:"ch2",num:2,title:"LightningModuleの基本",est:"55分",
 goal:"training_step / validation_step / test_step / configure_optimizers を正しく実装でき、MNIST の分類器を raw PyTorch の訓練ループと対比しながら Lightning で書き直せる。",
 sections:[
 {title:"training_step と validation_step の役割",
-body:`raw PyTorch の学習ループでは「バッチを取り出す・デバイスに転送・ゼロ勾配・forward・損失計算・backward・パラメータ更新」の7ステップを毎回書く必要があります。Lightning ではこれを training_step 一つに集約します。あなたが書くのは「このバッチでの損失をどう計算するか」だけです。
-
-validation_step は検証データに対して同様の処理をするメソッドです。raw PyTorch では別途 with torch.no_grad(): のブロックを書く必要がありましたが、Lightning は自動的に検証フェーズで勾配計算を無効化します。validation_step から返した値は自動集計され、on_validation_epoch_end でエポック全体の集計が行えます。
-
-test_step も同様の構造で、trainer.test() を呼んだ際に実行されます。学習・検証・テストの3フェーズが同じパターンで書けることが Lightning の大きな強みです。`,
+body:"raw PyTorch の学習ループでは「バッチを取り出す・デバイスに転送・ゼロ勾配・forward・損失計算・backward・パラメータ更新」の7ステップを毎回書く必要があります。Lightning ではこれを training_step 一つに集約します。あなたが書くのは「このバッチでの損失をどう計算するか」だけです。\n\nvalidation_step は検証データに対して同様の処理をするメソッドです。raw PyTorch では別途 with torch.no_grad(): のブロックを書く必要がありましたが、Lightning は自動的に検証フェーズで勾配計算を無効化します。validation_step から返した値は自動集計され、on_validation_epoch_end でエポック全体の集計が行えます。\n\ntest_step も同様の構造で、trainer.test() を呼んだ際に実行されます。学習・検証・テストの3フェーズが同じパターンで書けることが Lightning の大きな強みです。",
 table:T.moduleLifecycle,
-afterTable:`on_train_epoch_end や on_validation_epoch_end のフックは、エポック単位の集計（平均損失・精度の計算など）に使います。self.log() を呼ぶだけで Lightning が自動的に集計してくれるため、多くの場合これらのフックを明示的に書く必要はありません。`},
+afterTable:"on_train_epoch_end や on_validation_epoch_end のフックは、エポック単位の集計（平均損失・精度の計算など）に使います。self.log() を呼ぶだけで Lightning が自動的に集計してくれるため、多くの場合これらのフックを明示的に書く必要はありません。"},
 {title:"raw PyTorch との完全対比：MNIST 分類器",
-body:`MNIST の10クラス分類器を raw PyTorch と Lightning で並べて比較します。同じモデルアーキテクチャ（784→256→10）でも、Lightning 版は学習ループの定型コードが消え、モデルの本質的な部分だけが残ります。
-
-特に注目すべき点は configure_optimizers() です。このメソッドはオプティマイザ（とオプションでスケジューラ）を返します。raw PyTorch では optimizer = torch.optim.Adam(...) をグローバルスコープに置いていましたが、Lightning ではモデルの一部として管理されます。これによりチェックポイント保存・復元時にオプティマイザの状態も自動管理されます。`,
-code:`# ===== raw PyTorch =====
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class RawMNIST(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc1 = nn.Linear(784, 256)
-        self.fc2 = nn.Linear(256, 10)
-
-    def forward(self, x):
-        return self.fc2(F.relu(self.fc1(x.view(x.size(0),-1))))
-
-model     = RawMNIST().to('cuda')
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-
-for epoch in range(10):
-    model.train()
-    for x, y in train_loader:
-        x, y = x.to('cuda'), y.to('cuda')
-        optimizer.zero_grad()
-        loss = F.cross_entropy(model(x), y)
-        loss.backward()
-        optimizer.step()
-    model.eval()
-    with torch.no_grad():
-        for x, y in val_loader:
-            x, y = x.to('cuda'), y.to('cuda')
-            val_loss = F.cross_entropy(model(x), y)
-
-# ===== PyTorch Lightning =====
-import lightning as L
-
-class LitMNIST(L.LightningModule):
-    def __init__(self, lr=1e-3):
-        super().__init__()
-        self.save_hyperparameters()
-        self.fc1 = nn.Linear(784, 256)
-        self.fc2 = nn.Linear(256, 10)
-
-    def forward(self, x):
-        return self.fc2(F.relu(self.fc1(x.view(x.size(0),-1))))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        acc = (self(x).argmax(1) == y).float().mean()
-        self.log("val_loss", loss, prog_bar=True)
-        self.log("val_acc",  acc,  prog_bar=True)
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
-
-trainer = L.Trainer(max_epochs=10, accelerator="auto")
-trainer.fit(LitMNIST(), train_loader, val_loader)`,
-afterCode:`コード量は raw PyTorch の約半分になります。より重要なのは「何をしているか」が明確になることです。training_step を読めば「このモデルはクロスエントロピーで学習する」という事実が一目でわかります。raw PyTorch 版では学習ループの実装の中に埋もれていた情報です。`},
+body:"MNIST の10クラス分類器を raw PyTorch と Lightning で並べて比較します。同じモデルアーキテクチャ（784→256→10）でも、Lightning 版は学習ループの定型コードが消え、モデルの本質的な部分だけが残ります。\n\n特に注目すべき点は configure_optimizers() です。このメソッドはオプティマイザ（とオプションでスケジューラ）を返します。raw PyTorch では optimizer = torch.optim.Adam(...) をグローバルスコープに置いていましたが、Lightning ではモデルの一部として管理されます。これによりチェックポイント保存・復元時にオプティマイザの状態も自動管理されます。",
+code:"# ===== raw PyTorch =====\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass RawMNIST(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc1 = nn.Linear(784, 256)\n        self.fc2 = nn.Linear(256, 10)\n\n    def forward(self, x):\n        return self.fc2(F.relu(self.fc1(x.view(x.size(0),-1))))\n\nmodel     = RawMNIST().to('cuda')\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\n\nfor epoch in range(10):\n    model.train()\n    for x, y in train_loader:\n        x, y = x.to('cuda'), y.to('cuda')\n        optimizer.zero_grad()\n        loss = F.cross_entropy(model(x), y)\n        loss.backward()\n        optimizer.step()\n    model.eval()\n    with torch.no_grad():\n        for x, y in val_loader:\n            x, y = x.to('cuda'), y.to('cuda')\n            val_loss = F.cross_entropy(model(x), y)\n\n# ===== PyTorch Lightning =====\nimport lightning as L\n\nclass LitMNIST(L.LightningModule):\n    def __init__(self, lr=1e-3):\n        super().__init__()\n        self.save_hyperparameters()\n        self.fc1 = nn.Linear(784, 256)\n        self.fc2 = nn.Linear(256, 10)\n\n    def forward(self, x):\n        return self.fc2(F.relu(self.fc1(x.view(x.size(0),-1))))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss\n\n    def validation_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        acc = (self(x).argmax(1) == y).float().mean()\n        self.log(\"val_loss\", loss, prog_bar=True)\n        self.log(\"val_acc\",  acc,  prog_bar=True)\n\n    def configure_optimizers(self):\n        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)\n\ntrainer = L.Trainer(max_epochs=10, accelerator=\"auto\")\ntrainer.fit(LitMNIST(), train_loader, val_loader)",
+afterCode:"コード量は raw PyTorch の約半分になります。より重要なのは「何をしているか」が明確になることです。training_step を読めば「このモデルはクロスエントロピーで学習する」という事実が一目でわかります。raw PyTorch 版では学習ループの実装の中に埋もれていた情報です。"},
 {title:"self.log() の使い方",
-body:`self.log() は Lightning のメトリクス記録システムへの統一インターフェースです。ロガー（TensorBoard・W&B・CSVなど）への記録、プログレスバーへの表示、エポック単位の集計をこの一メソッドで制御できます。
-
-on_step と on_epoch の組み合わせで記録のタイミングを制御します。学習フェーズでは on_step=True がデフォルトで、ステップ単位の損失推移を確認できます。on_epoch=True を追加するとエポック単位の平均値も記録されます。検証フェーズでは on_epoch=True がデフォルトで、エポック終了時に自動集計されます。`,
-code:`def training_step(self, batch, batch_idx):
-    x, y = batch
-    logits = self(x)
-    loss = F.cross_entropy(logits, y)
-    acc  = (logits.argmax(dim=1) == y).float().mean()
-
-    # prog_bar=True: プログレスバーに表示
-    # on_step=True: ステップごとにログ（学習フェーズのデフォルト）
-    # on_epoch=True: エポックごとにも集計値をログ
-    self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
-    self.log("train_acc",  acc,  prog_bar=True, on_step=False, on_epoch=True)
-    return loss
-
-def validation_step(self, batch, batch_idx):
-    x, y = batch
-    logits = self(x)
-    loss = F.cross_entropy(logits, y)
-    acc  = (logits.argmax(dim=1) == y).float().mean()
-
-    # 検証フェーズ: on_epoch=True がデフォルト（エポック終了時に集計）
-    self.log("val_loss", loss, prog_bar=True)
-    self.log("val_acc",  acc,  prog_bar=True)`,
-afterCode:`sync_dist=True オプションはマルチ GPU 環境で全GPU間のメトリクスを平均します。シングル GPU では不要ですが、将来マルチGPUに移行したとき忘れずに追加しましょう。`},
+body:"self.log() は Lightning のメトリクス記録システムへの統一インターフェースです。ロガー（TensorBoard・W&B・CSVなど）への記録、プログレスバーへの表示、エポック単位の集計をこの一メソッドで制御できます。\n\non_step と on_epoch の組み合わせで記録のタイミングを制御します。学習フェーズでは on_step=True がデフォルトで、ステップ単位の損失推移を確認できます。on_epoch=True を追加するとエポック単位の平均値も記録されます。検証フェーズでは on_epoch=True がデフォルトで、エポック終了時に自動集計されます。",
+code:"def training_step(self, batch, batch_idx):\n    x, y = batch\n    logits = self(x)\n    loss = F.cross_entropy(logits, y)\n    acc  = (logits.argmax(dim=1) == y).float().mean()\n\n    # prog_bar=True: プログレスバーに表示\n    # on_step=True: ステップごとにログ（学習フェーズのデフォルト）\n    # on_epoch=True: エポックごとにも集計値をログ\n    self.log(\"train_loss\", loss, prog_bar=True, on_step=True, on_epoch=True)\n    self.log(\"train_acc\",  acc,  prog_bar=True, on_step=False, on_epoch=True)\n    return loss\n\ndef validation_step(self, batch, batch_idx):\n    x, y = batch\n    logits = self(x)\n    loss = F.cross_entropy(logits, y)\n    acc  = (logits.argmax(dim=1) == y).float().mean()\n\n    # 検証フェーズ: on_epoch=True がデフォルト（エポック終了時に集計）\n    self.log(\"val_loss\", loss, prog_bar=True)\n    self.log(\"val_acc\",  acc,  prog_bar=True)",
+afterCode:"sync_dist=True オプションはマルチ GPU 環境で全GPU間のメトリクスを平均します。シングル GPU では不要ですが、将来マルチGPUに移行したとき忘れずに追加しましょう。"},
 ]},
 {id:"ch3",num:3,title:"LightningDataModule",est:"50分",
 goal:"LightningDataModule を実装して prepare_data / setup / *_dataloader の責務を理解し、MNIST と独自データセットの DataModule を自力で書ける。",
 sections:[
 {title:"DataModule が解決する問題",
-body:`raw PyTorch でデータを扱うとき、データのダウンロード・前処理・分割・DataLoader の作成を学習スクリプトのメインコードに書きがちです。これにより「このスクリプトはこのデータセット専用」になり、データセットだけ変えたいときにコードの大幅な書き直しが必要になります。
-
-LightningDataModule はデータに関するすべての処理を一つのクラスにカプセル化します。model と datamodule を独立して管理できるため、「別のモデルで同じデータを試す」「同じモデルで別のデータを試す」が容易になります。また prepare_data メソッドは分散学習時も1プロセスだけで実行されるため、ダウンロードの重複実行を防ぎます。`,
+body:"raw PyTorch でデータを扱うとき、データのダウンロード・前処理・分割・DataLoader の作成を学習スクリプトのメインコードに書きがちです。これにより「このスクリプトはこのデータセット専用」になり、データセットだけ変えたいときにコードの大幅な書き直しが必要になります。\n\nLightningDataModule はデータに関するすべての処理を一つのクラスにカプセル化します。model と datamodule を独立して管理できるため、「別のモデルで同じデータを試す」「同じモデルで別のデータを試す」が容易になります。また prepare_data メソッドは分散学習時も1プロセスだけで実行されるため、ダウンロードの重複実行を防ぎます。",
 table:T.datamoduleMethods,
-afterTable:`stage 引数は "fit"（学習）・"validate"（検証のみ）・"test"・"predict" のいずれかです。stage に応じて必要なデータセットだけを準備することで、テストのみ実行したい場合に学習データをロードする無駄を省けます。`},
+afterTable:"stage 引数は \"fit\"（学習）・\"validate\"（検証のみ）・\"test\"・\"predict\" のいずれかです。stage に応じて必要なデータセットだけを準備することで、テストのみ実行したい場合に学習データをロードする無駄を省けます。"},
 {title:"MNIST DataModule の実装",
-body:`実際に MNIST の DataModule を実装します。prepare_data ではデータのダウンロードのみを行い、ファイルシステムへの書き込みを伴う処理をここに集めます。setup では実際のデータセットオブジェクトを作成し、train/val/test に分割します。
-
-random_split を使う際の注意点として、分割後の Subset オブジェクトは元のデータセットへの参照を持つため、transform を後から変更できません。学習と検証で異なる transform を使いたい場合は、同じデータを2つの異なる transform で読み込んだ Dataset を用意するパターンが確実です。これは CIFAR-10 の Data Augmentation などで重要になります。`,
-code:`import lightning as L
-from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, transforms
-
-class MNISTDataModule(L.LightningDataModule):
-    def __init__(self, data_dir="./data", batch_size=64, num_workers=4):
-        super().__init__()
-        self.save_hyperparameters()
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,)),
-        ])
-
-    def prepare_data(self):
-        # 1プロセスのみで実行。self.xxx = ... は NG（マルチGPU時に共有されない）
-        datasets.MNIST(self.hparams.data_dir, train=True,  download=True)
-        datasets.MNIST(self.hparams.data_dir, train=False, download=True)
-
-    def setup(self, stage=None):
-        if stage in ("fit", None):
-            full = datasets.MNIST(self.hparams.data_dir, train=True, transform=self.transform)
-            self.train_ds, self.val_ds = random_split(full, [50000, 10000])
-        if stage in ("test", None):
-            self.test_ds = datasets.MNIST(self.hparams.data_dir, train=False, transform=self.transform)
-
-    def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size=self.hparams.batch_size,
-                          shuffle=True, num_workers=self.hparams.num_workers,
-                          persistent_workers=True)
-
-    def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers, persistent_workers=True)
-
-    def test_dataloader(self):
-        return DataLoader(self.test_ds, batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers)
-
-# 使用例
-dm = MNISTDataModule(batch_size=128)
-trainer = L.Trainer(max_epochs=10)
-trainer.fit(model, dm)
-trainer.test(model, dm)`,
-afterCode:`persistent_workers=True を設定すると、エポック間で DataLoader の worker プロセスが再起動されず、大規模データセットでの学習が高速化されます。num_workers=4 以上の場合に効果が大きいです。`},
+body:"実際に MNIST の DataModule を実装します。prepare_data ではデータのダウンロードのみを行い、ファイルシステムへの書き込みを伴う処理をここに集めます。setup では実際のデータセットオブジェクトを作成し、train/val/test に分割します。\n\nrandom_split を使う際の注意点として、分割後の Subset オブジェクトは元のデータセットへの参照を持つため、transform を後から変更できません。学習と検証で異なる transform を使いたい場合は、同じデータを2つの異なる transform で読み込んだ Dataset を用意するパターンが確実です。これは CIFAR-10 の Data Augmentation などで重要になります。",
+code:"import lightning as L\nfrom torch.utils.data import DataLoader, random_split\nfrom torchvision import datasets, transforms\n\nclass MNISTDataModule(L.LightningDataModule):\n    def __init__(self, data_dir=\"./data\", batch_size=64, num_workers=4):\n        super().__init__()\n        self.save_hyperparameters()\n        self.transform = transforms.Compose([\n            transforms.ToTensor(),\n            transforms.Normalize((0.1307,), (0.3081,)),\n        ])\n\n    def prepare_data(self):\n        # 1プロセスのみで実行。self.xxx = ... は NG（マルチGPU時に共有されない）\n        datasets.MNIST(self.hparams.data_dir, train=True,  download=True)\n        datasets.MNIST(self.hparams.data_dir, train=False, download=True)\n\n    def setup(self, stage=None):\n        if stage in (\"fit\", None):\n            full = datasets.MNIST(self.hparams.data_dir, train=True, transform=self.transform)\n            self.train_ds, self.val_ds = random_split(full, [50000, 10000])\n        if stage in (\"test\", None):\n            self.test_ds = datasets.MNIST(self.hparams.data_dir, train=False, transform=self.transform)\n\n    def train_dataloader(self):\n        return DataLoader(self.train_ds, batch_size=self.hparams.batch_size,\n                          shuffle=True, num_workers=self.hparams.num_workers,\n                          persistent_workers=True)\n\n    def val_dataloader(self):\n        return DataLoader(self.val_ds, batch_size=self.hparams.batch_size,\n                          num_workers=self.hparams.num_workers, persistent_workers=True)\n\n    def test_dataloader(self):\n        return DataLoader(self.test_ds, batch_size=self.hparams.batch_size,\n                          num_workers=self.hparams.num_workers)\n\n# 使用例\ndm = MNISTDataModule(batch_size=128)\ntrainer = L.Trainer(max_epochs=10)\ntrainer.fit(model, dm)\ntrainer.test(model, dm)",
+afterCode:"persistent_workers=True を設定すると、エポック間で DataLoader の worker プロセスが再起動されず、大規模データセットでの学習が高速化されます。num_workers=4 以上の場合に効果が大きいです。"},
 {title:"カスタム Dataset と DataModule の組み合わせ",
-body:`実務では MNIST のような整備されたデータセットより、自分で収集した CSV や画像フォルダを扱う場面が多いです。torch.utils.data.Dataset を継承したカスタム Dataset を作り、それを DataModule に組み込むパターンを覚えましょう。
-
-__len__ と __getitem__ の2メソッドを実装すれば最低限動きます。__getitem__ が呼ばれるたびにファイルから読み込む「遅延ロード（Lazy Loading）」は大規模データセットに向いています。一方、メモリに余裕があれば __init__ でデータをすべてメモリに展開しておく「事前ロード」の方が学習が高速になります。`,
-code:`import torch
-from torch.utils.data import Dataset, DataLoader
-import pandas as pd
-import numpy as np
-from PIL import Image
-from pathlib import Path
-
-class ImageCSVDataset(Dataset):
-    """CSVに画像パスとラベルが書かれたデータセット"""
-    def __init__(self, csv_path, img_dir, transform=None):
-        self.df        = pd.read_csv(csv_path)
-        self.img_dir   = Path(img_dir)
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.df)
-
-    def __getitem__(self, idx):
-        row   = self.df.iloc[idx]
-        img   = Image.open(self.img_dir / row["filename"]).convert("RGB")
-        label = int(row["label"])
-        if self.transform:
-            img = self.transform(img)
-        return img, label
-
-# DataModule に組み込む
-class ImageDataModule(L.LightningDataModule):
-    def __init__(self, train_csv, val_csv, img_dir, batch_size=32):
-        super().__init__()
-        self.save_hyperparameters()
-
-    def setup(self, stage=None):
-        from torchvision import transforms
-        t = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225]),
-        ])
-        if stage in ("fit", None):
-            self.train_ds = ImageCSVDataset(self.hparams.train_csv, self.hparams.img_dir, t)
-            self.val_ds   = ImageCSVDataset(self.hparams.val_csv,   self.hparams.img_dir, t)
-
-    def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size=self.hparams.batch_size, shuffle=True)
-
-    def val_dataloader(self):
-        return DataLoader(self.val_ds,   batch_size=self.hparams.batch_size)`,
-afterCode:`CSV ベースのデータ管理は再現性と追跡しやすさの点で優れています。どの画像が学習・検証・テストに使われたかが明示的に管理されます。データ分割には sklearn の train_test_split と stratify オプションを使うと、クラスバランスを保った分割が容易です。`},
+body:"実務では MNIST のような整備されたデータセットより、自分で収集した CSV や画像フォルダを扱う場面が多いです。torch.utils.data.Dataset を継承したカスタム Dataset を作り、それを DataModule に組み込むパターンを覚えましょう。\n\n__len__ と __getitem__ の2メソッドを実装すれば最低限動きます。__getitem__ が呼ばれるたびにファイルから読み込む「遅延ロード（Lazy Loading）」は大規模データセットに向いています。一方、メモリに余裕があれば __init__ でデータをすべてメモリに展開しておく「事前ロード」の方が学習が高速になります。",
+code:"import torch\nfrom torch.utils.data import Dataset, DataLoader\nimport pandas as pd\nimport numpy as np\nfrom PIL import Image\nfrom pathlib import Path\n\nclass ImageCSVDataset(Dataset):\n    \"\"\"CSVに画像パスとラベルが書かれたデータセット\"\"\"\n    def __init__(self, csv_path, img_dir, transform=None):\n        self.df        = pd.read_csv(csv_path)\n        self.img_dir   = Path(img_dir)\n        self.transform = transform\n\n    def __len__(self):\n        return len(self.df)\n\n    def __getitem__(self, idx):\n        row   = self.df.iloc[idx]\n        img   = Image.open(self.img_dir / row[\"filename\"]).convert(\"RGB\")\n        label = int(row[\"label\"])\n        if self.transform:\n            img = self.transform(img)\n        return img, label\n\n# DataModule に組み込む\nclass ImageDataModule(L.LightningDataModule):\n    def __init__(self, train_csv, val_csv, img_dir, batch_size=32):\n        super().__init__()\n        self.save_hyperparameters()\n\n    def setup(self, stage=None):\n        from torchvision import transforms\n        t = transforms.Compose([\n            transforms.Resize((224, 224)),\n            transforms.ToTensor(),\n            transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225]),\n        ])\n        if stage in (\"fit\", None):\n            self.train_ds = ImageCSVDataset(self.hparams.train_csv, self.hparams.img_dir, t)\n            self.val_ds   = ImageCSVDataset(self.hparams.val_csv,   self.hparams.img_dir, t)\n\n    def train_dataloader(self):\n        return DataLoader(self.train_ds, batch_size=self.hparams.batch_size, shuffle=True)\n\n    def val_dataloader(self):\n        return DataLoader(self.val_ds,   batch_size=self.hparams.batch_size)",
+afterCode:"CSV ベースのデータ管理は再現性と追跡しやすさの点で優れています。どの画像が学習・検証・テストに使われたかが明示的に管理されます。データ分割には sklearn の train_test_split と stratify オプションを使うと、クラスバランスを保った分割が容易です。"},
 ]},
 {id:"ch4",num:4,title:"Trainer",est:"50分",
 goal:"Trainer の主要な設定引数を理解し、fit() / validate() / test() / predict() を使い分け、fast_dev_run や limit_train_batches でのデバッグ手順を実践できる。",
 sections:[
 {title:"Trainer の役割と主要引数",
-body:`Trainer は Lightning の中核で、学習ループ全体のオーケストレーションを担います。エポックのループ・バッチのループ・GPU への転送・混合精度の管理・チェックポイントの保存・ロギング・プログレスバーの表示——これらをすべて Trainer が処理します。
-
-Trainer の設定は全てコンストラクタ引数で行います。Python のコードをほとんど変えずに「CPU で開発・GPU でサーバー実行」「シングル GPU から4GPU に増やす」といった環境変更ができるのが大きな利点です。accelerator="auto" と devices="auto" を使えば、実行環境を自動検出して最適なデバイスを選択します。`,
+body:"Trainer は Lightning の中核で、学習ループ全体のオーケストレーションを担います。エポックのループ・バッチのループ・GPU への転送・混合精度の管理・チェックポイントの保存・ロギング・プログレスバーの表示——これらをすべて Trainer が処理します。\n\nTrainer の設定は全てコンストラクタ引数で行います。Python のコードをほとんど変えずに「CPU で開発・GPU でサーバー実行」「シングル GPU から4GPU に増やす」といった環境変更ができるのが大きな利点です。accelerator=\"auto\" と devices=\"auto\" を使えば、実行環境を自動検出して最適なデバイスを選択します。",
 table:T.trainerArgs,
-afterTable:`fast_dev_run=True は開発初期に特に有用です。1バッチだけ学習・検証を実行するため、コードにバグがないかを数秒で確認できます。limit_train_batches=0.1 は10%のバッチだけで学習するため、「アーキテクチャは正しいが過学習しているか」を確認するのに使えます。`},
+afterTable:"fast_dev_run=True は開発初期に特に有用です。1バッチだけ学習・検証を実行するため、コードにバグがないかを数秒で確認できます。limit_train_batches=0.1 は10%のバッチだけで学習するため、「アーキテクチャは正しいが過学習しているか」を確認するのに使えます。"},
 {title:"fit() / validate() / test() / predict() の使い分け",
-body:`Trainer のメソッドは用途によって使い分けます。fit() が最もよく使われ、学習と検証を同時に行います。validate() は学習済みモデルの検証セットでの性能を評価するために単独で使います。test() は最終評価専用で、通常は開発フェーズでは呼ばず、論文投稿や本番リリース前の最終確認で使います。
-
-これらの使い分けにより「テストセットを何度も確認してしまう」問題（テストセットへの過適合）を防ぐ設計になっています。fit() の最後に自動でテストを実行するのではなく、明示的に trainer.test() を呼ぶ必要があります。`,
-code:`import lightning as L
-
-model = LitMNIST()
-dm    = MNISTDataModule()
-
-trainer = L.Trainer(
-    max_epochs=30,
-    accelerator="auto",
-    devices="auto",
-    enable_checkpointing=True,
-    log_every_n_steps=10,
-)
-
-# Step 1: fast_dev_run でコードの検証
-debug_trainer = L.Trainer(fast_dev_run=True)
-debug_trainer.fit(model, dm)  # エラーがなければ次へ
-
-# Step 2: 本番学習
-trainer.fit(model, dm)
-
-# Step 3: 検証セットで評価（最良チェックポイントを使用）
-trainer.validate(model, dm, ckpt_path="best")
-
-# Step 4: テストセットで最終評価
-results = trainer.test(model, dm, ckpt_path="best")
-print(f"Test: {results}")
-
-# Step 5: 新しいデータで推論
-predictions = trainer.predict(model, dataloaders=predict_loader)`,
-afterCode:`ckpt_path="best" は Trainer が自動保存した最良チェックポイント（ModelCheckpoint の monitor で評価した最良モデル）を自動選択します。学習後に明示的なパスを指定する必要はありません。`},
+body:"Trainer のメソッドは用途によって使い分けます。fit() が最もよく使われ、学習と検証を同時に行います。validate() は学習済みモデルの検証セットでの性能を評価するために単独で使います。test() は最終評価専用で、通常は開発フェーズでは呼ばず、論文投稿や本番リリース前の最終確認で使います。\n\nこれらの使い分けにより「テストセットを何度も確認してしまう」問題（テストセットへの過適合）を防ぐ設計になっています。fit() の最後に自動でテストを実行するのではなく、明示的に trainer.test() を呼ぶ必要があります。",
+code:"import lightning as L\n\nmodel = LitMNIST()\ndm    = MNISTDataModule()\n\ntrainer = L.Trainer(\n    max_epochs=30,\n    accelerator=\"auto\",\n    devices=\"auto\",\n    enable_checkpointing=True,\n    log_every_n_steps=10,\n)\n\n# Step 1: fast_dev_run でコードの検証\ndebug_trainer = L.Trainer(fast_dev_run=True)\ndebug_trainer.fit(model, dm)  # エラーがなければ次へ\n\n# Step 2: 本番学習\ntrainer.fit(model, dm)\n\n# Step 3: 検証セットで評価（最良チェックポイントを使用）\ntrainer.validate(model, dm, ckpt_path=\"best\")\n\n# Step 4: テストセットで最終評価\nresults = trainer.test(model, dm, ckpt_path=\"best\")\nprint(f\"Test: {results}\")\n\n# Step 5: 新しいデータで推論\npredictions = trainer.predict(model, dataloaders=predict_loader)",
+afterCode:"ckpt_path=\"best\" は Trainer が自動保存した最良チェックポイント（ModelCheckpoint の monitor で評価した最良モデル）を自動選択します。学習後に明示的なパスを指定する必要はありません。"},
 {title:"学習のデバッグ手法",
-body:`深層学習の学習バグは通常の Python バグより発見が困難です。損失が NaN になる・勾配が爆発する・検証精度が全く上がらないなど、コード自体は動くが結果がおかしいケースが多いです。Lightning はデバッグをサポートするいくつかの仕組みを提供します。
-
-overfit_batches=1 は1バッチに過学習させるテストです。正しいモデルなら1バッチに過学習できるはずで、これができない場合はモデルのforward/loss計算にバグがある可能性が高いです。また gradient_clip_val と log_every_n_steps の組み合わせで、学習の安定性を確認しながらデバッグできます。`,
-code:`# デバッグ用 Trainer 設定集
-
-# 1. 高速動作確認（1バッチだけ）
-trainer = L.Trainer(fast_dev_run=True)
-
-# 2. 過学習テスト（モデルが正しく学習できるか確認）
-trainer = L.Trainer(
-    max_epochs=100,
-    overfit_batches=1,    # 1バッチに過学習させる
-    log_every_n_steps=1,  # 毎ステップログ
-)
-
-# 3. 少量データで動作確認
-trainer = L.Trainer(
-    max_epochs=5,
-    limit_train_batches=0.05,  # 5% だけで学習
-    limit_val_batches=0.1,
-)
-
-# 4. 勾配の状況を確認
-trainer = L.Trainer(
-    max_epochs=10,
-    gradient_clip_val=1.0,    # 勾配爆発を防ぎながら学習
-    log_every_n_steps=5,
-)
-
-# 損失が NaN になる場合のデバッグ方法:
-# 1. overfit_batches=1 で再現性確認
-# 2. lr を小さくする
-# 3. gradient_clip_val を設定する
-# 4. precision を '32-true' に戻して確認`,
-afterCode:`開発の流れとして「fast_dev_run → overfit_batches → limit_train_batches → 本番学習」の段階的な確認が効率的です。各段階でエラーを早期発見することで、フルスケール学習の時間を無駄にしません。`},
+body:"深層学習の学習バグは通常の Python バグより発見が困難です。損失が NaN になる・勾配が爆発する・検証精度が全く上がらないなど、コード自体は動くが結果がおかしいケースが多いです。Lightning はデバッグをサポートするいくつかの仕組みを提供します。\n\noverfit_batches=1 は1バッチに過学習させるテストです。正しいモデルなら1バッチに過学習できるはずで、これができない場合はモデルのforward/loss計算にバグがある可能性が高いです。また gradient_clip_val と log_every_n_steps の組み合わせで、学習の安定性を確認しながらデバッグできます。",
+code:"# デバッグ用 Trainer 設定集\n\n# 1. 高速動作確認（1バッチだけ）\ntrainer = L.Trainer(fast_dev_run=True)\n\n# 2. 過学習テスト（モデルが正しく学習できるか確認）\ntrainer = L.Trainer(\n    max_epochs=100,\n    overfit_batches=1,    # 1バッチに過学習させる\n    log_every_n_steps=1,  # 毎ステップログ\n)\n\n# 3. 少量データで動作確認\ntrainer = L.Trainer(\n    max_epochs=5,\n    limit_train_batches=0.05,  # 5% だけで学習\n    limit_val_batches=0.1,\n)\n\n# 4. 勾配の状況を確認\ntrainer = L.Trainer(\n    max_epochs=10,\n    gradient_clip_val=1.0,    # 勾配爆発を防ぎながら学習\n    log_every_n_steps=5,\n)\n\n# 損失が NaN になる場合のデバッグ方法:\n# 1. overfit_batches=1 で再現性確認\n# 2. lr を小さくする\n# 3. gradient_clip_val を設定する\n# 4. precision を '32-true' に戻して確認",
+afterCode:"開発の流れとして「fast_dev_run → overfit_batches → limit_train_batches → 本番学習」の段階的な確認が効率的です。各段階でエラーを早期発見することで、フルスケール学習の時間を無駄にしません。"},
 ]},
 {id:"ch5",num:5,title:"コールバック",est:"50分",
 goal:"ModelCheckpoint / EarlyStopping / LearningRateMonitor の設定を理解し、独自の Callback クラスを実装してトレーニングの動作をカスタマイズできる。",
 sections:[
 {title:"コールバックの仕組みと組み込みコールバック",
-body:`コールバックは学習ループの特定タイミング（エポック開始・バッチ終了・学習終了など）に割り込んで処理を追加する仕組みです。モデル本体のコードを汚さずに、ロギング・チェックポイント・早期停止などの横断的関心事を独立したクラスとして実装できます。
-
-Keras のコールバックを使ったことがある人には馴染みのある概念ですが、Lightning のコールバックはより豊富なフックポイントを持ちます。on_fit_start から on_fit_end まで30以上のフックがあり、学習プロセスのあらゆる場面に介入できます。複数のコールバックをリストで Trainer に渡すと、全て順番に実行されます。`,
+body:"コールバックは学習ループの特定タイミング（エポック開始・バッチ終了・学習終了など）に割り込んで処理を追加する仕組みです。モデル本体のコードを汚さずに、ロギング・チェックポイント・早期停止などの横断的関心事を独立したクラスとして実装できます。\n\nKeras のコールバックを使ったことがある人には馴染みのある概念ですが、Lightning のコールバックはより豊富なフックポイントを持ちます。on_fit_start から on_fit_end まで30以上のフックがあり、学習プロセスのあらゆる場面に介入できます。複数のコールバックをリストで Trainer に渡すと、全て順番に実行されます。",
 table:T.callbackList,
-afterTable:`StochasticWeightAveraging（SWA）は学習後半の複数チェックポイントの重みを平均するテクニックです。追加の学習コストなしに汎化性能が向上することが多く、簡単に試せる強力な手法です。swa_epoch_start で SWA を開始するエポックを指定します。`},
+afterTable:"StochasticWeightAveraging（SWA）は学習後半の複数チェックポイントの重みを平均するテクニックです。追加の学習コストなしに汎化性能が向上することが多く、簡単に試せる強力な手法です。swa_epoch_start で SWA を開始するエポックを指定します。"},
 {title:"ModelCheckpoint と EarlyStopping",
-body:`ModelCheckpoint は最良モデルを自動保存するコールバックです。monitor に監視するメトリクス（通常は "val_loss" や "val_acc"）を指定し、mode="min" なら小さい方、mode="max" なら大きい方を「改善」と判断します。save_top_k=3 で上位3つを保存し、save_last=True で常に最後のエポックのモデルも保存します。
-
-EarlyStopping は patience エポック間改善がなければ学習を自動停止します。過学習を防ぐために非常に有効ですが、patience の設定が重要です。短すぎると学習プラトー（一時的な停滞期）で停止してしまい、長すぎると効果がありません。一般的には10〜20エポック程度が目安ですが、学習率スケジューラとの組み合わせを考慮して調整します。`,
-code:`import lightning as L
-from lightning.pytorch.callbacks import (
-    ModelCheckpoint, EarlyStopping, LearningRateMonitor
-)
-
-# モデルチェックポイント
-ckpt_cb = ModelCheckpoint(
-    dirpath="checkpoints/",
-    filename="{epoch:02d}-{val_loss:.4f}",
-    monitor="val_loss",
-    mode="min",
-    save_top_k=3,       # 上位3つを保存
-    save_last=True,     # 最後のエポックも常に保存
-    verbose=True,
-)
-
-# 早期停止
-es_cb = EarlyStopping(
-    monitor="val_loss",
-    patience=10,         # 10エポック改善なしで停止
-    mode="min",
-    min_delta=0.0001,    # 改善の最小幅（この値以上の改善を要求）
-    verbose=True,
-)
-
-# 学習率モニター
-lr_cb = LearningRateMonitor(logging_interval="epoch")
-
-trainer = L.Trainer(
-    max_epochs=200,     # EarlyStopping が止めるので大きめでOK
-    callbacks=[ckpt_cb, es_cb, lr_cb],
-    accelerator="auto",
-)
-trainer.fit(model, dm)
-print(f"Best model: {ckpt_cb.best_model_path}")
-print(f"Best val_loss: {ckpt_cb.best_model_score:.4f}")`,
-afterCode:`min_delta は「この幅以上改善しなければ改善とみなさない」という閾値です。0に設定すると少しでも改善すればカウントがリセットされますが、浮動小数点誤差で停止しにくくなる場合があります。通常は 0.0001 程度の小さな値を設定します。`},
+body:"ModelCheckpoint は最良モデルを自動保存するコールバックです。monitor に監視するメトリクス（通常は \"val_loss\" や \"val_acc\"）を指定し、mode=\"min\" なら小さい方、mode=\"max\" なら大きい方を「改善」と判断します。save_top_k=3 で上位3つを保存し、save_last=True で常に最後のエポックのモデルも保存します。\n\nEarlyStopping は patience エポック間改善がなければ学習を自動停止します。過学習を防ぐために非常に有効ですが、patience の設定が重要です。短すぎると学習プラトー（一時的な停滞期）で停止してしまい、長すぎると効果がありません。一般的には10〜20エポック程度が目安ですが、学習率スケジューラとの組み合わせを考慮して調整します。",
+code:"import lightning as L\nfrom lightning.pytorch.callbacks import (\n    ModelCheckpoint, EarlyStopping, LearningRateMonitor\n)\n\n# モデルチェックポイント\nckpt_cb = ModelCheckpoint(\n    dirpath=\"checkpoints/\",\n    filename=\"{epoch:02d}-{val_loss:.4f}\",\n    monitor=\"val_loss\",\n    mode=\"min\",\n    save_top_k=3,       # 上位3つを保存\n    save_last=True,     # 最後のエポックも常に保存\n    verbose=True,\n)\n\n# 早期停止\nes_cb = EarlyStopping(\n    monitor=\"val_loss\",\n    patience=10,         # 10エポック改善なしで停止\n    mode=\"min\",\n    min_delta=0.0001,    # 改善の最小幅（この値以上の改善を要求）\n    verbose=True,\n)\n\n# 学習率モニター\nlr_cb = LearningRateMonitor(logging_interval=\"epoch\")\n\ntrainer = L.Trainer(\n    max_epochs=200,     # EarlyStopping が止めるので大きめでOK\n    callbacks=[ckpt_cb, es_cb, lr_cb],\n    accelerator=\"auto\",\n)\ntrainer.fit(model, dm)\nprint(f\"Best model: {ckpt_cb.best_model_path}\")\nprint(f\"Best val_loss: {ckpt_cb.best_model_score:.4f}\")",
+afterCode:"min_delta は「この幅以上改善しなければ改善とみなさない」という閾値です。0に設定すると少しでも改善すればカウントがリセットされますが、浮動小数点誤差で停止しにくくなる場合があります。通常は 0.0001 程度の小さな値を設定します。"},
 {title:"カスタムコールバックの実装",
-body:`Callback クラスを継承して on_* メソッドをオーバーライドすることで、学習プロセスのあらゆる場面に独自の処理を追加できます。pl_module 引数が LightningModule のインスタンスで、trainer 引数が Trainer のインスタンスです。これらを通じてモデルのパラメータや現在のメトリクスにアクセスできます。
-
-カスタムコールバックの典型的な用途は「特定の条件でモデルを保存する」「学習の進捗をSlackに通知する」「勾配のノルムを記録する」などです。コールバックはステートフル（状態を持てる）なので、best_val_loss のような値を属性として保持できます。`,
-code:`from lightning.pytorch.callbacks import Callback
-import time
-
-class WarmupCallback(Callback):
-    """最初の N ステップで学習率をウォームアップするコールバック"""
-    def __init__(self, warmup_steps=100):
-        super().__init__()
-        self.warmup_steps = warmup_steps
-
-    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
-        step = trainer.global_step
-        if step < self.warmup_steps:
-            # ウォームアップ期間中は学習率を線形に増加
-            lr_scale = (step + 1) / self.warmup_steps
-            for pg in trainer.optimizers[0].param_groups:
-                pg["lr"] = pg["lr"] * lr_scale
-
-class GradNormLogger(Callback):
-    """勾配のノルムをログするコールバック"""
-    def on_before_optimizer_step(self, trainer, pl_module, optimizer):
-        # 全パラメータの勾配ノルムを計算
-        total_norm = 0.0
-        for p in pl_module.parameters():
-            if p.grad is not None:
-                total_norm += p.grad.data.norm(2).item() ** 2
-        total_norm = total_norm ** 0.5
-        pl_module.log("grad_norm", total_norm, prog_bar=False)
-
-trainer = L.Trainer(
-    max_epochs=30,
-    callbacks=[WarmupCallback(warmup_steps=200), GradNormLogger()],
-)`,
-afterCode:`on_before_optimizer_step フックは Trainer が gradient_clip_val を適用した後、optimizer.step() の直前に呼ばれます。勾配クリッピング後のノルムを確認するのに最適です。grad_norm が突然大きくなる場合は学習が不安定になるサインです。`},
+body:"Callback クラスを継承して on_* メソッドをオーバーライドすることで、学習プロセスのあらゆる場面に独自の処理を追加できます。pl_module 引数が LightningModule のインスタンスで、trainer 引数が Trainer のインスタンスです。これらを通じてモデルのパラメータや現在のメトリクスにアクセスできます。\n\nカスタムコールバックの典型的な用途は「特定の条件でモデルを保存する」「学習の進捗をSlackに通知する」「勾配のノルムを記録する」などです。コールバックはステートフル（状態を持てる）なので、best_val_loss のような値を属性として保持できます。",
+code:"from lightning.pytorch.callbacks import Callback\nimport time\n\nclass WarmupCallback(Callback):\n    \"\"\"最初の N ステップで学習率をウォームアップするコールバック\"\"\"\n    def __init__(self, warmup_steps=100):\n        super().__init__()\n        self.warmup_steps = warmup_steps\n\n    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):\n        step = trainer.global_step\n        if step < self.warmup_steps:\n            # ウォームアップ期間中は学習率を線形に増加\n            lr_scale = (step + 1) / self.warmup_steps\n            for pg in trainer.optimizers[0].param_groups:\n                pg[\"lr\"] = pg[\"lr\"] * lr_scale\n\nclass GradNormLogger(Callback):\n    \"\"\"勾配のノルムをログするコールバック\"\"\"\n    def on_before_optimizer_step(self, trainer, pl_module, optimizer):\n        # 全パラメータの勾配ノルムを計算\n        total_norm = 0.0\n        for p in pl_module.parameters():\n            if p.grad is not None:\n                total_norm += p.grad.data.norm(2).item() ** 2\n        total_norm = total_norm ** 0.5\n        pl_module.log(\"grad_norm\", total_norm, prog_bar=False)\n\ntrainer = L.Trainer(\n    max_epochs=30,\n    callbacks=[WarmupCallback(warmup_steps=200), GradNormLogger()],\n)",
+afterCode:"on_before_optimizer_step フックは Trainer が gradient_clip_val を適用した後、optimizer.step() の直前に呼ばれます。勾配クリッピング後のノルムを確認するのに最適です。grad_norm が突然大きくなる場合は学習が不安定になるサインです。"},
 ]},
 {id:"ch6",num:6,title:"ロギング",est:"50分",
 goal:"self.log() の各オプション（on_step / on_epoch / sync_dist）を正しく使え、TensorBoardLogger と CSVLogger を設定し、W&B との統合手順を理解できる。",
 sections:[
 {title:"self.log() の詳細な使い方",
-body:`self.log() は Lightning のメトリクス記録の核心です。単純に値を渡すだけでなく、いくつかの重要なオプションがあります。prog_bar=True でプログレスバーに表示、on_step / on_epoch でログのタイミング制御、sync_dist=True でマルチ GPU での集計ができます。
-
-reduce_fx パラメータはエポック集計の方法を変えます。デフォルトは "mean"（平均）ですが、精度の計算を自前で行う場合は "max" や "min"、カウントを記録したい場合は "sum" に変えます。batch_size を指定すると、バッチサイズが異なるデータを正しくウェイト付けして集計できます。
-
-torchmetrics ライブラリと組み合わせると、Precision・Recall・F1・ROC-AUC などのメトリクスを分散学習環境でも正しく計算できます。self.log(metric_name, self.val_acc) のように torchmetrics オブジェクトを直接渡すと、Lightning が自動的に集計と更新を管理します。`,
-code:`def training_step(self, batch, batch_idx):
-    x, y = batch
-    logits = self(x)
-    loss = F.cross_entropy(logits, y)
-    acc  = (logits.argmax(1) == y).float().mean()
-
-    # 基本的な使い方
-    self.log("train_loss", loss)              # prog_bar=False, on_step=True がデフォルト
-
-    # オプションを明示指定
-    self.log("train_loss_detailed", loss,
-        prog_bar=True,    # プログレスバーに表示
-        on_step=True,     # ステップごとにログ
-        on_epoch=True,    # エポックごとにも集計
-        batch_size=len(x) # 正しいウェイトで集計
-    )
-
-    # 複数メトリクスを一度に記録
-    self.log_dict({
-        "train_loss": loss,
-        "train_acc":  acc,
-    }, prog_bar=True, on_epoch=True)
-
-    return loss
-
-# マルチ GPU での正しい使い方
-def validation_step(self, batch, batch_idx):
-    x, y = batch
-    loss = F.cross_entropy(self(x), y)
-    acc  = (self(x).argmax(1) == y).float().mean()
-    self.log("val_loss", loss, prog_bar=True, sync_dist=True)  # 全GPU間で平均
-    self.log("val_acc",  acc,  prog_bar=True, sync_dist=True)`,
-afterCode:`log_dict() は複数のメトリクスをまとめて記録する便利メソッドです。on_step / on_epoch などの引数は全メトリクスに一括適用されます。個別のメトリクスで設定を変えたい場合は self.log() を個別に呼びます。`},
+body:"self.log() は Lightning のメトリクス記録の核心です。単純に値を渡すだけでなく、いくつかの重要なオプションがあります。prog_bar=True でプログレスバーに表示、on_step / on_epoch でログのタイミング制御、sync_dist=True でマルチ GPU での集計ができます。\n\nreduce_fx パラメータはエポック集計の方法を変えます。デフォルトは \"mean\"（平均）ですが、精度の計算を自前で行う場合は \"max\" や \"min\"、カウントを記録したい場合は \"sum\" に変えます。batch_size を指定すると、バッチサイズが異なるデータを正しくウェイト付けして集計できます。\n\ntorchmetrics ライブラリと組み合わせると、Precision・Recall・F1・ROC-AUC などのメトリクスを分散学習環境でも正しく計算できます。self.log(metric_name, self.val_acc) のように torchmetrics オブジェクトを直接渡すと、Lightning が自動的に集計と更新を管理します。",
+code:"def training_step(self, batch, batch_idx):\n    x, y = batch\n    logits = self(x)\n    loss = F.cross_entropy(logits, y)\n    acc  = (logits.argmax(1) == y).float().mean()\n\n    # 基本的な使い方\n    self.log(\"train_loss\", loss)              # prog_bar=False, on_step=True がデフォルト\n\n    # オプションを明示指定\n    self.log(\"train_loss_detailed\", loss,\n        prog_bar=True,    # プログレスバーに表示\n        on_step=True,     # ステップごとにログ\n        on_epoch=True,    # エポックごとにも集計\n        batch_size=len(x) # 正しいウェイトで集計\n    )\n\n    # 複数メトリクスを一度に記録\n    self.log_dict({\n        \"train_loss\": loss,\n        \"train_acc\":  acc,\n    }, prog_bar=True, on_epoch=True)\n\n    return loss\n\n# マルチ GPU での正しい使い方\ndef validation_step(self, batch, batch_idx):\n    x, y = batch\n    loss = F.cross_entropy(self(x), y)\n    acc  = (self(x).argmax(1) == y).float().mean()\n    self.log(\"val_loss\", loss, prog_bar=True, sync_dist=True)  # 全GPU間で平均\n    self.log(\"val_acc\",  acc,  prog_bar=True, sync_dist=True)",
+afterCode:"log_dict() は複数のメトリクスをまとめて記録する便利メソッドです。on_step / on_epoch などの引数は全メトリクスに一括適用されます。個別のメトリクスで設定を変えたい場合は self.log() を個別に呼びます。"},
 {title:"ロガーの種類と設定",
-body:`Lightning はデフォルトで TensorBoardLogger を使いますが、複数のロガーを同時に使うことができます。実務では TensorBoard でローカル確認しながら W&B でチーム共有、という使い方が一般的です。複数ロガーをリストで渡すと、self.log() で記録した値が全てのロガーに送られます。
-
-CSVLogger は依存関係なしに動き、生成された metrics.csv を pandas で分析できる最もシンプルな選択肢です。研究論文の結果比較表を作る場合は CSVLogger で記録し、pandas で集計するワークフローが再現性・透明性の面で優れています。`,
+body:"Lightning はデフォルトで TensorBoardLogger を使いますが、複数のロガーを同時に使うことができます。実務では TensorBoard でローカル確認しながら W&B でチーム共有、という使い方が一般的です。複数ロガーをリストで渡すと、self.log() で記録した値が全てのロガーに送られます。\n\nCSVLogger は依存関係なしに動き、生成された metrics.csv を pandas で分析できる最もシンプルな選択肢です。研究論文の結果比較表を作る場合は CSVLogger で記録し、pandas で集計するワークフローが再現性・透明性の面で優れています。",
 table:T.loggerComparison,
-afterTable:`W&B（Weights & Biases）との統合は pip install wandb だけで完了します。wandb.init() の呼び出しも不要で、WandbLogger を作成して Trainer に渡すだけです。W&B の強みは複数の実験を横断的に比較できる parallel coordinates plot や、ハイパーパラメータと性能の関係を可視化する機能です。`},
+afterTable:"W&B（Weights & Biases）との統合は pip install wandb だけで完了します。wandb.init() の呼び出しも不要で、WandbLogger を作成して Trainer に渡すだけです。W&B の強みは複数の実験を横断的に比較できる parallel coordinates plot や、ハイパーパラメータと性能の関係を可視化する機能です。"},
 {title:"ロガーの実践的な設定",
-body:`実験管理では「どの設定で実行したか」をロガーに記録することが重要です。WandbLogger は config パラメータでハイパーパラメータを W&B に送れます。save_hyperparameters() を使っていれば self.hparams に全ての設定が格納されているため、これをそのまま渡せます。
-
-TensorBoardLogger の version 引数は実験バージョンの名前付けに使えます。"v1_lr_0.001" のように意味のある名前を付けると、後から TensorBoard でどの実験かを判別しやすくなります。デフォルトは 0・1・2・... と自動連番されます。`,
-code:`import lightning as L
-from lightning.pytorch.loggers import TensorBoardLogger, CSVLogger
-
-# TensorBoard ロガー
-tb_logger = TensorBoardLogger(
-    save_dir="logs/",
-    name="mnist_experiment",
-    version="lr0.001_batch64",  # 意味のある名前をつける
-)
-
-# CSV ロガー（最軽量・分析しやすい）
-csv_logger = CSVLogger(
-    save_dir="logs/",
-    name="mnist_experiment",
-)
-
-trainer = L.Trainer(
-    max_epochs=30,
-    logger=[tb_logger, csv_logger],  # 複数ロガーを同時使用
-    accelerator="auto",
-    log_every_n_steps=5,
-)
-
-# W&B を使う場合:
-# from lightning.pytorch.loggers import WandbLogger
-# wandb_logger = WandbLogger(project="mnist-study", name="run-001", log_model=True)
-# trainer = L.Trainer(logger=wandb_logger)
-
-# 学習後の CSV 分析例:
-# import pandas as pd
-# df = pd.read_csv("logs/mnist_experiment/version_0/metrics.csv")
-# df[["epoch", "train_loss", "val_loss"]].dropna().plot(x="epoch")`,
-afterCode:`log_every_n_steps=5 はステップ単位のログの頻度を制御します。デフォルトは50で、バッチ数が少ない場合（小さいデータセット）は警告が出ることがあります。データセットが小さい場合は log_every_n_steps=1 にします。`},
+body:"実験管理では「どの設定で実行したか」をロガーに記録することが重要です。WandbLogger は config パラメータでハイパーパラメータを W&B に送れます。save_hyperparameters() を使っていれば self.hparams に全ての設定が格納されているため、これをそのまま渡せます。\n\nTensorBoardLogger の version 引数は実験バージョンの名前付けに使えます。\"v1_lr_0.001\" のように意味のある名前を付けると、後から TensorBoard でどの実験かを判別しやすくなります。デフォルトは 0・1・2・... と自動連番されます。",
+code:"import lightning as L\nfrom lightning.pytorch.loggers import TensorBoardLogger, CSVLogger\n\n# TensorBoard ロガー\ntb_logger = TensorBoardLogger(\n    save_dir=\"logs/\",\n    name=\"mnist_experiment\",\n    version=\"lr0.001_batch64\",  # 意味のある名前をつける\n)\n\n# CSV ロガー（最軽量・分析しやすい）\ncsv_logger = CSVLogger(\n    save_dir=\"logs/\",\n    name=\"mnist_experiment\",\n)\n\ntrainer = L.Trainer(\n    max_epochs=30,\n    logger=[tb_logger, csv_logger],  # 複数ロガーを同時使用\n    accelerator=\"auto\",\n    log_every_n_steps=5,\n)\n\n# W&B を使う場合:\n# from lightning.pytorch.loggers import WandbLogger\n# wandb_logger = WandbLogger(project=\"mnist-study\", name=\"run-001\", log_model=True)\n# trainer = L.Trainer(logger=wandb_logger)\n\n# 学習後の CSV 分析例:\n# import pandas as pd\n# df = pd.read_csv(\"logs/mnist_experiment/version_0/metrics.csv\")\n# df[[\"epoch\", \"train_loss\", \"val_loss\"]].dropna().plot(x=\"epoch\")",
+afterCode:"log_every_n_steps=5 はステップ単位のログの頻度を制御します。デフォルトは50で、バッチ数が少ない場合（小さいデータセット）は警告が出ることがあります。データセットが小さい場合は log_every_n_steps=1 にします。"},
 ]},
 {id:"ch7",num:7,title:"学習率スケジューラ",est:"45分",
 goal:"configure_optimizers() でスケジューラを辞書形式で返す方法を理解し、OneCycleLR / CosineAnnealingLR / ReduceLROnPlateau を正しく設定できる。",
 sections:[
 {title:"configure_optimizers() でのスケジューラ設定",
-body:`学習率スケジューラは、学習の進行に合わせて学習率を変化させます。一定の学習率では「最初は大きすぎて発散しやすく、後半は小さすぎて収束が遅い」という問題があります。スケジューラを使うことで最初は適切な大きさで学習し、後半は細かく調整できます。
-
-Lightning の configure_optimizers() でスケジューラを返す場合、辞書形式で lr_scheduler キーに設定を渡します。interval="step" でステップごと、interval="epoch" でエポックごとに更新されます。ReduceLROnPlateau のように監視メトリクスが必要なスケジューラは monitor キーで指定します。`,
+body:"学習率スケジューラは、学習の進行に合わせて学習率を変化させます。一定の学習率では「最初は大きすぎて発散しやすく、後半は小さすぎて収束が遅い」という問題があります。スケジューラを使うことで最初は適切な大きさで学習し、後半は細かく調整できます。\n\nLightning の configure_optimizers() でスケジューラを返す場合、辞書形式で lr_scheduler キーに設定を渡します。interval=\"step\" でステップごと、interval=\"epoch\" でエポックごとに更新されます。ReduceLROnPlateau のように監視メトリクスが必要なスケジューラは monitor キーで指定します。",
 table:T.schedulerConfig,
-afterTable:`interval="step" を使う場合、バッチ数 × エポック数 = 総ステップ数を計算して total_steps に渡す必要があります。Lightning では trainer.estimated_stepping_batches でこの値を自動計算できるため、バッチサイズや DataLoader の長さを手動で計算する必要はありません。`},
+afterTable:"interval=\"step\" を使う場合、バッチ数 × エポック数 = 総ステップ数を計算して total_steps に渡す必要があります。Lightning では trainer.estimated_stepping_batches でこの値を自動計算できるため、バッチサイズや DataLoader の長さを手動で計算する必要はありません。"},
 {title:"主要スケジューラの使い方",
-body:`OneCycleLR は「学習率が最初に急上昇し、その後ゆっくり減衰する」スケジュールです。1サイクル学習（Super-convergence）として知られ、CosineAnnealingLR より少ないエポック数で収束することが多く、実務で人気のある選択肢です。PyTorch の OneCycleLR は steps_per_epoch × epochs = total_steps の計算が必要ですが、Lightning の estimated_stepping_batches で自動取得できます。
-
-CosineAnnealingLR はコサイン関数に従って学習率を 0 まで減衰させます。T_max はサイクルの半周期（エポック数）で、max_epochs と同じ値に設定するのが基本です。T_mult を使って周期を伸ばしていく Cosine Annealing with Warm Restarts（CosineAnnealingWarmRestarts）も有効です。`,
-code:`import lightning as L
-import torch
-
-class SchedulerDemo(L.LightningModule):
-    def __init__(self, lr=0.01):
-        super().__init__()
-        self.save_hyperparameters()
-        self.net = torch.nn.Linear(784, 10)
-
-    def forward(self, x): return self.net(x.view(x.size(0),-1))
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = torch.nn.functional.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)
-
-        # 選択肢 A: OneCycleLR（ステップ更新）
-        # total_steps を estimated_stepping_batches で自動計算
-        total_steps = self.trainer.estimated_stepping_batches
-        scheduler_a = torch.optim.lr_scheduler.OneCycleLR(
-            optimizer, max_lr=self.hparams.lr, total_steps=total_steps
-        )
-        return {"optimizer": optimizer,
-                "lr_scheduler": {"scheduler": scheduler_a, "interval": "step"}}
-
-        # 選択肢 B: CosineAnnealingLR（エポック更新）
-        # scheduler_b = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30)
-        # return {"optimizer": optimizer,
-        #         "lr_scheduler": {"scheduler": scheduler_b, "interval": "epoch"}}
-
-        # 選択肢 C: ReduceLROnPlateau（メトリクス監視）
-        # scheduler_c = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5)
-        # return {"optimizer": optimizer,
-        #         "lr_scheduler": {"scheduler": scheduler_c, "monitor": "val_loss"}}`,
-afterCode:`OneCycleLR は interval="step" で更新しないと正しく機能しません。ReduceLROnPlateau は monitor キーで検証メトリクスを指定する必要があります。このメトリクスが validation_step で self.log() されていない場合は LightningMisconfigurationException が発生します。`},
+body:"OneCycleLR は「学習率が最初に急上昇し、その後ゆっくり減衰する」スケジュールです。1サイクル学習（Super-convergence）として知られ、CosineAnnealingLR より少ないエポック数で収束することが多く、実務で人気のある選択肢です。PyTorch の OneCycleLR は steps_per_epoch × epochs = total_steps の計算が必要ですが、Lightning の estimated_stepping_batches で自動取得できます。\n\nCosineAnnealingLR はコサイン関数に従って学習率を 0 まで減衰させます。T_max はサイクルの半周期（エポック数）で、max_epochs と同じ値に設定するのが基本です。T_mult を使って周期を伸ばしていく Cosine Annealing with Warm Restarts（CosineAnnealingWarmRestarts）も有効です。",
+code:"import lightning as L\nimport torch\n\nclass SchedulerDemo(L.LightningModule):\n    def __init__(self, lr=0.01):\n        super().__init__()\n        self.save_hyperparameters()\n        self.net = torch.nn.Linear(784, 10)\n\n    def forward(self, x): return self.net(x.view(x.size(0),-1))\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = torch.nn.functional.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss\n\n    def configure_optimizers(self):\n        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)\n\n        # 選択肢 A: OneCycleLR（ステップ更新）\n        # total_steps を estimated_stepping_batches で自動計算\n        total_steps = self.trainer.estimated_stepping_batches\n        scheduler_a = torch.optim.lr_scheduler.OneCycleLR(\n            optimizer, max_lr=self.hparams.lr, total_steps=total_steps\n        )\n        return {\"optimizer\": optimizer,\n                \"lr_scheduler\": {\"scheduler\": scheduler_a, \"interval\": \"step\"}}\n\n        # 選択肢 B: CosineAnnealingLR（エポック更新）\n        # scheduler_b = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30)\n        # return {\"optimizer\": optimizer,\n        #         \"lr_scheduler\": {\"scheduler\": scheduler_b, \"interval\": \"epoch\"}}\n\n        # 選択肢 C: ReduceLROnPlateau（メトリクス監視）\n        # scheduler_c = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5)\n        # return {\"optimizer\": optimizer,\n        #         \"lr_scheduler\": {\"scheduler\": scheduler_c, \"monitor\": \"val_loss\"}}",
+afterCode:"OneCycleLR は interval=\"step\" で更新しないと正しく機能しません。ReduceLROnPlateau は monitor キーで検証メトリクスを指定する必要があります。このメトリクスが validation_step で self.log() されていない場合は LightningMisconfigurationException が発生します。"},
 {title:"LearningRateMonitor による可視化",
-body:`学習率の変化を記録・可視化することで、スケジューラが意図した通りに動いているかを確認できます。LearningRateMonitor コールバックを設定すると、各ステップまたはエポックの学習率が自動的にロガーに記録されます。TensorBoard では Scalars → lr/Adam のような名前でグラフを確認できます。
-
-学習率が急に 0 になっていたり、全くスケジュールされていない場合はバグのサインです。interval="step" と interval="epoch" を混同している、monitor に指定したメトリクスが記録されていない、などが典型的な原因です。LearningRateMonitor はこれらの問題を早期発見するのに役立ちます。`,
-code:`from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
-
-lr_monitor = LearningRateMonitor(
-    logging_interval="step",  # "step" or "epoch"
-    log_momentum=True,         # momentum も記録（SGD 使用時）
-)
-
-trainer = L.Trainer(
-    max_epochs=30,
-    callbacks=[
-        lr_monitor,
-        ModelCheckpoint(monitor="val_loss", mode="min"),
-    ],
-    accelerator="auto",
-)
-
-trainer.fit(model, dm)
-
-# TensorBoard で確認:
-# tensorboard --logdir lightning_logs
-# → Scalars タブで lr/Adam-momentum_0 などのキーで確認できる`,
-afterCode:`log_momentum=True は SGD のモメンタムも記録します。AdamW では β1・β2 がモメンタムに相当しますが、これらは変化しないため記録しても意味がありません。SGD with momentum を使う場合は学習率とモメンタムの両方の推移を確認できます。`},
+body:"学習率の変化を記録・可視化することで、スケジューラが意図した通りに動いているかを確認できます。LearningRateMonitor コールバックを設定すると、各ステップまたはエポックの学習率が自動的にロガーに記録されます。TensorBoard では Scalars → lr/Adam のような名前でグラフを確認できます。\n\n学習率が急に 0 になっていたり、全くスケジュールされていない場合はバグのサインです。interval=\"step\" と interval=\"epoch\" を混同している、monitor に指定したメトリクスが記録されていない、などが典型的な原因です。LearningRateMonitor はこれらの問題を早期発見するのに役立ちます。",
+code:"from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint\n\nlr_monitor = LearningRateMonitor(\n    logging_interval=\"step\",  # \"step\" or \"epoch\"\n    log_momentum=True,         # momentum も記録（SGD 使用時）\n)\n\ntrainer = L.Trainer(\n    max_epochs=30,\n    callbacks=[\n        lr_monitor,\n        ModelCheckpoint(monitor=\"val_loss\", mode=\"min\"),\n    ],\n    accelerator=\"auto\",\n)\n\ntrainer.fit(model, dm)\n\n# TensorBoard で確認:\n# tensorboard --logdir lightning_logs\n# → Scalars タブで lr/Adam-momentum_0 などのキーで確認できる",
+afterCode:"log_momentum=True は SGD のモメンタムも記録します。AdamW では β1・β2 がモメンタムに相当しますが、これらは変化しないため記録しても意味がありません。SGD with momentum を使う場合は学習率とモメンタムの両方の推移を確認できます。"},
 ]},
 {id:"ch8",num:8,title:"GPU・精度の設定",est:"45分",
 goal:"accelerator / devices / precision の設定を理解し、FP16 混合精度で学習を高速化し、DDP によるマルチGPU学習の基本設定を実施できる。",
 sections:[
 {title:"accelerator と devices の設定",
-body:`PyTorch で GPU を使う場合、raw PyTorch ではモデルとデータを手動で .to('cuda') する必要があります。Lightning では Trainer の accelerator と devices を設定するだけで、モデル・バッチ・オプティマイザの状態が自動的に適切なデバイスに転送されます。
-
-accelerator="auto" は実行環境を自動検出します。CUDA GPU があれば "gpu"、Apple Silicon なら "mps"（PyTorch 1.12+）、なければ "cpu" が自動選択されます。devices="auto" は検出されたデバイスのうち利用可能な全てを使います。本番では devices=1 のように明示することで再現性が高まります。`,
-code:`import lightning as L
-
-# シングル GPU
-trainer = L.Trainer(
-    max_epochs=30,
-    accelerator="gpu",
-    devices=1,
-)
-
-# 利用可能な全 GPU を使用
-trainer = L.Trainer(
-    max_epochs=30,
-    accelerator="gpu",
-    devices="auto",  # または devices=-1 で全GPU
-)
-
-# Apple Silicon (M1/M2/M3) Mac
-trainer = L.Trainer(
-    max_epochs=30,
-    accelerator="mps",
-    devices=1,
-)
-
-# CPU（デバッグ用）
-trainer = L.Trainer(
-    max_epochs=5,
-    accelerator="cpu",
-)
-
-# 自動選択（推奨）
-trainer = L.Trainer(
-    max_epochs=30,
-    accelerator="auto",  # 環境を自動検出
-    devices="auto",
-)`,
-afterCode:`MPS バックエンド（Apple Silicon）は全ての PyTorch 操作をサポートしていないため、一部のモデルで "operation not supported on MPS" エラーが出ることがあります。その場合は accelerator="cpu" で確認します。CUDA と MPS で同等の精度が得られるかも確認が必要です。`},
+body:"PyTorch で GPU を使う場合、raw PyTorch ではモデルとデータを手動で .to('cuda') する必要があります。Lightning では Trainer の accelerator と devices を設定するだけで、モデル・バッチ・オプティマイザの状態が自動的に適切なデバイスに転送されます。\n\naccelerator=\"auto\" は実行環境を自動検出します。CUDA GPU があれば \"gpu\"、Apple Silicon なら \"mps\"（PyTorch 1.12+）、なければ \"cpu\" が自動選択されます。devices=\"auto\" は検出されたデバイスのうち利用可能な全てを使います。本番では devices=1 のように明示することで再現性が高まります。",
+code:"import lightning as L\n\n# シングル GPU\ntrainer = L.Trainer(\n    max_epochs=30,\n    accelerator=\"gpu\",\n    devices=1,\n)\n\n# 利用可能な全 GPU を使用\ntrainer = L.Trainer(\n    max_epochs=30,\n    accelerator=\"gpu\",\n    devices=\"auto\",  # または devices=-1 で全GPU\n)\n\n# Apple Silicon (M1/M2/M3) Mac\ntrainer = L.Trainer(\n    max_epochs=30,\n    accelerator=\"mps\",\n    devices=1,\n)\n\n# CPU（デバッグ用）\ntrainer = L.Trainer(\n    max_epochs=5,\n    accelerator=\"cpu\",\n)\n\n# 自動選択（推奨）\ntrainer = L.Trainer(\n    max_epochs=30,\n    accelerator=\"auto\",  # 環境を自動検出\n    devices=\"auto\",\n)",
+afterCode:"MPS バックエンド（Apple Silicon）は全ての PyTorch 操作をサポートしていないため、一部のモデルで \"operation not supported on MPS\" エラーが出ることがあります。その場合は accelerator=\"cpu\" で確認します。CUDA と MPS で同等の精度が得られるかも確認が必要です。"},
 {title:"混合精度学習（AMP）",
-body:`混合精度学習（Automatic Mixed Precision, AMP）は、FP32（32ビット浮動小数点）の代わりに FP16 や BF16 を使って計算を行い、メモリ使用量と計算速度を改善します。NVIDIA GPU の Tensor Core は FP16/BF16 計算に特化しているため、最大3倍の高速化が得られる場合があります。
-
-FP16 は数値範囲が狭く、損失のスケーリング（loss scaling）が必要です。Lightning は precision="16-mixed" と設定するだけで自動的に loss scaling を適用します。BF16（bfloat16）は FP16 より数値範囲が広く、loss scaling が不要で安定しています。NVIDIA Ampere 世代以降（A100・3090以降）では BF16 を推奨します。`,
+body:"混合精度学習（Automatic Mixed Precision, AMP）は、FP32（32ビット浮動小数点）の代わりに FP16 や BF16 を使って計算を行い、メモリ使用量と計算速度を改善します。NVIDIA GPU の Tensor Core は FP16/BF16 計算に特化しているため、最大3倍の高速化が得られる場合があります。\n\nFP16 は数値範囲が狭く、損失のスケーリング（loss scaling）が必要です。Lightning は precision=\"16-mixed\" と設定するだけで自動的に loss scaling を適用します。BF16（bfloat16）は FP16 より数値範囲が広く、loss scaling が不要で安定しています。NVIDIA Ampere 世代以降（A100・3090以降）では BF16 を推奨します。",
 table:T.precisionOptions,
-afterTable:`"16-mixed" は計算の一部（フォワード・バックワード）を FP16 で行い、パラメータ更新は FP32 で行います。完全 FP16 ではパラメータの精度が失われるため "mixed" が推奨です。モデルが不安定（損失が NaN になる）な場合は "bf16-mixed" を試すか、gradient_clip_val を設定します。`},
+afterTable:"\"16-mixed\" は計算の一部（フォワード・バックワード）を FP16 で行い、パラメータ更新は FP32 で行います。完全 FP16 ではパラメータの精度が失われるため \"mixed\" が推奨です。モデルが不安定（損失が NaN になる）な場合は \"bf16-mixed\" を試すか、gradient_clip_val を設定します。"},
 {title:"マルチGPU学習入門",
-body:`マルチGPU学習は DDP（Distributed Data Parallel）が最も一般的な戦略です。各GPUにモデルの完全なコピーを置き、異なるバッチを並列処理して勾配を同期します。raw PyTorch でDDPを実装すると torch.distributed の初期化・プロセス管理・通信の設定が必要ですが、Lightning では Trainer の引数を変えるだけです。
-
-注意点として、実効バッチサイズはバッチサイズ × GPU数になります。2GPU で batch_size=32 なら実効バッチサイズは64です。Linear Scaling Rule に従い、学習率も GPU数に比例して増やすことが多いですが、効果はモデルや問題設定によって異なるため実験的に確認します。`,
+body:"マルチGPU学習は DDP（Distributed Data Parallel）が最も一般的な戦略です。各GPUにモデルの完全なコピーを置き、異なるバッチを並列処理して勾配を同期します。raw PyTorch でDDPを実装すると torch.distributed の初期化・プロセス管理・通信の設定が必要ですが、Lightning では Trainer の引数を変えるだけです。\n\n注意点として、実効バッチサイズはバッチサイズ × GPU数になります。2GPU で batch_size=32 なら実効バッチサイズは64です。Linear Scaling Rule に従い、学習率も GPU数に比例して増やすことが多いですが、効果はモデルや問題設定によって異なるため実験的に確認します。",
 table:T.gpuStrategies,
-afterTable:`sync_batchnorm=True は BatchNorm の統計をGPU間で同期します。DDP では各GPUが独立したバッチを処理するため、BatchNorm をそのまま使うとGPUごとに異なる正規化統計になります。sync_batchnorm を使うと全GPUのバッチをまとめた統計で正規化されます。`},
+afterTable:"sync_batchnorm=True は BatchNorm の統計をGPU間で同期します。DDP では各GPUが独立したバッチを処理するため、BatchNorm をそのまま使うとGPUごとに異なる正規化統計になります。sync_batchnorm を使うと全GPUのバッチをまとめた統計で正規化されます。"},
 ]},
 {id:"ch9",num:9,title:"転移学習とLightning",est:"50分",
 goal:"timm ライブラリを使って事前学習済みモデルを読み込み、backbone を freeze して LightningModule でファインチューニングを実装し、Gradual Unfreezing を適用できる。",
 sections:[
 {title:"timm による事前学習済みモデルの活用",
-body:`ImageNet 1000クラスで事前学習されたモデルは、画像に関する豊富な特徴表現を既に学習しています。これを新しいタスクに転用する「転移学習」は、少量のデータでも高い精度を達成できる強力な手法です。timm（PyTorch Image Models）はResNet・EfficientNet・ViT・Swinなど100以上の事前学習済みモデルを統一したAPIで提供するライブラリです。
-
-num_classes=0 を指定すると分類ヘッド（最終全結合層）が除かれ、特徴ベクトルを返すモードになります。backbone.num_features で特徴次元数を取得し、自分のタスク用のヘッドを接続します。このパターンでどのモデルでも同じコードで転移学習ができます。`,
+body:"ImageNet 1000クラスで事前学習されたモデルは、画像に関する豊富な特徴表現を既に学習しています。これを新しいタスクに転用する「転移学習」は、少量のデータでも高い精度を達成できる強力な手法です。timm（PyTorch Image Models）はResNet・EfficientNet・ViT・Swinなど100以上の事前学習済みモデルを統一したAPIで提供するライブラリです。\n\nnum_classes=0 を指定すると分類ヘッド（最終全結合層）が除かれ、特徴ベクトルを返すモードになります。backbone.num_features で特徴次元数を取得し、自分のタスク用のヘッドを接続します。このパターンでどのモデルでも同じコードで転移学習ができます。",
 table:T.timmModels,
-afterTable:`pretrained=True は自動的に ImageNet 事前学習済み重みをダウンロードします。初回実行時はダウンロードが発生しますが、~/.cache/torch/hub/ にキャッシュされるため2回目以降は不要です。HuggingFace Hub を通じて timm のモデルをダウンロードするため、インターネット接続が必要です。`},
+afterTable:"pretrained=True は自動的に ImageNet 事前学習済み重みをダウンロードします。初回実行時はダウンロードが発生しますが、~/.cache/torch/hub/ にキャッシュされるため2回目以降は不要です。HuggingFace Hub を通じて timm のモデルをダウンロードするため、インターネット接続が必要です。"},
 {title:"freeze と unfreeze によるファインチューニング",
-body:`転移学習の戦略として「段階的ファインチューニング（Gradual Unfreezing）」が有効です。最初は backbone を完全に凍結（requires_grad=False）して、新しいヘッドのみを学習します。ヘッドが収束したら backbone を解凍して全体を小さい学習率で再学習します。
-
-一度に全パラメータを学習すると、事前学習済みの特徴が壊れる「Catastrophic Forgetting」が起きやすいです。段階的なアプローチでは小さな学習率でヘッドが収束してから backbone を動かすため、破壊的な上書きを防ぎます。backbone の学習率はヘッドより1〜2桁小さい値（例: ヘッド 1e-3、backbone 1e-4）が一般的です。`,
-code:`import timm
-import lightning as L
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class TransferModel(L.LightningModule):
-    def __init__(self, model_name="resnet50", num_classes=10,
-                 lr_head=1e-3, lr_backbone=1e-4, freeze_epochs=5):
-        super().__init__()
-        self.save_hyperparameters()
-
-        # backbone: 分類ヘッドなし（特徴抽出器として使用）
-        self.backbone = timm.create_model(model_name, pretrained=True, num_classes=0)
-        self.head     = nn.Linear(self.backbone.num_features, num_classes)
-
-        # 最初は backbone を凍結
-        self._freeze_backbone()
-
-    def _freeze_backbone(self):
-        for p in self.backbone.parameters():
-            p.requires_grad = False
-
-    def _unfreeze_backbone(self):
-        for p in self.backbone.parameters():
-            p.requires_grad = True
-
-    def on_train_epoch_start(self):
-        if self.current_epoch == self.hparams.freeze_epochs:
-            print(f"\nEpoch {self.current_epoch}: backbone を unfreeze します")
-            self._unfreeze_backbone()
-
-    def forward(self, x):
-        return self.head(self.backbone(x))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
-        acc  = (logits.argmax(1) == y).float().mean()
-        self.log("train_loss", loss, prog_bar=True)
-        self.log("train_acc",  acc,  prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        self.log("val_loss", F.cross_entropy(logits, y), prog_bar=True)
-        self.log("val_acc",  (logits.argmax(1) == y).float().mean(), prog_bar=True)
-
-    def configure_optimizers(self):
-        # head のみ最適化（backbone は凍結中）
-        return torch.optim.Adam(self.head.parameters(), lr=self.hparams.lr_head)`,
-afterCode:`on_train_epoch_start で backbone を unfreeze した後、configure_optimizers を再設定する必要があります。Lightning 2.x では self.optimizers().add_param_group() で新しいパラメータグループを追加できます。backbone 用の学習率は lr_backbone として head より小さく設定します。`},
+body:"転移学習の戦略として「段階的ファインチューニング（Gradual Unfreezing）」が有効です。最初は backbone を完全に凍結（requires_grad=False）して、新しいヘッドのみを学習します。ヘッドが収束したら backbone を解凍して全体を小さい学習率で再学習します。\n\n一度に全パラメータを学習すると、事前学習済みの特徴が壊れる「Catastrophic Forgetting」が起きやすいです。段階的なアプローチでは小さな学習率でヘッドが収束してから backbone を動かすため、破壊的な上書きを防ぎます。backbone の学習率はヘッドより1〜2桁小さい値（例: ヘッド 1e-3、backbone 1e-4）が一般的です。",
+code:"import timm\nimport lightning as L\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass TransferModel(L.LightningModule):\n    def __init__(self, model_name=\"resnet50\", num_classes=10,\n                 lr_head=1e-3, lr_backbone=1e-4, freeze_epochs=5):\n        super().__init__()\n        self.save_hyperparameters()\n\n        # backbone: 分類ヘッドなし（特徴抽出器として使用）\n        self.backbone = timm.create_model(model_name, pretrained=True, num_classes=0)\n        self.head     = nn.Linear(self.backbone.num_features, num_classes)\n\n        # 最初は backbone を凍結\n        self._freeze_backbone()\n\n    def _freeze_backbone(self):\n        for p in self.backbone.parameters():\n            p.requires_grad = False\n\n    def _unfreeze_backbone(self):\n        for p in self.backbone.parameters():\n            p.requires_grad = True\n\n    def on_train_epoch_start(self):\n        if self.current_epoch == self.hparams.freeze_epochs:\n            print(f\"\nEpoch {self.current_epoch}: backbone を unfreeze します\")\n            self._unfreeze_backbone()\n\n    def forward(self, x):\n        return self.head(self.backbone(x))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        logits = self(x)\n        loss = F.cross_entropy(logits, y)\n        acc  = (logits.argmax(1) == y).float().mean()\n        self.log(\"train_loss\", loss, prog_bar=True)\n        self.log(\"train_acc\",  acc,  prog_bar=True)\n        return loss\n\n    def validation_step(self, batch, batch_idx):\n        x, y = batch\n        logits = self(x)\n        self.log(\"val_loss\", F.cross_entropy(logits, y), prog_bar=True)\n        self.log(\"val_acc\",  (logits.argmax(1) == y).float().mean(), prog_bar=True)\n\n    def configure_optimizers(self):\n        # head のみ最適化（backbone は凍結中）\n        return torch.optim.Adam(self.head.parameters(), lr=self.hparams.lr_head)",
+afterCode:"on_train_epoch_start で backbone を unfreeze した後、configure_optimizers を再設定する必要があります。Lightning 2.x では self.optimizers().add_param_group() で新しいパラメータグループを追加できます。backbone 用の学習率は lr_backbone として head より小さく設定します。"},
 {title:"Layer-wise Learning Rate Decay（LLRD）",
-body:`転移学習では、事前学習済みの深い層（入力に近い層）は汎用的な特徴（エッジ・テクスチャ）を学習しており、これらはタスクを問わず有用です。一方、最終層に近い層はImageNetに特化した特徴を学習しており、新しいタスクへの適応が必要です。
-
-Layer-wise Learning Rate Decay（LLRD）はこの知見を活用し、入力に近い層ほど小さい学習率、出力に近い層ほど大きい学習率を設定します。一般的には各層で 0.8〜0.95 倍の係数を掛けていきます。configure_optimizers() で param_groups のリストを作成し、層ごとに lr を設定することで実現できます。`,
-code:`import timm
-import torch
-import torch.nn as nn
-import lightning as L
-
-class LLRDModel(L.LightningModule):
-    def __init__(self, num_classes=10, base_lr=1e-3, decay=0.9):
-        super().__init__()
-        self.save_hyperparameters()
-        self.backbone = timm.create_model("resnet50", pretrained=True, num_classes=0)
-        self.head = nn.Linear(self.backbone.num_features, num_classes)
-
-    def forward(self, x):
-        return self.head(self.backbone(x))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = torch.nn.functional.cross_entropy(self(x), y)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        self.log("val_loss", torch.nn.functional.cross_entropy(logits, y), prog_bar=True)
-        self.log("val_acc",  (logits.argmax(1) == y).float().mean(), prog_bar=True)
-
-    def configure_optimizers(self):
-        lr   = self.hparams.base_lr
-        d    = self.hparams.decay
-        # 出力に近い順に層をリスト化
-        layers = [
-            ("head",    self.head),
-            ("layer4",  self.backbone.layer4),
-            ("layer3",  self.backbone.layer3),
-            ("layer2",  self.backbone.layer2),
-            ("layer1",  self.backbone.layer1),
-        ]
-        param_groups = []
-        for i, (name, layer) in enumerate(layers):
-            group_lr = lr * (d ** i)
-            param_groups.append({"params": layer.parameters(), "lr": group_lr})
-            print(f"  {name}: lr={group_lr:.2e}")
-
-        return torch.optim.AdamW(param_groups, weight_decay=1e-4)`,
-afterCode:`LLRD は特に大規模な事前学習済みモデル（BERT・ViTなど）のファインチューニングで効果が大きいです。decay_factor を 0.95 に設定すると、12層のTransformerでは最終層と最初の層の学習率が約 0.95^12 ≈ 0.54 倍の差になります。`},
+body:"転移学習では、事前学習済みの深い層（入力に近い層）は汎用的な特徴（エッジ・テクスチャ）を学習しており、これらはタスクを問わず有用です。一方、最終層に近い層はImageNetに特化した特徴を学習しており、新しいタスクへの適応が必要です。\n\nLayer-wise Learning Rate Decay（LLRD）はこの知見を活用し、入力に近い層ほど小さい学習率、出力に近い層ほど大きい学習率を設定します。一般的には各層で 0.8〜0.95 倍の係数を掛けていきます。configure_optimizers() で param_groups のリストを作成し、層ごとに lr を設定することで実現できます。",
+code:"import timm\nimport torch\nimport torch.nn as nn\nimport lightning as L\n\nclass LLRDModel(L.LightningModule):\n    def __init__(self, num_classes=10, base_lr=1e-3, decay=0.9):\n        super().__init__()\n        self.save_hyperparameters()\n        self.backbone = timm.create_model(\"resnet50\", pretrained=True, num_classes=0)\n        self.head = nn.Linear(self.backbone.num_features, num_classes)\n\n    def forward(self, x):\n        return self.head(self.backbone(x))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = torch.nn.functional.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss, prog_bar=True)\n        return loss\n\n    def validation_step(self, batch, batch_idx):\n        x, y = batch\n        logits = self(x)\n        self.log(\"val_loss\", torch.nn.functional.cross_entropy(logits, y), prog_bar=True)\n        self.log(\"val_acc\",  (logits.argmax(1) == y).float().mean(), prog_bar=True)\n\n    def configure_optimizers(self):\n        lr   = self.hparams.base_lr\n        d    = self.hparams.decay\n        # 出力に近い順に層をリスト化\n        layers = [\n            (\"head\",    self.head),\n            (\"layer4\",  self.backbone.layer4),\n            (\"layer3\",  self.backbone.layer3),\n            (\"layer2\",  self.backbone.layer2),\n            (\"layer1\",  self.backbone.layer1),\n        ]\n        param_groups = []\n        for i, (name, layer) in enumerate(layers):\n            group_lr = lr * (d ** i)\n            param_groups.append({\"params\": layer.parameters(), \"lr\": group_lr})\n            print(f\"  {name}: lr={group_lr:.2e}\")\n\n        return torch.optim.AdamW(param_groups, weight_decay=1e-4)",
+afterCode:"LLRD は特に大規模な事前学習済みモデル（BERT・ViTなど）のファインチューニングで効果が大きいです。decay_factor を 0.95 に設定すると、12層のTransformerでは最終層と最初の層の学習率が約 0.95^12 ≈ 0.54 倍の差になります。"},
 ]},
 {id:"ch10",num:10,title:"テストと推論",est:"45分",
 goal:"trainer.test() で最良モデルを評価し、predict_step を実装して新しいデータへの推論を行い、TorchScript を使ってモデルをデプロイできる形式に変換できる。",
 sections:[
 {title:"trainer.test() による最終評価",
-body:`test_step は学習・検証とは独立したテストフェーズ専用のメソッドです。研究では「テストセットは一度だけ見る」というルールが重要で、開発中に何度もテストセットを確認すると結果が無意識に過適合します。Lightning の設計はこれを明示的にサポートしており、trainer.test() は学習とは別のコマンドで実行します。
-
-ckpt_path="best" を渡すと ModelCheckpoint が記録した最良チェックポイントを自動的にロードして評価します。明示的なパスを渡すことも可能で、best_model_path プロパティで最良チェックポイントのパスを取得できます。テスト結果はリスト（各データローダーごと）で返され、メトリクスのキーと値の辞書が含まれます。`,
-code:`import lightning as L
-from lightning.pytorch.callbacks import ModelCheckpoint
-
-class EvalModel(L.LightningModule):
-    # ... training_step, validation_step は省略 ...
-
-    def test_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
-        acc  = (logits.argmax(1) == y).float().mean()
-        # テストメトリクスは test_ プレフィックスを付けることが多い
-        self.log("test_loss", loss)
-        self.log("test_acc",  acc)
-
-checkpoint_cb = ModelCheckpoint(monitor="val_loss", mode="min", save_top_k=1)
-trainer = L.Trainer(max_epochs=30, callbacks=[checkpoint_cb])
-
-model = EvalModel()
-dm    = MyDataModule()
-
-# 学習
-trainer.fit(model, dm)
-
-# 最良チェックポイントで評価
-test_results = trainer.test(model, dm, ckpt_path="best")
-print(f"Best ckpt: {checkpoint_cb.best_model_path}")
-print(f"Test results: {test_results}")
-# [{"test_loss": 0.0842, "test_acc": 0.9751}] のような形で返る`,
-afterCode:`trainer.test() は trainer.fit() と同じ Trainer インスタンスを使います。学習後に別の Trainer を作って test() を呼んだ場合、コールバックの状態が引き継がれないため ckpt_path="best" が機能しない場合があります。同じ Trainer インスタンスを使い続けることが重要です。`},
+body:"test_step は学習・検証とは独立したテストフェーズ専用のメソッドです。研究では「テストセットは一度だけ見る」というルールが重要で、開発中に何度もテストセットを確認すると結果が無意識に過適合します。Lightning の設計はこれを明示的にサポートしており、trainer.test() は学習とは別のコマンドで実行します。\n\nckpt_path=\"best\" を渡すと ModelCheckpoint が記録した最良チェックポイントを自動的にロードして評価します。明示的なパスを渡すことも可能で、best_model_path プロパティで最良チェックポイントのパスを取得できます。テスト結果はリスト（各データローダーごと）で返され、メトリクスのキーと値の辞書が含まれます。",
+code:"import lightning as L\nfrom lightning.pytorch.callbacks import ModelCheckpoint\n\nclass EvalModel(L.LightningModule):\n    # ... training_step, validation_step は省略 ...\n\n    def test_step(self, batch, batch_idx):\n        x, y = batch\n        logits = self(x)\n        loss = F.cross_entropy(logits, y)\n        acc  = (logits.argmax(1) == y).float().mean()\n        # テストメトリクスは test_ プレフィックスを付けることが多い\n        self.log(\"test_loss\", loss)\n        self.log(\"test_acc\",  acc)\n\ncheckpoint_cb = ModelCheckpoint(monitor=\"val_loss\", mode=\"min\", save_top_k=1)\ntrainer = L.Trainer(max_epochs=30, callbacks=[checkpoint_cb])\n\nmodel = EvalModel()\ndm    = MyDataModule()\n\n# 学習\ntrainer.fit(model, dm)\n\n# 最良チェックポイントで評価\ntest_results = trainer.test(model, dm, ckpt_path=\"best\")\nprint(f\"Best ckpt: {checkpoint_cb.best_model_path}\")\nprint(f\"Test results: {test_results}\")\n# [{\"test_loss\": 0.0842, \"test_acc\": 0.9751}] のような形で返る",
+afterCode:"trainer.test() は trainer.fit() と同じ Trainer インスタンスを使います。学習後に別の Trainer を作って test() を呼んだ場合、コールバックの状態が引き継がれないため ckpt_path=\"best\" が機能しない場合があります。同じ Trainer インスタンスを使い続けることが重要です。"},
 {title:"predict_step と推論パイプライン",
-body:`predict_step は新しいデータへの推論専用のメソッドで、test_step と異なりラベルなしのデータに対して使います。Trainer が自動的に model.eval() と torch.no_grad() を設定するため、明示的に書く必要はありません。
-
-trainer.predict() の返り値はリストのリスト（バッチ×各バッチの返り値）です。全バッチをまとめるには torch.cat() を使います。DataModule の predict_dataloader() を実装するか、predict() に直接 DataLoader を渡すか、どちらでも機能します。ラベルなしデータへの推論では DataLoader が (x,) タプルか x テンソルのどちらかを返す設計が多いため、predict_step でその違いを吸収します。`,
-code:`import lightning as L
-import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
-class InferenceModel(L.LightningModule):
-    def __init__(self, input_dim=784, num_classes=10):
-        super().__init__()
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(input_dim, 256), torch.nn.ReLU(),
-            torch.nn.Linear(256, num_classes)
-        )
-
-    def forward(self, x):
-        return self.net(x.view(x.size(0), -1))
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss = F.cross_entropy(self(x), y)
-        self.log("train_loss", loss)
-        return loss
-
-    def predict_step(self, batch, batch_idx):
-        # ラベルなし: batch = x テンソル or (x,) タプル
-        x = batch[0] if isinstance(batch, (list, tuple)) else batch
-        logits = self(x)
-        probs  = F.softmax(logits, dim=1)
-        preds  = probs.argmax(dim=1)
-        return {"probs": probs, "preds": preds}
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters())
-
-# 推論実行
-model = InferenceModel.load_from_checkpoint("checkpoints/best.ckpt")
-trainer = L.Trainer(accelerator="auto")
-
-# ラベルなしデータ
-new_x = torch.randn(1000, 784)
-predict_dl = DataLoader(TensorDataset(new_x), batch_size=128)
-
-results = trainer.predict(model, dataloaders=predict_dl)
-
-# バッチを結合
-all_probs = torch.cat([r["probs"] for r in results], dim=0)
-all_preds = torch.cat([r["preds"] for r in results], dim=0)
-print(f"予測形状: {all_probs.shape}")   # (1000, 10)
-print(f"先頭10件: {all_preds[:10]}")`,
-afterCode:`load_from_checkpoint() は save_hyperparameters() で保存されたハイパーパラメータを自動的に読み込みます。そのため、ファイルのパスだけで完全なモデルを復元できます。ただし、モデルのクラス定義（コード）は Python パスに存在する必要があります。`},
+body:"predict_step は新しいデータへの推論専用のメソッドで、test_step と異なりラベルなしのデータに対して使います。Trainer が自動的に model.eval() と torch.no_grad() を設定するため、明示的に書く必要はありません。\n\ntrainer.predict() の返り値はリストのリスト（バッチ×各バッチの返り値）です。全バッチをまとめるには torch.cat() を使います。DataModule の predict_dataloader() を実装するか、predict() に直接 DataLoader を渡すか、どちらでも機能します。ラベルなしデータへの推論では DataLoader が (x,) タプルか x テンソルのどちらかを返す設計が多いため、predict_step でその違いを吸収します。",
+code:"import lightning as L\nimport torch\nimport torch.nn.functional as F\nfrom torch.utils.data import DataLoader, TensorDataset\n\nclass InferenceModel(L.LightningModule):\n    def __init__(self, input_dim=784, num_classes=10):\n        super().__init__()\n        self.net = torch.nn.Sequential(\n            torch.nn.Linear(input_dim, 256), torch.nn.ReLU(),\n            torch.nn.Linear(256, num_classes)\n        )\n\n    def forward(self, x):\n        return self.net(x.view(x.size(0), -1))\n\n    def training_step(self, batch, batch_idx):\n        x, y = batch\n        loss = F.cross_entropy(self(x), y)\n        self.log(\"train_loss\", loss)\n        return loss\n\n    def predict_step(self, batch, batch_idx):\n        # ラベルなし: batch = x テンソル or (x,) タプル\n        x = batch[0] if isinstance(batch, (list, tuple)) else batch\n        logits = self(x)\n        probs  = F.softmax(logits, dim=1)\n        preds  = probs.argmax(dim=1)\n        return {\"probs\": probs, \"preds\": preds}\n\n    def configure_optimizers(self):\n        return torch.optim.Adam(self.parameters())\n\n# 推論実行\nmodel = InferenceModel.load_from_checkpoint(\"checkpoints/best.ckpt\")\ntrainer = L.Trainer(accelerator=\"auto\")\n\n# ラベルなしデータ\nnew_x = torch.randn(1000, 784)\npredict_dl = DataLoader(TensorDataset(new_x), batch_size=128)\n\nresults = trainer.predict(model, dataloaders=predict_dl)\n\n# バッチを結合\nall_probs = torch.cat([r[\"probs\"] for r in results], dim=0)\nall_preds = torch.cat([r[\"preds\"] for r in results], dim=0)\nprint(f\"予測形状: {all_probs.shape}\")   # (1000, 10)\nprint(f\"先頭10件: {all_preds[:10]}\")",
+afterCode:"load_from_checkpoint() は save_hyperparameters() で保存されたハイパーパラメータを自動的に読み込みます。そのため、ファイルのパスだけで完全なモデルを復元できます。ただし、モデルのクラス定義（コード）は Python パスに存在する必要があります。"},
 {title:"TorchScript によるデプロイ",
-body:`学習済みモデルを本番環境にデプロイする際、Python 環境が使えない場合や推論速度を最大化したい場合に TorchScript が有効です。TorchScript はモデルを Python 非依存の中間表現にコンパイルします。torch.jit.script はソースコードを解析してコンパイル、torch.jit.trace は実際の入力でトレースしてコンパイルします。
-
-script の方が制御フロー（if・for・while）を正確に保持できるため汎用性が高いですが、型アノテーションが必要で一部の Python 機能が使えません。trace は型アノテーション不要で簡単ですが、条件分岐がトレース時の入力に応じて固定されます。Lightning モデルを TorchScript 化する際は、forward() メソッドに型アノテーションを付けることが重要です。`,
+body:"学習済みモデルを本番環境にデプロイする際、Python 環境が使えない場合や推論速度を最大化したい場合に TorchScript が有効です。TorchScript はモデルを Python 非依存の中間表現にコンパイルします。torch.jit.script はソースコードを解析してコンパイル、torch.jit.trace は実際の入力でトレースしてコンパイルします。\n\nscript の方が制御フロー（if・for・while）を正確に保持できるため汎用性が高いですが、型アノテーションが必要で一部の Python 機能が使えません。trace は型アノテーション不要で簡単ですが、条件分岐がトレース時の入力に応じて固定されます。Lightning モデルを TorchScript 化する際は、forward() メソッドに型アノテーションを付けることが重要です。",
 table:T.deployOptions,
-afterTable:`torch.compile（PyTorch 2.0+）は TorchScript とは異なり Python 環境のまま JIT コンパイルします。model = torch.compile(model) の一行で適用でき、TorchScript のような型アノテーション制約がありません。NVIDIA GPU での推論速度が 20〜60% 向上することが多く、最も手軽なデプロイ最適化オプションです。`},
+afterTable:"torch.compile（PyTorch 2.0+）は TorchScript とは異なり Python 環境のまま JIT コンパイルします。model = torch.compile(model) の一行で適用でき、TorchScript のような型アノテーション制約がありません。NVIDIA GPU での推論速度が 20〜60% 向上することが多く、最も手軽なデプロイ最適化オプションです。"},
 ]},
 ];
 

@@ -96,631 +96,112 @@ const EX = {
     {
       diff: 2,
       q: "DDPを使って2GPU上でシンプルなモデルを訓練するスクリプトを書いてください。\n・dist.init_process_group で初期化\n・DistributedDataParallelでラップ\n・DistributedSamplerを使ってデータを分割",
-      code: `import torch
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data.distributed import DistributedSampler
-import torch.multiprocessing as mp
-
-def train(rank, world_size):
-    # TODO: dist初期化、モデルのDDPラップ、DistributedSampler設定
-
-if __name__ == "__main__":
-    world_size = 2
-    mp.spawn(train, args=(world_size,), nprocs=world_size)`,
-      answer: `import torch
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader, TensorDataset
-from torch.utils.data.distributed import DistributedSampler
-import torch.multiprocessing as mp
-
-def train(rank, world_size):
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-    torch.cuda.set_device(rank)
-
-    model = torch.nn.Linear(10, 1).to(rank)
-    model = DDP(model, device_ids=[rank])
-
-    dataset = TensorDataset(torch.randn(100, 10), torch.randn(100, 1))
-    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
-    loader = DataLoader(dataset, batch_size=16, sampler=sampler)
-
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-    for x, y in loader:
-        x, y = x.to(rank), y.to(rank)
-        loss = torch.nn.functional.mse_loss(model(x), y)
-        optimizer.zero_grad(); loss.backward(); optimizer.step()
-
-    dist.destroy_process_group()
-
-if __name__ == "__main__":
-    mp.spawn(train, args=(2,), nprocs=2)`
+      code: "import torch\nimport torch.distributed as dist\nfrom torch.nn.parallel import DistributedDataParallel as DDP\nfrom torch.utils.data.distributed import DistributedSampler\nimport torch.multiprocessing as mp\n\ndef train(rank, world_size):\n    # TODO: dist初期化、モデルのDDPラップ、DistributedSampler設定\n\nif __name__ == \"__main__\":\n    world_size = 2\n    mp.spawn(train, args=(world_size,), nprocs=world_size)",
+      answer: "import torch\nimport torch.distributed as dist\nfrom torch.nn.parallel import DistributedDataParallel as DDP\nfrom torch.utils.data import DataLoader, TensorDataset\nfrom torch.utils.data.distributed import DistributedSampler\nimport torch.multiprocessing as mp\n\ndef train(rank, world_size):\n    dist.init_process_group(\"nccl\", rank=rank, world_size=world_size)\n    torch.cuda.set_device(rank)\n\n    model = torch.nn.Linear(10, 1).to(rank)\n    model = DDP(model, device_ids=[rank])\n\n    dataset = TensorDataset(torch.randn(100, 10), torch.randn(100, 1))\n    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)\n    loader = DataLoader(dataset, batch_size=16, sampler=sampler)\n\n    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)\n    for x, y in loader:\n        x, y = x.to(rank), y.to(rank)\n        loss = torch.nn.functional.mse_loss(model(x), y)\n        optimizer.zero_grad(); loss.backward(); optimizer.step()\n\n    dist.destroy_process_group()\n\nif __name__ == \"__main__\":\n    mp.spawn(train, args=(2,), nprocs=2)"
     },
     {
       diff: 3,
       q: "FSDPを使って大規模モデルをシャーディングする基本設定を書いてください。\n・AUTO_WRAPポリシーでトランスフォーマーブロックを単位にシャーディング\n・混合精度（BF16）を有効化",
-      code: `import torch
-import torch.distributed as dist
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-from torch.distributed.fsdp import MixedPrecision
-from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
-import functools
-
-class TransformerBlock(torch.nn.Module):
-    def __init__(self): super().__init__(); self.fc = torch.nn.Linear(512, 512)
-    def forward(self, x): return self.fc(x)
-
-class MyModel(torch.nn.Module):
-    def __init__(self): super().__init__(); self.layers = torch.nn.ModuleList([TransformerBlock() for _ in range(4)])
-    def forward(self, x):
-        for layer in self.layers: x = layer(x)
-        return x
-
-def setup(rank, world_size):
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-    torch.cuda.set_device(rank)
-    # TODO: FSDPでモデルをラップ（BF16混合精度、transformer_auto_wrap_policy）`,
-      answer: `import torch
-import torch.distributed as dist
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, MixedPrecision
-from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
-import functools
-
-class TransformerBlock(torch.nn.Module):
-    def __init__(self): super().__init__(); self.fc = torch.nn.Linear(512, 512)
-    def forward(self, x): return self.fc(x)
-
-class MyModel(torch.nn.Module):
-    def __init__(self): super().__init__(); self.layers = torch.nn.ModuleList([TransformerBlock() for _ in range(4)])
-    def forward(self, x):
-        for layer in self.layers: x = layer(x)
-        return x
-
-def setup(rank, world_size):
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-    torch.cuda.set_device(rank)
-
-    bf16_policy = MixedPrecision(
-        param_dtype=torch.bfloat16,
-        reduce_dtype=torch.bfloat16,
-        buffer_dtype=torch.bfloat16
-    )
-    auto_wrap = functools.partial(transformer_auto_wrap_policy, transformer_layer_cls={TransformerBlock})
-    model = FSDP(MyModel().to(rank), auto_wrap_policy=auto_wrap, mixed_precision=bf16_policy)
-    return model`
+      code: "import torch\nimport torch.distributed as dist\nfrom torch.distributed.fsdp import FullyShardedDataParallel as FSDP\nfrom torch.distributed.fsdp import MixedPrecision\nfrom torch.distributed.fsdp.wrap import transformer_auto_wrap_policy\nimport functools\n\nclass TransformerBlock(torch.nn.Module):\n    def __init__(self): super().__init__(); self.fc = torch.nn.Linear(512, 512)\n    def forward(self, x): return self.fc(x)\n\nclass MyModel(torch.nn.Module):\n    def __init__(self): super().__init__(); self.layers = torch.nn.ModuleList([TransformerBlock() for _ in range(4)])\n    def forward(self, x):\n        for layer in self.layers: x = layer(x)\n        return x\n\ndef setup(rank, world_size):\n    dist.init_process_group(\"nccl\", rank=rank, world_size=world_size)\n    torch.cuda.set_device(rank)\n    # TODO: FSDPでモデルをラップ（BF16混合精度、transformer_auto_wrap_policy）",
+      answer: "import torch\nimport torch.distributed as dist\nfrom torch.distributed.fsdp import FullyShardedDataParallel as FSDP, MixedPrecision\nfrom torch.distributed.fsdp.wrap import transformer_auto_wrap_policy\nimport functools\n\nclass TransformerBlock(torch.nn.Module):\n    def __init__(self): super().__init__(); self.fc = torch.nn.Linear(512, 512)\n    def forward(self, x): return self.fc(x)\n\nclass MyModel(torch.nn.Module):\n    def __init__(self): super().__init__(); self.layers = torch.nn.ModuleList([TransformerBlock() for _ in range(4)])\n    def forward(self, x):\n        for layer in self.layers: x = layer(x)\n        return x\n\ndef setup(rank, world_size):\n    dist.init_process_group(\"nccl\", rank=rank, world_size=world_size)\n    torch.cuda.set_device(rank)\n\n    bf16_policy = MixedPrecision(\n        param_dtype=torch.bfloat16,\n        reduce_dtype=torch.bfloat16,\n        buffer_dtype=torch.bfloat16\n    )\n    auto_wrap = functools.partial(transformer_auto_wrap_policy, transformer_layer_cls={TransformerBlock})\n    model = FSDP(MyModel().to(rank), auto_wrap_policy=auto_wrap, mixed_precision=bf16_policy)\n    return model"
     }
   ],
   ch2: [
     {
       diff: 2,
       q: "PEFTライブラリを使ってLLMにLoRAアダプターを追加し、アダプターのみを訓練してください。\n・ランクr=8、target_modules=[\"q_proj\",\"v_proj\"]\n・trainable parametersの割合を表示する",
-      code: `from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import LoraConfig, get_peft_model, TaskType
-
-model_name = "meta-llama/Llama-2-7b-hf"  # 例
-
-def print_trainable(model):
-    total = sum(p.numel() for p in model.parameters())
-    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Trainable: {trainable:,} / Total: {total:,} ({100*trainable/total:.2f}%)")
-
-# TODO: LoraConfigを作りget_peft_modelでラップ`,
-      answer: `from transformers import AutoModelForCausalLM
-from peft import LoraConfig, get_peft_model, TaskType
-
-model_name = "meta-llama/Llama-2-7b-hf"
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto")
-
-lora_config = LoraConfig(
-    task_type=TaskType.CAUSAL_LM,
-    r=8,
-    lora_alpha=16,
-    target_modules=["q_proj", "v_proj"],
-    lora_dropout=0.05,
-    bias="none"
-)
-
-model = get_peft_model(model, lora_config)
-
-total = sum(p.numel() for p in model.parameters())
-trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(f"Trainable: {trainable:,} / Total: {total:,} ({100*trainable/total:.2f}%)")`
+      code: "from transformers import AutoModelForCausalLM, AutoTokenizer\nfrom peft import LoraConfig, get_peft_model, TaskType\n\nmodel_name = \"meta-llama/Llama-2-7b-hf\"  # 例\n\ndef print_trainable(model):\n    total = sum(p.numel() for p in model.parameters())\n    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)\n    print(f\"Trainable: {trainable:,} / Total: {total:,} ({100*trainable/total:.2f}%)\")\n\n# TODO: LoraConfigを作りget_peft_modelでラップ",
+      answer: "from transformers import AutoModelForCausalLM\nfrom peft import LoraConfig, get_peft_model, TaskType\n\nmodel_name = \"meta-llama/Llama-2-7b-hf\"\nmodel = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=\"auto\")\n\nlora_config = LoraConfig(\n    task_type=TaskType.CAUSAL_LM,\n    r=8,\n    lora_alpha=16,\n    target_modules=[\"q_proj\", \"v_proj\"],\n    lora_dropout=0.05,\n    bias=\"none\"\n)\n\nmodel = get_peft_model(model, lora_config)\n\ntotal = sum(p.numel() for p in model.parameters())\ntrainable = sum(p.numel() for p in model.parameters() if p.requires_grad)\nprint(f\"Trainable: {trainable:,} / Total: {total:,} ({100*trainable/total:.2f}%)\")"
     },
     {
       diff: 3,
       q: "QLoRAのキーとなるbitsandbytesのBF16+4bit量子化設定を書いてください。\n・NF4量子化・二重量子化・compute_dtype=BF16\n・LoRAと組み合わせてモデルをロードする",
-      code: `from transformers import AutoModelForCausalLM, BitsAndBytesConfig
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-import torch
-
-# TODO: BitsAndBytesConfigを設定してモデルをロード
-# TODO: prepare_model_for_kbit_trainingでkbit訓練用に準備
-# TODO: LoRAアダプターを追加`,
-      answer: `from transformers import AutoModelForCausalLM, BitsAndBytesConfig
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-import torch
-
-bnb_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_use_double_quant=True,
-    bnb_4bit_compute_dtype=torch.bfloat16
-)
-model = AutoModelForCausalLM.from_pretrained(
-    "meta-llama/Llama-2-7b-hf",
-    quantization_config=bnb_config,
-    device_map="auto"
-)
-model = prepare_model_for_kbit_training(model)
-
-lora_config = LoraConfig(r=16, lora_alpha=32, target_modules=["q_proj","v_proj"], lora_dropout=0.05)
-model = get_peft_model(model, lora_config)
-model.print_trainable_parameters()`
+      code: "from transformers import AutoModelForCausalLM, BitsAndBytesConfig\nfrom peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training\nimport torch\n\n# TODO: BitsAndBytesConfigを設定してモデルをロード\n# TODO: prepare_model_for_kbit_trainingでkbit訓練用に準備\n# TODO: LoRAアダプターを追加",
+      answer: "from transformers import AutoModelForCausalLM, BitsAndBytesConfig\nfrom peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training\nimport torch\n\nbnb_config = BitsAndBytesConfig(\n    load_in_4bit=True,\n    bnb_4bit_quant_type=\"nf4\",\n    bnb_4bit_use_double_quant=True,\n    bnb_4bit_compute_dtype=torch.bfloat16\n)\nmodel = AutoModelForCausalLM.from_pretrained(\n    \"meta-llama/Llama-2-7b-hf\",\n    quantization_config=bnb_config,\n    device_map=\"auto\"\n)\nmodel = prepare_model_for_kbit_training(model)\n\nlora_config = LoraConfig(r=16, lora_alpha=32, target_modules=[\"q_proj\",\"v_proj\"], lora_dropout=0.05)\nmodel = get_peft_model(model, lora_config)\nmodel.print_trainable_parameters()"
     }
   ],
   ch3: [
     {
       diff: 2,
       q: "torch.compileの3つのモードを使ってモデルの推論時間を比較してください。\n・default・reduce-overhead・max-autotuneそれぞれでcompileしてtimeitで計測",
-      code: `import torch
-import time
-
-model = torch.nn.Sequential(
-    torch.nn.Linear(1024, 1024), torch.nn.ReLU(),
-    torch.nn.Linear(1024, 1024)
-).cuda().eval()
-x = torch.randn(64, 1024).cuda()
-
-def benchmark(m, x, n=50):
-    # ウォームアップ
-    for _ in range(5): m(x)
-    torch.cuda.synchronize()
-    t0 = time.time()
-    for _ in range(n): m(x)
-    torch.cuda.synchronize()
-    return (time.time() - t0) / n * 1000
-
-# TODO: 3モードでcompileして比較`,
-      answer: `import torch, time
-
-model = torch.nn.Sequential(
-    torch.nn.Linear(1024, 1024), torch.nn.ReLU(),
-    torch.nn.Linear(1024, 1024)
-).cuda().eval()
-x = torch.randn(64, 1024).cuda()
-
-def benchmark(m, x, n=50):
-    for _ in range(5): m(x)
-    torch.cuda.synchronize()
-    t0 = time.time()
-    for _ in range(n): m(x)
-    torch.cuda.synchronize()
-    return (time.time() - t0) / n * 1000
-
-modes = ["default", "reduce-overhead", "max-autotune"]
-print(f"Eager: {benchmark(model, x):.2f}ms")
-for mode in modes:
-    compiled = torch.compile(model, mode=mode)
-    ms = benchmark(compiled, x)
-    print(f"compile({mode}): {ms:.2f}ms")`
+      code: "import torch\nimport time\n\nmodel = torch.nn.Sequential(\n    torch.nn.Linear(1024, 1024), torch.nn.ReLU(),\n    torch.nn.Linear(1024, 1024)\n).cuda().eval()\nx = torch.randn(64, 1024).cuda()\n\ndef benchmark(m, x, n=50):\n    # ウォームアップ\n    for _ in range(5): m(x)\n    torch.cuda.synchronize()\n    t0 = time.time()\n    for _ in range(n): m(x)\n    torch.cuda.synchronize()\n    return (time.time() - t0) / n * 1000\n\n# TODO: 3モードでcompileして比較",
+      answer: "import torch, time\n\nmodel = torch.nn.Sequential(\n    torch.nn.Linear(1024, 1024), torch.nn.ReLU(),\n    torch.nn.Linear(1024, 1024)\n).cuda().eval()\nx = torch.randn(64, 1024).cuda()\n\ndef benchmark(m, x, n=50):\n    for _ in range(5): m(x)\n    torch.cuda.synchronize()\n    t0 = time.time()\n    for _ in range(n): m(x)\n    torch.cuda.synchronize()\n    return (time.time() - t0) / n * 1000\n\nmodes = [\"default\", \"reduce-overhead\", \"max-autotune\"]\nprint(f\"Eager: {benchmark(model, x):.2f}ms\")\nfor mode in modes:\n    compiled = torch.compile(model, mode=mode)\n    ms = benchmark(compiled, x)\n    print(f\"compile({mode}): {ms:.2f}ms\")"
     },
     {
       diff: 2,
       q: "torch.jit.scriptでモデルをTorchScript化してファイルに保存・ロードしてください。",
-      code: `import torch
-
-class SimpleModel(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc = torch.nn.Linear(10, 5)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.relu(self.fc(x))
-
-# TODO: torch.jit.scriptでスクリプト化、saved_model.ptに保存してロードして推論`,
-      answer: `import torch
-
-class SimpleModel(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc = torch.nn.Linear(10, 5)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.relu(self.fc(x))
-
-model = SimpleModel()
-scripted = torch.jit.script(model)
-scripted.save("saved_model.pt")
-
-# ロードして推論（Pythonクラス定義不要）
-loaded = torch.jit.load("saved_model.pt")
-x = torch.randn(1, 10)
-output = loaded(x)
-print(output.shape)  # torch.Size([1, 5])`
+      code: "import torch\n\nclass SimpleModel(torch.nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc = torch.nn.Linear(10, 5)\n\n    def forward(self, x: torch.Tensor) -> torch.Tensor:\n        return torch.relu(self.fc(x))\n\n# TODO: torch.jit.scriptでスクリプト化、saved_model.ptに保存してロードして推論",
+      answer: "import torch\n\nclass SimpleModel(torch.nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc = torch.nn.Linear(10, 5)\n\n    def forward(self, x: torch.Tensor) -> torch.Tensor:\n        return torch.relu(self.fc(x))\n\nmodel = SimpleModel()\nscripted = torch.jit.script(model)\nscripted.save(\"saved_model.pt\")\n\n# ロードして推論（Pythonクラス定義不要）\nloaded = torch.jit.load(\"saved_model.pt\")\nx = torch.randn(1, 10)\noutput = loaded(x)\nprint(output.shape)  # torch.Size([1, 5])"
     }
   ],
   ch4: [
     {
       diff: 2,
       q: "カスタム自動微分関数（torch.autograd.Function）を実装してください。\n・forward: 入力をclamp_min(0)するReLU\n・backward: 入力が正の部分のみgradを通す",
-      code: `import torch
-
-class CustomReLU(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, input):
-        # TODO: maskを保存してclamp_min(0)を返す
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        # TODO: maskを使ってgradをフィルタ
-
-x = torch.tensor([-1.0, 0.5, 2.0], requires_grad=True)
-y = CustomReLU.apply(x)
-y.sum().backward()
-print(x.grad)  # tensor([0., 1., 1.])`,
-      answer: `import torch
-
-class CustomReLU(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, input):
-        mask = input > 0
-        ctx.save_for_backward(mask)
-        return input.clamp_min(0)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        mask, = ctx.saved_tensors
-        return grad_output * mask.float()
-
-x = torch.tensor([-1.0, 0.5, 2.0], requires_grad=True)
-y = CustomReLU.apply(x)
-y.sum().backward()
-print(x.grad)  # tensor([0., 1., 1.])`
+      code: "import torch\n\nclass CustomReLU(torch.autograd.Function):\n    @staticmethod\n    def forward(ctx, input):\n        # TODO: maskを保存してclamp_min(0)を返す\n\n    @staticmethod\n    def backward(ctx, grad_output):\n        # TODO: maskを使ってgradをフィルタ\n\nx = torch.tensor([-1.0, 0.5, 2.0], requires_grad=True)\ny = CustomReLU.apply(x)\ny.sum().backward()\nprint(x.grad)  # tensor([0., 1., 1.])",
+      answer: "import torch\n\nclass CustomReLU(torch.autograd.Function):\n    @staticmethod\n    def forward(ctx, input):\n        mask = input > 0\n        ctx.save_for_backward(mask)\n        return input.clamp_min(0)\n\n    @staticmethod\n    def backward(ctx, grad_output):\n        mask, = ctx.saved_tensors\n        return grad_output * mask.float()\n\nx = torch.tensor([-1.0, 0.5, 2.0], requires_grad=True)\ny = CustomReLU.apply(x)\ny.sum().backward()\nprint(x.grad)  # tensor([0., 1., 1.])"
     },
     {
       diff: 3,
       q: "torch.utils.cpp_extensionのload()でJIT-コンパイルするカスタムC++拡張の構造を書いてください。\n・CPU C++でReLUを実装するcpp_sourceを定義し、load()の使い方を示す",
-      code: `import torch
-from torch.utils.cpp_extension import load
-
-# TODO: C++ソースを文字列で定義してload()でJITコンパイル
-# relu_forward(input: Tensor) -> Tensor を実装するC++コードを書く`,
-      answer: `import torch
-from torch.utils.cpp_extension import load
-import tempfile, os
-
-cpp_source = """
-#include <torch/extension.h>
-
-torch::Tensor relu_forward(torch::Tensor input) {
-    return torch::clamp_min(input, 0);
-}
-
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("relu_forward", &relu_forward, "Custom ReLU (CPU)");
-}
-"""
-
-# ファイルに書き出してload()でJITコンパイル
-with tempfile.NamedTemporaryFile(suffix=".cpp", delete=False, mode="w") as f:
-    f.write(cpp_source)
-    tmp_path = f.name
-
-ext = load(name="custom_relu", sources=[tmp_path], verbose=False)
-x = torch.randn(5)
-print(ext.relu_forward(x))  # ReLU適用済みテンソル
-os.unlink(tmp_path)`
+      code: "import torch\nfrom torch.utils.cpp_extension import load\n\n# TODO: C++ソースを文字列で定義してload()でJITコンパイル\n# relu_forward(input: Tensor) -> Tensor を実装するC++コードを書く",
+      answer: "import torch\nfrom torch.utils.cpp_extension import load\nimport tempfile, os\n\ncpp_source = \"\"\"\n#include <torch/extension.h>\n\ntorch::Tensor relu_forward(torch::Tensor input) {\n    return torch::clamp_min(input, 0);\n}\n\nPYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {\n    m.def(\"relu_forward\", &relu_forward, \"Custom ReLU (CPU)\");\n}\n\"\"\"\n\n# ファイルに書き出してload()でJITコンパイル\nwith tempfile.NamedTemporaryFile(suffix=\".cpp\", delete=False, mode=\"w\") as f:\n    f.write(cpp_source)\n    tmp_path = f.name\n\next = load(name=\"custom_relu\", sources=[tmp_path], verbose=False)\nx = torch.randn(5)\nprint(ext.relu_forward(x))  # ReLU適用済みテンソル\nos.unlink(tmp_path)"
     }
   ],
   ch5: [
     {
       diff: 2,
       q: "CartPole-v1環境でDQNエージェントの主要コンポーネントを実装してください。\n・Q-NetworkとTarget-Networkの2つのネットワーク\n・ReplayBufferからのランダムサンプリング",
-      code: `import torch
-import torch.nn as nn
-import random
-from collections import deque
-
-class QNetwork(nn.Module):
-    def __init__(self, state_dim, action_dim):
-        super().__init__()
-        # TODO: 2層MLPを定義（128ユニット）
-
-class ReplayBuffer:
-    def __init__(self, capacity):
-        self.buffer = deque(maxlen=capacity)
-
-    def push(self, state, action, reward, next_state, done):
-        # TODO
-
-    def sample(self, batch_size):
-        # TODO: ランダムサンプリングしてTensorで返す
-
-    def __len__(self): return len(self.buffer)`,
-      answer: `import torch
-import torch.nn as nn
-import random
-from collections import deque
-
-class QNetwork(nn.Module):
-    def __init__(self, state_dim, action_dim):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(state_dim, 128), nn.ReLU(),
-            nn.Linear(128, 128), nn.ReLU(),
-            nn.Linear(128, action_dim)
-        )
-    def forward(self, x): return self.net(x)
-
-class ReplayBuffer:
-    def __init__(self, capacity):
-        self.buffer = deque(maxlen=capacity)
-
-    def push(self, state, action, reward, next_state, done):
-        self.buffer.append((state, action, reward, next_state, done))
-
-    def sample(self, batch_size):
-        batch = random.sample(self.buffer, batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch)
-        return (torch.FloatTensor(states), torch.LongTensor(actions),
-                torch.FloatTensor(rewards), torch.FloatTensor(next_states),
-                torch.FloatTensor(dones))
-
-    def __len__(self): return len(self.buffer)`
+      code: "import torch\nimport torch.nn as nn\nimport random\nfrom collections import deque\n\nclass QNetwork(nn.Module):\n    def __init__(self, state_dim, action_dim):\n        super().__init__()\n        # TODO: 2層MLPを定義（128ユニット）\n\nclass ReplayBuffer:\n    def __init__(self, capacity):\n        self.buffer = deque(maxlen=capacity)\n\n    def push(self, state, action, reward, next_state, done):\n        # TODO\n\n    def sample(self, batch_size):\n        # TODO: ランダムサンプリングしてTensorで返す\n\n    def __len__(self): return len(self.buffer)",
+      answer: "import torch\nimport torch.nn as nn\nimport random\nfrom collections import deque\n\nclass QNetwork(nn.Module):\n    def __init__(self, state_dim, action_dim):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(state_dim, 128), nn.ReLU(),\n            nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, action_dim)\n        )\n    def forward(self, x): return self.net(x)\n\nclass ReplayBuffer:\n    def __init__(self, capacity):\n        self.buffer = deque(maxlen=capacity)\n\n    def push(self, state, action, reward, next_state, done):\n        self.buffer.append((state, action, reward, next_state, done))\n\n    def sample(self, batch_size):\n        batch = random.sample(self.buffer, batch_size)\n        states, actions, rewards, next_states, dones = zip(*batch)\n        return (torch.FloatTensor(states), torch.LongTensor(actions),\n                torch.FloatTensor(rewards), torch.FloatTensor(next_states),\n                torch.FloatTensor(dones))\n\n    def __len__(self): return len(self.buffer)"
     },
     {
       diff: 3,
       q: "PPOのクリッピング付き目的関数を実装してください。\n・ratio = pi_new / pi_old\n・clipした目的関数とUnclipの小さい方の平均を返す",
-      code: `import torch
-
-def ppo_clip_loss(log_probs_new, log_probs_old, advantages, clip_eps=0.2):
-    """
-    log_probs_new: 現在の方策の対数確率
-    log_probs_old: 古い方策の対数確率（detach済み）
-    advantages: Advantage推定値
-    """
-    # TODO: ratioを計算し、クリッピング付き損失を返す`,
-      answer: `import torch
-
-def ppo_clip_loss(log_probs_new, log_probs_old, advantages, clip_eps=0.2):
-    ratio = torch.exp(log_probs_new - log_probs_old)
-    surr1 = ratio * advantages
-    surr2 = torch.clamp(ratio, 1 - clip_eps, 1 + clip_eps) * advantages
-    # 最小化するため負の符号（最大化問題を最小化問題に変換）
-    return -torch.min(surr1, surr2).mean()
-
-# 動作確認
-log_new = torch.tensor([0.1, 0.2, -0.1, 0.3])
-log_old = torch.tensor([0.0, 0.1, 0.0, 0.1])
-adv = torch.tensor([1.0, -0.5, 2.0, -1.0])
-loss = ppo_clip_loss(log_new, log_old, adv)
-print(f"PPO Loss: {loss.item():.4f}")`
+      code: "import torch\n\ndef ppo_clip_loss(log_probs_new, log_probs_old, advantages, clip_eps=0.2):\n    \"\"\"\n    log_probs_new: 現在の方策の対数確率\n    log_probs_old: 古い方策の対数確率（detach済み）\n    advantages: Advantage推定値\n    \"\"\"\n    # TODO: ratioを計算し、クリッピング付き損失を返す",
+      answer: "import torch\n\ndef ppo_clip_loss(log_probs_new, log_probs_old, advantages, clip_eps=0.2):\n    ratio = torch.exp(log_probs_new - log_probs_old)\n    surr1 = ratio * advantages\n    surr2 = torch.clamp(ratio, 1 - clip_eps, 1 + clip_eps) * advantages\n    # 最小化するため負の符号（最大化問題を最小化問題に変換）\n    return -torch.min(surr1, surr2).mean()\n\n# 動作確認\nlog_new = torch.tensor([0.1, 0.2, -0.1, 0.3])\nlog_old = torch.tensor([0.0, 0.1, 0.0, 0.1])\nadv = torch.tensor([1.0, -0.5, 2.0, -1.0])\nloss = ppo_clip_loss(log_new, log_old, adv)\nprint(f\"PPO Loss: {loss.item():.4f}\")"
     }
   ],
   ch6: [
     {
       diff: 2,
       q: "SimCLRのNTXent（対照損失）を実装してください。\n・同一画像の2つのAugmentation viewをペアとして引き寄せる\n・バッチ内の他サンプルを負例とする",
-      code: `import torch
-import torch.nn.functional as F
-
-def ntxent_loss(z1, z2, temperature=0.5):
-    """
-    z1, z2: shape (N, D) の正規化済み特徴ベクトル
-    同一インデックス(i, i)が正例ペア
-    """
-    # TODO: コサイン類似度行列を計算し、対角要素を正例として損失を計算`,
-      answer: `import torch
-import torch.nn.functional as F
-
-def ntxent_loss(z1, z2, temperature=0.5):
-    N = z1.shape[0]
-    z = torch.cat([z1, z2], dim=0)  # (2N, D)
-    z = F.normalize(z, dim=1)
-    sim = torch.mm(z, z.T) / temperature  # (2N, 2N)
-
-    # 自己類似度を-infに
-    sim.fill_diagonal_(float('-inf'))
-
-    # 正例のインデックス: i <-> i+N, i+N <-> i
-    labels = torch.arange(N, device=z1.device)
-    labels = torch.cat([labels + N, labels])  # (2N,)
-
-    return F.cross_entropy(sim, labels)
-
-# 動作確認
-z1 = F.normalize(torch.randn(8, 128), dim=1)
-z2 = F.normalize(torch.randn(8, 128), dim=1)
-print(f"NTXent Loss: {ntxent_loss(z1, z2):.4f}")`
+      code: "import torch\nimport torch.nn.functional as F\n\ndef ntxent_loss(z1, z2, temperature=0.5):\n    \"\"\"\n    z1, z2: shape (N, D) の正規化済み特徴ベクトル\n    同一インデックス(i, i)が正例ペア\n    \"\"\"\n    # TODO: コサイン類似度行列を計算し、対角要素を正例として損失を計算",
+      answer: "import torch\nimport torch.nn.functional as F\n\ndef ntxent_loss(z1, z2, temperature=0.5):\n    N = z1.shape[0]\n    z = torch.cat([z1, z2], dim=0)  # (2N, D)\n    z = F.normalize(z, dim=1)\n    sim = torch.mm(z, z.T) / temperature  # (2N, 2N)\n\n    # 自己類似度を-infに\n    sim.fill_diagonal_(float('-inf'))\n\n    # 正例のインデックス: i <-> i+N, i+N <-> i\n    labels = torch.arange(N, device=z1.device)\n    labels = torch.cat([labels + N, labels])  # (2N,)\n\n    return F.cross_entropy(sim, labels)\n\n# 動作確認\nz1 = F.normalize(torch.randn(8, 128), dim=1)\nz2 = F.normalize(torch.randn(8, 128), dim=1)\nprint(f\"NTXent Loss: {ntxent_loss(z1, z2):.4f}\")"
     },
     {
       diff: 2,
       q: "MAEのランダムマスキング（パッチの75%をマスク）を実装してください。\n・パッチ列をランダムにシャッフル\n・上位75%をマスクとして返す",
-      code: `import torch
-
-def random_masking(x, mask_ratio=0.75):
-    """
-    x: shape (B, N, D) — B=バッチ、N=パッチ数、D=特徴次元
-    return: x_masked (B, N_visible, D), mask (B, N), ids_restore (B, N)
-    """
-    B, N, D = x.shape
-    num_keep = int(N * (1 - mask_ratio))
-    # TODO: ランダムに num_keep 個のパッチを残す`,
-      answer: `import torch
-
-def random_masking(x, mask_ratio=0.75):
-    B, N, D = x.shape
-    num_keep = int(N * (1 - mask_ratio))
-
-    noise = torch.rand(B, N, device=x.device)
-    ids_shuffle = torch.argsort(noise, dim=1)
-    ids_restore = torch.argsort(ids_shuffle, dim=1)
-
-    ids_keep = ids_shuffle[:, :num_keep]
-    x_masked = torch.gather(x, 1, ids_keep.unsqueeze(-1).expand(-1, -1, D))
-
-    mask = torch.ones(B, N, device=x.device)
-    mask[:, :num_keep] = 0
-    mask = torch.gather(mask, 1, ids_restore)
-
-    return x_masked, mask, ids_restore
-
-x = torch.randn(4, 196, 768)  # 196パッチ、ViT-Baseの次元
-x_m, mask, ids_r = random_masking(x)
-print(f"Visible: {x_m.shape}, Mask sum: {mask.sum(dim=1)[0]:.0f}/196")`
+      code: "import torch\n\ndef random_masking(x, mask_ratio=0.75):\n    \"\"\"\n    x: shape (B, N, D) — B=バッチ、N=パッチ数、D=特徴次元\n    return: x_masked (B, N_visible, D), mask (B, N), ids_restore (B, N)\n    \"\"\"\n    B, N, D = x.shape\n    num_keep = int(N * (1 - mask_ratio))\n    # TODO: ランダムに num_keep 個のパッチを残す",
+      answer: "import torch\n\ndef random_masking(x, mask_ratio=0.75):\n    B, N, D = x.shape\n    num_keep = int(N * (1 - mask_ratio))\n\n    noise = torch.rand(B, N, device=x.device)\n    ids_shuffle = torch.argsort(noise, dim=1)\n    ids_restore = torch.argsort(ids_shuffle, dim=1)\n\n    ids_keep = ids_shuffle[:, :num_keep]\n    x_masked = torch.gather(x, 1, ids_keep.unsqueeze(-1).expand(-1, -1, D))\n\n    mask = torch.ones(B, N, device=x.device)\n    mask[:, :num_keep] = 0\n    mask = torch.gather(mask, 1, ids_restore)\n\n    return x_masked, mask, ids_restore\n\nx = torch.randn(4, 196, 768)  # 196パッチ、ViT-Baseの次元\nx_m, mask, ids_r = random_masking(x)\nprint(f\"Visible: {x_m.shape}, Mask sum: {mask.sum(dim=1)[0]:.0f}/196\")"
     }
   ],
   ch7: [
     {
       diff: 2,
       q: "torch.quantization.quantize_dynamicで線形層をINT8量子化し、推論速度とモデルサイズを比較してください。",
-      code: `import torch
-import torch.nn as nn
-import time
-
-model = nn.Sequential(
-    nn.Linear(512, 2048), nn.ReLU(),
-    nn.Linear(2048, 2048), nn.ReLU(),
-    nn.Linear(2048, 10)
-)
-model.eval()
-
-# TODO: quantize_dynamicで量子化
-# TODO: FP32とINT8のサイズ・推論時間を比較`,
-      answer: `import torch
-import torch.nn as nn
-import time, io
-
-model = nn.Sequential(
-    nn.Linear(512, 2048), nn.ReLU(),
-    nn.Linear(2048, 2048), nn.ReLU(),
-    nn.Linear(2048, 10)
-).eval()
-
-quantized = torch.quantization.quantize_dynamic(
-    model, {nn.Linear}, dtype=torch.qint8
-)
-
-def model_size(m):
-    buf = io.BytesIO(); torch.save(m.state_dict(), buf); return len(buf.getvalue()) / 1024
-
-def latency(m, x, n=100):
-    for _ in range(5): m(x)
-    t0 = time.time()
-    for _ in range(n): m(x)
-    return (time.time() - t0) / n * 1000
-
-x = torch.randn(1, 512)
-print(f"FP32 size: {model_size(model):.1f} KB, latency: {latency(model, x):.2f}ms")
-print(f"INT8 size: {model_size(quantized):.1f} KB, latency: {latency(quantized, x):.2f}ms")`
+      code: "import torch\nimport torch.nn as nn\nimport time\n\nmodel = nn.Sequential(\n    nn.Linear(512, 2048), nn.ReLU(),\n    nn.Linear(2048, 2048), nn.ReLU(),\n    nn.Linear(2048, 10)\n)\nmodel.eval()\n\n# TODO: quantize_dynamicで量子化\n# TODO: FP32とINT8のサイズ・推論時間を比較",
+      answer: "import torch\nimport torch.nn as nn\nimport time, io\n\nmodel = nn.Sequential(\n    nn.Linear(512, 2048), nn.ReLU(),\n    nn.Linear(2048, 2048), nn.ReLU(),\n    nn.Linear(2048, 10)\n).eval()\n\nquantized = torch.quantization.quantize_dynamic(\n    model, {nn.Linear}, dtype=torch.qint8\n)\n\ndef model_size(m):\n    buf = io.BytesIO(); torch.save(m.state_dict(), buf); return len(buf.getvalue()) / 1024\n\ndef latency(m, x, n=100):\n    for _ in range(5): m(x)\n    t0 = time.time()\n    for _ in range(n): m(x)\n    return (time.time() - t0) / n * 1000\n\nx = torch.randn(1, 512)\nprint(f\"FP32 size: {model_size(model):.1f} KB, latency: {latency(model, x):.2f}ms\")\nprint(f\"INT8 size: {model_size(quantized):.1f} KB, latency: {latency(quantized, x):.2f}ms\")"
     },
     {
       diff: 2,
       q: "torch.cuda.amp.autocastとGradScalerを使った混合精度訓練ループを実装してください。",
-      code: `import torch
-import torch.nn as nn
-from torch.cuda.amp import autocast, GradScaler
-
-model = nn.Linear(512, 10).cuda()
-optimizer = torch.optim.AdamW(model.parameters())
-scaler = GradScaler()
-x = torch.randn(64, 512).cuda()
-y = torch.randint(0, 10, (64,)).cuda()
-
-# TODO: autocastとGradScalerを使った訓練ループを1イテレーション実装`,
-      answer: `import torch
-import torch.nn as nn
-from torch.cuda.amp import autocast, GradScaler
-
-model = nn.Linear(512, 10).cuda()
-optimizer = torch.optim.AdamW(model.parameters())
-scaler = GradScaler()
-x = torch.randn(64, 512).cuda()
-y = torch.randint(0, 10, (64,)).cuda()
-
-optimizer.zero_grad()
-with autocast(dtype=torch.float16):
-    logits = model(x)
-    loss = nn.functional.cross_entropy(logits, y)
-
-scaler.scale(loss).backward()
-scaler.step(optimizer)
-scaler.update()
-print(f"Loss: {loss.item():.4f} (computed in FP16, grad in FP32)")`
+      code: "import torch\nimport torch.nn as nn\nfrom torch.cuda.amp import autocast, GradScaler\n\nmodel = nn.Linear(512, 10).cuda()\noptimizer = torch.optim.AdamW(model.parameters())\nscaler = GradScaler()\nx = torch.randn(64, 512).cuda()\ny = torch.randint(0, 10, (64,)).cuda()\n\n# TODO: autocastとGradScalerを使った訓練ループを1イテレーション実装",
+      answer: "import torch\nimport torch.nn as nn\nfrom torch.cuda.amp import autocast, GradScaler\n\nmodel = nn.Linear(512, 10).cuda()\noptimizer = torch.optim.AdamW(model.parameters())\nscaler = GradScaler()\nx = torch.randn(64, 512).cuda()\ny = torch.randint(0, 10, (64,)).cuda()\n\noptimizer.zero_grad()\nwith autocast(dtype=torch.float16):\n    logits = model(x)\n    loss = nn.functional.cross_entropy(logits, y)\n\nscaler.scale(loss).backward()\nscaler.step(optimizer)\nscaler.update()\nprint(f\"Loss: {loss.item():.4f} (computed in FP16, grad in FP32)\")"
     }
   ],
   ch8: [
     {
       diff: 2,
       q: "DDPMの順方向拡散プロセス（ノイズを加える）を実装してください。\n・任意のタイムステップtでx_tを一発で計算するclosed-form式を使う",
-      code: `import torch
-
-class DiffusionScheduler:
-    def __init__(self, T=1000, beta_start=1e-4, beta_end=0.02):
-        self.T = T
-        betas = torch.linspace(beta_start, beta_end, T)
-        alphas = 1 - betas
-        self.alphas_cumprod = torch.cumprod(alphas, dim=0)
-
-    def q_sample(self, x0, t, noise=None):
-        """x0からタイムステップtのx_tをサンプリング"""
-        # TODO: closed-form: x_t = sqrt(alpha_bar_t)*x0 + sqrt(1-alpha_bar_t)*eps`,
-      answer: `import torch
-
-class DiffusionScheduler:
-    def __init__(self, T=1000, beta_start=1e-4, beta_end=0.02):
-        self.T = T
-        betas = torch.linspace(beta_start, beta_end, T)
-        alphas = 1 - betas
-        self.alphas_cumprod = torch.cumprod(alphas, dim=0)
-
-    def q_sample(self, x0, t, noise=None):
-        if noise is None:
-            noise = torch.randn_like(x0)
-        alpha_bar = self.alphas_cumprod[t].view(-1, 1, 1, 1)
-        return torch.sqrt(alpha_bar) * x0 + torch.sqrt(1 - alpha_bar) * noise
-
-scheduler = DiffusionScheduler()
-x0 = torch.randn(4, 3, 32, 32)
-t = torch.randint(0, 1000, (4,))
-xt = scheduler.q_sample(x0, t)
-print(f"x0 std: {x0.std():.3f}, xt std: {xt.std():.3f}")`
+      code: "import torch\n\nclass DiffusionScheduler:\n    def __init__(self, T=1000, beta_start=1e-4, beta_end=0.02):\n        self.T = T\n        betas = torch.linspace(beta_start, beta_end, T)\n        alphas = 1 - betas\n        self.alphas_cumprod = torch.cumprod(alphas, dim=0)\n\n    def q_sample(self, x0, t, noise=None):\n        \"\"\"x0からタイムステップtのx_tをサンプリング\"\"\"\n        # TODO: closed-form: x_t = sqrt(alpha_bar_t)*x0 + sqrt(1-alpha_bar_t)*eps",
+      answer: "import torch\n\nclass DiffusionScheduler:\n    def __init__(self, T=1000, beta_start=1e-4, beta_end=0.02):\n        self.T = T\n        betas = torch.linspace(beta_start, beta_end, T)\n        alphas = 1 - betas\n        self.alphas_cumprod = torch.cumprod(alphas, dim=0)\n\n    def q_sample(self, x0, t, noise=None):\n        if noise is None:\n            noise = torch.randn_like(x0)\n        alpha_bar = self.alphas_cumprod[t].view(-1, 1, 1, 1)\n        return torch.sqrt(alpha_bar) * x0 + torch.sqrt(1 - alpha_bar) * noise\n\nscheduler = DiffusionScheduler()\nx0 = torch.randn(4, 3, 32, 32)\nt = torch.randint(0, 1000, (4,))\nxt = scheduler.q_sample(x0, t)\nprint(f\"x0 std: {x0.std():.3f}, xt std: {xt.std():.3f}\")"
     },
     {
       diff: 3,
       q: "Mambaの選択的状態空間（SSM）の核心であるゼロ次ホールド離散化を実装してください。\n・A_bar = exp(delta * A)\n・B_bar = (exp(delta*A) - 1) / A * B",
-      code: `import torch
-
-def discretize_zoh(A, B, delta):
-    """
-    Zero-Order Hold による離散化
-    A: (D, N) — 状態遷移行列（対角近似）
-    B: (D, N) — 入力行列
-    delta: (B_batch, D) — タイムステップ
-    return: A_bar, B_bar  どちらも (B_batch, D, N)
-    """
-    # TODO`,
-      answer: `import torch
-
-def discretize_zoh(A, B, delta):
-    # dA: (B, D, N)
-    dA = torch.einsum("bd,dn->bdn", delta, A)
-    A_bar = torch.exp(dA)
-    # B_bar = (exp(dA) - 1) / dA * (delta * B)
-    dB = torch.einsum("bd,dn->bdn", delta, B)
-    # 数値安定: (exp(x)-1)/x を expm1で計算
-    B_bar = torch.expm1(dA) / dA * dB
-    return A_bar, B_bar
-
-# 動作確認
-D, N = 16, 4
-A = -torch.abs(torch.randn(D, N))  # 安定性のため負の値
-B = torch.randn(D, N)
-delta = torch.rand(2, D) * 0.01 + 0.001
-A_bar, B_bar = discretize_zoh(A, B, delta)
-print(f"A_bar: {A_bar.shape}, B_bar: {B_bar.shape}")
-# A_bar: torch.Size([2, 16, 4]), B_bar: torch.Size([2, 16, 4])`
+      code: "import torch\n\ndef discretize_zoh(A, B, delta):\n    \"\"\"\n    Zero-Order Hold による離散化\n    A: (D, N) — 状態遷移行列（対角近似）\n    B: (D, N) — 入力行列\n    delta: (B_batch, D) — タイムステップ\n    return: A_bar, B_bar  どちらも (B_batch, D, N)\n    \"\"\"\n    # TODO",
+      answer: "import torch\n\ndef discretize_zoh(A, B, delta):\n    # dA: (B, D, N)\n    dA = torch.einsum(\"bd,dn->bdn\", delta, A)\n    A_bar = torch.exp(dA)\n    # B_bar = (exp(dA) - 1) / dA * (delta * B)\n    dB = torch.einsum(\"bd,dn->bdn\", delta, B)\n    # 数値安定: (exp(x)-1)/x を expm1で計算\n    B_bar = torch.expm1(dA) / dA * dB\n    return A_bar, B_bar\n\n# 動作確認\nD, N = 16, 4\nA = -torch.abs(torch.randn(D, N))  # 安定性のため負の値\nB = torch.randn(D, N)\ndelta = torch.rand(2, D) * 0.01 + 0.001\nA_bar, B_bar = discretize_zoh(A, B, delta)\nprint(f\"A_bar: {A_bar.shape}, B_bar: {B_bar.shape}\")\n# A_bar: torch.Size([2, 16, 4]), B_bar: torch.Size([2, 16, 4])"
     }
   ]
 };
@@ -739,31 +220,7 @@ const chapters = [
         body: "大規模モデルの訓練は単一GPUでは不可能です。PyTorchはDistributedDataParallel（DDP）とFullyShardedDataParallel（FSDP）という2つの分散訓練方式を提供します。\n\nDDPは各GPUに全パラメータのコピーを持ち、バックワード時にAllReduceで勾配を同期するシンプルな方式です。一方FSDPはZeRO-3アルゴリズムに基づいており、パラメータ・勾配・オプティマイザ状態をGPU間でシャーディング（分割保持）します。70Bを超えるモデルはFSDPなしでは訓練できません。",
         table: T.ddpVsFsdp,
         afterTable: "FSDPのシャーディングはforward時に必要なシャードを他GPUからAllGatherして使い、不要になったらすぐ解放します。メモリ効率は大幅に上がりますが、通信オーバーヘッドが増えるため通信帯域がボトルネックになる場合があります。",
-        code: `# FSDP基本設定例
-import torch
-import torch.distributed as dist
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-from torch.distributed.fsdp import ShardingStrategy, MixedPrecision
-import torch.multiprocessing as mp
-
-def fsdp_train(rank, world_size):
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-    torch.cuda.set_device(rank)
-
-    model = build_large_model().to(rank)
-    model = FSDP(
-        model,
-        sharding_strategy=ShardingStrategy.FULL_SHARD,
-        mixed_precision=MixedPrecision(
-            param_dtype=torch.bfloat16,
-            reduce_dtype=torch.bfloat16
-        ),
-        device_id=rank
-    )
-
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
-    # ... 訓練ループ
-    dist.destroy_process_group()`,
+        code: "# FSDP基本設定例\nimport torch\nimport torch.distributed as dist\nfrom torch.distributed.fsdp import FullyShardedDataParallel as FSDP\nfrom torch.distributed.fsdp import ShardingStrategy, MixedPrecision\nimport torch.multiprocessing as mp\n\ndef fsdp_train(rank, world_size):\n    dist.init_process_group(\"nccl\", rank=rank, world_size=world_size)\n    torch.cuda.set_device(rank)\n\n    model = build_large_model().to(rank)\n    model = FSDP(\n        model,\n        sharding_strategy=ShardingStrategy.FULL_SHARD,\n        mixed_precision=MixedPrecision(\n            param_dtype=torch.bfloat16,\n            reduce_dtype=torch.bfloat16\n        ),\n        device_id=rank\n    )\n\n    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)\n    # ... 訓練ループ\n    dist.destroy_process_group()",
         afterCode: "TORCH_NCCL_ASYNC_ERROR_HANDLING=1 環境変数を設定しておくと、NCCL通信エラーが発生した際にプロセスが無限にハングせず、デバッグしやすくなります。"
       }
     ]
@@ -780,26 +237,7 @@ def fsdp_train(rank, world_size):
         body: "LoRA（Low-Rank Adaptation）は、事前学習済みモデルの重み行列Wを凍結し、低ランク行列の積ΔW = BA（Bはd×r、Aはr×k、r << min(d,k)）だけを訓練するパラメータ効率的なファインチューニング手法です。\n\n7Bのモデルでも r=8 程度にすれば訓練パラメータ数は全体の0.1%以下になります。メモリ消費が大幅に下がるため、A100 80GBで訓練していたモデルをRTX 4090 24GBで訓練できるようになります。PEFTライブラリはLoRAをdecorator的に既存モデルに追加する実装を提供しています。",
         table: T.loraConfig,
         afterTable: "target_modulesはアーキテクチャによって異なります。LLaMA系はq_proj, v_proj、GPT系はc_attn, c_projが典型的です。attention層だけでなくMLPのゲート層まで広げるとさらに精度が上がる場合があります。",
-        code: `from peft import LoraConfig, get_peft_model, TaskType
-from transformers import AutoModelForCausalLM, TrainingArguments
-
-model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf")
-
-config = LoraConfig(
-    task_type=TaskType.CAUSAL_LM,
-    r=8, lora_alpha=16,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-    lora_dropout=0.05, bias="none"
-)
-model = get_peft_model(model, config)
-model.print_trainable_parameters()
-# Trainable: 4,194,304 / Total: 6,742,609,920 (0.06%)
-
-training_args = TrainingArguments(
-    output_dir="./lora-llama", num_train_epochs=3,
-    per_device_train_batch_size=4, gradient_accumulation_steps=4,
-    bf16=True, logging_steps=10
-)`,
+        code: "from peft import LoraConfig, get_peft_model, TaskType\nfrom transformers import AutoModelForCausalLM, TrainingArguments\n\nmodel = AutoModelForCausalLM.from_pretrained(\"meta-llama/Llama-2-7b-hf\")\n\nconfig = LoraConfig(\n    task_type=TaskType.CAUSAL_LM,\n    r=8, lora_alpha=16,\n    target_modules=[\"q_proj\", \"k_proj\", \"v_proj\", \"o_proj\"],\n    lora_dropout=0.05, bias=\"none\"\n)\nmodel = get_peft_model(model, config)\nmodel.print_trainable_parameters()\n# Trainable: 4,194,304 / Total: 6,742,609,920 (0.06%)\n\ntraining_args = TrainingArguments(\n    output_dir=\"./lora-llama\", num_train_epochs=3,\n    per_device_train_batch_size=4, gradient_accumulation_steps=4,\n    bf16=True, logging_steps=10\n)",
         afterCode: "gradient_accumulation_stepsを使うと仮想的なバッチサイズを増やせます。per_device_train_batch_size=4、gradient_accumulation_steps=4なら実効バッチサイズは16です。"
       }
     ]
@@ -816,30 +254,7 @@ training_args = TrainingArguments(
         body: "PyTorch 2.0で導入されたtorch.compileは、Eager実行のPyTorchコードをほぼそのまま高速化できる画期的な機能です。内部的にはTorchDynamo（Pythonバイトコードからグラフを抽出）とTorchInductor（グラフをCUDA/CPPカーネルに最適化）の2段階で動作します。\n\nAOT Autograd（Ahead-of-Time自動微分）も組み合わさり、訓練ループ全体をコンパイルすることで20〜100%程度の高速化が報告されています。実務では既存コードにmodel = torch.compile(model) を1行追加するだけで使えます。",
         table: T.compileMode,
         afterTable: "torch.compileは動的シェイプの入力が来るたびに再コンパイルが走ります。dynamic=Trueを設定するか、入力シェイプをなるべく固定することで再コンパイルを防げます。",
-        code: `import torch
-import torch.nn as nn
-
-class Transformer(nn.Module):
-    def __init__(self, d, nhead, layers):
-        super().__init__()
-        enc = nn.TransformerEncoderLayer(d, nhead, dim_feedforward=d*4, batch_first=True)
-        self.encoder = nn.TransformerEncoder(enc, layers)
-        self.head = nn.Linear(d, d)
-
-    def forward(self, x):
-        return self.head(self.encoder(x))
-
-model = Transformer(512, 8, 6).cuda().eval()
-
-# 3つのモードを試す
-m_default = torch.compile(model, mode="default")
-m_reduce  = torch.compile(model, mode="reduce-overhead")
-m_max     = torch.compile(model, mode="max-autotune")
-
-x = torch.randn(8, 128, 512).cuda()
-with torch.no_grad():
-    out = m_default(x)
-print(out.shape)  # torch.Size([8, 128, 512])`,
+        code: "import torch\nimport torch.nn as nn\n\nclass Transformer(nn.Module):\n    def __init__(self, d, nhead, layers):\n        super().__init__()\n        enc = nn.TransformerEncoderLayer(d, nhead, dim_feedforward=d*4, batch_first=True)\n        self.encoder = nn.TransformerEncoder(enc, layers)\n        self.head = nn.Linear(d, d)\n\n    def forward(self, x):\n        return self.head(self.encoder(x))\n\nmodel = Transformer(512, 8, 6).cuda().eval()\n\n# 3つのモードを試す\nm_default = torch.compile(model, mode=\"default\")\nm_reduce  = torch.compile(model, mode=\"reduce-overhead\")\nm_max     = torch.compile(model, mode=\"max-autotune\")\n\nx = torch.randn(8, 128, 512).cuda()\nwith torch.no_grad():\n    out = m_default(x)\nprint(out.shape)  # torch.Size([8, 128, 512])",
         afterCode: "ポイント: max-autotuneは最初の実行で数分かかる場合があります。コンパイル結果をキャッシュするにはTORCHINDUCTOR_CACHE_DIR環境変数を設定します。"
       }
     ]
@@ -856,28 +271,7 @@ print(out.shape)  # torch.Size([8, 128, 512])`,
         body: "PyTorchの自動微分（autograd）は計算グラフを動的に構築します。torch.autograd.Functionを継承することで、forwardとbackwardを自分で定義したカスタム演算を計算グラフに挿入できます。\n\nカスタム演算が必要になる典型的なシーンは「PyTorchの標準演算では表現しにくい数値安定な実装が必要な場合」「CUDA最適化された独自カーネルと組み合わせたい場合」「勾配の計算方法を特殊にカスタマイズしたい場合」です。ctx.save_for_backward()とctx.saved_tensorsでforward→backward間のテンソルを受け渡します。",
         table: T.cudaExtFlow,
         afterTable: "C++/CUDAカーネルの開発はsetup.pyでビルドする事前コンパイルと、load()でJITコンパイルする即時コンパイルの2通りがあります。開発中はload()が手軽で、パッケージ配布時はsetup.pyが適しています。",
-        code: `import torch
-
-# カスタム自動微分関数の例：数値安定なSigmoid
-class StableSigmoid(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, x):
-        # x > 0: 1/(1+exp(-x)), x <= 0: exp(x)/(1+exp(x))
-        out = torch.where(x >= 0, 1/(1+torch.exp(-x)), torch.exp(x)/(1+torch.exp(x)))
-        ctx.save_for_backward(out)
-        return out
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        out, = ctx.saved_tensors
-        # sigmoid'(x) = sigmoid(x) * (1 - sigmoid(x))
-        return grad_output * out * (1 - out)
-
-# 使い方（F.sigmoidと同じインターフェース）
-x = torch.randn(5, requires_grad=True)
-y = StableSigmoid.apply(x)
-y.sum().backward()
-print(x.grad)`,
+        code: "import torch\n\n# カスタム自動微分関数の例：数値安定なSigmoid\nclass StableSigmoid(torch.autograd.Function):\n    @staticmethod\n    def forward(ctx, x):\n        # x > 0: 1/(1+exp(-x)), x <= 0: exp(x)/(1+exp(x))\n        out = torch.where(x >= 0, 1/(1+torch.exp(-x)), torch.exp(x)/(1+torch.exp(x)))\n        ctx.save_for_backward(out)\n        return out\n\n    @staticmethod\n    def backward(ctx, grad_output):\n        out, = ctx.saved_tensors\n        # sigmoid'(x) = sigmoid(x) * (1 - sigmoid(x))\n        return grad_output * out * (1 - out)\n\n# 使い方（F.sigmoidと同じインターフェース）\nx = torch.randn(5, requires_grad=True)\ny = StableSigmoid.apply(x)\ny.sum().backward()\nprint(x.grad)",
         afterCode: "torch.autograd.gradcheck()でカスタム実装の勾配が数値微分と一致するかを検証できます。本番投入前に必ず gradcheck を通すことでバグを早期発見できます。"
       }
     ]
@@ -894,31 +288,7 @@ print(x.grad)`,
         body: "Deep Q-Network（DQN）はQ値（状態sで行動aを取った際の期待累積報酬）をニューラルネットワークで近似する手法です。古典的なQ学習とDeep Learningを組み合わせたもので、Atari系ゲームで人間を超えるパフォーマンスを達成したことで有名です。\n\nDQNの安定化に重要な2つの工夫があります。ReplayBuffer（過去の経験をランダムサンプリングして相関を断つ）とTarget Network（更新ターゲットを定期的に更新して学習の発散を防ぐ）です。これらがなければQ値の推定が発散しやすく、学習が安定しません。",
         table: T.rlAlgos,
         afterTable: "PPOはOpenAIが提案し、現在のLLM強化学習（RLHF）の基盤となっています。ChatGPTもPPOで人間フィードバックを取り込んでいます。安定した学習と実装のシンプルさからRL研究の実質的な標準アルゴリズムとなっています。",
-        code: `import torch
-import torch.nn as nn
-
-class DQNAgent:
-    def __init__(self, state_dim, action_dim, gamma=0.99):
-        self.gamma = gamma
-        self.q_net = nn.Sequential(
-            nn.Linear(state_dim, 128), nn.ReLU(),
-            nn.Linear(128, 128), nn.ReLU(),
-            nn.Linear(128, action_dim)
-        )
-        self.target_net = type(self.q_net)(*[])
-        self.target_net.load_state_dict(self.q_net.state_dict())
-        self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=1e-3)
-
-    def update(self, s, a, r, ns, done):
-        with torch.no_grad():
-            target = r + self.gamma * (1 - done) * self.target_net(ns).max(1)[0]
-        q_val = self.q_net(s).gather(1, a.unsqueeze(1)).squeeze()
-        loss = nn.functional.smooth_l1_loss(q_val, target)
-        self.optimizer.zero_grad(); loss.backward(); self.optimizer.step()
-        return loss.item()
-
-    def sync_target(self):
-        self.target_net.load_state_dict(self.q_net.state_dict())`,
+        code: "import torch\nimport torch.nn as nn\n\nclass DQNAgent:\n    def __init__(self, state_dim, action_dim, gamma=0.99):\n        self.gamma = gamma\n        self.q_net = nn.Sequential(\n            nn.Linear(state_dim, 128), nn.ReLU(),\n            nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, action_dim)\n        )\n        self.target_net = type(self.q_net)(*[])\n        self.target_net.load_state_dict(self.q_net.state_dict())\n        self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=1e-3)\n\n    def update(self, s, a, r, ns, done):\n        with torch.no_grad():\n            target = r + self.gamma * (1 - done) * self.target_net(ns).max(1)[0]\n        q_val = self.q_net(s).gather(1, a.unsqueeze(1)).squeeze()\n        loss = nn.functional.smooth_l1_loss(q_val, target)\n        self.optimizer.zero_grad(); loss.backward(); self.optimizer.step()\n        return loss.item()\n\n    def sync_target(self):\n        self.target_net.load_state_dict(self.q_net.state_dict())",
         afterCode: "Target Networkの同期頻度（sync_target の呼び出し間隔）はハイパーパラメータです。CartPoleでは100ステップごとに同期するのが典型的です。Soft update（EMA）で毎ステップ少しずつ更新する方法もあります。"
       }
     ]
@@ -935,34 +305,7 @@ class DQNAgent:
         body: "自己教師あり学習（SSL）はラベルなしデータから有用な表現を学習します。大量のラベルなし画像・テキストが入手しやすい現代において、SSLは基盤モデルの事前学習の中心的な手法です。\n\n2大アプローチは「対照学習」と「生成的手法」です。SimCLRに代表される対照学習は同一画像の異なるAugmentation（正例ペア）を互いに引き寄せ、異なる画像（負例）から遠ざけることで表現を学習します。一方MAE（Masked Autoencoder）はViTのパッチをランダムにマスクし、マスクされたパッチのピクセルを再構成させることで構造的な理解を促します。",
         table: T.sslMethods,
         afterTable: "負例を必要としないDINO・BYOL・SimSiamなどの手法も登場し、対照学習の実装が複雑化する問題を解決しています。Transformerと組み合わさったDINOv2は画像認識の万能な特徴抽出器として広く使われています。",
-        code: `import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import transforms
-
-def get_augmentation(size=224):
-    return transforms.Compose([
-        transforms.RandomResizedCrop(size, scale=(0.2, 1.0)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
-        transforms.RandomGrayscale(p=0.2),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
-
-class SimCLR(nn.Module):
-    def __init__(self, encoder, feat_dim, proj_dim=128):
-        super().__init__()
-        self.encoder = encoder
-        self.projector = nn.Sequential(
-            nn.Linear(feat_dim, feat_dim), nn.ReLU(),
-            nn.Linear(feat_dim, proj_dim)
-        )
-
-    def forward(self, x1, x2):
-        z1 = F.normalize(self.projector(self.encoder(x1)), dim=1)
-        z2 = F.normalize(self.projector(self.encoder(x2)), dim=1)
-        return ntxent_loss(z1, z2)`,
+        code: "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nfrom torchvision import transforms\n\ndef get_augmentation(size=224):\n    return transforms.Compose([\n        transforms.RandomResizedCrop(size, scale=(0.2, 1.0)),\n        transforms.RandomHorizontalFlip(),\n        transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),\n        transforms.RandomGrayscale(p=0.2),\n        transforms.ToTensor(),\n        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])\n    ])\n\nclass SimCLR(nn.Module):\n    def __init__(self, encoder, feat_dim, proj_dim=128):\n        super().__init__()\n        self.encoder = encoder\n        self.projector = nn.Sequential(\n            nn.Linear(feat_dim, feat_dim), nn.ReLU(),\n            nn.Linear(feat_dim, proj_dim)\n        )\n\n    def forward(self, x1, x2):\n        z1 = F.normalize(self.projector(self.encoder(x1)), dim=1)\n        z2 = F.normalize(self.projector(self.encoder(x2)), dim=1)\n        return ntxent_loss(z1, z2)",
         afterCode: "エンコーダーのProjection Headは事前学習後に捨てて、エンコーダー出力（backbone）だけを下流タスクのfine-tuningに使います。Projection Headは訓練の安定化に必要ですが、最終的な特徴として使うわけではない点が重要です。"
       }
     ]
@@ -979,35 +322,7 @@ class SimCLR(nn.Module):
         body: "量子化はモデルの重みや活性化を低精度（INT8・INT4など）で表現することでモデルサイズを縮小し、推論速度を上げる手法です。LLMの普及により、70BモデルをINT4量子化で14GBに圧縮して一般的なGPUで動かすQLoRA/GGUFが広く使われています。\n\n量子化には訓練後量子化（PTQ）と量子化認識訓練（QAT）があります。PTQは訓練済みモデルに後から適用でき手軽ですが精度劣化が大きめです。QATは訓練中に量子化ノイズをシミュレートするため精度劣化が少なく、エッジデバイスへのデプロイに向いています。",
         table: T.quantTypes,
         afterTable: "LLMの量子化ではGPTQ（勾配情報を使って各レイヤーのスケール因子を最適化）とAWQ（重みの顕著性に基づき量子化を適応）が精度劣化の少ない手法として主流になっています。",
-        code: `import torch
-import torch.nn as nn
-
-# 静的量子化（calibrationデータが必要）
-class MyModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.quant = torch.quantization.QuantStub()
-        self.fc1 = nn.Linear(512, 256)
-        self.fc2 = nn.Linear(256, 10)
-        self.dequant = torch.quantization.DeQuantStub()
-
-    def forward(self, x):
-        x = self.quant(x)
-        x = torch.relu(self.fc1(x))
-        x = self.fc2(x)
-        return self.dequant(x)
-
-model = MyModel().eval()
-model.qconfig = torch.quantization.get_default_qconfig('fbgemm')
-torch.quantization.prepare(model, inplace=True)
-
-# Calibration（代表的なデータを流す）
-with torch.no_grad():
-    for _ in range(100):
-        model(torch.randn(32, 512))
-
-torch.quantization.convert(model, inplace=True)
-print(model.fc1.weight().dtype)  # torch.qint8`,
+        code: "import torch\nimport torch.nn as nn\n\n# 静的量子化（calibrationデータが必要）\nclass MyModel(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.quant = torch.quantization.QuantStub()\n        self.fc1 = nn.Linear(512, 256)\n        self.fc2 = nn.Linear(256, 10)\n        self.dequant = torch.quantization.DeQuantStub()\n\n    def forward(self, x):\n        x = self.quant(x)\n        x = torch.relu(self.fc1(x))\n        x = self.fc2(x)\n        return self.dequant(x)\n\nmodel = MyModel().eval()\nmodel.qconfig = torch.quantization.get_default_qconfig('fbgemm')\ntorch.quantization.prepare(model, inplace=True)\n\n# Calibration（代表的なデータを流す）\nwith torch.no_grad():\n    for _ in range(100):\n        model(torch.randn(32, 512))\n\ntorch.quantization.convert(model, inplace=True)\nprint(model.fc1.weight().dtype)  # torch.qint8",
         afterCode: "fbgemmはx86 CPUバックエンド、qnnpackはARM CPUバックエンドです。GPUでの推論にはtorchaoやTensorRTを使います。"
       }
     ]
@@ -1024,32 +339,7 @@ print(model.fc1.weight().dtype)  # torch.qint8`,
         body: "Transformerはシーケンス長Nに対してAttentionがO(N^2)の計算量を要します。長いコンテキスト（100K tokens以上）では推論コストが爆発的に増大します。Mambaは選択的状態空間モデル（SSM）を使い、O(N)の線形計算量でシーケンスを処理できるアーキテクチャです。\n\nSSMは信号処理の制御理論に由来します。連続時間の状態方程式 dx/dt = Ax + Bu, y = Cx を離散化してRNNのように逐次処理します。Mambaの「選択的」とは、入力xに応じてパラメータΔ（タイムステップ）を動的に変えることで、必要な情報だけを状態に選択的に保持する仕組みです。",
         table: T.archCompare,
         afterTable: "Mambaは純粋なSSMですが、実際にはTransformerとのハイブリッド（Jamba等）も多く提案されています。短距離依存はSSMが得意、長距離の全体的な参照はAttentionが得意という補完関係にあります。",
-        code: `import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-# DDPMの訓練ループ（Unetはtimm等から取得する想定）
-class DiffusionScheduler:
-    def __init__(self, T=1000):
-        betas = torch.linspace(1e-4, 0.02, T)
-        alphas = 1 - betas
-        self.a_bar = torch.cumprod(alphas, dim=0)
-
-    def q_sample(self, x0, t, noise):
-        a = self.a_bar[t].view(-1, 1, 1, 1).to(x0.device)
-        return torch.sqrt(a) * x0 + torch.sqrt(1 - a) * noise
-
-def train_step(model, scheduler, x0, optimizer):
-    B = x0.shape[0]
-    t = torch.randint(0, len(scheduler.a_bar), (B,))
-    noise = torch.randn_like(x0)
-    xt = scheduler.q_sample(x0, t, noise)
-    # モデルはt条件付きでノイズを予測
-    t_emb = t.float().unsqueeze(1)  # 簡略化
-    pred_noise = model(xt, t_emb)
-    loss = F.mse_loss(pred_noise, noise)
-    optimizer.zero_grad(); loss.backward(); optimizer.step()
-    return loss.item()`,
+        code: "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\n# DDPMの訓練ループ（Unetはtimm等から取得する想定）\nclass DiffusionScheduler:\n    def __init__(self, T=1000):\n        betas = torch.linspace(1e-4, 0.02, T)\n        alphas = 1 - betas\n        self.a_bar = torch.cumprod(alphas, dim=0)\n\n    def q_sample(self, x0, t, noise):\n        a = self.a_bar[t].view(-1, 1, 1, 1).to(x0.device)\n        return torch.sqrt(a) * x0 + torch.sqrt(1 - a) * noise\n\ndef train_step(model, scheduler, x0, optimizer):\n    B = x0.shape[0]\n    t = torch.randint(0, len(scheduler.a_bar), (B,))\n    noise = torch.randn_like(x0)\n    xt = scheduler.q_sample(x0, t, noise)\n    # モデルはt条件付きでノイズを予測\n    t_emb = t.float().unsqueeze(1)  # 簡略化\n    pred_noise = model(xt, t_emb)\n    loss = F.mse_loss(pred_noise, noise)\n    optimizer.zero_grad(); loss.backward(); optimizer.step()\n    return loss.item()",
         afterCode: "本コースを修了した皆さんには、pytorch.org/docs の最新ドキュメントと論文（arxiv）を組み合わせながら、最先端の研究実装に挑戦し続けることを強くおすすめします。実務規模のLLM訓練・最適化の次のステップはTorchAO・vLLM・FlashAttentionの内部実装の読解です。"
       }
     ]

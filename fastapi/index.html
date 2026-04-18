@@ -152,930 +152,206 @@ const EX = {
     {
       diff: 1,
       q: "FastAPI の最小アプリケーションを作成し、GET / にアクセスすると {\"message\": \"Hello, FastAPI!\"} を返すエンドポイントを実装してください。",
-      code: `# main.py を作成し、uvicorn main:app --reload で起動
-# http://127.0.0.1:8000/ にアクセスして確認`,
-      answer: `from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello, FastAPI!"}`
+      code: "# main.py を作成し、uvicorn main:app --reload で起動\n# http://127.0.0.1:8000/ にアクセスして確認",
+      answer: "from fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"Hello, FastAPI!\"}"
     },
     {
       diff: 1,
       q: "上記のアプリに GET /health エンドポイントを追加し、{\"status\": \"ok\"} を返すようにしてください。\nヘルスチェック用途でよく使われるパターンです。",
-      code: `# /health にアクセスすると {"status": "ok"} が返る`,
-      answer: `from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello, FastAPI!"}
-
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}`
+      code: "# /health にアクセスすると {\"status\": \"ok\"} が返る",
+      answer: "from fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"Hello, FastAPI!\"}\n\n@app.get(\"/health\")\ndef health_check():\n    return {\"status\": \"ok\"}"
     },
     {
       diff: 2,
       q: "FastAPI アプリにタイトル・説明・バージョンを設定し、/docs にアクセスした際に表示されるようにしてください。\n\n【使う知識】FastAPI() のコンストラクタ引数",
-      code: `# タイトル: \"My API\"
-# 説明: \"学習用の FastAPI アプリケーション\"
-# バージョン: \"0.1.0\"`,
-      answer: `from fastapi import FastAPI
-
-app = FastAPI(
-    title="My API",
-    description="学習用の FastAPI アプリケーション",
-    version="0.1.0"
-)
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello, FastAPI!"}`
+      code: "# タイトル: \"My API\"\n# 説明: \"学習用の FastAPI アプリケーション\"\n# バージョン: \"0.1.0\"",
+      answer: "from fastapi import FastAPI\n\napp = FastAPI(\n    title=\"My API\",\n    description=\"学習用の FastAPI アプリケーション\",\n    version=\"0.1.0\"\n)\n\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"Hello, FastAPI!\"}"
     }
   ],
   ch2: [
     {
       diff: 1,
       q: "パスパラメータを使って、GET /users/{user_id} にアクセスすると {\"user_id\": 123} のように受け取った ID を返すエンドポイントを作成してください。\nuser_id は int 型で型注釈をつけること。",
-      code: `# GET /users/42 → {"user_id": 42}
-# GET /users/abc → 422 バリデーションエラー`,
-      answer: `from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/users/{user_id}")
-def read_user(user_id: int):
-    return {"user_id": user_id}`
+      code: "# GET /users/42 → {\"user_id\": 42}\n# GET /users/abc → 422 バリデーションエラー",
+      answer: "from fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get(\"/users/{user_id}\")\ndef read_user(user_id: int):\n    return {\"user_id\": user_id}"
     },
     {
       diff: 2,
       q: "クエリパラメータを使って、GET /items にページネーション機能を実装してください。\nskip（デフォルト0）と limit（デフォルト10）を受け取り、ダミーデータのスライスを返すこと。",
-      code: `# GET /items?skip=0&limit=5 → 最初の5件
-# GET /items → デフォルトで skip=0, limit=10`,
-      answer: `from fastapi import FastAPI
-
-app = FastAPI()
-
-fake_items = [{"id": i, "name": f"Item {i}"} for i in range(100)]
-
-@app.get("/items")
-def read_items(skip: int = 0, limit: int = 10):
-    return fake_items[skip : skip + limit]`
+      code: "# GET /items?skip=0&limit=5 → 最初の5件\n# GET /items → デフォルトで skip=0, limit=10",
+      answer: "from fastapi import FastAPI\n\napp = FastAPI()\n\nfake_items = [{\"id\": i, \"name\": f\"Item {i}\"} for i in range(100)]\n\n@app.get(\"/items\")\ndef read_items(skip: int = 0, limit: int = 10):\n    return fake_items[skip : skip + limit]"
     },
     {
       diff: 2,
       q: "パスパラメータとクエリパラメータを組み合わせて、GET /users/{user_id}/items でそのユーザーのアイテム一覧を返すエンドポイントを実装してください。\nクエリパラメータ q（オプション、文字列）で名前フィルタも可能にすること。",
-      code: `# GET /users/1/items → ユーザー1の全アイテム
-# GET /users/1/items?q=book → 名前に"book"を含むアイテム`,
-      answer: `from fastapi import FastAPI
-from typing import Optional
-
-app = FastAPI()
-
-fake_db = {
-    1: [{"name": "book"}, {"name": "pen"}, {"name": "notebook"}],
-    2: [{"name": "laptop"}, {"name": "mouse"}]
-}
-
-@app.get("/users/{user_id}/items")
-def read_user_items(user_id: int, q: Optional[str] = None):
-    items = fake_db.get(user_id, [])
-    if q:
-        items = [item for item in items if q in item["name"]]
-    return items`
+      code: "# GET /users/1/items → ユーザー1の全アイテム\n# GET /users/1/items?q=book → 名前に\"book\"を含むアイテム",
+      answer: "from fastapi import FastAPI\nfrom typing import Optional\n\napp = FastAPI()\n\nfake_db = {\n    1: [{\"name\": \"book\"}, {\"name\": \"pen\"}, {\"name\": \"notebook\"}],\n    2: [{\"name\": \"laptop\"}, {\"name\": \"mouse\"}]\n}\n\n@app.get(\"/users/{user_id}/items\")\ndef read_user_items(user_id: int, q: Optional[str] = None):\n    items = fake_db.get(user_id, [])\n    if q:\n        items = [item for item in items if q in item[\"name\"]]\n    return items"
     },
     {
       diff: 3,
       q: "Enum を使ってパスパラメータの値を制限してください。\nGET /models/{model_name} で model_name は \"alexnet\", \"resnet\", \"lenet\" のいずれかのみ受け付けること。",
-      code: `# GET /models/alexnet → {"model_name": "alexnet", ...}
-# GET /models/invalid → 422 エラー`,
-      answer: `from enum import Enum
-from fastapi import FastAPI
-
-class ModelName(str, Enum):
-    alexnet = "alexnet"
-    resnet = "resnet"
-    lenet = "lenet"
-
-app = FastAPI()
-
-@app.get("/models/{model_name}")
-def get_model(model_name: ModelName):
-    messages = {
-        ModelName.alexnet: "Deep Learning FTW!",
-        ModelName.resnet: "LeCun all the images",
-        ModelName.lenet: "Have some residuals",
-    }
-    return {"model_name": model_name, "message": messages[model_name]}`
+      code: "# GET /models/alexnet → {\"model_name\": \"alexnet\", ...}\n# GET /models/invalid → 422 エラー",
+      answer: "from enum import Enum\nfrom fastapi import FastAPI\n\nclass ModelName(str, Enum):\n    alexnet = \"alexnet\"\n    resnet = \"resnet\"\n    lenet = \"lenet\"\n\napp = FastAPI()\n\n@app.get(\"/models/{model_name}\")\ndef get_model(model_name: ModelName):\n    messages = {\n        ModelName.alexnet: \"Deep Learning FTW!\",\n        ModelName.resnet: \"LeCun all the images\",\n        ModelName.lenet: \"Have some residuals\",\n    }\n    return {\"model_name\": model_name, \"message\": messages[model_name]}"
     }
   ],
   ch3: [
     {
       diff: 1,
       q: "Pydantic の BaseModel を使って、name (str) と price (float) を持つ Item モデルを定義し、POST /items でリクエストボディを受け取って返すエンドポイントを作成してください。",
-      code: `# POST /items に {"name": "Apple", "price": 1.5} を送信
-# → そのまま返却`,
-      answer: `from fastapi import FastAPI
-from pydantic import BaseModel
-
-app = FastAPI()
-
-class Item(BaseModel):
-    name: str
-    price: float
-
-@app.post("/items")
-def create_item(item: Item):
-    return item`
+      code: "# POST /items に {\"name\": \"Apple\", \"price\": 1.5} を送信\n# → そのまま返却",
+      answer: "from fastapi import FastAPI\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass Item(BaseModel):\n    name: str\n    price: float\n\n@app.post(\"/items\")\ndef create_item(item: Item):\n    return item"
     },
     {
       diff: 2,
       q: "Field を使ってバリデーション付きの User モデルを定義してください。\n・name: 2文字以上50文字以下\n・age: 0以上150以下\n・email: メールアドレスのパターン\nPOST /users で受け取りバリデーション結果を確認できるようにすること。",
-      code: `# 正常: {"name": "太郎", "age": 25, "email": "taro@example.com"}
-# エラー: {"name": "a", "age": -1, "email": "invalid"}`,
-      answer: `from fastapi import FastAPI
-from pydantic import BaseModel, Field
-
-app = FastAPI()
-
-class User(BaseModel):
-    name: str = Field(..., min_length=2, max_length=50)
-    age: int = Field(..., ge=0, le=150)
-    email: str = Field(..., pattern=r"^[\\w.-]+@[\\w.-]+\\.\\w+$")
-
-@app.post("/users")
-def create_user(user: User):
-    return {"message": "User created", "user": user}`
+      code: "# 正常: {\"name\": \"太郎\", \"age\": 25, \"email\": \"taro@example.com\"}\n# エラー: {\"name\": \"a\", \"age\": -1, \"email\": \"invalid\"}",
+      answer: "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field\n\napp = FastAPI()\n\nclass User(BaseModel):\n    name: str = Field(..., min_length=2, max_length=50)\n    age: int = Field(..., ge=0, le=150)\n    email: str = Field(..., pattern=r\"^[\\w.-]+@[\\w.-]+\\.\\w+$\")\n\n@app.post(\"/users\")\ndef create_user(user: User):\n    return {\"message\": \"User created\", \"user\": user}"
     },
     {
       diff: 2,
       q: "ネストされた Pydantic モデルを定義してください。\nOrder モデルは item (Item) と quantity (int, 1以上) を持ち、total_price を計算する @computed_field を実装すること。",
-      code: `# POST /orders に {"item": {"name": "Apple", "price": 1.5}, "quantity": 3}
-# → {"item": {...}, "quantity": 3, "total_price": 4.5}`,
-      answer: `from fastapi import FastAPI
-from pydantic import BaseModel, Field, computed_field
-
-app = FastAPI()
-
-class Item(BaseModel):
-    name: str
-    price: float = Field(..., gt=0)
-
-class Order(BaseModel):
-    item: Item
-    quantity: int = Field(..., ge=1)
-
-    @computed_field
-    @property
-    def total_price(self) -> float:
-        return self.item.price * self.quantity
-
-@app.post("/orders")
-def create_order(order: Order):
-    return order`
+      code: "# POST /orders に {\"item\": {\"name\": \"Apple\", \"price\": 1.5}, \"quantity\": 3}\n# → {\"item\": {...}, \"quantity\": 3, \"total_price\": 4.5}",
+      answer: "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field, computed_field\n\napp = FastAPI()\n\nclass Item(BaseModel):\n    name: str\n    price: float = Field(..., gt=0)\n\nclass Order(BaseModel):\n    item: Item\n    quantity: int = Field(..., ge=1)\n\n    @computed_field\n    @property\n    def total_price(self) -> float:\n        return self.item.price * self.quantity\n\n@app.post(\"/orders\")\ndef create_order(order: Order):\n    return order"
     }
   ],
   ch4: [
     {
       diff: 1,
       q: "response_model を使って、レスポンスから password フィールドを除外してください。\nUserIn（入力）に name, email, password を持たせ、UserOut（出力）には password を含めないこと。",
-      code: `# POST /users に {"name": "太郎", "email": "taro@example.com", "password": "secret"}
-# → {"name": "太郎", "email": "taro@example.com"} (password なし)`,
-      answer: `from fastapi import FastAPI
-from pydantic import BaseModel
-
-app = FastAPI()
-
-class UserIn(BaseModel):
-    name: str
-    email: str
-    password: str
-
-class UserOut(BaseModel):
-    name: str
-    email: str
-
-@app.post("/users", response_model=UserOut)
-def create_user(user: UserIn):
-    # 実際にはここで DB 保存
-    return user`
+      code: "# POST /users に {\"name\": \"太郎\", \"email\": \"taro@example.com\", \"password\": \"secret\"}\n# → {\"name\": \"太郎\", \"email\": \"taro@example.com\"} (password なし)",
+      answer: "from fastapi import FastAPI\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass UserIn(BaseModel):\n    name: str\n    email: str\n    password: str\n\nclass UserOut(BaseModel):\n    name: str\n    email: str\n\n@app.post(\"/users\", response_model=UserOut)\ndef create_user(user: UserIn):\n    # 実際にはここで DB 保存\n    return user"
     },
     {
       diff: 2,
       q: "HTTPException を使って、存在しないアイテムへのアクセスで 404 エラーを返すエンドポイントを実装してください。\nまた、カスタムの detail メッセージも含めること。",
-      code: `# GET /items/1 → {"id": 1, "name": "Apple"} (存在する場合)
-# GET /items/999 → 404 {"detail": "Item with id 999 not found"}`,
-      answer: `from fastapi import FastAPI, HTTPException
-
-app = FastAPI()
-
-items_db = {1: {"id": 1, "name": "Apple"}, 2: {"id": 2, "name": "Banana"}}
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int):
-    if item_id not in items_db:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Item with id {item_id} not found"
-        )
-    return items_db[item_id]`
+      code: "# GET /items/1 → {\"id\": 1, \"name\": \"Apple\"} (存在する場合)\n# GET /items/999 → 404 {\"detail\": \"Item with id 999 not found\"}",
+      answer: "from fastapi import FastAPI, HTTPException\n\napp = FastAPI()\n\nitems_db = {1: {\"id\": 1, \"name\": \"Apple\"}, 2: {\"id\": 2, \"name\": \"Banana\"}}\n\n@app.get(\"/items/{item_id}\")\ndef read_item(item_id: int):\n    if item_id not in items_db:\n        raise HTTPException(\n            status_code=404,\n            detail=f\"Item with id {item_id} not found\"\n        )\n    return items_db[item_id]"
     },
     {
       diff: 3,
       q: "status_code パラメータと response_model を組み合わせた CRUD API を実装してください。\n・POST /items → 201 Created で作成\n・GET /items/{id} → 200 OK で取得\n・DELETE /items/{id} → 204 No Content で削除\n存在しない ID には 404 を返すこと。",
-      code: `# POST /items → 201
-# GET /items/1 → 200
-# DELETE /items/1 → 204
-# GET /items/999 → 404`,
-      answer: `from fastapi import FastAPI, HTTPException, Response, status
-from pydantic import BaseModel
-
-app = FastAPI()
-
-class ItemCreate(BaseModel):
-    name: str
-    price: float
-
-class ItemOut(BaseModel):
-    id: int
-    name: str
-    price: float
-
-db: dict[int, dict] = {}
-counter = 0
-
-@app.post("/items", response_model=ItemOut, status_code=status.HTTP_201_CREATED)
-def create_item(item: ItemCreate):
-    global counter
-    counter += 1
-    db[counter] = {"id": counter, **item.model_dump()}
-    return db[counter]
-
-@app.get("/items/{item_id}", response_model=ItemOut)
-def read_item(item_id: int):
-    if item_id not in db:
-        raise HTTPException(status_code=404, detail="Not found")
-    return db[item_id]
-
-@app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_item(item_id: int):
-    if item_id not in db:
-        raise HTTPException(status_code=404, detail="Not found")
-    del db[item_id]`
+      code: "# POST /items → 201\n# GET /items/1 → 200\n# DELETE /items/1 → 204\n# GET /items/999 → 404",
+      answer: "from fastapi import FastAPI, HTTPException, Response, status\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass ItemCreate(BaseModel):\n    name: str\n    price: float\n\nclass ItemOut(BaseModel):\n    id: int\n    name: str\n    price: float\n\ndb: dict[int, dict] = {}\ncounter = 0\n\n@app.post(\"/items\", response_model=ItemOut, status_code=status.HTTP_201_CREATED)\ndef create_item(item: ItemCreate):\n    global counter\n    counter += 1\n    db[counter] = {\"id\": counter, **item.model_dump()}\n    return db[counter]\n\n@app.get(\"/items/{item_id}\", response_model=ItemOut)\ndef read_item(item_id: int):\n    if item_id not in db:\n        raise HTTPException(status_code=404, detail=\"Not found\")\n    return db[item_id]\n\n@app.delete(\"/items/{item_id}\", status_code=status.HTTP_204_NO_CONTENT)\ndef delete_item(item_id: int):\n    if item_id not in db:\n        raise HTTPException(status_code=404, detail=\"Not found\")\n    del db[item_id]"
     }
   ],
   ch5: [
     {
       diff: 1,
       q: "Depends を使って共通のページネーションパラメータを抽出する依存関数を作成してください。\n複数のエンドポイントで同じ skip/limit ロジックを再利用できるようにすること。",
-      code: `# GET /items?skip=10&limit=5
-# GET /users?skip=0&limit=20
-# どちらも同じページネーションロジックを使う`,
-      answer: `from fastapi import FastAPI, Depends
-
-app = FastAPI()
-
-def common_pagination(skip: int = 0, limit: int = 10):
-    return {"skip": skip, "limit": limit}
-
-fake_items = [f"item_{i}" for i in range(100)]
-fake_users = [f"user_{i}" for i in range(50)]
-
-@app.get("/items")
-def read_items(pagination: dict = Depends(common_pagination)):
-    s, l = pagination["skip"], pagination["limit"]
-    return fake_items[s : s + l]
-
-@app.get("/users")
-def read_users(pagination: dict = Depends(common_pagination)):
-    s, l = pagination["skip"], pagination["limit"]
-    return fake_users[s : s + l]`
+      code: "# GET /items?skip=10&limit=5\n# GET /users?skip=0&limit=20\n# どちらも同じページネーションロジックを使う",
+      answer: "from fastapi import FastAPI, Depends\n\napp = FastAPI()\n\ndef common_pagination(skip: int = 0, limit: int = 10):\n    return {\"skip\": skip, \"limit\": limit}\n\nfake_items = [f\"item_{i}\" for i in range(100)]\nfake_users = [f\"user_{i}\" for i in range(50)]\n\n@app.get(\"/items\")\ndef read_items(pagination: dict = Depends(common_pagination)):\n    s, l = pagination[\"skip\"], pagination[\"limit\"]\n    return fake_items[s : s + l]\n\n@app.get(\"/users\")\ndef read_users(pagination: dict = Depends(common_pagination)):\n    s, l = pagination[\"skip\"], pagination[\"limit\"]\n    return fake_users[s : s + l]"
     },
     {
       diff: 2,
       q: "依存性の連鎖（サブ依存性）を実装してください。\nget_db → get_repository → get_service のように3段階の依存関係を作り、各段階でログ出力してライフサイクルを確認すること。",
-      code: `# GET /items → get_db → get_repository → get_service の順で呼ばれる`,
-      answer: `from fastapi import FastAPI, Depends
-
-app = FastAPI()
-
-def get_db():
-    print("DB接続を取得")
-    return {"db": "connected"}
-
-def get_repository(db: dict = Depends(get_db)):
-    print("リポジトリを初期化")
-    return {"repo": "initialized", **db}
-
-def get_service(repo: dict = Depends(get_repository)):
-    print("サービスを初期化")
-    return {"service": "ready", **repo}
-
-@app.get("/items")
-def read_items(service: dict = Depends(get_service)):
-    return {"message": "Items fetched", "context": service}`
+      code: "# GET /items → get_db → get_repository → get_service の順で呼ばれる",
+      answer: "from fastapi import FastAPI, Depends\n\napp = FastAPI()\n\ndef get_db():\n    print(\"DB接続を取得\")\n    return {\"db\": \"connected\"}\n\ndef get_repository(db: dict = Depends(get_db)):\n    print(\"リポジトリを初期化\")\n    return {\"repo\": \"initialized\", **db}\n\ndef get_service(repo: dict = Depends(get_repository)):\n    print(\"サービスを初期化\")\n    return {\"service\": \"ready\", **repo}\n\n@app.get(\"/items\")\ndef read_items(service: dict = Depends(get_service)):\n    return {\"message\": \"Items fetched\", \"context\": service}"
     },
     {
       diff: 3,
       q: "yield を使った依存関数で、リクエスト処理の前後でリソースの取得・解放を行うパターンを実装してください。\nデータベースセッションの開始・コミット/ロールバック・クローズを模擬すること。",
-      code: `# リクエスト時: セッション開始 → 処理 → コミット → クローズ
-# エラー時: セッション開始 → 処理 → ロールバック → クローズ`,
-      answer: `from fastapi import FastAPI, Depends, HTTPException
-
-app = FastAPI()
-
-class FakeSession:
-    def __init__(self):
-        print("Session: 開始")
-    def commit(self):
-        print("Session: コミット")
-    def rollback(self):
-        print("Session: ロールバック")
-    def close(self):
-        print("Session: クローズ")
-
-def get_session():
-    session = FakeSession()
-    try:
-        yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-@app.get("/items")
-def read_items(session: FakeSession = Depends(get_session)):
-    return {"message": "Items fetched"}
-
-@app.get("/error")
-def trigger_error(session: FakeSession = Depends(get_session)):
-    raise HTTPException(status_code=500, detail="Something went wrong")`
+      code: "# リクエスト時: セッション開始 → 処理 → コミット → クローズ\n# エラー時: セッション開始 → 処理 → ロールバック → クローズ",
+      answer: "from fastapi import FastAPI, Depends, HTTPException\n\napp = FastAPI()\n\nclass FakeSession:\n    def __init__(self):\n        print(\"Session: 開始\")\n    def commit(self):\n        print(\"Session: コミット\")\n    def rollback(self):\n        print(\"Session: ロールバック\")\n    def close(self):\n        print(\"Session: クローズ\")\n\ndef get_session():\n    session = FakeSession()\n    try:\n        yield session\n        session.commit()\n    except Exception:\n        session.rollback()\n        raise\n    finally:\n        session.close()\n\n@app.get(\"/items\")\ndef read_items(session: FakeSession = Depends(get_session)):\n    return {\"message\": \"Items fetched\"}\n\n@app.get(\"/error\")\ndef trigger_error(session: FakeSession = Depends(get_session)):\n    raise HTTPException(status_code=500, detail=\"Something went wrong\")"
     }
   ],
   ch6: [
     {
       diff: 1,
       q: "同期関数 (def) と非同期関数 (async def) の両方でエンドポイントを作成し、それぞれの動作を確認してください。\n同期版は time.sleep、非同期版は asyncio.sleep を使うこと。",
-      code: `# GET /sync → 1秒待ってからレスポンス
-# GET /async → 1秒待ってからレスポンス（非同期）`,
-      answer: `import time
-import asyncio
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/sync")
-def sync_endpoint():
-    time.sleep(1)
-    return {"message": "sync done"}
-
-@app.get("/async")
-async def async_endpoint():
-    await asyncio.sleep(1)
-    return {"message": "async done"}`
+      code: "# GET /sync → 1秒待ってからレスポンス\n# GET /async → 1秒待ってからレスポンス（非同期）",
+      answer: "import time\nimport asyncio\nfrom fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get(\"/sync\")\ndef sync_endpoint():\n    time.sleep(1)\n    return {\"message\": \"sync done\"}\n\n@app.get(\"/async\")\nasync def async_endpoint():\n    await asyncio.sleep(1)\n    return {\"message\": \"async done\"}"
     },
     {
       diff: 2,
       q: "BackgroundTasks を使って、メール送信を模擬するバックグラウンドタスクを実装してください。\nエンドポイントは即座にレスポンスを返し、バックグラウンドでタスクが実行されること。",
-      code: `# POST /send-notification?email=user@example.com
-# → 即座に {"message": "Notification will be sent"} を返す
-# → バックグラウンドで送信処理が実行される`,
-      answer: `import time
-from fastapi import FastAPI, BackgroundTasks
-
-app = FastAPI()
-
-def send_email(email: str, message: str):
-    # メール送信を模擬（実際は SMTP 等）
-    time.sleep(3)
-    print(f"Email sent to {email}: {message}")
-
-@app.post("/send-notification")
-async def send_notification(
-    email: str,
-    background_tasks: BackgroundTasks
-):
-    background_tasks.add_task(send_email, email, "Welcome!")
-    return {"message": "Notification will be sent"}`
+      code: "# POST /send-notification?email=user@example.com\n# → 即座に {\"message\": \"Notification will be sent\"} を返す\n# → バックグラウンドで送信処理が実行される",
+      answer: "import time\nfrom fastapi import FastAPI, BackgroundTasks\n\napp = FastAPI()\n\ndef send_email(email: str, message: str):\n    # メール送信を模擬（実際は SMTP 等）\n    time.sleep(3)\n    print(f\"Email sent to {email}: {message}\")\n\n@app.post(\"/send-notification\")\nasync def send_notification(\n    email: str,\n    background_tasks: BackgroundTasks\n):\n    background_tasks.add_task(send_email, email, \"Welcome!\")\n    return {\"message\": \"Notification will be sent\"}"
     },
     {
       diff: 3,
       q: "httpx の AsyncClient を使って、外部 API を非同期で呼び出すエンドポイントを実装してください。\n複数の外部 API を asyncio.gather で並列呼び出しして結果を集約すること。",
-      code: `# GET /aggregate → 3つの外部APIを並列呼び出し → 結果をまとめて返す`,
-      answer: `import asyncio
-import httpx
-from fastapi import FastAPI
-
-app = FastAPI()
-
-async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
-    response = await client.get(url)
-    return {"url": url, "status": response.status_code}
-
-@app.get("/aggregate")
-async def aggregate():
-    urls = [
-        "https://httpbin.org/get",
-        "https://httpbin.org/ip",
-        "https://httpbin.org/user-agent",
-    ]
-    async with httpx.AsyncClient() as client:
-        tasks = [fetch_url(client, url) for url in urls]
-        results = await asyncio.gather(*tasks)
-    return {"results": results}`
+      code: "# GET /aggregate → 3つの外部APIを並列呼び出し → 結果をまとめて返す",
+      answer: "import asyncio\nimport httpx\nfrom fastapi import FastAPI\n\napp = FastAPI()\n\nasync def fetch_url(client: httpx.AsyncClient, url: str) -> dict:\n    response = await client.get(url)\n    return {\"url\": url, \"status\": response.status_code}\n\n@app.get(\"/aggregate\")\nasync def aggregate():\n    urls = [\n        \"https://httpbin.org/get\",\n        \"https://httpbin.org/ip\",\n        \"https://httpbin.org/user-agent\",\n    ]\n    async with httpx.AsyncClient() as client:\n        tasks = [fetch_url(client, url) for url in urls]\n        results = await asyncio.gather(*tasks)\n    return {\"results\": results}"
     }
   ],
   ch7: [
     {
       diff: 2,
       q: "SQLAlchemy 2.0 スタイルでモデルを定義し、FastAPI と連携する最小構成を作成してください。\nUser テーブル（id, name, email）を定義し、CRUD エンドポイントを実装すること。\n（SQLite をインメモリで使用）",
-      code: `# POST /users → ユーザー作成
-# GET /users → ユーザー一覧
-# GET /users/{id} → ユーザー取得`,
-      answer: `from fastapi import FastAPI, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import create_engine, String
-from sqlalchemy.orm import (
-    DeclarativeBase, Mapped, mapped_column,
-    Session, sessionmaker
-)
-
-# --- DB設定 ---
-engine = create_engine("sqlite:///./test.db", echo=True)
-SessionLocal = sessionmaker(bind=engine)
-
-class Base(DeclarativeBase):
-    pass
-
-class UserModel(Base):
-    __tablename__ = "users"
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(50))
-    email: Mapped[str] = mapped_column(String(100), unique=True)
-
-Base.metadata.create_all(bind=engine)
-
-# --- Pydantic ---
-class UserCreate(BaseModel):
-    name: str
-    email: str
-
-class UserOut(BaseModel):
-    id: int
-    name: str
-    email: str
-    model_config = {"from_attributes": True}
-
-# --- FastAPI ---
-app = FastAPI()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-@app.post("/users", response_model=UserOut, status_code=201)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = UserModel(**user.model_dump())
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
-
-@app.get("/users", response_model=list[UserOut])
-def read_users(db: Session = Depends(get_db)):
-    return db.query(UserModel).all()
-
-@app.get("/users/{user_id}", response_model=UserOut)
-def read_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.get(UserModel, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user`
+      code: "# POST /users → ユーザー作成\n# GET /users → ユーザー一覧\n# GET /users/{id} → ユーザー取得",
+      answer: "from fastapi import FastAPI, Depends, HTTPException\nfrom pydantic import BaseModel\nfrom sqlalchemy import create_engine, String\nfrom sqlalchemy.orm import (\n    DeclarativeBase, Mapped, mapped_column,\n    Session, sessionmaker\n)\n\n# --- DB設定 ---\nengine = create_engine(\"sqlite:///./test.db\", echo=True)\nSessionLocal = sessionmaker(bind=engine)\n\nclass Base(DeclarativeBase):\n    pass\n\nclass UserModel(Base):\n    __tablename__ = \"users\"\n    id: Mapped[int] = mapped_column(primary_key=True, index=True)\n    name: Mapped[str] = mapped_column(String(50))\n    email: Mapped[str] = mapped_column(String(100), unique=True)\n\nBase.metadata.create_all(bind=engine)\n\n# --- Pydantic ---\nclass UserCreate(BaseModel):\n    name: str\n    email: str\n\nclass UserOut(BaseModel):\n    id: int\n    name: str\n    email: str\n    model_config = {\"from_attributes\": True}\n\n# --- FastAPI ---\napp = FastAPI()\n\ndef get_db():\n    db = SessionLocal()\n    try:\n        yield db\n    finally:\n        db.close()\n\n@app.post(\"/users\", response_model=UserOut, status_code=201)\ndef create_user(user: UserCreate, db: Session = Depends(get_db)):\n    db_user = UserModel(**user.model_dump())\n    db.add(db_user)\n    db.commit()\n    db.refresh(db_user)\n    return db_user\n\n@app.get(\"/users\", response_model=list[UserOut])\ndef read_users(db: Session = Depends(get_db)):\n    return db.query(UserModel).all()\n\n@app.get(\"/users/{user_id}\", response_model=UserOut)\ndef read_user(user_id: int, db: Session = Depends(get_db)):\n    user = db.get(UserModel, user_id)\n    if not user:\n        raise HTTPException(status_code=404, detail=\"User not found\")\n    return user"
     },
     {
       diff: 3,
       q: "Alembic を使ったマイグレーション設定の手順を示してください。\n以下のコマンドとファイル構成を書くこと。\n1. Alembic の初期化\n2. env.py の設定\n3. マイグレーションファイルの自動生成\n4. マイグレーションの適用",
-      code: `# Alembic のセットアップから初回マイグレーションまでの手順`,
-      answer: `# 1. Alembic の初期化
-# pip install alembic
-# alembic init alembic
-
-# 2. alembic/env.py の設定
-# --- env.py (抜粋) ---
-# from app.database import Base
-# target_metadata = Base.metadata
-#
-# config = context.config
-# config.set_main_option(
-#     "sqlalchemy.url",
-#     "sqlite:///./test.db"
-# )
-
-# 3. マイグレーションファイルの自動生成
-# alembic revision --autogenerate -m "create users table"
-
-# 4. マイグレーションの適用
-# alembic upgrade head
-
-# 5. 確認
-# alembic history       # マイグレーション履歴
-# alembic current       # 現在のリビジョン
-# alembic downgrade -1  # 1つ戻す`
+      code: "# Alembic のセットアップから初回マイグレーションまでの手順",
+      answer: "# 1. Alembic の初期化\n# pip install alembic\n# alembic init alembic\n\n# 2. alembic/env.py の設定\n# --- env.py (抜粋) ---\n# from app.database import Base\n# target_metadata = Base.metadata\n#\n# config = context.config\n# config.set_main_option(\n#     \"sqlalchemy.url\",\n#     \"sqlite:///./test.db\"\n# )\n\n# 3. マイグレーションファイルの自動生成\n# alembic revision --autogenerate -m \"create users table\"\n\n# 4. マイグレーションの適用\n# alembic upgrade head\n\n# 5. 確認\n# alembic history       # マイグレーション履歴\n# alembic current       # 現在のリビジョン\n# alembic downgrade -1  # 1つ戻す"
     },
     {
       diff: 3,
       q: "非同期セッション（AsyncSession）を使った DB 連携を実装してください。\naiosqlite を使い、async def のエンドポイントから非同期でクエリを実行すること。",
-      code: `# async def でDB操作を行う最小構成`,
-      answer: `from fastapi import FastAPI, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import String, select
-from sqlalchemy.ext.asyncio import (
-    AsyncSession, async_sessionmaker, create_async_engine
-)
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
-# --- 非同期DB設定 ---
-engine = create_async_engine("sqlite+aiosqlite:///./async_test.db")
-async_session = async_sessionmaker(engine, class_=AsyncSession)
-
-class Base(DeclarativeBase):
-    pass
-
-class ItemModel(Base):
-    __tablename__ = "items"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100))
-
-class ItemCreate(BaseModel):
-    name: str
-
-class ItemOut(BaseModel):
-    id: int
-    name: str
-    model_config = {"from_attributes": True}
-
-app = FastAPI()
-
-@app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-async def get_db():
-    async with async_session() as session:
-        yield session
-
-@app.post("/items", response_model=ItemOut, status_code=201)
-async def create_item(item: ItemCreate, db: AsyncSession = Depends(get_db)):
-    db_item = ItemModel(**item.model_dump())
-    db.add(db_item)
-    await db.commit()
-    await db.refresh(db_item)
-    return db_item
-
-@app.get("/items", response_model=list[ItemOut])
-async def read_items(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(ItemModel))
-    return result.scalars().all()`
+      code: "# async def でDB操作を行う最小構成",
+      answer: "from fastapi import FastAPI, Depends, HTTPException\nfrom pydantic import BaseModel\nfrom sqlalchemy import String, select\nfrom sqlalchemy.ext.asyncio import (\n    AsyncSession, async_sessionmaker, create_async_engine\n)\nfrom sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column\n\n# --- 非同期DB設定 ---\nengine = create_async_engine(\"sqlite+aiosqlite:///./async_test.db\")\nasync_session = async_sessionmaker(engine, class_=AsyncSession)\n\nclass Base(DeclarativeBase):\n    pass\n\nclass ItemModel(Base):\n    __tablename__ = \"items\"\n    id: Mapped[int] = mapped_column(primary_key=True)\n    name: Mapped[str] = mapped_column(String(100))\n\nclass ItemCreate(BaseModel):\n    name: str\n\nclass ItemOut(BaseModel):\n    id: int\n    name: str\n    model_config = {\"from_attributes\": True}\n\napp = FastAPI()\n\n@app.on_event(\"startup\")\nasync def startup():\n    async with engine.begin() as conn:\n        await conn.run_sync(Base.metadata.create_all)\n\nasync def get_db():\n    async with async_session() as session:\n        yield session\n\n@app.post(\"/items\", response_model=ItemOut, status_code=201)\nasync def create_item(item: ItemCreate, db: AsyncSession = Depends(get_db)):\n    db_item = ItemModel(**item.model_dump())\n    db.add(db_item)\n    await db.commit()\n    await db.refresh(db_item)\n    return db_item\n\n@app.get(\"/items\", response_model=list[ItemOut])\nasync def read_items(db: AsyncSession = Depends(get_db)):\n    result = await db.execute(select(ItemModel))\n    return result.scalars().all()"
     }
   ],
   ch8: [
     {
       diff: 2,
       q: "OAuth2PasswordBearer と JWT を使った認証フローを実装してください。\n・POST /token でユーザー名・パスワードを受け取り JWT を発行\n・GET /users/me で現在のユーザー情報を返す（トークン必須）",
-      code: `# POST /token → {"access_token": "...", "token_type": "bearer"}
-# GET /users/me (Authorization: Bearer ...) → {"username": "..."}`,
-      answer: `from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel
-import jwt
-
-SECRET_KEY = "your-secret-key"
-ALGORITHM = "HS256"
-
-app = FastAPI()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-fake_users = {
-    "testuser": {"username": "testuser", "password": "testpass"}
-}
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-def create_access_token(data: dict) -> str:
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    user = fake_users.get(username)
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
-
-@app.post("/token", response_model=Token)
-def login(form: OAuth2PasswordRequestForm = Depends()):
-    user = fake_users.get(form.username)
-    if not user or user["password"] != form.password:
-        raise HTTPException(status_code=401, detail="Incorrect credentials")
-    token = create_access_token(data={"sub": form.username})
-    return {"access_token": token, "token_type": "bearer"}
-
-@app.get("/users/me")
-def read_users_me(user: dict = Depends(get_current_user)):
-    return {"username": user["username"]}`
+      code: "# POST /token → {\"access_token\": \"...\", \"token_type\": \"bearer\"}\n# GET /users/me (Authorization: Bearer ...) → {\"username\": \"...\"}",
+      answer: "from datetime import datetime, timedelta, timezone\nfrom fastapi import FastAPI, Depends, HTTPException, status\nfrom fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm\nfrom pydantic import BaseModel\nimport jwt\n\nSECRET_KEY = \"your-secret-key\"\nALGORITHM = \"HS256\"\n\napp = FastAPI()\noauth2_scheme = OAuth2PasswordBearer(tokenUrl=\"token\")\n\nfake_users = {\n    \"testuser\": {\"username\": \"testuser\", \"password\": \"testpass\"}\n}\n\nclass Token(BaseModel):\n    access_token: str\n    token_type: str\n\ndef create_access_token(data: dict) -> str:\n    to_encode = data.copy()\n    expire = datetime.now(timezone.utc) + timedelta(minutes=30)\n    to_encode.update({\"exp\": expire})\n    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)\n\ndef get_current_user(token: str = Depends(oauth2_scheme)) -> dict:\n    try:\n        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])\n        username = payload.get(\"sub\")\n        if username is None:\n            raise HTTPException(status_code=401, detail=\"Invalid token\")\n    except jwt.InvalidTokenError:\n        raise HTTPException(status_code=401, detail=\"Invalid token\")\n    user = fake_users.get(username)\n    if user is None:\n        raise HTTPException(status_code=401, detail=\"User not found\")\n    return user\n\n@app.post(\"/token\", response_model=Token)\ndef login(form: OAuth2PasswordRequestForm = Depends()):\n    user = fake_users.get(form.username)\n    if not user or user[\"password\"] != form.password:\n        raise HTTPException(status_code=401, detail=\"Incorrect credentials\")\n    token = create_access_token(data={\"sub\": form.username})\n    return {\"access_token\": token, \"token_type\": \"bearer\"}\n\n@app.get(\"/users/me\")\ndef read_users_me(user: dict = Depends(get_current_user)):\n    return {\"username\": user[\"username\"]}"
     },
     {
       diff: 2,
       q: "パスワードのハッシュ化を実装してください。\npasslib の bcrypt を使い、パスワードの保存時にハッシュ化、認証時にベリファイを行うこと。",
-      code: `# パスワードを平文で保存せず、bcrypt でハッシュ化する`,
-      answer: `from passlib.context import CryptContext
-from pydantic import BaseModel
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-class UserInDB(BaseModel):
-    username: str
-    hashed_password: str
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
-
-# 使用例
-hashed = hash_password("mypassword")
-print(f"Hashed: {hashed}")
-print(f"Verify: {verify_password('mypassword', hashed)}")
-print(f"Wrong:  {verify_password('wrong', hashed)}")`
+      code: "# パスワードを平文で保存せず、bcrypt でハッシュ化する",
+      answer: "from passlib.context import CryptContext\nfrom pydantic import BaseModel\n\npwd_context = CryptContext(schemes=[\"bcrypt\"], deprecated=\"auto\")\n\nclass UserInDB(BaseModel):\n    username: str\n    hashed_password: str\n\ndef hash_password(password: str) -> str:\n    return pwd_context.hash(password)\n\ndef verify_password(plain: str, hashed: str) -> bool:\n    return pwd_context.verify(plain, hashed)\n\n# 使用例\nhashed = hash_password(\"mypassword\")\nprint(f\"Hashed: {hashed}\")\nprint(f\"Verify: {verify_password('mypassword', hashed)}\")\nprint(f\"Wrong:  {verify_password('wrong', hashed)}\")"
     },
     {
       diff: 3,
       q: "ロールベースのアクセス制御（RBAC）を Depends で実装してください。\n・admin ロールのみアクセス可能なエンドポイント\n・user ロール以上でアクセス可能なエンドポイント\nを作り分けること。",
-      code: `# GET /admin/dashboard → admin のみ
-# GET /profile → user 以上（user, admin）`,
-      answer: `from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from enum import Enum
-
-app = FastAPI()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-class Role(str, Enum):
-    user = "user"
-    admin = "admin"
-
-fake_tokens = {
-    "admin-token": {"username": "admin", "role": Role.admin},
-    "user-token": {"username": "user1", "role": Role.user},
-}
-
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    user = fake_tokens.get(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return user
-
-def require_role(*roles: Role):
-    def checker(user: dict = Depends(get_current_user)):
-        if user["role"] not in roles:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
-        return user
-    return checker
-
-@app.get("/admin/dashboard")
-def admin_dashboard(user: dict = Depends(require_role(Role.admin))):
-    return {"message": "Admin dashboard", "user": user["username"]}
-
-@app.get("/profile")
-def profile(user: dict = Depends(require_role(Role.user, Role.admin))):
-    return {"message": "Profile", "user": user["username"]}`
+      code: "# GET /admin/dashboard → admin のみ\n# GET /profile → user 以上（user, admin）",
+      answer: "from fastapi import FastAPI, Depends, HTTPException, status\nfrom fastapi.security import OAuth2PasswordBearer\nfrom enum import Enum\n\napp = FastAPI()\noauth2_scheme = OAuth2PasswordBearer(tokenUrl=\"token\")\n\nclass Role(str, Enum):\n    user = \"user\"\n    admin = \"admin\"\n\nfake_tokens = {\n    \"admin-token\": {\"username\": \"admin\", \"role\": Role.admin},\n    \"user-token\": {\"username\": \"user1\", \"role\": Role.user},\n}\n\ndef get_current_user(token: str = Depends(oauth2_scheme)):\n    user = fake_tokens.get(token)\n    if not user:\n        raise HTTPException(status_code=401, detail=\"Invalid token\")\n    return user\n\ndef require_role(*roles: Role):\n    def checker(user: dict = Depends(get_current_user)):\n        if user[\"role\"] not in roles:\n            raise HTTPException(status_code=403, detail=\"Insufficient permissions\")\n        return user\n    return checker\n\n@app.get(\"/admin/dashboard\")\ndef admin_dashboard(user: dict = Depends(require_role(Role.admin))):\n    return {\"message\": \"Admin dashboard\", \"user\": user[\"username\"]}\n\n@app.get(\"/profile\")\ndef profile(user: dict = Depends(require_role(Role.user, Role.admin))):\n    return {\"message\": \"Profile\", \"user\": user[\"username\"]}"
     }
   ],
   ch9: [
     {
       diff: 1,
       q: "UploadFile を使ったファイルアップロードのエンドポイントを実装してください。\nファイル名・サイズ・Content-Type を返すこと。",
-      code: `# POST /upload にファイルをアップロード
-# → {"filename": "test.txt", "size": 1234, "content_type": "text/plain"}`,
-      answer: `from fastapi import FastAPI, UploadFile
-
-app = FastAPI()
-
-@app.post("/upload")
-async def upload_file(file: UploadFile):
-    contents = await file.read()
-    return {
-        "filename": file.filename,
-        "size": len(contents),
-        "content_type": file.content_type,
-    }`
+      code: "# POST /upload にファイルをアップロード\n# → {\"filename\": \"test.txt\", \"size\": 1234, \"content_type\": \"text/plain\"}",
+      answer: "from fastapi import FastAPI, UploadFile\n\napp = FastAPI()\n\n@app.post(\"/upload\")\nasync def upload_file(file: UploadFile):\n    contents = await file.read()\n    return {\n        \"filename\": file.filename,\n        \"size\": len(contents),\n        \"content_type\": file.content_type,\n    }"
     },
     {
       diff: 2,
       q: "複数ファイルのアップロードと、ファイルサイズ制限（5MB以下）を実装してください。\n制限を超えた場合は 413 エラーを返すこと。",
-      code: `# POST /upload-multiple にファイルを複数アップロード
-# → 各ファイルの情報をリストで返す
-# → 5MB超のファイルは413エラー`,
-      answer: `from fastapi import FastAPI, UploadFile, HTTPException
-
-app = FastAPI()
-
-MAX_SIZE = 5 * 1024 * 1024  # 5MB
-
-@app.post("/upload-multiple")
-async def upload_files(files: list[UploadFile]):
-    results = []
-    for file in files:
-        contents = await file.read()
-        if len(contents) > MAX_SIZE:
-            raise HTTPException(
-                status_code=413,
-                detail=f"{file.filename} exceeds 5MB limit"
-            )
-        results.append({
-            "filename": file.filename,
-            "size": len(contents),
-        })
-    return results`
+      code: "# POST /upload-multiple にファイルを複数アップロード\n# → 各ファイルの情報をリストで返す\n# → 5MB超のファイルは413エラー",
+      answer: "from fastapi import FastAPI, UploadFile, HTTPException\n\napp = FastAPI()\n\nMAX_SIZE = 5 * 1024 * 1024  # 5MB\n\n@app.post(\"/upload-multiple\")\nasync def upload_files(files: list[UploadFile]):\n    results = []\n    for file in files:\n        contents = await file.read()\n        if len(contents) > MAX_SIZE:\n            raise HTTPException(\n                status_code=413,\n                detail=f\"{file.filename} exceeds 5MB limit\"\n            )\n        results.append({\n            \"filename\": file.filename,\n            \"size\": len(contents),\n        })\n    return results"
     },
     {
       diff: 3,
       q: "WebSocket を使ったリアルタイムチャットのエンドポイントを実装してください。\n接続管理クラスを作り、複数クライアントへのブロードキャストを可能にすること。",
-      code: `# ws://localhost:8000/ws/{client_id} で接続
-# メッセージ送信 → 全接続クライアントにブロードキャスト`,
-      answer: `from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-
-app = FastAPI()
-
-class ConnectionManager:
-    def __init__(self):
-        self.active: list[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active.remove(websocket)
-
-    async def broadcast(self, message: str):
-        for connection in self.active:
-            await connection.send_text(message)
-
-manager = ConnectionManager()
-
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    await manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            await manager.broadcast(f"{client_id}: {data}")
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        await manager.broadcast(f"{client_id} left the chat")`
+      code: "# ws://localhost:8000/ws/{client_id} で接続\n# メッセージ送信 → 全接続クライアントにブロードキャスト",
+      answer: "from fastapi import FastAPI, WebSocket, WebSocketDisconnect\n\napp = FastAPI()\n\nclass ConnectionManager:\n    def __init__(self):\n        self.active: list[WebSocket] = []\n\n    async def connect(self, websocket: WebSocket):\n        await websocket.accept()\n        self.active.append(websocket)\n\n    def disconnect(self, websocket: WebSocket):\n        self.active.remove(websocket)\n\n    async def broadcast(self, message: str):\n        for connection in self.active:\n            await connection.send_text(message)\n\nmanager = ConnectionManager()\n\n@app.websocket(\"/ws/{client_id}\")\nasync def websocket_endpoint(websocket: WebSocket, client_id: str):\n    await manager.connect(websocket)\n    try:\n        while True:\n            data = await websocket.receive_text()\n            await manager.broadcast(f\"{client_id}: {data}\")\n    except WebSocketDisconnect:\n        manager.disconnect(websocket)\n        await manager.broadcast(f\"{client_id} left the chat\")"
     }
   ],
   ch10: [
     {
       diff: 1,
       q: "TestClient を使って、GET / エンドポイントの動作をテストしてください。\nステータスコードとレスポンスボディの両方を検証すること。",
-      code: `# pytest で実行: pytest test_main.py`,
-      answer: `from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello"}
-
-# --- テスト ---
-client = TestClient(app)
-
-def test_read_root():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Hello"}
-
-def test_not_found():
-    response = client.get("/nonexistent")
-    assert response.status_code == 404`
+      code: "# pytest で実行: pytest test_main.py",
+      answer: "from fastapi import FastAPI\nfrom fastapi.testclient import TestClient\n\napp = FastAPI()\n\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"Hello\"}\n\n# --- テスト ---\nclient = TestClient(app)\n\ndef test_read_root():\n    response = client.get(\"/\")\n    assert response.status_code == 200\n    assert response.json() == {\"message\": \"Hello\"}\n\ndef test_not_found():\n    response = client.get(\"/nonexistent\")\n    assert response.status_code == 404"
     },
     {
       diff: 2,
       q: "dependency_overrides を使って、DB 依存をモックに差し替えたテストを書いてください。\n実際の DB に接続せずにエンドポイントをテストすること。",
-      code: `# テスト時だけ get_db をモックに差し替える`,
-      answer: `from fastapi import FastAPI, Depends
-from fastapi.testclient import TestClient
-
-app = FastAPI()
-
-def get_db():
-    return {"real": "database"}
-
-@app.get("/items")
-def read_items(db: dict = Depends(get_db)):
-    return {"db_type": db.get("real", db.get("mock", "unknown"))}
-
-# --- テスト ---
-def override_get_db():
-    return {"mock": "database"}
-
-app.dependency_overrides[get_db] = override_get_db
-client = TestClient(app)
-
-def test_read_items_with_mock():
-    response = client.get("/items")
-    assert response.status_code == 200
-    assert response.json() == {"db_type": "database"}
-
-# テスト後にクリア
-app.dependency_overrides.clear()`
+      code: "# テスト時だけ get_db をモックに差し替える",
+      answer: "from fastapi import FastAPI, Depends\nfrom fastapi.testclient import TestClient\n\napp = FastAPI()\n\ndef get_db():\n    return {\"real\": \"database\"}\n\n@app.get(\"/items\")\ndef read_items(db: dict = Depends(get_db)):\n    return {\"db_type\": db.get(\"real\", db.get(\"mock\", \"unknown\"))}\n\n# --- テスト ---\ndef override_get_db():\n    return {\"mock\": \"database\"}\n\napp.dependency_overrides[get_db] = override_get_db\nclient = TestClient(app)\n\ndef test_read_items_with_mock():\n    response = client.get(\"/items\")\n    assert response.status_code == 200\n    assert response.json() == {\"db_type\": \"database\"}\n\n# テスト後にクリア\napp.dependency_overrides.clear()"
     },
     {
       diff: 3,
       q: "POST / GET / DELETE を含む CRUD API の統合テストを書いてください。\nテストの順序に依存しない設計（各テストが独立）にすること。",
-      code: `# 作成 → 取得 → 削除 の流れをテスト
-# 各テストが独立して動作すること`,
-      answer: `from fastapi import FastAPI, HTTPException, status
-from fastapi.testclient import TestClient
-from pydantic import BaseModel
-
-app = FastAPI()
-
-class ItemCreate(BaseModel):
-    name: str
-
-db: dict[int, dict] = {}
-counter = 0
-
-@app.post("/items", status_code=201)
-def create_item(item: ItemCreate):
-    global counter
-    counter += 1
-    db[counter] = {"id": counter, "name": item.name}
-    return db[counter]
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int):
-    if item_id not in db:
-        raise HTTPException(status_code=404)
-    return db[item_id]
-
-@app.delete("/items/{item_id}", status_code=204)
-def delete_item(item_id: int):
-    if item_id not in db:
-        raise HTTPException(status_code=404)
-    del db[item_id]
-
-# --- テスト ---
-client = TestClient(app)
-
-def test_create_and_read():
-    # 作成
-    res = client.post("/items", json={"name": "Apple"})
-    assert res.status_code == 201
-    item_id = res.json()["id"]
-    # 取得
-    res = client.get(f"/items/{item_id}")
-    assert res.status_code == 200
-    assert res.json()["name"] == "Apple"
-
-def test_delete():
-    # 作成 → 削除 → 再取得で404
-    res = client.post("/items", json={"name": "Temp"})
-    item_id = res.json()["id"]
-    res = client.delete(f"/items/{item_id}")
-    assert res.status_code == 204
-    res = client.get(f"/items/{item_id}")
-    assert res.status_code == 404
-
-def test_not_found():
-    res = client.get("/items/99999")
-    assert res.status_code == 404`
+      code: "# 作成 → 取得 → 削除 の流れをテスト\n# 各テストが独立して動作すること",
+      answer: "from fastapi import FastAPI, HTTPException, status\nfrom fastapi.testclient import TestClient\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass ItemCreate(BaseModel):\n    name: str\n\ndb: dict[int, dict] = {}\ncounter = 0\n\n@app.post(\"/items\", status_code=201)\ndef create_item(item: ItemCreate):\n    global counter\n    counter += 1\n    db[counter] = {\"id\": counter, \"name\": item.name}\n    return db[counter]\n\n@app.get(\"/items/{item_id}\")\ndef read_item(item_id: int):\n    if item_id not in db:\n        raise HTTPException(status_code=404)\n    return db[item_id]\n\n@app.delete(\"/items/{item_id}\", status_code=204)\ndef delete_item(item_id: int):\n    if item_id not in db:\n        raise HTTPException(status_code=404)\n    del db[item_id]\n\n# --- テスト ---\nclient = TestClient(app)\n\ndef test_create_and_read():\n    # 作成\n    res = client.post(\"/items\", json={\"name\": \"Apple\"})\n    assert res.status_code == 201\n    item_id = res.json()[\"id\"]\n    # 取得\n    res = client.get(f\"/items/{item_id}\")\n    assert res.status_code == 200\n    assert res.json()[\"name\"] == \"Apple\"\n\ndef test_delete():\n    # 作成 → 削除 → 再取得で404\n    res = client.post(\"/items\", json={\"name\": \"Temp\"})\n    item_id = res.json()[\"id\"]\n    res = client.delete(f\"/items/{item_id}\")\n    assert res.status_code == 204\n    res = client.get(f\"/items/{item_id}\")\n    assert res.status_code == 404\n\ndef test_not_found():\n    res = client.get(\"/items/99999\")\n    assert res.status_code == 404"
     }
   ]
 };
@@ -1095,60 +371,17 @@ const chapters = [{
   }, {
     title: "ASGI と Starlette",
     body: "ASGI（Asynchronous Server Gateway Interface）は、WSGI の非同期版にあたるインタフェース仕様です。WSGI は 1 リクエスト = 1 スレッドで処理するため、I/O 待ちが多い API では効率が悪くなります。ASGI は async/await をネイティブに扱えるため、1 プロセスで数千の同時接続をさばくことが可能です。\n\nFastAPI は内部で Starlette というマイクロフレームワークをベースに構築されています。ルーティング、ミドルウェア、WebSocket、静的ファイル配信といった低レイヤーの機能は全て Starlette が担当し、FastAPI はその上に型ヒント駆動のバリデーション、依存性注入、自動ドキュメント生成を載せています。\n\nこの二層構造のおかげで、パフォーマンスは Starlette 直書きとほぼ同等でありながら、開発者は宣言的で読みやすいコードを書けます。Flask で言えば Werkzeug が裏方を担当しているのと同じ関係です。",
-    code: `# ASGI アプリケーションの最小構造（参考）
-# FastAPI はこれを内部で自動構築している
-async def app(scope, receive, send):
-    # scope: リクエスト情報
-    # receive: リクエストボディ受信
-    # send: レスポンス送信
-    pass
-
-# 実際には Uvicorn がこの ASGI アプリを起動する
-# uvicorn main:app --reload`,
+    code: "# ASGI アプリケーションの最小構造（参考）\n# FastAPI はこれを内部で自動構築している\nasync def app(scope, receive, send):\n    # scope: リクエスト情報\n    # receive: リクエストボディ受信\n    # send: レスポンス送信\n    pass\n\n# 実際には Uvicorn がこの ASGI アプリを起動する\n# uvicorn main:app --reload",
     afterCode: "ポイント: Uvicorn は ASGI サーバの実装で、FastAPI アプリを実行するために使います。Flask での flask run や Django での manage.py runserver に相当します。--reload オプションを付けるとファイル変更時に自動再起動します。"
   }, {
     title: "環境構築",
     body: "FastAPI の環境構築は pip だけで完結します。venv で仮想環境を作り、fastapi と uvicorn をインストールすれば準備完了です。Django のような startproject コマンドや設定ファイルの生成は不要で、Python ファイル 1 つから始められるのが FastAPI のシンプルさです。\n\n開発時には uvicorn main:app --reload で起動し、http://127.0.0.1:8000/docs にアクセスすると自動生成された Swagger UI が表示されます。ここからブラウザ上でエンドポイントを試せるため、curl や Postman を使わなくても動作確認ができます。\n\nPython 3.10 以上を推奨します。型ヒント構文が簡潔になり、match 文なども使えるためです。",
-    code: `# 仮想環境の作成と有効化
-python -m venv venv
-source venv/bin/activate    # Windows: venv\\Scripts\\activate
-
-# FastAPI と Uvicorn のインストール
-pip install "fastapi[standard]"
-
-# 最小限のアプリケーション (main.py)
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello, FastAPI!"}
-
-# 起動
-# uvicorn main:app --reload`,
+    code: "# 仮想環境の作成と有効化\npython -m venv venv\nsource venv/bin/activate    # Windows: venv\\Scripts\\activate\n\n# FastAPI と Uvicorn のインストール\npip install \"fastapi[standard]\"\n\n# 最小限のアプリケーション (main.py)\nfrom fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"Hello, FastAPI!\"}\n\n# 起動\n# uvicorn main:app --reload",
     afterCode: "起動したら以下の URL にアクセスしてみましょう:\n・http://127.0.0.1:8000/ → JSON レスポンス確認\n・http://127.0.0.1:8000/docs → Swagger UI（対話的ドキュメント）\n・http://127.0.0.1:8000/redoc → ReDoc（見やすいドキュメント）"
   }, {
     title: "型ヒント駆動開発",
     body: "FastAPI の最大の革新は「型ヒントを書くだけで 3 つのことが同時に起きる」点です。第一にリクエストパラメータの自動パース（文字列 '42' を int の 42 に変換）、第二にバリデーション（型が合わなければ 422 エラーを自動返却）、第三に OpenAPI ドキュメントの自動生成です。\n\nFlask では request.args.get('id') で取得して int() で変換し、ValueError をキャッチして 400 を返す、というコードを手動で書く必要がありました。Django REST Framework では Serializer クラスを別途定義する必要がありました。FastAPI では関数引数に item_id: int と書くだけで、これら全てが自動化されます。\n\nこの設計は「同じ情報を二度書かない（DRY）」原則の徹底であり、コードがそのままドキュメントになるという理想に近づいています。型ヒントは IDE の補完とも連携するため、開発体験が非常に良いのも大きな魅力です。",
-    code: `from fastapi import FastAPI
-
-app = FastAPI()
-
-# 型ヒントだけで自動パース + バリデーション + ドキュメント生成
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: str | None = None):
-    return {"item_id": item_id, "q": q}
-
-# Flask で同じことをする場合（比較）
-# @app.route("/items/<item_id>")
-# def read_item(item_id):
-#     try:
-#         item_id = int(item_id)
-#     except ValueError:
-#         abort(400)
-#     q = request.args.get("q")
-#     return jsonify({"item_id": item_id, "q": q})`,
+    code: "from fastapi import FastAPI\n\napp = FastAPI()\n\n# 型ヒントだけで自動パース + バリデーション + ドキュメント生成\n@app.get(\"/items/{item_id}\")\ndef read_item(item_id: int, q: str | None = None):\n    return {\"item_id\": item_id, \"q\": q}\n\n# Flask で同じことをする場合（比較）\n# @app.route(\"/items/<item_id>\")\n# def read_item(item_id):\n#     try:\n#         item_id = int(item_id)\n#     except ValueError:\n#         abort(400)\n#     q = request.args.get(\"q\")\n#     return jsonify({\"item_id\": item_id, \"q\": q})",
     afterCode: "ミニ演習: item_id を str のまま渡したら何が起きるか確認してみましょう。/docs の Swagger UI から試すと、422 Unprocessable Entity とともにどのパラメータが不正だったかが JSON で返ります。"
   }]
 }, {
@@ -1161,109 +394,23 @@ def read_item(item_id: int, q: str | None = None):
     title: "HTTP メソッドとルーティング",
     body: "REST API の基本は HTTP メソッドの使い分けです。リソースの取得には GET、作成には POST、全体更新には PUT、部分更新には PATCH、削除には DELETE を使います。FastAPI ではこの 5 つのメソッドそれぞれに対応するデコレータが用意されています。\n\nFlask では @app.route('/items', methods=['GET', 'POST']) のように 1 つのルートに複数メソッドを割り当てることが多いですが、FastAPI では @app.get('/items') と @app.post('/items') を別々に定義します。メソッドごとに関数が分かれるため、各処理の責務が明確になり、OpenAPI ドキュメントにも正しく反映されます。\n\nDjango REST Framework の ViewSet が class ベースでメソッドをまとめるのに対し、FastAPI は関数ベースで 1 エンドポイント 1 関数という原則を取ります。シンプルな API ではこちらのほうが見通しが良くなります。",
     table: T.httpMethods,
-    code: `from fastapi import FastAPI
-
-app = FastAPI()
-
-items = {}
-
-@app.get("/items")
-def list_items():
-    return list(items.values())
-
-@app.post("/items")
-def create_item(name: str, price: float):
-    item_id = len(items) + 1
-    items[item_id] = {"id": item_id, "name": name, "price": price}
-    return items[item_id]
-
-@app.put("/items/{item_id}")
-def update_item(item_id: int, name: str, price: float):
-    items[item_id] = {"id": item_id, "name": name, "price": price}
-    return items[item_id]
-
-@app.delete("/items/{item_id}")
-def delete_item(item_id: int):
-    del items[item_id]
-    return {"message": "deleted"}`,
+    code: "from fastapi import FastAPI\n\napp = FastAPI()\n\nitems = {}\n\n@app.get(\"/items\")\ndef list_items():\n    return list(items.values())\n\n@app.post(\"/items\")\ndef create_item(name: str, price: float):\n    item_id = len(items) + 1\n    items[item_id] = {\"id\": item_id, \"name\": name, \"price\": price}\n    return items[item_id]\n\n@app.put(\"/items/{item_id}\")\ndef update_item(item_id: int, name: str, price: float):\n    items[item_id] = {\"id\": item_id, \"name\": name, \"price\": price}\n    return items[item_id]\n\n@app.delete(\"/items/{item_id}\")\ndef delete_item(item_id: int):\n    del items[item_id]\n    return {\"message\": \"deleted\"}",
     afterCode: "ポイント: FastAPI のデコレータ名がそのまま HTTP メソッド名になっているので、コードを見るだけでどのメソッドかが一目瞭然です。"
   }, {
     title: "パスパラメータ",
     body: "パスパラメータは URL の一部としてデータを受け取る方法です。/users/{user_id} のように波括弧で囲んだ部分が引数名と対応します。FastAPI では関数の引数名がパスの変数名と一致していれば自動的にバインドされ、型注釈に従って変換・バリデーションが行われます。\n\nFlask では @app.route('/users/<int:user_id>') のように型指定を明示する必要がありましたが、FastAPI では Python 標準の型ヒントだけで済みます。型が合わない値（例: /users/abc に int を期待している場合）は 422 エラーとして自動的に拒否されるため、手動のバリデーションコードが不要です。\n\n複数のパスパラメータを組み合わせることも可能で、/users/{user_id}/items/{item_id} のように階層的なリソース構造を表現できます。",
-    code: `from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/users/{user_id}")
-def read_user(user_id: int):
-    return {"user_id": user_id}
-
-# 複数パスパラメータ
-@app.get("/users/{user_id}/items/{item_id}")
-def read_user_item(user_id: int, item_id: int):
-    return {"user_id": user_id, "item_id": item_id}
-
-# 順序に注意: 固定パスを先に定義する
-@app.get("/users/me")       # ← 先に定義
-def read_current_user():
-    return {"user": "current"}
-
-@app.get("/users/{user_id}")  # ← 後に定義
-def read_user_by_id(user_id: int):
-    return {"user_id": user_id}`,
+    code: "from fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get(\"/users/{user_id}\")\ndef read_user(user_id: int):\n    return {\"user_id\": user_id}\n\n# 複数パスパラメータ\n@app.get(\"/users/{user_id}/items/{item_id}\")\ndef read_user_item(user_id: int, item_id: int):\n    return {\"user_id\": user_id, \"item_id\": item_id}\n\n# 順序に注意: 固定パスを先に定義する\n@app.get(\"/users/me\")       # ← 先に定義\ndef read_current_user():\n    return {\"user\": \"current\"}\n\n@app.get(\"/users/{user_id}\")  # ← 後に定義\ndef read_user_by_id(user_id: int):\n    return {\"user_id\": user_id}",
     afterCode: "注意: /users/me と /users/{user_id} のように固定パスと変数パスが競合する場合、固定パスを先に定義する必要があります。そうしないと me が user_id として解釈されてしまいます。"
   }, {
     title: "クエリパラメータ",
     body: "クエリパラメータは URL の ? 以降に付くパラメータで、/items?skip=0&limit=10 のような形式です。FastAPI ではパスに含まれない関数引数が自動的にクエリパラメータとして扱われます。デフォルト値を設定すれば省略可能になり、Optional を使えば None も許容されます。\n\nFlask では request.args.get('skip', default=0, type=int) と書く必要があり、型変換・デフォルト値・None チェックを手動で行う必要がありました。FastAPI では関数シグネチャだけで全てが表現され、Swagger UI にもパラメータの型・デフォルト値・必須/任意の区別が自動的に反映されます。\n\nクエリパラメータは主に一覧取得時のフィルタリング・ソート・ページネーションに使われます。RESTful 設計では、リソースの識別にはパスパラメータ、オプショナルな修飾にはクエリパラメータ、という使い分けが定石です。",
     table: T.paramTypes,
-    code: `from fastapi import FastAPI, Query
-
-app = FastAPI()
-
-@app.get("/items")
-def read_items(
-    skip: int = 0,
-    limit: int = Query(default=10, le=100),  # 最大100件
-    q: str | None = None
-):
-    results = {"skip": skip, "limit": limit}
-    if q:
-        results["q"] = q
-    return results
-
-# Query() でバリデーションを追加
-@app.get("/search")
-def search(
-    keyword: str = Query(..., min_length=1, max_length=50),
-    page: int = Query(default=1, ge=1)
-):
-    return {"keyword": keyword, "page": page}`,
+    code: "from fastapi import FastAPI, Query\n\napp = FastAPI()\n\n@app.get(\"/items\")\ndef read_items(\n    skip: int = 0,\n    limit: int = Query(default=10, le=100),  # 最大100件\n    q: str | None = None\n):\n    results = {\"skip\": skip, \"limit\": limit}\n    if q:\n        results[\"q\"] = q\n    return results\n\n# Query() でバリデーションを追加\n@app.get(\"/search\")\ndef search(\n    keyword: str = Query(..., min_length=1, max_length=50),\n    page: int = Query(default=1, ge=1)\n):\n    return {\"keyword\": keyword, \"page\": page}",
     afterCode: "ポイント: Query(...) の ... は「必須」を意味します。デフォルト値を設定しない場合はクエリパラメータが必須になり、省略すると 422 エラーが返ります。Query(default=10) のように明示的に書くほうが可読性は高くなります。"
   }, {
     title: "リクエストボディ",
     body: "POST や PUT でクライアントからデータを送る場合、リクエストボディを使います。FastAPI では Pydantic モデルを引数の型として指定するだけで、JSON ボディの自動パース・バリデーションが行われます（Pydantic の詳細は次章で解説します）。\n\nFlask では request.get_json() で辞書を取得し、各フィールドの存在チェックと型チェックを手動で行うのが一般的でした。Django REST Framework では Serializer クラスを定義する必要がありました。FastAPI では Pydantic モデルの定義が入力バリデーション・ドキュメント生成・コード補完の全てを兼ねるため、情報の重複がありません。\n\nパスパラメータ・クエリパラメータ・リクエストボディは 1 つのエンドポイントで同時に使えます。FastAPI は引数の型と位置から自動的にどこからデータを取るかを判定します。",
-    code: `from fastapi import FastAPI
-from pydantic import BaseModel
-
-app = FastAPI()
-
-class Item(BaseModel):
-    name: str
-    price: float
-    description: str | None = None
-
-# ボディ + パスパラメータ + クエリパラメータの組み合わせ
-@app.put("/items/{item_id}")
-def update_item(
-    item_id: int,           # パスパラメータ
-    item: Item,              # リクエストボディ（Pydantic モデル）
-    importance: int = 0      # クエリパラメータ
-):
-    return {
-        "item_id": item_id,
-        "item": item,
-        "importance": importance
-    }`,
+    code: "from fastapi import FastAPI\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass Item(BaseModel):\n    name: str\n    price: float\n    description: str | None = None\n\n# ボディ + パスパラメータ + クエリパラメータの組み合わせ\n@app.put(\"/items/{item_id}\")\ndef update_item(\n    item_id: int,           # パスパラメータ\n    item: Item,              # リクエストボディ（Pydantic モデル）\n    importance: int = 0      # クエリパラメータ\n):\n    return {\n        \"item_id\": item_id,\n        \"item\": item,\n        \"importance\": importance\n    }",
     afterCode: "判定ルール: パスに含まれる名前 → パスパラメータ。Pydantic モデル型 → リクエストボディ。それ以外 → クエリパラメータ。このルールさえ覚えれば混乱しません。"
   }]
 }, {
@@ -1275,126 +422,28 @@ def update_item(
   sections: [{
     title: "Pydantic の役割",
     body: "Pydantic は Python の型ヒントを使ってデータの検証と変換を行うライブラリです。FastAPI はこの Pydantic を全面的に採用しており、リクエストボディの解析、レスポンスの整形、設定ファイルの読み込みなど、あらゆる場面でデータバリデーションの基盤として機能しています。\n\nFlask ではリクエストの JSON を辞書として受け取った後、各フィールドの存在チェック・型チェック・範囲チェックを手動で書く必要がありました。marshmallow や cerberus といったバリデーションライブラリを追加で導入する開発者も多いですが、それでも「スキーマ定義」「バリデーション」「ドキュメント」が分散しがちでした。Pydantic はこの 3 つを 1 つのクラス定義に集約します。\n\nPydantic v2（2023 年リリース）は Rust で書かれたコアエンジンを持ち、v1 比で 5〜50 倍の高速化を実現しています。FastAPI 0.100 以降は Pydantic v2 をネイティブサポートしており、本コースでも v2 の記法を使います。",
-    code: `from pydantic import BaseModel, Field
-
-class User(BaseModel):
-    name: str
-    age: int
-    email: str | None = None
-
-# 自動バリデーション
-user = User(name="太郎", age=25)         # OK
-# user = User(name="太郎", age="abc")    # ValidationError
-
-# 辞書から生成
-user = User.model_validate({"name": "太郎", "age": 25})
-
-# JSON 文字列から生成
-user = User.model_validate_json('{"name": "太郎", "age": 25}')
-
-# 辞書・JSON への変換
-print(user.model_dump())       # {"name": "太郎", "age": 25, "email": None}
-print(user.model_dump_json())  # '{"name":"太郎","age":25,"email":null}'`,
+    code: "from pydantic import BaseModel, Field\n\nclass User(BaseModel):\n    name: str\n    age: int\n    email: str | None = None\n\n# 自動バリデーション\nuser = User(name=\"太郎\", age=25)         # OK\n# user = User(name=\"太郎\", age=\"abc\")    # ValidationError\n\n# 辞書から生成\nuser = User.model_validate({\"name\": \"太郎\", \"age\": 25})\n\n# JSON 文字列から生成\nuser = User.model_validate_json('{\"name\": \"太郎\", \"age\": 25}')\n\n# 辞書・JSON への変換\nprint(user.model_dump())       # {\"name\": \"太郎\", \"age\": 25, \"email\": None}\nprint(user.model_dump_json())  # '{\"name\":\"太郎\",\"age\":25,\"email\":null}'",
     afterCode: "ポイント: model_dump() は Pydantic v2 のメソッドです。v1 では .dict() / .json() でしたが、v2 で名前が変わりました。ネット上の古い記事に注意してください。"
   }, {
     title: "Field によるバリデーション",
     body: "Field() を使うと、各フィールドに対して詳細なバリデーションルールを宣言的に定義できます。数値の範囲（gt, ge, lt, le）、文字列の長さ（min_length, max_length）、正規表現パターン（pattern）、デフォルト値、OpenAPI 上の説明文などを 1 行で指定できます。\n\nFlask + marshmallow の場合、Schema クラスの中で Length(min=2, max=50) や Range(min=0) のようにバリデータを記述しますが、Pydantic では Python の型注釈に統合されているため、IDE の補完が効き、読みやすさも格段に上です。\n\nField の第 1 引数に ... を渡すと「必須フィールド」、default=値 を渡すと「省略可能でデフォルト値あり」という意味になります。None を許容するには型を str | None にして default=None とします。",
     table: T.pydanticField,
-    code: `from pydantic import BaseModel, Field
-
-class Product(BaseModel):
-    name: str = Field(
-        ...,
-        min_length=1,
-        max_length=100,
-        description="商品名"
-    )
-    price: float = Field(
-        ...,
-        gt=0,
-        description="価格（0より大きい）"
-    )
-    quantity: int = Field(
-        default=0,
-        ge=0,
-        description="在庫数"
-    )
-    category: str = Field(
-        default="general",
-        pattern=r"^[a-z]+$",
-        description="カテゴリ（小文字英字のみ）"
-    )`,
+    code: "from pydantic import BaseModel, Field\n\nclass Product(BaseModel):\n    name: str = Field(\n        ...,\n        min_length=1,\n        max_length=100,\n        description=\"商品名\"\n    )\n    price: float = Field(\n        ...,\n        gt=0,\n        description=\"価格（0より大きい）\"\n    )\n    quantity: int = Field(\n        default=0,\n        ge=0,\n        description=\"在庫数\"\n    )\n    category: str = Field(\n        default=\"general\",\n        pattern=r\"^[a-z]+$\",\n        description=\"カテゴリ（小文字英字のみ）\"\n    )",
     afterCode: "ミニ演習: price に -100 を、category に 'ABC'（大文字）を渡すと、それぞれどんな ValidationError が出るか確認してみましょう。エラーメッセージにはどのフィールドのどのルールに違反したかが明示されます。"
   }, {
     title: "model_validator とカスタムバリデーション",
     body: "個々のフィールドの制約を超えて「フィールド間の関係」を検証したい場合は、model_validator を使います。たとえば「開始日が終了日より前であること」や「パスワードと確認パスワードが一致すること」といった複合条件です。\n\nPydantic v2 では @model_validator(mode='before') と @model_validator(mode='after') の 2 つのタイミングがあります。before はデータが Pydantic モデルに変換される前（つまり dict 段階）、after は全フィールドのバリデーションが通った後に実行されます。ほとんどの場合は after を使います。\n\n個別のフィールド単位のバリデーションには @field_validator を使います。こちらは特定の 1 フィールドに対するカスタムルールを書く場合に使います。",
-    code: `from pydantic import BaseModel, model_validator, field_validator
-
-class DateRange(BaseModel):
-    start_date: str
-    end_date: str
-
-    @model_validator(mode="after")
-    def check_dates(self):
-        if self.start_date >= self.end_date:
-            raise ValueError("start_date must be before end_date")
-        return self
-
-class Username(BaseModel):
-    name: str
-
-    @field_validator("name")
-    @classmethod
-    def name_must_not_contain_spaces(cls, v: str) -> str:
-        if " " in v:
-            raise ValueError("name must not contain spaces")
-        return v.strip()`,
+    code: "from pydantic import BaseModel, model_validator, field_validator\n\nclass DateRange(BaseModel):\n    start_date: str\n    end_date: str\n\n    @model_validator(mode=\"after\")\n    def check_dates(self):\n        if self.start_date >= self.end_date:\n            raise ValueError(\"start_date must be before end_date\")\n        return self\n\nclass Username(BaseModel):\n    name: str\n\n    @field_validator(\"name\")\n    @classmethod\n    def name_must_not_contain_spaces(cls, v: str) -> str:\n        if \" \" in v:\n            raise ValueError(\"name must not contain spaces\")\n        return v.strip()",
     afterCode: "ポイント: field_validator は classmethod として定義し、引数 v にそのフィールドの値が渡されます。戻り値がそのまま最終的な値になるので、strip() のような正規化処理も可能です。"
   }, {
     title: "ネストされたモデル",
     body: "実際の API では、JSON の構造がフラットであることは稀です。ユーザーの中に住所があり、住所の中に都道府県がある、というようなネスト構造が一般的です。Pydantic ではモデルの中にモデルを入れることで、任意の深さのネストを表現できます。\n\nネストされたモデルもバリデーションは再帰的に適用されるため、内側のモデルのルール違反はエラーメッセージに「どの階層のどのフィールドか」がパス形式（address.city など）で示されます。これにより、フロントエンド側でどのフォームフィールドにエラーを表示すべきかが一目で分かります。\n\nリストや辞書との組み合わせも自然に書けます。list[Item] と書けば Item のリストとして検証され、各要素に対して Item のバリデーションが走ります。",
-    code: `from pydantic import BaseModel, Field
-
-class Address(BaseModel):
-    prefecture: str
-    city: str
-    street: str | None = None
-
-class User(BaseModel):
-    name: str
-    age: int = Field(..., ge=0)
-    address: Address                # ネスト
-    tags: list[str] = []            # リスト
-    scores: dict[str, int] = {}     # 辞書
-
-# 使用例
-user = User(
-    name="太郎",
-    age=25,
-    address={"prefecture": "東京都", "city": "渋谷区"},
-    tags=["python", "fastapi"],
-    scores={"math": 90, "english": 85}
-)`,
+    code: "from pydantic import BaseModel, Field\n\nclass Address(BaseModel):\n    prefecture: str\n    city: str\n    street: str | None = None\n\nclass User(BaseModel):\n    name: str\n    age: int = Field(..., ge=0)\n    address: Address                # ネスト\n    tags: list[str] = []            # リスト\n    scores: dict[str, int] = {}     # 辞書\n\n# 使用例\nuser = User(\n    name=\"太郎\",\n    age=25,\n    address={\"prefecture\": \"東京都\", \"city\": \"渋谷区\"},\n    tags=[\"python\", \"fastapi\"],\n    scores={\"math\": 90, \"english\": 85}\n)",
     afterCode: "ポイント: address に辞書を渡しても Pydantic が自動的に Address モデルに変換してくれます。これは「コアシング（型強制）」と呼ばれる機能で、JSON のようなシリアライズ済みデータとの親和性が高い設計です。"
   }, {
     title: "入力モデルと出力モデルの分離",
     body: "実務では「入力時に受け取るフィールド」と「出力時に返すフィールド」が異なることがほとんどです。たとえばユーザー作成時にはパスワードを受け取りますが、レスポンスにパスワードを含めてはいけません。また、id は DB が自動生成するため入力には不要ですが出力には必要です。\n\nFastAPI ではこの問題を「モデルの継承」で解決するのが定番です。共通フィールドを持つ Base クラスを定義し、入力用（Create）と出力用（Out / Response）で必要なフィールドだけを追加・除外します。Django REST Framework の Serializer でも同様のパターンがありますが、Pydantic のほうが Python の型システムとの統合が深く、IDE サポートも強力です。\n\nPydantic v2 では model_config で from_attributes = True を指定すると、SQLAlchemy のモデルオブジェクトを直接 Pydantic モデルに変換できます（ORM モード）。これにより、DB のモデルと API のレスポンスモデルの変換がシームレスになります。",
-    code: `from pydantic import BaseModel
-
-class UserBase(BaseModel):
-    name: str
-    email: str
-
-class UserCreate(UserBase):
-    password: str              # 入力時のみ
-
-class UserOut(UserBase):
-    id: int                    # 出力時のみ
-    model_config = {"from_attributes": True}
-
-# class UserUpdate(BaseModel):
-#     name: str | None = None  # 全フィールド Optional（部分更新用）
-#     email: str | None = None`,
+    code: "from pydantic import BaseModel\n\nclass UserBase(BaseModel):\n    name: str\n    email: str\n\nclass UserCreate(UserBase):\n    password: str              # 入力時のみ\n\nclass UserOut(UserBase):\n    id: int                    # 出力時のみ\n    model_config = {\"from_attributes\": True}\n\n# class UserUpdate(BaseModel):\n#     name: str | None = None  # 全フィールド Optional（部分更新用）\n#     email: str | None = None",
     afterCode: "ポイント: from_attributes = True を設定すると、user_out = UserOut.model_validate(db_user) のように SQLAlchemy の ORM オブジェクトから直接変換できます。db_user.name のような属性アクセスが自動的にフィールドにマッピングされます。"
   }]
 }, {
@@ -1406,112 +455,23 @@ class UserOut(UserBase):
   sections: [{
     title: "response_model",
     body: "FastAPI のデコレータには response_model パラメータを指定でき、レスポンス JSON のフィルタリングとバリデーションを自動化できます。関数が返す値が response_model に合致しないフィールドを持っていた場合、そのフィールドは自動的に除外されます。\n\nこの仕組みが特に重要なのはセキュリティの観点です。たとえば ORM からユーザーオブジェクトを取得すると hashed_password フィールドが含まれていますが、response_model に UserOut（password フィールドなし）を指定しておけば、実装者がうっかり return user しても パスワードが漏洩することはありません。\n\nFlask ではこのフィルタリングを手動で行う（辞書から不要なキーを pop する、Marshmallow で dump する等）必要がありましたが、FastAPI では宣言的に解決できます。Django REST Framework の Serializer と似た役割ですが、response_model はデコレータ引数として外から指定するため、関数の本体をシンプルに保てます。",
-    code: `from fastapi import FastAPI
-from pydantic import BaseModel
-
-app = FastAPI()
-
-class UserIn(BaseModel):
-    name: str
-    email: str
-    password: str
-
-class UserOut(BaseModel):
-    name: str
-    email: str
-
-@app.post("/users", response_model=UserOut)
-def create_user(user: UserIn):
-    # user には password が含まれているが、
-    # response_model=UserOut により自動的に除外される
-    return user
-
-# response_model_exclude_unset=True で未設定フィールドを除外
-@app.get("/items/{id}", response_model_exclude_unset=True)
-def read_item(id: int):
-    return {"id": id, "name": "Apple"}  # price が未設定なら含めない`,
+    code: "from fastapi import FastAPI\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass UserIn(BaseModel):\n    name: str\n    email: str\n    password: str\n\nclass UserOut(BaseModel):\n    name: str\n    email: str\n\n@app.post(\"/users\", response_model=UserOut)\ndef create_user(user: UserIn):\n    # user には password が含まれているが、\n    # response_model=UserOut により自動的に除外される\n    return user\n\n# response_model_exclude_unset=True で未設定フィールドを除外\n@app.get(\"/items/{id}\", response_model_exclude_unset=True)\ndef read_item(id: int):\n    return {\"id\": id, \"name\": \"Apple\"}  # price が未設定なら含めない",
     afterCode: "ポイント: response_model はレスポンスのバリデーションも行います。関数が返した値が response_model の型に合わない場合は 500 Internal Server Error になります。これはバグの早期発見に役立ちます。"
   }, {
     title: "ステータスコード",
     body: "HTTP ステータスコードは API のクライアントに「リクエストがどう処理されたか」を伝える重要な手段です。FastAPI ではデコレータの status_code パラメータで正常系のステータスコードを指定します。\n\nデフォルトは 200 OK ですが、リソース作成時は 201 Created、削除成功時は 204 No Content を返すのが RESTful の慣例です。Flask でも make_response() でステータスコードを指定できましたが、FastAPI のほうがデコレータレベルで宣言的に書けるため、エンドポイントの仕様が一目で分かります。\n\nfastapi.status モジュールには HTTP_201_CREATED のような定数が用意されており、マジックナンバーを避けてコードの可読性を上げられます。これらの定数は starlette.status からの再エクスポートで、Starlette と同じものです。",
     table: T.statusCodes,
-    code: `from fastapi import FastAPI, status
-from pydantic import BaseModel
-
-app = FastAPI()
-
-class Item(BaseModel):
-    name: str
-    price: float
-
-@app.post("/items", status_code=status.HTTP_201_CREATED)
-def create_item(item: Item):
-    return {"id": 1, **item.model_dump()}
-
-@app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_item(item_id: int):
-    # 204 の場合、レスポンスボディは返さない
-    pass`,
+    code: "from fastapi import FastAPI, status\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass Item(BaseModel):\n    name: str\n    price: float\n\n@app.post(\"/items\", status_code=status.HTTP_201_CREATED)\ndef create_item(item: Item):\n    return {\"id\": 1, **item.model_dump()}\n\n@app.delete(\"/items/{item_id}\", status_code=status.HTTP_204_NO_CONTENT)\ndef delete_item(item_id: int):\n    # 204 の場合、レスポンスボディは返さない\n    pass",
     afterCode: "ポイント: 204 No Content のエンドポイントでは関数の戻り値が無視されます。return で何か返しても実際のレスポンスボディは空になります。"
   }, {
     title: "HTTPException",
     body: "エラー時にはステータスコードとエラーメッセージを含むレスポンスを返す必要があります。FastAPI では HTTPException を raise するだけで、指定したステータスコードとメッセージが JSON レスポンスとして返されます。\n\nFlask では abort(404) や jsonify + make_response で手動構築していましたが、FastAPI の HTTPException は Python の例外機構に乗っているため、処理の途中で即座に脱出できます。ネストされた関数呼び出しの深いところからでも raise 一発でエラーレスポンスを返せるのは大きな利点です。\n\nheaders パラメータで追加の HTTP ヘッダー（WWW-Authenticate など）を付けることもでき、認証エラーの標準的なレスポンス形式に対応しています。",
-    code: `from fastapi import FastAPI, HTTPException, status
-
-app = FastAPI()
-
-items_db = {1: {"id": 1, "name": "Apple"}}
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int):
-    if item_id not in items_db:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Item {item_id} not found",
-            headers={"X-Error": "Item not found"}  # カスタムヘッダー
-        )
-    return items_db[item_id]`,
+    code: "from fastapi import FastAPI, HTTPException, status\n\napp = FastAPI()\n\nitems_db = {1: {\"id\": 1, \"name\": \"Apple\"}}\n\n@app.get(\"/items/{item_id}\")\ndef read_item(item_id: int):\n    if item_id not in items_db:\n        raise HTTPException(\n            status_code=status.HTTP_404_NOT_FOUND,\n            detail=f\"Item {item_id} not found\",\n            headers={\"X-Error\": \"Item not found\"}  # カスタムヘッダー\n        )\n    return items_db[item_id]",
     afterCode: "detail にはテキストだけでなく辞書やリストも渡せます。例: detail={\"error\": \"not_found\", \"item_id\": 42}。フロントエンド側でプログラム的にエラー種別を判定したい場合に便利です。"
   }, {
     title: "カスタム例外ハンドラ",
     body: "アプリケーション固有の例外クラスを定義し、それに対応するハンドラを登録することで、エラーレスポンスの形式を統一できます。@app.exception_handler() デコレータで例外クラスとハンドラ関数を紐付けます。\n\nこのパターンは Flask の @app.errorhandler() や Django の EXCEPTION_HANDLER 設定に相当します。実務では「全ての API エラーを統一フォーマットで返す」という要件が多く、カスタム例外ハンドラはほぼ必須のテクニックです。\n\nRequestValidationError（Pydantic のバリデーションエラー）のハンドラを上書きすることで、デフォルトの 422 レスポンスのフォーマットをカスタマイズすることも可能です。",
-    code: `from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-
-app = FastAPI()
-
-# カスタム例外クラス
-class ItemNotFoundError(Exception):
-    def __init__(self, item_id: int):
-        self.item_id = item_id
-
-# 例外ハンドラの登録
-@app.exception_handler(ItemNotFoundError)
-async def item_not_found_handler(request: Request, exc: ItemNotFoundError):
-    return JSONResponse(
-        status_code=404,
-        content={
-            "error": "ITEM_NOT_FOUND",
-            "detail": f"Item {exc.item_id} does not exist",
-            "path": str(request.url)
-        }
-    )
-
-# バリデーションエラーのカスタマイズ
-@app.exception_handler(RequestValidationError)
-async def validation_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=422,
-        content={
-            "error": "VALIDATION_ERROR",
-            "detail": exc.errors()
-        }
-    )
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int):
-    raise ItemNotFoundError(item_id=item_id)`,
+    code: "from fastapi import FastAPI, Request\nfrom fastapi.responses import JSONResponse\nfrom fastapi.exceptions import RequestValidationError\n\napp = FastAPI()\n\n# カスタム例外クラス\nclass ItemNotFoundError(Exception):\n    def __init__(self, item_id: int):\n        self.item_id = item_id\n\n# 例外ハンドラの登録\n@app.exception_handler(ItemNotFoundError)\nasync def item_not_found_handler(request: Request, exc: ItemNotFoundError):\n    return JSONResponse(\n        status_code=404,\n        content={\n            \"error\": \"ITEM_NOT_FOUND\",\n            \"detail\": f\"Item {exc.item_id} does not exist\",\n            \"path\": str(request.url)\n        }\n    )\n\n# バリデーションエラーのカスタマイズ\n@app.exception_handler(RequestValidationError)\nasync def validation_handler(request: Request, exc: RequestValidationError):\n    return JSONResponse(\n        status_code=422,\n        content={\n            \"error\": \"VALIDATION_ERROR\",\n            \"detail\": exc.errors()\n        }\n    )\n\n@app.get(\"/items/{item_id}\")\ndef read_item(item_id: int):\n    raise ItemNotFoundError(item_id=item_id)",
     afterCode: "ポイント: 例外ハンドラは async def で定義します。Request オブジェクトからリクエストの URL やメソッドなどの情報を取得でき、エラーログに含めるのに便利です。"
   }]
 }, {
@@ -1523,90 +483,23 @@ def read_item(item_id: int):
   sections: [{
     title: "依存性注入とは",
     body: "依存性注入（Dependency Injection, DI）は「関数が必要とするもの（依存）を外部から渡す」設計パターンです。FastAPI では Depends() を使ってこれを宣言的に実現します。\n\nたとえば「全てのエンドポイントで認証チェックを行いたい」場合、各関数に認証コードをコピーペーストするのではなく、認証ロジックを 1 つの依存関数に切り出し、Depends() で注入します。Flask ではデコレータ（@login_required）や before_request フックで実現していましたが、FastAPI の DI はテスト時にモック差し替えが容易という点で優れています。\n\nDjango REST Framework にも permission_classes や authentication_classes による DI 的な仕組みがありますが、FastAPI の Depends() はより汎用的で、認証に限らずあらゆる「共通処理」を注入できます。DB セッションの取得、設定値の読み込み、レートリミット、ログ出力など、用途は無限です。",
-    code: `from fastapi import FastAPI, Depends
-
-app = FastAPI()
-
-# 依存関数: 共通のページネーションパラメータ
-def pagination(skip: int = 0, limit: int = 10):
-    return {"skip": skip, "limit": limit}
-
-# Depends() で注入
-@app.get("/items")
-def read_items(paging: dict = Depends(pagination)):
-    return {"pagination": paging}
-
-@app.get("/users")
-def read_users(paging: dict = Depends(pagination)):
-    return {"pagination": paging}`,
+    code: "from fastapi import FastAPI, Depends\n\napp = FastAPI()\n\n# 依存関数: 共通のページネーションパラメータ\ndef pagination(skip: int = 0, limit: int = 10):\n    return {\"skip\": skip, \"limit\": limit}\n\n# Depends() で注入\n@app.get(\"/items\")\ndef read_items(paging: dict = Depends(pagination)):\n    return {\"pagination\": paging}\n\n@app.get(\"/users\")\ndef read_users(paging: dict = Depends(pagination)):\n    return {\"pagination\": paging}",
     afterCode: "ポイント: 依存関数もクエリパラメータを持てます。pagination 関数の skip と limit は自動的にクエリパラメータとして Swagger UI に表示されます。"
   }, {
     title: "依存性のスコープ",
     body: "Depends() は関数引数だけでなく、パスオペレーション・ルーター・アプリケーション全体にも適用できます。スコープが広いほど多くのエンドポイントに影響し、狭いほど局所的な適用になります。\n\n実務では「認証はアプリ全体」「ログ出力はルーター単位」「DB トランザクションは関数単位」のように、目的に応じてスコープを使い分けます。Flask の before_request（アプリ全体）と個別デコレータ（関数単位）の使い分けに相当しますが、FastAPI のほうが階層が明確です。\n\nルーター単位の依存性は APIRouter の dependencies パラメータに指定します。たとえば管理者用ルーターに認証チェックを付ければ、そのルーター配下の全エンドポイントで認証が必須になります。",
     table: T.dependsScope,
-    code: `from fastapi import FastAPI, Depends, APIRouter
-
-def verify_token():
-    # トークン検証ロジック
-    pass
-
-def log_request():
-    print("Request received")
-
-# アプリ全体に適用
-app = FastAPI(dependencies=[Depends(verify_token)])
-
-# ルーター単位に適用
-admin_router = APIRouter(
-    prefix="/admin",
-    dependencies=[Depends(log_request)]
-)
-
-# パスオペレーション単位に適用
-@app.get("/special", dependencies=[Depends(log_request)])
-def special_endpoint():
-    return {"message": "special"}`,
+    code: "from fastapi import FastAPI, Depends, APIRouter\n\ndef verify_token():\n    # トークン検証ロジック\n    pass\n\ndef log_request():\n    print(\"Request received\")\n\n# アプリ全体に適用\napp = FastAPI(dependencies=[Depends(verify_token)])\n\n# ルーター単位に適用\nadmin_router = APIRouter(\n    prefix=\"/admin\",\n    dependencies=[Depends(log_request)]\n)\n\n# パスオペレーション単位に適用\n@app.get(\"/special\", dependencies=[Depends(log_request)])\ndef special_endpoint():\n    return {\"message\": \"special\"}",
     afterCode: "ポイント: dependencies=[...] で指定した依存関数の戻り値はエンドポイント関数には渡されません。副作用（認証チェック、ログ出力など）だけが目的の場合にこの形式を使います。"
   }, {
     title: "サブ依存性（依存の連鎖）",
     body: "依存関数の中でさらに別の依存関数を Depends() で要求できます。これをサブ依存性と呼び、A → B → C のような依存の連鎖を宣言的に構築できます。\n\nたとえば「DB セッション → リポジトリ → サービス」という三層構造は、get_db → get_repository(db=Depends(get_db)) → get_service(repo=Depends(get_repository)) のように書けます。各層がそれぞれの関心に集中でき、テスト時には任意の層をモックに差し替えられます。\n\nFastAPI は依存グラフを解析し、同じ依存関数が複数回参照されている場合はリクエストごとに 1 回だけ実行してキャッシュします（use_cache=True がデフォルト）。これにより DB セッションが複数回作られるといった問題が自動的に防がれます。",
-    code: `from fastapi import FastAPI, Depends
-
-app = FastAPI()
-
-def get_db():
-    return {"type": "database"}
-
-def get_repository(db: dict = Depends(get_db)):
-    return {"repo": True, "db": db}
-
-def get_service(repo: dict = Depends(get_repository)):
-    return {"service": True, "repo": repo}
-
-@app.get("/items")
-def read_items(service: dict = Depends(get_service)):
-    # service には get_service → get_repository → get_db の結果が含まれる
-    return service`,
+    code: "from fastapi import FastAPI, Depends\n\napp = FastAPI()\n\ndef get_db():\n    return {\"type\": \"database\"}\n\ndef get_repository(db: dict = Depends(get_db)):\n    return {\"repo\": True, \"db\": db}\n\ndef get_service(repo: dict = Depends(get_repository)):\n    return {\"service\": True, \"repo\": repo}\n\n@app.get(\"/items\")\ndef read_items(service: dict = Depends(get_service)):\n    # service には get_service → get_repository → get_db の結果が含まれる\n    return service",
     afterCode: "ポイント: use_cache=False を指定すると、同じ依存関数でもリクエスト内で毎回新しく呼ばれます。通常はデフォルトのキャッシュで十分ですが、呼び出しごとに異なる結果を返したい場合に使います。"
   }, {
     title: "yield を使った依存関数",
     body: "yield を使った依存関数は、リクエスト処理の前後でリソースの取得・解放を行う強力なパターンです。yield の前がセットアップ（リソース取得）、yield の後がティアダウン（リソース解放）に対応します。\n\nこれは Python の contextmanager と同じ発想で、DB セッションのオープン/クローズ、ファイルのオープン/クローズ、ロックの取得/解放などに使います。Flask では @app.teardown_appcontext で後処理を登録する必要がありましたが、FastAPI では yield 1 つで前処理と後処理をまとめて書けます。\n\nエラーが発生した場合でも finally ブロックが実行されるため、リソースリークの心配がありません。try / except / finally と組み合わせることで、正常時はコミット・エラー時はロールバック・最後にクローズ、という DB トランザクション管理の定番パターンが簡潔に書けます。",
-    code: `from fastapi import FastAPI, Depends
-
-app = FastAPI()
-
-# yield を使った依存関数
-def get_db():
-    db = {"connection": "open"}
-    print("DB接続を開始")
-    try:
-        yield db                  # ← ここでリクエスト処理が走る
-    finally:
-        print("DB接続をクローズ")  # ← リクエスト処理後に必ず実行
-
-@app.get("/items")
-def read_items(db: dict = Depends(get_db)):
-    return {"items": [], "db_status": db["connection"]}`,
+    code: "from fastapi import FastAPI, Depends\n\napp = FastAPI()\n\n# yield を使った依存関数\ndef get_db():\n    db = {\"connection\": \"open\"}\n    print(\"DB接続を開始\")\n    try:\n        yield db                  # ← ここでリクエスト処理が走る\n    finally:\n        print(\"DB接続をクローズ\")  # ← リクエスト処理後に必ず実行\n\n@app.get(\"/items\")\ndef read_items(db: dict = Depends(get_db)):\n    return {\"items\": [], \"db_status\": db[\"connection\"]}",
     afterCode: "ポイント: yield は 1 回だけ使えます。yield の前がリクエスト処理前、yield の後がリクエスト処理後に対応します。async def と async yield も使えます。"
   }]
 }, {
@@ -1619,109 +512,22 @@ def read_items(db: dict = Depends(get_db)):
     title: "async def と def の違い",
     body: "FastAPI では async def と def の両方でエンドポイントを定義できます。async def の場合はイベントループ上で実行され、await で I/O 待ちの間に他のリクエストを処理できます。def の場合は外部のスレッドプールで実行され、従来の同期的なコードがそのまま動きます。\n\nFlask は基本的に全て同期で、非同期にしたい場合は Celery などの外部タスクキューを使うのが一般的でした。Django も 4.1 から async view をサポートしましたが、ORM が同期のままなど制約が多い状態です。FastAPI は ASGI ネイティブなので、非同期の恩恵をフルに受けられます。\n\n重要な注意点として、async def の中で time.sleep() や requests.get() のようなブロッキング処理を呼ぶと、イベントループ全体が止まってしまいます。非同期エンドポイントでは必ず asyncio.sleep() や httpx.AsyncClient を使うようにしましょう。",
     table: T.asyncComp,
-    code: `import asyncio
-import time
-from fastapi import FastAPI
-
-app = FastAPI()
-
-# 同期: スレッドプールで実行される
-@app.get("/sync")
-def sync_endpoint():
-    time.sleep(1)  # OK: スレッドプールなのでブロックしない
-    return {"type": "sync"}
-
-# 非同期: イベントループで実行される
-@app.get("/async")
-async def async_endpoint():
-    await asyncio.sleep(1)  # OK: await で他のリクエストに切り替え
-    return {"type": "async"}
-
-# NG: async def 内で同期ブロッキング
-# @app.get("/bad")
-# async def bad_endpoint():
-#     time.sleep(1)  # ❌ イベントループ全体がブロック！
-#     return {"type": "bad"}`,
+    code: "import asyncio\nimport time\nfrom fastapi import FastAPI\n\napp = FastAPI()\n\n# 同期: スレッドプールで実行される\n@app.get(\"/sync\")\ndef sync_endpoint():\n    time.sleep(1)  # OK: スレッドプールなのでブロックしない\n    return {\"type\": \"sync\"}\n\n# 非同期: イベントループで実行される\n@app.get(\"/async\")\nasync def async_endpoint():\n    await asyncio.sleep(1)  # OK: await で他のリクエストに切り替え\n    return {\"type\": \"async\"}\n\n# NG: async def 内で同期ブロッキング\n# @app.get(\"/bad\")\n# async def bad_endpoint():\n#     time.sleep(1)  # ❌ イベントループ全体がブロック！\n#     return {\"type\": \"bad\"}",
     afterCode: "判断基準: 非同期ライブラリ（asyncpg, httpx, aiofiles 等）を使うなら async def。同期ライブラリ（psycopg2, requests, open 等）を使うなら def。迷ったら def のほうが安全です。"
   }, {
     title: "BackgroundTasks",
     body: "エンドポイントの処理は完了したいが、時間のかかるタスク（メール送信、ログ書き込み、画像リサイズなど）は後回しにしたい、という場面で BackgroundTasks を使います。レスポンスはすぐに返し、タスクはバックグラウンドで非同期に実行されます。\n\nFlask では Celery + Redis を別途セットアップする必要がありましたが、FastAPI の BackgroundTasks は外部依存なしで使えます。ただし、プロセスが終了するとタスクも消えるため、信頼性が求められるタスク（課金処理など）には Celery や AWS SQS のような本格的なタスクキューを使うべきです。\n\nBackgroundTasks は依存性注入にも対応しており、Depends() で取得した DB セッションをバックグラウンドタスクに渡すことも可能です（ただしセッションの寿命に注意）。",
-    code: `from fastapi import FastAPI, BackgroundTasks
-import time
-
-app = FastAPI()
-
-def write_log(message: str):
-    time.sleep(2)  # 重い処理を模擬
-    with open("log.txt", "a") as f:
-        f.write(f"{message}\\n")
-
-@app.post("/items")
-def create_item(name: str, background_tasks: BackgroundTasks):
-    # バックグラウンドで実行（レスポンスは即座に返る）
-    background_tasks.add_task(write_log, f"Item created: {name}")
-    return {"name": name, "status": "created"}
-
-# 複数のタスクを追加
-@app.post("/notifications")
-async def send_notifications(background_tasks: BackgroundTasks):
-    background_tasks.add_task(write_log, "Email sent")
-    background_tasks.add_task(write_log, "Push notification sent")
-    return {"message": "Notifications queued"}`,
+    code: "from fastapi import FastAPI, BackgroundTasks\nimport time\n\napp = FastAPI()\n\ndef write_log(message: str):\n    time.sleep(2)  # 重い処理を模擬\n    with open(\"log.txt\", \"a\") as f:\n        f.write(f\"{message}\\n\")\n\n@app.post(\"/items\")\ndef create_item(name: str, background_tasks: BackgroundTasks):\n    # バックグラウンドで実行（レスポンスは即座に返る）\n    background_tasks.add_task(write_log, f\"Item created: {name}\")\n    return {\"name\": name, \"status\": \"created\"}\n\n# 複数のタスクを追加\n@app.post(\"/notifications\")\nasync def send_notifications(background_tasks: BackgroundTasks):\n    background_tasks.add_task(write_log, \"Email sent\")\n    background_tasks.add_task(write_log, \"Push notification sent\")\n    return {\"message\": \"Notifications queued\"}",
     afterCode: "ポイント: BackgroundTasks は add_task で複数のタスクを追加でき、順番に実行されます。並列実行が必要な場合は asyncio.gather を使うか、Celery を検討してください。"
   }, {
     title: "非同期 HTTP クライアント",
     body: "外部 API を呼び出す場面は実務で頻繁にあります。同期の requests ライブラリは async def 内で使えないため、FastAPI と相性の良い httpx を使います。httpx は requests とほぼ同じ API を持ちつつ、async/await に対応しています。\n\nFlask + requests の組み合わせでは、外部 API の応答を待つ間にスレッドが占有されてしまいます。FastAPI + httpx なら await で待っている間に別のリクエストを処理でき、スループットが大幅に向上します。\n\n特に asyncio.gather を使えば、複数の外部 API を同時に呼び出して結果を集約する「ファンアウト」パターンが簡潔に書けます。3 つの API を順番に呼ぶと 3 秒かかる処理が、並列呼び出しなら約 1 秒で完了します。",
-    code: `import httpx
-import asyncio
-from fastapi import FastAPI
-
-app = FastAPI()
-
-# 単一の外部API呼び出し
-@app.get("/proxy")
-async def proxy():
-    async with httpx.AsyncClient() as client:
-        response = await client.get("https://httpbin.org/get")
-        return response.json()
-
-# 複数APIの並列呼び出し（ファンアウト）
-@app.get("/aggregate")
-async def aggregate():
-    async with httpx.AsyncClient() as client:
-        results = await asyncio.gather(
-            client.get("https://httpbin.org/get"),
-            client.get("https://httpbin.org/ip"),
-            client.get("https://httpbin.org/user-agent"),
-        )
-    return {
-        "results": [r.json() for r in results]
-    }`,
+    code: "import httpx\nimport asyncio\nfrom fastapi import FastAPI\n\napp = FastAPI()\n\n# 単一の外部API呼び出し\n@app.get(\"/proxy\")\nasync def proxy():\n    async with httpx.AsyncClient() as client:\n        response = await client.get(\"https://httpbin.org/get\")\n        return response.json()\n\n# 複数APIの並列呼び出し（ファンアウト）\n@app.get(\"/aggregate\")\nasync def aggregate():\n    async with httpx.AsyncClient() as client:\n        results = await asyncio.gather(\n            client.get(\"https://httpbin.org/get\"),\n            client.get(\"https://httpbin.org/ip\"),\n            client.get(\"https://httpbin.org/user-agent\"),\n        )\n    return {\n        \"results\": [r.json() for r in results]\n    }",
     afterCode: "ポイント: httpx.AsyncClient はコンテキストマネージャ（async with）で使い、リクエスト後に接続を確実にクローズします。アプリ起動時に 1 つのクライアントを作って使い回すとコネクションプーリングの恩恵を受けられます。"
   }, {
     title: "ライフスパンイベント",
     body: "アプリケーションの起動時・終了時に実行したい処理（DB 接続プールの初期化、キャッシュのウォームアップ、リソースの解放など）は lifespan パラメータで定義します。\n\nFastAPI の旧バージョンでは @app.on_event('startup') / @app.on_event('shutdown') が使われていましたが、現在は lifespan コンテキストマネージャが推奨されています。yield の前が起動時処理、yield の後が終了時処理に対応し、依存関数の yield パターンと同じ考え方です。\n\nFlask では before_first_request や atexit モジュールで類似のことができましたが、async に対応しておらず、リソース管理の信頼性にも課題がありました。FastAPI の lifespan は async 対応で、確実にクリーンアップが実行されます。",
-    code: `from contextlib import asynccontextmanager
-from fastapi import FastAPI
-import httpx
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # 起動時の処理
-    app.state.http_client = httpx.AsyncClient()
-    print("HTTP client initialized")
-    yield
-    # 終了時の処理
-    await app.state.http_client.aclose()
-    print("HTTP client closed")
-
-app = FastAPI(lifespan=lifespan)
-
-@app.get("/external")
-async def call_external():
-    client = app.state.http_client
-    response = await client.get("https://httpbin.org/get")
-    return response.json()`,
+    code: "from contextlib import asynccontextmanager\nfrom fastapi import FastAPI\nimport httpx\n\n@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    # 起動時の処理\n    app.state.http_client = httpx.AsyncClient()\n    print(\"HTTP client initialized\")\n    yield\n    # 終了時の処理\n    await app.state.http_client.aclose()\n    print(\"HTTP client closed\")\n\napp = FastAPI(lifespan=lifespan)\n\n@app.get(\"/external\")\nasync def call_external():\n    client = app.state.http_client\n    response = await client.get(\"https://httpbin.org/get\")\n    return response.json()",
     afterCode: "ポイント: app.state は FastAPI アプリケーション全体で共有される状態オブジェクトです。lifespan で初期化したリソースをここに保存しておけば、エンドポイントからアクセスできます。"
   }]
 }, {
@@ -1734,129 +540,22 @@ async def call_external():
     title: "SQLAlchemy 2.0 の基本",
     body: "SQLAlchemy は Python で最も広く使われている ORM（Object-Relational Mapper）です。バージョン 2.0 で大きなリニューアルがあり、型ヒントとの統合が深まりました。FastAPI と組み合わせる場合、SQLAlchemy 2.0 の宣言的マッピング（Mapped[type]）を使うのが現在のベストプラクティスです。\n\nDjango ORM は Django に密結合しており、Django 以外のフレームワークでは使えません。SQLAlchemy はフレームワーク非依存なので、Flask でも FastAPI でも同じ書き方が通用します。クエリの記法も session.query(Model)（1.x スタイル）から select(Model)（2.0 スタイル）に変わり、より SQL に近い宣言的な記述が可能になりました。\n\nFastAPI は SQLAlchemy を同梱していないため、pip install sqlalchemy で別途インストールが必要です。DB ドライバもデータベースに応じて選択します（PostgreSQL なら psycopg2 や asyncpg、SQLite なら標準ライブラリ）。",
     table: T.sqlalchemyComp,
-    code: `from sqlalchemy import create_engine, String
-from sqlalchemy.orm import (
-    DeclarativeBase, Mapped, mapped_column, sessionmaker
-)
-
-# エンジン作成
-engine = create_engine("sqlite:///./app.db", echo=True)
-SessionLocal = sessionmaker(bind=engine)
-
-# Base クラス（2.0 スタイル）
-class Base(DeclarativeBase):
-    pass
-
-# モデル定義
-class User(Base):
-    __tablename__ = "users"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(50))
-    email: Mapped[str] = mapped_column(String(100), unique=True)
-    is_active: Mapped[bool] = mapped_column(default=True)
-
-# テーブル作成
-Base.metadata.create_all(bind=engine)`,
+    code: "from sqlalchemy import create_engine, String\nfrom sqlalchemy.orm import (\n    DeclarativeBase, Mapped, mapped_column, sessionmaker\n)\n\n# エンジン作成\nengine = create_engine(\"sqlite:///./app.db\", echo=True)\nSessionLocal = sessionmaker(bind=engine)\n\n# Base クラス（2.0 スタイル）\nclass Base(DeclarativeBase):\n    pass\n\n# モデル定義\nclass User(Base):\n    __tablename__ = \"users\"\n\n    id: Mapped[int] = mapped_column(primary_key=True, index=True)\n    name: Mapped[str] = mapped_column(String(50))\n    email: Mapped[str] = mapped_column(String(100), unique=True)\n    is_active: Mapped[bool] = mapped_column(default=True)\n\n# テーブル作成\nBase.metadata.create_all(bind=engine)",
     afterCode: "ポイント: Mapped[int] は SQLAlchemy 2.0 の型ヒント統合です。IDE が型を正しく推論できるようになり、user.name の型が str であることをエディタが知っています。1.x の Column(String(50)) よりも格段に型安全です。"
   }, {
     title: "FastAPI との統合",
     body: "SQLAlchemy のセッション管理を FastAPI の依存性注入に載せるのが定番パターンです。get_db() という依存関数を定義し、リクエストごとにセッションを作成・yield・クローズします。\n\nこのパターンのメリットは 3 つあります。第一に、各エンドポイントが DB の接続管理を意識しなくてよい。第二に、テスト時に get_db をモックに差し替えてインメモリ DB を使える。第三に、yield + finally でセッションのクローズが確実に実行される。\n\nFlask では g オブジェクトにセッションを保存し、@app.teardown_appcontext でクローズする方法が一般的でしたが、FastAPI の Depends + yield のほうが明示的でテストしやすい設計です。",
-    code: `from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-
-app = FastAPI()
-
-# 依存関数: セッション管理
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Pydantic モデル
-class UserCreate(BaseModel):
-    name: str
-    email: str
-
-class UserOut(BaseModel):
-    id: int
-    name: str
-    email: str
-    model_config = {"from_attributes": True}
-
-# エンドポイント
-@app.post("/users", response_model=UserOut, status_code=201)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = User(**user.model_dump())
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
-
-@app.get("/users", response_model=list[UserOut])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(User).offset(skip).limit(limit).all()`,
+    code: "from fastapi import FastAPI, Depends, HTTPException\nfrom sqlalchemy.orm import Session\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\n# 依存関数: セッション管理\ndef get_db():\n    db = SessionLocal()\n    try:\n        yield db\n    finally:\n        db.close()\n\n# Pydantic モデル\nclass UserCreate(BaseModel):\n    name: str\n    email: str\n\nclass UserOut(BaseModel):\n    id: int\n    name: str\n    email: str\n    model_config = {\"from_attributes\": True}\n\n# エンドポイント\n@app.post(\"/users\", response_model=UserOut, status_code=201)\ndef create_user(user: UserCreate, db: Session = Depends(get_db)):\n    db_user = User(**user.model_dump())\n    db.add(db_user)\n    db.commit()\n    db.refresh(db_user)\n    return db_user\n\n@app.get(\"/users\", response_model=list[UserOut])\ndef read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):\n    return db.query(User).offset(skip).limit(limit).all()",
     afterCode: "ポイント: model_config = {\"from_attributes\": True} を設定すると、SQLAlchemy のモデルオブジェクトを Pydantic モデルに直接変換できます。db_user.name のような属性アクセスが自動的にフィールドにマッピングされます。"
   }, {
     title: "非同期セッション（AsyncSession）",
     body: "高トラフィックな API では、DB の I/O 待ちの間に他のリクエストを処理できる非同期セッションが有効です。SQLAlchemy 2.0 は AsyncSession をネイティブサポートしており、asyncpg（PostgreSQL）や aiosqlite（SQLite）と組み合わせて使います。\n\n非同期セッションを使う場合、エンドポイントは async def で定義し、DB 操作には await を付けます。select() 文を session.execute() で実行し、結果を scalars().all() で取得するのが 2.0 スタイルです。\n\n同期セッションとの使い分けは、アプリケーションの負荷特性に依存します。同時接続数が少ないなら同期で十分ですが、数百〜数千の同時接続をさばく必要があるなら非同期が必須です。",
-    code: `from sqlalchemy.ext.asyncio import (
-    AsyncSession, async_sessionmaker, create_async_engine
-)
-from sqlalchemy import select
-
-# 非同期エンジン
-async_engine = create_async_engine("sqlite+aiosqlite:///./app.db")
-async_session = async_sessionmaker(async_engine, class_=AsyncSession)
-
-# 依存関数
-async def get_async_db():
-    async with async_session() as session:
-        yield session
-
-# エンドポイント
-@app.get("/users", response_model=list[UserOut])
-async def read_users(db: AsyncSession = Depends(get_async_db)):
-    result = await db.execute(select(User).offset(0).limit(100))
-    return result.scalars().all()
-
-@app.post("/users", response_model=UserOut, status_code=201)
-async def create_user(user: UserCreate, db: AsyncSession = Depends(get_async_db)):
-    db_user = User(**user.model_dump())
-    db.add(db_user)
-    await db.commit()
-    await db.refresh(db_user)
-    return db_user`,
+    code: "from sqlalchemy.ext.asyncio import (\n    AsyncSession, async_sessionmaker, create_async_engine\n)\nfrom sqlalchemy import select\n\n# 非同期エンジン\nasync_engine = create_async_engine(\"sqlite+aiosqlite:///./app.db\")\nasync_session = async_sessionmaker(async_engine, class_=AsyncSession)\n\n# 依存関数\nasync def get_async_db():\n    async with async_session() as session:\n        yield session\n\n# エンドポイント\n@app.get(\"/users\", response_model=list[UserOut])\nasync def read_users(db: AsyncSession = Depends(get_async_db)):\n    result = await db.execute(select(User).offset(0).limit(100))\n    return result.scalars().all()\n\n@app.post(\"/users\", response_model=UserOut, status_code=201)\nasync def create_user(user: UserCreate, db: AsyncSession = Depends(get_async_db)):\n    db_user = User(**user.model_dump())\n    db.add(db_user)\n    await db.commit()\n    await db.refresh(db_user)\n    return db_user",
     afterCode: "ポイント: 非同期エンジンの URL は sqlite+aiosqlite:// や postgresql+asyncpg:// のように、非同期ドライバを明示します。通常の sqlite:// は同期専用です。"
   }, {
     title: "Alembic によるマイグレーション",
     body: "開発が進むにつれてモデルのフィールドが増えたりテーブルが追加されたりします。その都度 DB を手動で ALTER TABLE するのは現実的ではないため、マイグレーションツールで変更を管理します。SQLAlchemy と組み合わせるなら Alembic が標準的な選択肢です。\n\nDjango には makemigrations / migrate が組み込まれていますが、Flask + SQLAlchemy では Flask-Migrate（Alembic のラッパー）を使います。FastAPI でも Alembic を直接使うのが一般的で、Flask-Migrate のようなラッパーは不要です。\n\nAlembic はモデル定義と実際の DB スキーマの差分を検出し、マイグレーションファイルを自動生成します。このファイルには upgrade()（適用）と downgrade()（巻き戻し）の両方が含まれるため、安全にスキーマを変更・ロールバックできます。",
-    code: `# Alembic のセットアップ手順
-# 1. インストール
-# pip install alembic
-
-# 2. 初期化（alembic/ ディレクトリが生成される）
-# alembic init alembic
-
-# 3. alembic.ini の sqlalchemy.url を設定
-# sqlalchemy.url = sqlite:///./app.db
-
-# 4. alembic/env.py で Base.metadata を設定
-# from app.models import Base
-# target_metadata = Base.metadata
-
-# 5. マイグレーション生成
-# alembic revision --autogenerate -m "create users table"
-
-# 6. マイグレーション適用
-# alembic upgrade head
-
-# 7. 履歴確認
-# alembic history
-# alembic current`,
+    code: "# Alembic のセットアップ手順\n# 1. インストール\n# pip install alembic\n\n# 2. 初期化（alembic/ ディレクトリが生成される）\n# alembic init alembic\n\n# 3. alembic.ini の sqlalchemy.url を設定\n# sqlalchemy.url = sqlite:///./app.db\n\n# 4. alembic/env.py で Base.metadata を設定\n# from app.models import Base\n# target_metadata = Base.metadata\n\n# 5. マイグレーション生成\n# alembic revision --autogenerate -m \"create users table\"\n\n# 6. マイグレーション適用\n# alembic upgrade head\n\n# 7. 履歴確認\n# alembic history\n# alembic current",
     afterCode: "注意: --autogenerate は万能ではありません。カラム名の変更やデータの移行は自動検出できないため、生成されたマイグレーションファイルを必ず目視で確認してください。"
   }]
 }, {
@@ -1873,86 +572,17 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_async_db)
   }, {
     title: "OAuth2 + JWT の実装",
     body: "OAuth2PasswordBearer は「ログインフォームでユーザー名とパスワードを受け取り、JWT トークンを発行する」フローの入り口です。tokenUrl パラメータにトークン取得用のエンドポイントを指定すると、Swagger UI にログインフォームが自動生成されます。\n\nJWT（JSON Web Token）はヘッダー・ペイロード・署名の 3 部分で構成される URL セーフなトークンです。サーバは秘密鍵で署名を検証するだけでユーザーを特定でき、DB にセッション情報を保存する必要がありません（状態レス）。PyJWT ライブラリで簡単にエンコード・デコードできます。\n\nDjango REST Framework の TokenAuthentication はトークンを DB に保存しますが、JWT はサーバサイドに保存不要なのが利点です。一方で、発行済みの JWT を無効化するにはブラックリスト機構を別途用意する必要があるというトレードオフがあります。",
-    code: `from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-import jwt
-
-SECRET_KEY = "your-secret-key-change-in-production"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-app = FastAPI()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-def create_access_token(data: dict) -> str:
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-@app.post("/token")
-def login(form: OAuth2PasswordRequestForm = Depends()):
-    # 実際には DB からユーザーを検索してパスワード検証
-    if form.username != "admin" or form.password != "secret":
-        raise HTTPException(status_code=401, detail="Incorrect credentials")
-    token = create_access_token(data={"sub": form.username})
-    return {"access_token": token, "token_type": "bearer"}`,
+    code: "from datetime import datetime, timedelta, timezone\nfrom fastapi import FastAPI, Depends, HTTPException, status\nfrom fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm\nimport jwt\n\nSECRET_KEY = \"your-secret-key-change-in-production\"\nALGORITHM = \"HS256\"\nACCESS_TOKEN_EXPIRE_MINUTES = 30\n\napp = FastAPI()\noauth2_scheme = OAuth2PasswordBearer(tokenUrl=\"token\")\n\ndef create_access_token(data: dict) -> str:\n    to_encode = data.copy()\n    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)\n    to_encode.update({\"exp\": expire})\n    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)\n\n@app.post(\"/token\")\ndef login(form: OAuth2PasswordRequestForm = Depends()):\n    # 実際には DB からユーザーを検索してパスワード検証\n    if form.username != \"admin\" or form.password != \"secret\":\n        raise HTTPException(status_code=401, detail=\"Incorrect credentials\")\n    token = create_access_token(data={\"sub\": form.username})\n    return {\"access_token\": token, \"token_type\": \"bearer\"}",
     afterCode: "ポイント: OAuth2PasswordRequestForm は application/x-www-form-urlencoded 形式でデータを受け取ります。JSON ではなくフォームデータです。これは OAuth2 仕様に準拠した動作です。"
   }, {
     title: "パスワードのハッシュ化",
     body: "パスワードを平文で DB に保存するのは重大なセキュリティリスクです。必ずハッシュ化して保存し、認証時にはハッシュ値を照合します。Python では passlib ライブラリの bcrypt アルゴリズムが広く使われています。\n\nbcrypt はソルト（ランダムな付加値）を自動的に生成するため、同じパスワードでも毎回異なるハッシュ値が生成されます。これによりレインボーテーブル攻撃（事前計算した辞書を使って逆引きする攻撃）を防ぎます。\n\nDjango は PBKDF2 をデフォルトのハッシュアルゴリズムとして採用していますが、bcrypt のほうが GPU 攻撃への耐性が高いとされています。FastAPI は特定のハッシュアルゴリズムを強制しないため、要件に応じて argon2（最新の推奨）や scrypt を選ぶこともできます。",
-    code: `from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-# ユーザー作成時
-hashed = hash_password("user_password")
-# → "$2b$12$LJ3m4ys..." のようなハッシュ文字列
-
-# 認証時
-is_valid = verify_password("user_password", hashed)
-# → True`,
+    code: "from passlib.context import CryptContext\n\npwd_context = CryptContext(schemes=[\"bcrypt\"], deprecated=\"auto\")\n\ndef hash_password(password: str) -> str:\n    return pwd_context.hash(password)\n\ndef verify_password(plain_password: str, hashed_password: str) -> bool:\n    return pwd_context.verify(plain_password, hashed_password)\n\n# ユーザー作成時\nhashed = hash_password(\"user_password\")\n# → \"$2b$12$LJ3m4ys...\" のようなハッシュ文字列\n\n# 認証時\nis_valid = verify_password(\"user_password\", hashed)\n# → True",
     afterCode: "ポイント: ハッシュ化は不可逆変換です。ハッシュ値から元のパスワードを復元することはできません。パスワードリセット機能では新しいパスワードのハッシュ値で上書きします。"
   }, {
     title: "認可（ロールベースアクセス制御）",
     body: "認証（誰であるかの確認）の次は認可（何ができるかの制御）です。最も一般的なパターンはロールベースアクセス制御（RBAC）で、ユーザーにロール（admin, user, viewer など）を割り当て、ロールに応じてアクセスを制限します。\n\nFastAPI では Depends() を使ってロールチェックを依存関数として実装するのが自然です。require_role(\"admin\") のようなファクトリ関数を作り、各エンドポイントに Depends(require_role(\"admin\")) として適用します。\n\nDjango REST Framework の permission_classes（IsAuthenticated, IsAdminUser 等）に相当しますが、FastAPI のほうがカスタムロールの定義が柔軟です。Enum でロールを定義すれば型安全になり、存在しないロール名をタイポする心配もなくなります。",
-    code: `from fastapi import FastAPI, Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
-from enum import Enum
-
-app = FastAPI()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-class Role(str, Enum):
-    admin = "admin"
-    user = "user"
-    viewer = "viewer"
-
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    # JWT をデコードしてユーザー情報を取得
-    return {"username": "admin", "role": Role.admin}
-
-def require_role(*allowed_roles: Role):
-    def checker(user: dict = Depends(get_current_user)):
-        if user["role"] not in allowed_roles:
-            raise HTTPException(status_code=403, detail="Forbidden")
-        return user
-    return checker
-
-@app.get("/admin")
-def admin_only(user: dict = Depends(require_role(Role.admin))):
-    return {"message": "Admin area", "user": user["username"]}
-
-@app.get("/dashboard")
-def dashboard(user: dict = Depends(require_role(Role.admin, Role.user))):
-    return {"message": "Dashboard", "user": user["username"]}`,
+    code: "from fastapi import FastAPI, Depends, HTTPException\nfrom fastapi.security import OAuth2PasswordBearer\nfrom enum import Enum\n\napp = FastAPI()\noauth2_scheme = OAuth2PasswordBearer(tokenUrl=\"token\")\n\nclass Role(str, Enum):\n    admin = \"admin\"\n    user = \"user\"\n    viewer = \"viewer\"\n\ndef get_current_user(token: str = Depends(oauth2_scheme)):\n    # JWT をデコードしてユーザー情報を取得\n    return {\"username\": \"admin\", \"role\": Role.admin}\n\ndef require_role(*allowed_roles: Role):\n    def checker(user: dict = Depends(get_current_user)):\n        if user[\"role\"] not in allowed_roles:\n            raise HTTPException(status_code=403, detail=\"Forbidden\")\n        return user\n    return checker\n\n@app.get(\"/admin\")\ndef admin_only(user: dict = Depends(require_role(Role.admin))):\n    return {\"message\": \"Admin area\", \"user\": user[\"username\"]}\n\n@app.get(\"/dashboard\")\ndef dashboard(user: dict = Depends(require_role(Role.admin, Role.user))):\n    return {\"message\": \"Dashboard\", \"user\": user[\"username\"]}",
     afterCode: "ポイント: require_role はクロージャ（関数を返す関数）で、許可するロールを引数で受け取ります。このパターンは Flask の @roles_required デコレータに似ていますが、Depends() と統合されている点が異なります。"
   }]
 }, {
@@ -1965,127 +595,22 @@ def dashboard(user: dict = Depends(require_role(Role.admin, Role.user))):
     title: "ファイルアップロード",
     body: "FastAPI では UploadFile クラスを使ってファイルアップロードを処理します。UploadFile は内部的に SpooledTemporaryFile を使っており、小さなファイルはメモリに保持し、大きなファイルは一時ファイルに自動的にスプールされます。これにより、大容量ファイルのアップロードでもメモリを圧迫しません。\n\nFlask では request.files からファイルオブジェクトを取得しますが、ファイルサイズの制限は MAX_CONTENT_LENGTH 設定に依存し、超過時のエラーハンドリングが面倒でした。FastAPI では UploadFile のプロパティ（filename, content_type, size）で情報を取得でき、バリデーションも関数内で自由に書けます。\n\nFile(...) を使うとファイル全体を bytes として読み込みます。小さなファイル（アイコン画像など）にはこちらが手軽ですが、大きなファイルではメモリを消費するため UploadFile を使いましょう。",
     table: T.fileUpload,
-    code: `from fastapi import FastAPI, UploadFile, File, HTTPException
-import shutil
-from pathlib import Path
-
-app = FastAPI()
-
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
-
-@app.post("/upload")
-async def upload_file(file: UploadFile):
-    # ファイル情報の取得
-    info = {
-        "filename": file.filename,
-        "content_type": file.content_type,
-    }
-    # ファイルの保存
-    dest = UPLOAD_DIR / file.filename
-    with open(dest, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return info
-
-# bytes として読み込む場合
-@app.post("/upload-bytes")
-async def upload_bytes(file: bytes = File(...)):
-    return {"size": len(file)}`,
+    code: "from fastapi import FastAPI, UploadFile, File, HTTPException\nimport shutil\nfrom pathlib import Path\n\napp = FastAPI()\n\nUPLOAD_DIR = Path(\"uploads\")\nUPLOAD_DIR.mkdir(exist_ok=True)\n\n@app.post(\"/upload\")\nasync def upload_file(file: UploadFile):\n    # ファイル情報の取得\n    info = {\n        \"filename\": file.filename,\n        \"content_type\": file.content_type,\n    }\n    # ファイルの保存\n    dest = UPLOAD_DIR / file.filename\n    with open(dest, \"wb\") as buffer:\n        shutil.copyfileobj(file.file, buffer)\n    return info\n\n# bytes として読み込む場合\n@app.post(\"/upload-bytes\")\nasync def upload_bytes(file: bytes = File(...)):\n    return {\"size\": len(file)}",
     afterCode: "ポイント: UploadFile は async メソッド（await file.read(), await file.write()）を持っていますが、shutil.copyfileobj を使ったチャンク単位のコピーのほうがメモリ効率が良いです。"
   }, {
     title: "複数ファイルとバリデーション",
     body: "複数のファイルを同時にアップロードするには、引数の型を list[UploadFile] にします。フォームデータとファイルを同時に受け取ることもでき、Form() と UploadFile を併用します。\n\nファイルサイズの制限やファイル種別の検証は、アップロードされたファイルの content_type や size を確認して行います。許可されていない場合は HTTPException を raise してエラーを返します。\n\nDjango では MAX_UPLOAD_SIZE の設定とフォームの clean メソッドでバリデーションしますが、FastAPI ではエンドポイント関数内で直接チェックするのが一般的です。Pydantic のバリデーションはファイルには適用されないため、手動でのチェックが必要です。",
-    code: `from fastapi import FastAPI, UploadFile, Form, HTTPException
-
-app = FastAPI()
-
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif"}
-MAX_SIZE = 5 * 1024 * 1024  # 5MB
-
-@app.post("/upload-multiple")
-async def upload_multiple(
-    files: list[UploadFile],
-    description: str = Form(default="")
-):
-    results = []
-    for file in files:
-        # Content-Type チェック
-        if file.content_type not in ALLOWED_TYPES:
-            raise HTTPException(400, f"Invalid file type: {file.content_type}")
-        # サイズチェック
-        contents = await file.read()
-        if len(contents) > MAX_SIZE:
-            raise HTTPException(413, f"{file.filename} exceeds 5MB")
-        results.append({"filename": file.filename, "size": len(contents)})
-        await file.seek(0)  # 読み取り位置をリセット
-    return {"description": description, "files": results}`,
+    code: "from fastapi import FastAPI, UploadFile, Form, HTTPException\n\napp = FastAPI()\n\nALLOWED_TYPES = {\"image/jpeg\", \"image/png\", \"image/gif\"}\nMAX_SIZE = 5 * 1024 * 1024  # 5MB\n\n@app.post(\"/upload-multiple\")\nasync def upload_multiple(\n    files: list[UploadFile],\n    description: str = Form(default=\"\")\n):\n    results = []\n    for file in files:\n        # Content-Type チェック\n        if file.content_type not in ALLOWED_TYPES:\n            raise HTTPException(400, f\"Invalid file type: {file.content_type}\")\n        # サイズチェック\n        contents = await file.read()\n        if len(contents) > MAX_SIZE:\n            raise HTTPException(413, f\"{file.filename} exceeds 5MB\")\n        results.append({\"filename\": file.filename, \"size\": len(contents)})\n        await file.seek(0)  # 読み取り位置をリセット\n    return {\"description\": description, \"files\": results}",
     afterCode: "注意: await file.read() 後にもう一度読みたい場合は await file.seek(0) でポインタを先頭に戻す必要があります。Flask の request.files でも同様です。"
   }, {
     title: "WebSocket の基本",
     body: "HTTP は「クライアントがリクエスト → サーバがレスポンス」の一方向通信ですが、WebSocket は接続を維持したまま双方向のメッセージをやり取りできます。チャット、リアルタイム通知、株価ティッカー、ゲームなどの用途に使われます。\n\nFastAPI は Starlette の WebSocket サポートを継承しており、@app.websocket() デコレータでエンドポイントを定義します。Flask では Flask-SocketIO などの拡張が必要でしたが、FastAPI では標準機能として使えます。\n\nWebSocket のライフサイクルは「接続（accept）→ メッセージ送受信（send/receive ループ）→ 切断（disconnect）」の 3 段階です。接続管理のためにコネクションマネージャクラスを作るのが定番パターンです。",
-    code: `from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-
-app = FastAPI()
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()       # 接続を受け入れ
-    try:
-        while True:
-            data = await websocket.receive_text()   # メッセージ受信
-            await websocket.send_text(f"Echo: {data}")  # メッセージ送信
-    except WebSocketDisconnect:
-        print("Client disconnected")
-
-# HTML テストページ（/docs では WebSocket をテストできないため）
-@app.get("/ws-test")
-def ws_test_page():
-    return {"html": """
-    <script>
-      const ws = new WebSocket("ws://localhost:8000/ws");
-      ws.onmessage = (event) => console.log(event.data);
-      ws.onopen = () => ws.send("Hello!");
-    <\/script>
-    """}`,
+    code: "from fastapi import FastAPI, WebSocket, WebSocketDisconnect\n\napp = FastAPI()\n\n@app.websocket(\"/ws\")\nasync def websocket_endpoint(websocket: WebSocket):\n    await websocket.accept()       # 接続を受け入れ\n    try:\n        while True:\n            data = await websocket.receive_text()   # メッセージ受信\n            await websocket.send_text(f\"Echo: {data}\")  # メッセージ送信\n    except WebSocketDisconnect:\n        print(\"Client disconnected\")\n\n# HTML テストページ（/docs では WebSocket をテストできないため）\n@app.get(\"/ws-test\")\ndef ws_test_page():\n    return {\"html\": \"\"\"\n    <script>\n      const ws = new WebSocket(\"ws://localhost:8000/ws\");\n      ws.onmessage = (event) => console.log(event.data);\n      ws.onopen = () => ws.send(\"Hello!\");\n    <\/script>\n    \"\"\"}",
     afterCode: "ポイント: WebSocket エンドポイントは Swagger UI (/docs) からはテストできません。ブラウザの JavaScript コンソールや wscat コマンドラインツールでテストします。"
   }, {
     title: "コネクション管理とブロードキャスト",
     body: "チャットルームのように複数のクライアントが同時に接続し、あるクライアントのメッセージを全員に配信する場合、接続を管理するクラスが必要です。ConnectionManager クラスを作り、接続・切断・ブロードキャストのロジックをカプセル化します。\n\nこのパターンでは、全アクティブ接続をリストで管理し、broadcast メソッドで全接続にメッセージを送信します。実運用では Redis の Pub/Sub を使って複数のサーバプロセス間で WebSocket メッセージを共有する構成が必要になりますが、入門段階では単一プロセスでの実装を理解しておけば十分です。\n\nFlask-SocketIO は Socket.IO プロトコル（WebSocket の上位互換）を使いますが、FastAPI は素の WebSocket プロトコルを使います。Socket.IO のほうがフォールバック（ロングポーリング等）に強い一方、WebSocket はシンプルで標準的です。",
-    code: `from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-
-app = FastAPI()
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-    async def send_personal(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-manager = ConnectionManager()
-
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    await manager.connect(websocket)
-    await manager.broadcast(f"{client_id} joined")
-    try:
-        while True:
-            data = await websocket.receive_text()
-            await manager.broadcast(f"{client_id}: {data}")
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        await manager.broadcast(f"{client_id} left")`,
+    code: "from fastapi import FastAPI, WebSocket, WebSocketDisconnect\n\napp = FastAPI()\n\nclass ConnectionManager:\n    def __init__(self):\n        self.active_connections: list[WebSocket] = []\n\n    async def connect(self, websocket: WebSocket):\n        await websocket.accept()\n        self.active_connections.append(websocket)\n\n    def disconnect(self, websocket: WebSocket):\n        self.active_connections.remove(websocket)\n\n    async def send_personal(self, message: str, websocket: WebSocket):\n        await websocket.send_text(message)\n\n    async def broadcast(self, message: str):\n        for connection in self.active_connections:\n            await connection.send_text(message)\n\nmanager = ConnectionManager()\n\n@app.websocket(\"/ws/{client_id}\")\nasync def websocket_endpoint(websocket: WebSocket, client_id: str):\n    await manager.connect(websocket)\n    await manager.broadcast(f\"{client_id} joined\")\n    try:\n        while True:\n            data = await websocket.receive_text()\n            await manager.broadcast(f\"{client_id}: {data}\")\n    except WebSocketDisconnect:\n        manager.disconnect(websocket)\n        await manager.broadcast(f\"{client_id} left\")",
     afterCode: "ポイント: manager はグローバル変数として定義されていますが、実運用では Redis や DB を介してプロセス間で状態を共有する設計にします。Uvicorn の --workers オプションで複数ワーカーを起動すると、各ワーカーが独立した manager を持つため、ブロードキャストが同じワーカー内のクライアントにしか届きません。"
   }]
 }, {
@@ -2098,148 +623,22 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     title: "テスト戦略の概要",
     body: "API のテストは品質保証の要です。FastAPI は TestClient クラスを提供しており、実際の HTTP サーバを起動せずにエンドポイントをテストできます。内部的には httpx の同期クライアントが使われており、requests と同じ使い勝手で response.status_code や response.json() を検証できます。\n\nFlask では Flask.test_client() が同様の役割を果たし、Django では Client クラスを使いますが、FastAPI の TestClient は型ヒントによる自動バリデーションも含めてテストできるため、より本番に近い検証が可能です。\n\nテスト対象は大きく 4 層に分かれます。エンドポイント（統合テスト）、Pydantic モデル（単体テスト）、依存関数（モック差し替え）、DB 連携（テスト用 DB）です。pytest と組み合わせるのが FastAPI コミュニティの標準的な選択です。",
     table: T.testMethods,
-    code: `from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello, World!"}
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: str | None = None):
-    return {"item_id": item_id, "q": q}
-
-# --- テスト ---
-client = TestClient(app)
-
-def test_read_root():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Hello, World!"}
-
-def test_read_item():
-    response = client.get("/items/42?q=test")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["item_id"] == 42
-    assert data["q"] == "test"
-
-def test_invalid_item_id():
-    response = client.get("/items/not-a-number")
-    assert response.status_code == 422  # バリデーションエラー`,
+    code: "from fastapi import FastAPI\nfrom fastapi.testclient import TestClient\n\napp = FastAPI()\n\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"Hello, World!\"}\n\n@app.get(\"/items/{item_id}\")\ndef read_item(item_id: int, q: str | None = None):\n    return {\"item_id\": item_id, \"q\": q}\n\n# --- テスト ---\nclient = TestClient(app)\n\ndef test_read_root():\n    response = client.get(\"/\")\n    assert response.status_code == 200\n    assert response.json() == {\"message\": \"Hello, World!\"}\n\ndef test_read_item():\n    response = client.get(\"/items/42?q=test\")\n    assert response.status_code == 200\n    data = response.json()\n    assert data[\"item_id\"] == 42\n    assert data[\"q\"] == \"test\"\n\ndef test_invalid_item_id():\n    response = client.get(\"/items/not-a-number\")\n    assert response.status_code == 422  # バリデーションエラー",
     afterCode: "ポイント: TestClient は同期的に動作するため、async def で定義されたエンドポイントもテストできます。非同期テストが必要な場合は pytest-asyncio + httpx.AsyncClient を使います。"
   }, {
     title: "依存性のモック差し替え",
     body: "app.dependency_overrides は FastAPI の強力なテスト機能で、依存関数を別の関数に差し替えることができます。DB 接続・外部 API 呼び出し・認証チェックなど、テスト時に本物を使いたくない依存を簡単にモック化できます。\n\nFlask では unittest.mock.patch を使って関数を差し替えるのが一般的ですが、FastAPI の dependency_overrides のほうが宣言的で、何を差し替えているかが一目で分かります。テスト後に clear() でリセットすることを忘れないようにしましょう。\n\npytest のフィクスチャと組み合わせると、テスト関数ごとに異なるモックを適用したり、テスト終了後に自動的にリセットしたりできます。",
-    code: `from fastapi import FastAPI, Depends
-from fastapi.testclient import TestClient
-import pytest
-
-app = FastAPI()
-
-def get_db():
-    return {"type": "production_db"}
-
-@app.get("/items")
-def read_items(db=Depends(get_db)):
-    return {"db": db["type"]}
-
-# --- テスト ---
-def mock_get_db():
-    return {"type": "test_db"}
-
-@pytest.fixture
-def client():
-    app.dependency_overrides[get_db] = mock_get_db
-    yield TestClient(app)
-    app.dependency_overrides.clear()
-
-def test_with_mock_db(client):
-    response = client.get("/items")
-    assert response.json() == {"db": "test_db"}`,
+    code: "from fastapi import FastAPI, Depends\nfrom fastapi.testclient import TestClient\nimport pytest\n\napp = FastAPI()\n\ndef get_db():\n    return {\"type\": \"production_db\"}\n\n@app.get(\"/items\")\ndef read_items(db=Depends(get_db)):\n    return {\"db\": db[\"type\"]}\n\n# --- テスト ---\ndef mock_get_db():\n    return {\"type\": \"test_db\"}\n\n@pytest.fixture\ndef client():\n    app.dependency_overrides[get_db] = mock_get_db\n    yield TestClient(app)\n    app.dependency_overrides.clear()\n\ndef test_with_mock_db(client):\n    response = client.get(\"/items\")\n    assert response.json() == {\"db\": \"test_db\"}",
     afterCode: "ポイント: fixture に yield を使うと、テスト後のクリーンアップ（dependency_overrides.clear()）が自動的に実行されます。各テストが独立して動作することを保証するために重要です。"
   }, {
     title: "DB を使ったテスト",
     body: "DB 連携のテストでは、本番 DB を汚さないようにテスト用の DB（インメモリ SQLite やテスト専用の PostgreSQL）を使います。各テストの前後でテーブルを作成・破棄するか、トランザクションをロールバックしてデータをリセットします。\n\nDjango は TestCase でトランザクションを自動ロールバックしてくれますが、FastAPI + SQLAlchemy では自分で設計する必要があります。定番パターンは、テスト用エンジンを作成し、フィクスチャでテーブルの作成・破棄を行い、get_db を override してテスト用セッションを返すことです。\n\nインメモリ SQLite（sqlite://）を使えば、テスト実行のたびにクリーンな DB が使え、ファイルの後片付けも不要です。ただし PostgreSQL 固有の機能（JSONB, ARRAY 等）を使っている場合は、テストでも PostgreSQL を使う必要があります。",
-    code: `import pytest
-from fastapi import FastAPI, Depends
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, String
-from sqlalchemy.orm import (
-    DeclarativeBase, Mapped, mapped_column, Session, sessionmaker
-)
-
-# テスト用インメモリDB
-test_engine = create_engine("sqlite://", echo=True)
-TestSession = sessionmaker(bind=test_engine)
-
-class Base(DeclarativeBase):
-    pass
-
-class User(Base):
-    __tablename__ = "users"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(50))
-
-@pytest.fixture(autouse=True)
-def setup_db():
-    Base.metadata.create_all(bind=test_engine)
-    yield
-    Base.metadata.drop_all(bind=test_engine)
-
-@pytest.fixture
-def client(setup_db):
-    def get_test_db():
-        db = TestSession()
-        try:
-            yield db
-        finally:
-            db.close()
-    # app.dependency_overrides[get_db] = get_test_db
-    # yield TestClient(app)
-    # app.dependency_overrides.clear()`,
+    code: "import pytest\nfrom fastapi import FastAPI, Depends\nfrom fastapi.testclient import TestClient\nfrom sqlalchemy import create_engine, String\nfrom sqlalchemy.orm import (\n    DeclarativeBase, Mapped, mapped_column, Session, sessionmaker\n)\n\n# テスト用インメモリDB\ntest_engine = create_engine(\"sqlite://\", echo=True)\nTestSession = sessionmaker(bind=test_engine)\n\nclass Base(DeclarativeBase):\n    pass\n\nclass User(Base):\n    __tablename__ = \"users\"\n    id: Mapped[int] = mapped_column(primary_key=True)\n    name: Mapped[str] = mapped_column(String(50))\n\n@pytest.fixture(autouse=True)\ndef setup_db():\n    Base.metadata.create_all(bind=test_engine)\n    yield\n    Base.metadata.drop_all(bind=test_engine)\n\n@pytest.fixture\ndef client(setup_db):\n    def get_test_db():\n        db = TestSession()\n        try:\n            yield db\n        finally:\n            db.close()\n    # app.dependency_overrides[get_db] = get_test_db\n    # yield TestClient(app)\n    # app.dependency_overrides.clear()",
     afterCode: "ポイント: autouse=True のフィクスチャは全テスト関数で自動的に実行されます。DB の作成・破棄を毎回行うことで、テスト間のデータ汚染を防ぎます。"
   }, {
     title: "OpenAPI ドキュメントのカスタマイズ",
     body: "FastAPI は /docs（Swagger UI）と /redoc（ReDoc）にアクセスすると、OpenAPI 仕様に基づく API ドキュメントを自動生成します。エンドポイントの説明、パラメータの型と制約、リクエスト/レスポンスのスキーマが全て反映されます。\n\nFlask では Flasgger や flask-restx でドキュメントを生成できましたが、コードとドキュメントの乖離が起きやすいのが課題でした。Django REST Framework + drf-spectacular も優秀ですが、FastAPI のドキュメント生成はコードから自動的に生成されるため、乖離が原理的に発生しません。\n\n関数の docstring やデコレータの description / summary / tags パラメータで、ドキュメントをさらに充実させることができます。タグでエンドポイントをグループ化すると、Swagger UI でカテゴリ別に整理されて見やすくなります。",
-    code: `from fastapi import FastAPI
-from pydantic import BaseModel, Field
-
-app = FastAPI(
-    title="My Awesome API",
-    description="## 概要\\nこの API は商品管理を行います。",
-    version="1.0.0",
-    contact={"name": "API Support", "email": "support@example.com"},
-    license_info={"name": "MIT"}
-)
-
-class Item(BaseModel):
-    """商品モデル"""
-    name: str = Field(..., description="商品名", examples=["Apple"])
-    price: float = Field(..., gt=0, description="税込価格")
-
-@app.post(
-    "/items",
-    response_model=Item,
-    status_code=201,
-    summary="商品を新規作成する",
-    description="商品名と価格を指定して新しい商品を登録します。",
-    tags=["Items"],
-    responses={
-        201: {"description": "作成成功"},
-        422: {"description": "バリデーションエラー"}
-    }
-)
-def create_item(item: Item):
-    """
-    商品を作成します。
-
-    - **name**: 商品名（必須）
-    - **price**: 税込価格（0より大きい数値）
-    """
-    return item`,
+    code: "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field\n\napp = FastAPI(\n    title=\"My Awesome API\",\n    description=\"## 概要\\nこの API は商品管理を行います。\",\n    version=\"1.0.0\",\n    contact={\"name\": \"API Support\", \"email\": \"support@example.com\"},\n    license_info={\"name\": \"MIT\"}\n)\n\nclass Item(BaseModel):\n    \"\"\"商品モデル\"\"\"\n    name: str = Field(..., description=\"商品名\", examples=[\"Apple\"])\n    price: float = Field(..., gt=0, description=\"税込価格\")\n\n@app.post(\n    \"/items\",\n    response_model=Item,\n    status_code=201,\n    summary=\"商品を新規作成する\",\n    description=\"商品名と価格を指定して新しい商品を登録します。\",\n    tags=[\"Items\"],\n    responses={\n        201: {\"description\": \"作成成功\"},\n        422: {\"description\": \"バリデーションエラー\"}\n    }\n)\ndef create_item(item: Item):\n    \"\"\"\n    商品を作成します。\n\n    - **name**: 商品名（必須）\n    - **price**: 税込価格（0より大きい数値）\n    \"\"\"\n    return item",
     afterCode: "ポイント: 関数の docstring は Swagger UI の説明欄に Markdown として表示されます。箇条書きやコードブロックも使えるので、API の使い方を丁寧に書いておくとフロントエンド開発者に喜ばれます。"
   }]
 }];

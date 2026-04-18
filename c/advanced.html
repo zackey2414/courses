@@ -22,520 +22,67 @@ const { useState } = React;
 const EX = {
   ch1: [
     {diff:2, q:"簡単なトークナイザーを実装してください。入力文字列から整数リテラル・識別子・演算子(+,-,*,/)をトークン化してください。",
-     code:`#include <stdio.h>
-#include <ctype.h>
-#include <string.h>
-
-typedef enum { TOK_INT, TOK_IDENT, TOK_OP, TOK_EOF } TokenKind;
-typedef struct { TokenKind kind; char value[64]; } Token;
-
-Token next_token(const char **src) {
-    // 空白スキップ → 数字/英字/演算子を判定
-}`,
-     answer:`Token next_token(const char **src) {
-    while (isspace(**src)) (*src)++;
-    if (**src == '\\0') return (Token){TOK_EOF, ""};
-    Token tok;
-    if (isdigit(**src)) {
-        tok.kind = TOK_INT;
-        int i = 0;
-        while (isdigit(**src)) tok.value[i++] = *(*src)++;
-        tok.value[i] = '\\0';
-    } else if (isalpha(**src) || **src == '_') {
-        tok.kind = TOK_IDENT;
-        int i = 0;
-        while (isalnum(**src) || **src == '_') tok.value[i++] = *(*src)++;
-        tok.value[i] = '\\0';
-    } else {
-        tok.kind = TOK_OP;
-        tok.value[0] = *(*src)++;
-        tok.value[1] = '\\0';
-    }
-    return tok;
-}`},
+     code:"#include <stdio.h>\n#include <ctype.h>\n#include <string.h>\n\ntypedef enum { TOK_INT, TOK_IDENT, TOK_OP, TOK_EOF } TokenKind;\ntypedef struct { TokenKind kind; char value[64]; } Token;\n\nToken next_token(const char **src) {\n    // 空白スキップ → 数字/英字/演算子を判定\n}",
+     answer:"Token next_token(const char **src) {\n    while (isspace(**src)) (*src)++;\n    if (**src == '\\0') return (Token){TOK_EOF, \"\"};\n    Token tok;\n    if (isdigit(**src)) {\n        tok.kind = TOK_INT;\n        int i = 0;\n        while (isdigit(**src)) tok.value[i++] = *(*src)++;\n        tok.value[i] = '\\0';\n    } else if (isalpha(**src) || **src == '_') {\n        tok.kind = TOK_IDENT;\n        int i = 0;\n        while (isalnum(**src) || **src == '_') tok.value[i++] = *(*src)++;\n        tok.value[i] = '\\0';\n    } else {\n        tok.kind = TOK_OP;\n        tok.value[0] = *(*src)++;\n        tok.value[1] = '\\0';\n    }\n    return tok;\n}"},
     {diff:3, q:"文字列をトークナイズする際、/*...*/形式のCスタイルコメントをスキップする処理を実装してください。",
-     code:`void skip_comment(const char **src) {
-    // '/*' を検出したらコメント終了の '*/' まで進める
-    // ネストは考慮不要
-}`,
-     answer:`void skip_comment(const char **src) {
-    if ((*src)[0] == '/' && (*src)[1] == '*') {
-        *src += 2; // '/*' をスキップ
-        while (**src != '\\0') {
-            if ((*src)[0] == '*' && (*src)[1] == '/') {
-                *src += 2; // '*/' をスキップ
-                return;
-            }
-            (*src)++;
-        }
-        fprintf(stderr, "コメントが閉じられていません\\n");
-    }
-}`}
+     code:"void skip_comment(const char **src) {\n    // '/*' を検出したらコメント終了の '*/' まで進める\n    // ネストは考慮不要\n}",
+     answer:"void skip_comment(const char **src) {\n    if ((*src)[0] == '/' && (*src)[1] == '*') {\n        *src += 2; // '/*' をスキップ\n        while (**src != '\\0') {\n            if ((*src)[0] == '*' && (*src)[1] == '/') {\n                *src += 2; // '*/' をスキップ\n                return;\n            }\n            (*src)++;\n        }\n        fprintf(stderr, \"コメントが閉じられていません\\n\");\n    }\n}"}
   ],
   ch2: [
     {diff:2, q:"整数リテラルと+演算子を扱う再帰下降パーサーを実装してください。expr → term ('+' term)*、term → NUMBERの文法を実装してください。",
-     code:`#include <stdlib.h>
-
-typedef struct Node { int value; struct Node *left, *right; char op; } Node;
-
-Node *parse_expr(const char **src);
-Node *parse_term(const char **src);
-
-// parse_termはTOK_INTを読みNodeを返す
-// parse_exprは'+' が続く限りループ`,
-     answer:`Node *new_node(int val) {
-    Node *n = malloc(sizeof(Node));
-    n->value = val; n->left = n->right = NULL; n->op = 0;
-    return n;
-}
-Node *parse_term(const char **src) {
-    while (isspace(**src)) (*src)++;
-    int v = 0;
-    while (isdigit(**src)) v = v * 10 + (*(*src)++ - '0');
-    return new_node(v);
-}
-Node *parse_expr(const char **src) {
-    Node *left = parse_term(src);
-    while (isspace(**src)) (*src)++;
-    while (**src == '+') {
-        (*src)++;
-        Node *right = parse_term(src);
-        Node *parent = new_node(0);
-        parent->op = '+'; parent->left = left; parent->right = right;
-        left = parent;
-        while (isspace(**src)) (*src)++;
-    }
-    return left;
-}`},
+     code:"#include <stdlib.h>\n\ntypedef struct Node { int value; struct Node *left, *right; char op; } Node;\n\nNode *parse_expr(const char **src);\nNode *parse_term(const char **src);\n\n// parse_termはTOK_INTを読みNodeを返す\n// parse_exprは'+' が続く限りループ",
+     answer:"Node *new_node(int val) {\n    Node *n = malloc(sizeof(Node));\n    n->value = val; n->left = n->right = NULL; n->op = 0;\n    return n;\n}\nNode *parse_term(const char **src) {\n    while (isspace(**src)) (*src)++;\n    int v = 0;\n    while (isdigit(**src)) v = v * 10 + (*(*src)++ - '0');\n    return new_node(v);\n}\nNode *parse_expr(const char **src) {\n    Node *left = parse_term(src);\n    while (isspace(**src)) (*src)++;\n    while (**src == '+') {\n        (*src)++;\n        Node *right = parse_term(src);\n        Node *parent = new_node(0);\n        parent->op = '+'; parent->left = left; parent->right = right;\n        left = parent;\n        while (isspace(**src)) (*src)++;\n    }\n    return left;\n}"},
     {diff:3, q:"ASTノードを再帰的にevalし、整数計算結果を返す関数を実装してください。+と-と*と/をサポートしてください。",
-     code:`int eval(Node *node) {
-    // 葉ノード: value を返す
-    // 内部ノード: opに応じて左右を再帰eval
-}`,
-     answer:`int eval(Node *node) {
-    if (!node->left && !node->right) return node->value;
-    int l = eval(node->left);
-    int r = eval(node->right);
-    switch (node->op) {
-        case '+': return l + r;
-        case '-': return l - r;
-        case '*': return l * r;
-        case '/':
-            if (r == 0) { fprintf(stderr, "ゼロ除算\\n"); return 0; }
-            return l / r;
-        default:
-            fprintf(stderr, "不明な演算子: %c\\n", node->op);
-            return 0;
-    }
-}`}
+     code:"int eval(Node *node) {\n    // 葉ノード: value を返す\n    // 内部ノード: opに応じて左右を再帰eval\n}",
+     answer:"int eval(Node *node) {\n    if (!node->left && !node->right) return node->value;\n    int l = eval(node->left);\n    int r = eval(node->right);\n    switch (node->op) {\n        case '+': return l + r;\n        case '-': return l - r;\n        case '*': return l * r;\n        case '/':\n            if (r == 0) { fprintf(stderr, \"ゼロ除算\\n\"); return 0; }\n            return l / r;\n        default:\n            fprintf(stderr, \"不明な演算子: %c\\n\", node->op);\n            return 0;\n    }\n}"}
   ],
   ch3: [
     {diff:2, q:"Linuxカーネルモジュールのhello_init・hello_exitを実装し、insmodでメッセージがカーネルログに表示されるようにしてください。",
-     code:`#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/init.h>
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Student");
-
-static int __init hello_init(void) {
-    // pr_infoでメッセージを出力
-}
-
-static void __exit hello_exit(void) {
-    // pr_infoでメッセージを出力
-}`,
-     answer:`#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/init.h>
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Student");
-MODULE_DESCRIPTION("Hello World Kernel Module");
-
-static int __init hello_init(void) {
-    pr_info("Hello, Kernel World!\\n");
-    return 0; // 0以外はinsmod失敗
-}
-
-static void __exit hello_exit(void) {
-    pr_info("Goodbye, Kernel World!\\n");
-}
-
-module_init(hello_init);
-module_exit(hello_exit);`},
+     code:"#include <linux/module.h>\n#include <linux/kernel.h>\n#include <linux/init.h>\n\nMODULE_LICENSE(\"GPL\");\nMODULE_AUTHOR(\"Student\");\n\nstatic int __init hello_init(void) {\n    // pr_infoでメッセージを出力\n}\n\nstatic void __exit hello_exit(void) {\n    // pr_infoでメッセージを出力\n}",
+     answer:"#include <linux/module.h>\n#include <linux/kernel.h>\n#include <linux/init.h>\n\nMODULE_LICENSE(\"GPL\");\nMODULE_AUTHOR(\"Student\");\nMODULE_DESCRIPTION(\"Hello World Kernel Module\");\n\nstatic int __init hello_init(void) {\n    pr_info(\"Hello, Kernel World!\\n\");\n    return 0; // 0以外はinsmod失敗\n}\n\nstatic void __exit hello_exit(void) {\n    pr_info(\"Goodbye, Kernel World!\\n\");\n}\n\nmodule_init(hello_init);\nmodule_exit(hello_exit);"},
     {diff:3, q:"/proc/hello_countファイルを持つカーネルモジュールを実装してください。読み取るたびにカウンタが増加し、数値を返してください。",
-     code:`#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
-
-static int count = 0;
-
-static int hello_show(struct seq_file *m, void *v) {
-    // カウンタをインクリメントして表示
-}
-
-static int hello_open(struct inode *inode, struct file *file) {
-    return single_open(file, hello_show, NULL);
-}`,
-     answer:`#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
-#include <linux/atomic.h>
-
-static atomic_t count = ATOMIC_INIT(0);
-
-static int hello_show(struct seq_file *m, void *v) {
-    int c = atomic_inc_return(&count);
-    seq_printf(m, "Read count: %d\\n", c);
-    return 0;
-}
-
-static int hello_open(struct inode *inode, struct file *file) {
-    return single_open(file, hello_show, NULL);
-}
-
-static const struct proc_ops hello_fops = {
-    .proc_open = hello_open,
-    .proc_read = seq_read,
-    .proc_release = single_release,
-};
-
-static int __init hello_init(void) {
-    proc_create("hello_count", 0444, NULL, &hello_fops);
-    return 0;
-}`}
+     code:"#include <linux/proc_fs.h>\n#include <linux/seq_file.h>\n\nstatic int count = 0;\n\nstatic int hello_show(struct seq_file *m, void *v) {\n    // カウンタをインクリメントして表示\n}\n\nstatic int hello_open(struct inode *inode, struct file *file) {\n    return single_open(file, hello_show, NULL);\n}",
+     answer:"#include <linux/proc_fs.h>\n#include <linux/seq_file.h>\n#include <linux/atomic.h>\n\nstatic atomic_t count = ATOMIC_INIT(0);\n\nstatic int hello_show(struct seq_file *m, void *v) {\n    int c = atomic_inc_return(&count);\n    seq_printf(m, \"Read count: %d\\n\", c);\n    return 0;\n}\n\nstatic int hello_open(struct inode *inode, struct file *file) {\n    return single_open(file, hello_show, NULL);\n}\n\nstatic const struct proc_ops hello_fops = {\n    .proc_open = hello_open,\n    .proc_read = seq_read,\n    .proc_release = single_release,\n};\n\nstatic int __init hello_init(void) {\n    proc_create(\"hello_count\", 0444, NULL, &hello_fops);\n    return 0;\n}"}
   ],
   ch4: [
     {diff:2, q:"Mark-and-Sweepガーベジコレクタのマーク処理を実装してください。オブジェクトのmarkedフラグを再帰的に設定してください。",
-     code:`#include <stdbool.h>
-#define MAX_REFS 8
-
-typedef struct Object {
-    bool marked;
-    struct Object *refs[MAX_REFS];
-    int num_refs;
-} Object;
-
-void mark(Object *obj) {
-    // 既にマーク済みならスキップ
-    // マーク → 子を再帰的にmark
-}`,
-     answer:`void mark(Object *obj) {
-    if (!obj || obj->marked) return; // NULL or already marked
-    obj->marked = true;
-    for (int i = 0; i < obj->num_refs; i++) {
-        mark(obj->refs[i]); // 子オブジェクトを再帰的にマーク
-    }
-}`},
+     code:"#include <stdbool.h>\n#define MAX_REFS 8\n\ntypedef struct Object {\n    bool marked;\n    struct Object *refs[MAX_REFS];\n    int num_refs;\n} Object;\n\nvoid mark(Object *obj) {\n    // 既にマーク済みならスキップ\n    // マーク → 子を再帰的にmark\n}",
+     answer:"void mark(Object *obj) {\n    if (!obj || obj->marked) return; // NULL or already marked\n    obj->marked = true;\n    for (int i = 0; i < obj->num_refs; i++) {\n        mark(obj->refs[i]); // 子オブジェクトを再帰的にマーク\n    }\n}"},
     {diff:3, q:"スウィープ処理を実装してください。マークされていないオブジェクトをヒープリストから除去してfreeし、マーク済みオブジェクトのmarkedをリセットしてください。",
-     code:`typedef struct HeapNode {
-    Object *obj;
-    struct HeapNode *next;
-} HeapNode;
-
-HeapNode *heap_head = NULL;
-
-void sweep(void) {
-    // markedでないObjectをfree
-    // markedなObjectのmarkedをfalseにリセット
-}`,
-     answer:`void sweep(void) {
-    HeapNode **curr = &heap_head;
-    while (*curr) {
-        HeapNode *node = *curr;
-        if (!node->obj->marked) {
-            // マークされていない: 解放
-            *curr = node->next;
-            free(node->obj);
-            free(node);
-        } else {
-            // マークされている: フラグをリセット
-            node->obj->marked = false;
-            curr = &node->next;
-        }
-    }
-}`}
+     code:"typedef struct HeapNode {\n    Object *obj;\n    struct HeapNode *next;\n} HeapNode;\n\nHeapNode *heap_head = NULL;\n\nvoid sweep(void) {\n    // markedでないObjectをfree\n    // markedなObjectのmarkedをfalseにリセット\n}",
+     answer:"void sweep(void) {\n    HeapNode **curr = &heap_head;\n    while (*curr) {\n        HeapNode *node = *curr;\n        if (!node->obj->marked) {\n            // マークされていない: 解放\n            *curr = node->next;\n            free(node->obj);\n            free(node);\n        } else {\n            // マークされている: フラグをリセット\n            node->obj->marked = false;\n            curr = &node->next;\n        }\n    }\n}"}
   ],
   ch5: [
     {diff:2, q:"ELFファイルのマジックナンバーとファイルタイプを検証するC関数を実装してください。",
-     code:`#include <stdio.h>
-#include <stdint.h>
-#include <elf.h>
-
-int check_elf_header(const char *filename) {
-    // ファイルを開いてElf64_Ehdrを読み込む
-    // マジックナンバー確認 → ファイルタイプを表示
-}`,
-     answer:`#include <stdio.h>
-#include <elf.h>
-
-int check_elf_header(const char *filename) {
-    FILE *f = fopen(filename, "rb");
-    if (!f) { perror(filename); return -1; }
-    Elf64_Ehdr hdr;
-    if (fread(&hdr, sizeof(hdr), 1, f) != 1) {
-        fclose(f); return -1;
-    }
-    fclose(f);
-    if (hdr.e_ident[EI_MAG0] != ELFMAG0 ||
-        hdr.e_ident[EI_MAG1] != ELFMAG1 ||
-        hdr.e_ident[EI_MAG2] != ELFMAG2 ||
-        hdr.e_ident[EI_MAG3] != ELFMAG3) {
-        fprintf(stderr, "ELFファイルではありません\\n");
-        return -1;
-    }
-    const char *types[] = {"NONE","REL","EXEC","DYN","CORE"};
-    printf("ELFタイプ: %s\\n", e_type < 5 ? types[hdr.e_type] : "OTHER");
-    return 0;
-}`},
+     code:"#include <stdio.h>\n#include <stdint.h>\n#include <elf.h>\n\nint check_elf_header(const char *filename) {\n    // ファイルを開いてElf64_Ehdrを読み込む\n    // マジックナンバー確認 → ファイルタイプを表示\n}",
+     answer:"#include <stdio.h>\n#include <elf.h>\n\nint check_elf_header(const char *filename) {\n    FILE *f = fopen(filename, \"rb\");\n    if (!f) { perror(filename); return -1; }\n    Elf64_Ehdr hdr;\n    if (fread(&hdr, sizeof(hdr), 1, f) != 1) {\n        fclose(f); return -1;\n    }\n    fclose(f);\n    if (hdr.e_ident[EI_MAG0] != ELFMAG0 ||\n        hdr.e_ident[EI_MAG1] != ELFMAG1 ||\n        hdr.e_ident[EI_MAG2] != ELFMAG2 ||\n        hdr.e_ident[EI_MAG3] != ELFMAG3) {\n        fprintf(stderr, \"ELFファイルではありません\\n\");\n        return -1;\n    }\n    const char *types[] = {\"NONE\",\"REL\",\"EXEC\",\"DYN\",\"CORE\"};\n    printf(\"ELFタイプ: %s\\n\", e_type < 5 ? types[hdr.e_type] : \"OTHER\");\n    return 0;\n}"},
     {diff:3, q:"ELFファイルのセクションヘッダテーブルを読み込み、全セクション名と種類を表示するC関数を実装してください。",
-     code:`void print_sections(const char *filename) {
-    // Elf64_Ehdrを読む
-    // セクションヘッダテーブルの位置へfseek
-    // 各セクションヘッダを読んでsh_nameとsh_typeを表示
-}`,
-     answer:`#include <stdio.h>
-#include <stdlib.h>
-#include <elf.h>
-
-void print_sections(const char *filename) {
-    FILE *f = fopen(filename, "rb");
-    if (!f) { perror(filename); return; }
-
-    Elf64_Ehdr ehdr;
-    fread(&ehdr, sizeof(ehdr), 1, f);
-
-    // セクション名文字列テーブル (shstrtab) を読む
-    fseek(f, ehdr.e_shoff + ehdr.e_shstrndx * ehdr.e_shentsize, SEEK_SET);
-    Elf64_Shdr shstrtab_hdr;
-    fread(&shstrtab_hdr, sizeof(shstrtab_hdr), 1, f);
-    char *shstrtab = malloc(shstrtab_hdr.sh_size);
-    fseek(f, shstrtab_hdr.sh_offset, SEEK_SET);
-    fread(shstrtab, shstrtab_hdr.sh_size, 1, f);
-
-    // 各セクションを表示
-    for (int i = 0; i < ehdr.e_shnum; i++) {
-        fseek(f, ehdr.e_shoff + i * ehdr.e_shentsize, SEEK_SET);
-        Elf64_Shdr shdr;
-        fread(&shdr, sizeof(shdr), 1, f);
-        printf("[%2d] %-20s type=%u\\n", i,
-               shstrtab + shdr.sh_name, shdr.sh_type);
-    }
-    free(shstrtab);
-    fclose(f);
-}`}
+     code:"void print_sections(const char *filename) {\n    // Elf64_Ehdrを読む\n    // セクションヘッダテーブルの位置へfseek\n    // 各セクションヘッダを読んでsh_nameとsh_typeを表示\n}",
+     answer:"#include <stdio.h>\n#include <stdlib.h>\n#include <elf.h>\n\nvoid print_sections(const char *filename) {\n    FILE *f = fopen(filename, \"rb\");\n    if (!f) { perror(filename); return; }\n\n    Elf64_Ehdr ehdr;\n    fread(&ehdr, sizeof(ehdr), 1, f);\n\n    // セクション名文字列テーブル (shstrtab) を読む\n    fseek(f, ehdr.e_shoff + ehdr.e_shstrndx * ehdr.e_shentsize, SEEK_SET);\n    Elf64_Shdr shstrtab_hdr;\n    fread(&shstrtab_hdr, sizeof(shstrtab_hdr), 1, f);\n    char *shstrtab = malloc(shstrtab_hdr.sh_size);\n    fseek(f, shstrtab_hdr.sh_offset, SEEK_SET);\n    fread(shstrtab, shstrtab_hdr.sh_size, 1, f);\n\n    // 各セクションを表示\n    for (int i = 0; i < ehdr.e_shnum; i++) {\n        fseek(f, ehdr.e_shoff + i * ehdr.e_shentsize, SEEK_SET);\n        Elf64_Shdr shdr;\n        fread(&shdr, sizeof(shdr), 1, f);\n        printf(\"[%2d] %-20s type=%u\\n\", i,\n               shstrtab + shdr.sh_name, shdr.sh_type);\n    }\n    free(shstrtab);\n    fclose(f);\n}"}
   ],
   ch6: [
     {diff:2, q:"epollを使ってソケットをノンブロッキングに設定し、epoll_ctlで監視を登録する初期化関数を実装してください。",
-     code:`#include <sys/epoll.h>
-#include <fcntl.h>
-#include <unistd.h>
-
-int make_nonblocking(int fd);
-int setup_epoll(int server_fd);
-// epollfdを作成してserver_fdをEPOLLINで登録`,
-     answer:`#include <sys/epoll.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
-
-int make_nonblocking(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-}
-
-int setup_epoll(int server_fd) {
-    int epfd = epoll_create1(EPOLL_CLOEXEC);
-    if (epfd < 0) { perror("epoll_create1"); exit(1); }
-
-    struct epoll_event ev = {
-        .events = EPOLLIN | EPOLLET, // Edge-Triggered
-        .data.fd = server_fd,
-    };
-    if (epoll_ctl(epfd, EPOLL_CTL_ADD, server_fd, &ev) < 0) {
-        perror("epoll_ctl"); exit(1);
-    }
-    return epfd;
-}`},
+     code:"#include <sys/epoll.h>\n#include <fcntl.h>\n#include <unistd.h>\n\nint make_nonblocking(int fd);\nint setup_epoll(int server_fd);\n// epollfdを作成してserver_fdをEPOLLINで登録",
+     answer:"#include <sys/epoll.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <stdlib.h>\n\nint make_nonblocking(int fd) {\n    int flags = fcntl(fd, F_GETFL, 0);\n    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);\n}\n\nint setup_epoll(int server_fd) {\n    int epfd = epoll_create1(EPOLL_CLOEXEC);\n    if (epfd < 0) { perror(\"epoll_create1\"); exit(1); }\n\n    struct epoll_event ev = {\n        .events = EPOLLIN | EPOLLET, // Edge-Triggered\n        .data.fd = server_fd,\n    };\n    if (epoll_ctl(epfd, EPOLL_CTL_ADD, server_fd, &ev) < 0) {\n        perror(\"epoll_ctl\"); exit(1);\n    }\n    return epfd;\n}"},
     {diff:3, q:"epollイベントループで新しい接続を受け付け、既存接続からのデータを読み込んでそのままエコーバックする簡単なHTTPサーバのメインループを実装してください。",
-     code:`#define MAX_EVENTS 64
-
-void event_loop(int server_fd, int epfd) {
-    struct epoll_event events[MAX_EVENTS];
-    // epoll_waitでイベントを受け取る
-    // server_fdなら accept → 登録
-    // それ以外なら read → send (エコー)
-}`,
-     answer:`#include <sys/socket.h>
-#include <netinet/in.h>
-#include <string.h>
-
-#define MAX_EVENTS 64
-#define BUF_SIZE 4096
-
-void event_loop(int server_fd, int epfd) {
-    struct epoll_event events[MAX_EVENTS];
-    char buf[BUF_SIZE];
-
-    for (;;) {
-        int n = epoll_wait(epfd, events, MAX_EVENTS, -1);
-        for (int i = 0; i < n; i++) {
-            int fd = events[i].data.fd;
-            if (fd == server_fd) {
-                // 新しい接続を受け付ける
-                struct sockaddr_in addr;
-                socklen_t addrlen = sizeof(addr);
-                int client = accept4(server_fd, (struct sockaddr*)&addr,
-                                     &addrlen, SOCK_NONBLOCK | SOCK_CLOEXEC);
-                if (client < 0) continue;
-                struct epoll_event ev = {
-                    .events = EPOLLIN | EPOLLET,
-                    .data.fd = client
-                };
-                epoll_ctl(epfd, EPOLL_CTL_ADD, client, &ev);
-            } else {
-                // データ受信: エコーバック
-                ssize_t r = read(fd, buf, BUF_SIZE);
-                if (r <= 0) { close(fd); }
-                else { send(fd, buf, r, 0); }
-            }
-        }
-    }
-}`}
+     code:"#define MAX_EVENTS 64\n\nvoid event_loop(int server_fd, int epfd) {\n    struct epoll_event events[MAX_EVENTS];\n    // epoll_waitでイベントを受け取る\n    // server_fdなら accept → 登録\n    // それ以外なら read → send (エコー)\n}",
+     answer:"#include <sys/socket.h>\n#include <netinet/in.h>\n#include <string.h>\n\n#define MAX_EVENTS 64\n#define BUF_SIZE 4096\n\nvoid event_loop(int server_fd, int epfd) {\n    struct epoll_event events[MAX_EVENTS];\n    char buf[BUF_SIZE];\n\n    for (;;) {\n        int n = epoll_wait(epfd, events, MAX_EVENTS, -1);\n        for (int i = 0; i < n; i++) {\n            int fd = events[i].data.fd;\n            if (fd == server_fd) {\n                // 新しい接続を受け付ける\n                struct sockaddr_in addr;\n                socklen_t addrlen = sizeof(addr);\n                int client = accept4(server_fd, (struct sockaddr*)&addr,\n                                     &addrlen, SOCK_NONBLOCK | SOCK_CLOEXEC);\n                if (client < 0) continue;\n                struct epoll_event ev = {\n                    .events = EPOLLIN | EPOLLET,\n                    .data.fd = client\n                };\n                epoll_ctl(epfd, EPOLL_CTL_ADD, client, &ev);\n            } else {\n                // データ受信: エコーバック\n                ssize_t r = read(fd, buf, BUF_SIZE);\n                if (r <= 0) { close(fd); }\n                else { send(fd, buf, r, 0); }\n            }\n        }\n    }\n}"}
   ],
   ch7: [
     {diff:2, q:"固定サイズのメモリプールを実装してください。pool_init・pool_alloc・pool_freeを実装してください。",
-     code:`#include <stddef.h>
-#include <stdint.h>
-
-#define POOL_CAPACITY 1024
-#define BLOCK_SIZE    64
-
-typedef struct {
-    uint8_t data[POOL_CAPACITY * BLOCK_SIZE];
-    uint8_t used[POOL_CAPACITY]; // 0=空き, 1=使用中
-} Pool;
-
-void pool_init(Pool *p);
-void *pool_alloc(Pool *p);
-void pool_free(Pool *p, void *ptr);`,
-     answer:`#include <string.h>
-
-void pool_init(Pool *p) {
-    memset(p->used, 0, sizeof(p->used));
-}
-
-void *pool_alloc(Pool *p) {
-    for (int i = 0; i < POOL_CAPACITY; i++) {
-        if (!p->used[i]) {
-            p->used[i] = 1;
-            return p->data + i * BLOCK_SIZE;
-        }
-    }
-    return NULL; // プール枯渇
-}
-
-void pool_free(Pool *p, void *ptr) {
-    uint8_t *bp = (uint8_t*)ptr;
-    ptrdiff_t offset = bp - p->data;
-    if (offset < 0 || offset % BLOCK_SIZE != 0) return;
-    p->used[offset / BLOCK_SIZE] = 0;
-}`},
+     code:"#include <stddef.h>\n#include <stdint.h>\n\n#define POOL_CAPACITY 1024\n#define BLOCK_SIZE    64\n\ntypedef struct {\n    uint8_t data[POOL_CAPACITY * BLOCK_SIZE];\n    uint8_t used[POOL_CAPACITY]; // 0=空き, 1=使用中\n} Pool;\n\nvoid pool_init(Pool *p);\nvoid *pool_alloc(Pool *p);\nvoid pool_free(Pool *p, void *ptr);",
+     answer:"#include <string.h>\n\nvoid pool_init(Pool *p) {\n    memset(p->used, 0, sizeof(p->used));\n}\n\nvoid *pool_alloc(Pool *p) {\n    for (int i = 0; i < POOL_CAPACITY; i++) {\n        if (!p->used[i]) {\n            p->used[i] = 1;\n            return p->data + i * BLOCK_SIZE;\n        }\n    }\n    return NULL; // プール枯渇\n}\n\nvoid pool_free(Pool *p, void *ptr) {\n    uint8_t *bp = (uint8_t*)ptr;\n    ptrdiff_t offset = bp - p->data;\n    if (offset < 0 || offset % BLOCK_SIZE != 0) return;\n    p->used[offset / BLOCK_SIZE] = 0;\n}"},
     {diff:3, q:"フリーリストを持つカスタムアロケータを実装してください。malloc/freeの代わりに使え、解放されたブロックはフリーリストで管理してください。",
-     code:`typedef struct FreeBlock { struct FreeBlock *next; size_t size; } FreeBlock;
-static uint8_t heap[65536];
-static FreeBlock *free_list = NULL;
-
-void allocator_init(void);
-void *my_malloc(size_t size);
-void my_free(void *ptr);`,
-     answer:`#include <string.h>
-#include <stdint.h>
-
-static uint8_t heap[65536];
-static FreeBlock *free_list = NULL;
-
-void allocator_init(void) {
-    free_list = (FreeBlock *)heap;
-    free_list->size = sizeof(heap) - sizeof(FreeBlock);
-    free_list->next = NULL;
-}
-
-void *my_malloc(size_t size) {
-    FreeBlock **curr = &free_list;
-    while (*curr) {
-        if ((*curr)->size >= size) {
-            FreeBlock *block = *curr;
-            *curr = block->next; // フリーリストから除去
-            return (uint8_t *)block + sizeof(FreeBlock);
-        }
-        curr = &(*curr)->next;
-    }
-    return NULL;
-}
-
-void my_free(void *ptr) {
-    FreeBlock *block = (FreeBlock *)((uint8_t *)ptr - sizeof(FreeBlock));
-    block->next = free_list;
-    free_list = block; // フリーリストの先頭に追加
-}`}
+     code:"typedef struct FreeBlock { struct FreeBlock *next; size_t size; } FreeBlock;\nstatic uint8_t heap[65536];\nstatic FreeBlock *free_list = NULL;\n\nvoid allocator_init(void);\nvoid *my_malloc(size_t size);\nvoid my_free(void *ptr);",
+     answer:"#include <string.h>\n#include <stdint.h>\n\nstatic uint8_t heap[65536];\nstatic FreeBlock *free_list = NULL;\n\nvoid allocator_init(void) {\n    free_list = (FreeBlock *)heap;\n    free_list->size = sizeof(heap) - sizeof(FreeBlock);\n    free_list->next = NULL;\n}\n\nvoid *my_malloc(size_t size) {\n    FreeBlock **curr = &free_list;\n    while (*curr) {\n        if ((*curr)->size >= size) {\n            FreeBlock *block = *curr;\n            *curr = block->next; // フリーリストから除去\n            return (uint8_t *)block + sizeof(FreeBlock);\n        }\n        curr = &(*curr)->next;\n    }\n    return NULL;\n}\n\nvoid my_free(void *ptr) {\n    FreeBlock *block = (FreeBlock *)((uint8_t *)ptr - sizeof(FreeBlock));\n    block->next = free_list;\n    free_list = block; // フリーリストの先頭に追加\n}"}
   ],
   ch8: [
     {diff:2, q:"スタックバッファオーバーフローに脆弱な関数を修正してください。strncpyを使い、NUL終端を保証してください。",
-     code:`#include <string.h>
-
-// 脆弱: バッファオーバーフローの可能性
-void vulnerable_copy(char *dst, const char *src) {
-    strcpy(dst, src);  // srcが長すぎると危険
-}
-
-// 安全版: bufsize引数を追加してstrncpyで修正
-void safe_copy(char *dst, const char *src, size_t bufsize) {
-    // 実装してください
-}`,
-     answer:`#include <string.h>
-
-void safe_copy(char *dst, const char *src, size_t bufsize) {
-    if (bufsize == 0) return;
-    strncpy(dst, src, bufsize - 1);
-    dst[bufsize - 1] = '\\0'; // 必ずNUL終端
-    // strlcpy(dst, src, bufsize) が使える環境ではそちらを推奨
-}
-
-// さらに安全: snprintfを使う方法
-void safe_copy2(char *dst, const char *src, size_t bufsize) {
-    snprintf(dst, bufsize, "%s", src);
-    // snprintfは常にNUL終端し、戻り値で切り捨てを検知できる
-}`},
+     code:"#include <string.h>\n\n// 脆弱: バッファオーバーフローの可能性\nvoid vulnerable_copy(char *dst, const char *src) {\n    strcpy(dst, src);  // srcが長すぎると危険\n}\n\n// 安全版: bufsize引数を追加してstrncpyで修正\nvoid safe_copy(char *dst, const char *src, size_t bufsize) {\n    // 実装してください\n}",
+     answer:"#include <string.h>\n\nvoid safe_copy(char *dst, const char *src, size_t bufsize) {\n    if (bufsize == 0) return;\n    strncpy(dst, src, bufsize - 1);\n    dst[bufsize - 1] = '\\0'; // 必ずNUL終端\n    // strlcpy(dst, src, bufsize) が使える環境ではそちらを推奨\n}\n\n// さらに安全: snprintfを使う方法\nvoid safe_copy2(char *dst, const char *src, size_t bufsize) {\n    snprintf(dst, bufsize, \"%s\", src);\n    // snprintfは常にNUL終端し、戻り値で切り捨てを検知できる\n}"},
     {diff:3, q:"整数オーバーフローに対して安全なメモリ確保関数を実装してください。count * sizeが桁あふれする場合はNULLを返してください。",
-     code:`#include <stdlib.h>
-#include <stdint.h>
-
-// count個のsize-byteオブジェクトを確保
-// count * size がオーバーフローする場合はNULLを返す
-void *safe_calloc(size_t count, size_t size) {
-    // オーバーフローチェック → calloc
-}`,
-     answer:`#include <stdlib.h>
-#include <stdint.h>
-
-void *safe_calloc(size_t count, size_t size) {
-    // SIZE_MAXを超えるか確認
-    if (size != 0 && count > SIZE_MAX / size) {
-        return NULL; // 整数オーバーフローを防止
-    }
-    return calloc(count, size);
-}
-
-// C23のckd_mul（checked multiply）を使う方法
-#ifdef __STDC_VERSION__
-void *safe_calloc_c23(size_t count, size_t size) {
-    size_t total;
-    if (__builtin_mul_overflow(count, size, &total)) {
-        return NULL;
-    }
-    return malloc(total);
-}
-#endif`}
+     code:"#include <stdlib.h>\n#include <stdint.h>\n\n// count個のsize-byteオブジェクトを確保\n// count * size がオーバーフローする場合はNULLを返す\nvoid *safe_calloc(size_t count, size_t size) {\n    // オーバーフローチェック → calloc\n}",
+     answer:"#include <stdlib.h>\n#include <stdint.h>\n\nvoid *safe_calloc(size_t count, size_t size) {\n    // SIZE_MAXを超えるか確認\n    if (size != 0 && count > SIZE_MAX / size) {\n        return NULL; // 整数オーバーフローを防止\n    }\n    return calloc(count, size);\n}\n\n// C23のckd_mul（checked multiply）を使う方法\n#ifdef __STDC_VERSION__\nvoid *safe_calloc_c23(size_t count, size_t size) {\n    size_t total;\n    if (__builtin_mul_overflow(count, size, &total)) {\n        return NULL;\n    }\n    return malloc(total);\n}\n#endif"}
   ],
 };
 
@@ -543,741 +90,82 @@ const chapters = [
   {id:"ch1", num:1, title:"字句解析器（Lexer）実装", est:"70分",
    goal:"C言語でトークナイザーを実装し、キーワード・識別子・整数リテラル・演算子・文字列リテラルを正しく認識できる。複数文字トークン（==、<=）の処理もできる。",
    sections:[
-     {title:"字句解析の仕組みとトークン設計", body:`字句解析（Lexing）はソースコード文字列を意味のある最小単位「トークン」に分割する処理です。Pythonのtokenizeモジュールが行う処理と同等ですが、Cでは自前で実装します。コンパイラの最初のフェーズで、構文解析（Parsing）に先立って行われます。
-
-トークンの種類はenumで定義するのが定石です。キーワード（if・while・return）・識別子（変数名・関数名）・リテラル（整数・文字列・文字）・演算子（+・==・&&）・区切り文字（;・{・}）が主なカテゴリです。各トークンは種類と値（文字列表現）をペアで保持します。
-
-字句解析器の実装パターンは「1文字先読みしながら状態遷移する」オートマトンです。現在位置のポインタを進めながら、文字の種類（isdigit・isalpha・ispunct）に応じてトークン種別を判定します。複数文字の演算子（!=・<=・>>）は先読みが必要です。`,
-      code:`#include <stdio.h>
-#include <ctype.h>
-#include <string.h>
-#include <stdlib.h>
-
-typedef enum {
-    TK_INT, TK_FLOAT, TK_STRING, TK_IDENT, TK_KEYWORD,
-    TK_PLUS, TK_MINUS, TK_STAR, TK_SLASH,
-    TK_EQ, TK_NEQ, TK_LT, TK_LE, TK_GT, TK_GE,
-    TK_LPAREN, TK_RPAREN, TK_LBRACE, TK_RBRACE,
-    TK_SEMI, TK_EOF
-} TokenKind;
-
-typedef struct {
-    TokenKind kind;
-    char value[256];
-    int line;
-} Token;
-
-static const char *KEYWORDS[] = {
-    "if", "else", "while", "for", "return", "int", "void", NULL
-};
-
-int is_keyword(const char *s) {
-    for (int i = 0; KEYWORDS[i]; i++)
-        if (strcmp(s, KEYWORDS[i]) == 0) return 1;
-    return 0;
-}`,
+     {title:"字句解析の仕組みとトークン設計", body:"字句解析（Lexing）はソースコード文字列を意味のある最小単位「トークン」に分割する処理です。Pythonのtokenizeモジュールが行う処理と同等ですが、Cでは自前で実装します。コンパイラの最初のフェーズで、構文解析（Parsing）に先立って行われます。\n\nトークンの種類はenumで定義するのが定石です。キーワード（if・while・return）・識別子（変数名・関数名）・リテラル（整数・文字列・文字）・演算子（+・==・&&）・区切り文字（;・{・}）が主なカテゴリです。各トークンは種類と値（文字列表現）をペアで保持します。\n\n字句解析器の実装パターンは「1文字先読みしながら状態遷移する」オートマトンです。現在位置のポインタを進めながら、文字の種類（isdigit・isalpha・ispunct）に応じてトークン種別を判定します。複数文字の演算子（!=・<=・>>）は先読みが必要です。",
+      code:"#include <stdio.h>\n#include <ctype.h>\n#include <string.h>\n#include <stdlib.h>\n\ntypedef enum {\n    TK_INT, TK_FLOAT, TK_STRING, TK_IDENT, TK_KEYWORD,\n    TK_PLUS, TK_MINUS, TK_STAR, TK_SLASH,\n    TK_EQ, TK_NEQ, TK_LT, TK_LE, TK_GT, TK_GE,\n    TK_LPAREN, TK_RPAREN, TK_LBRACE, TK_RBRACE,\n    TK_SEMI, TK_EOF\n} TokenKind;\n\ntypedef struct {\n    TokenKind kind;\n    char value[256];\n    int line;\n} Token;\n\nstatic const char *KEYWORDS[] = {\n    \"if\", \"else\", \"while\", \"for\", \"return\", \"int\", \"void\", NULL\n};\n\nint is_keyword(const char *s) {\n    for (int i = 0; KEYWORDS[i]; i++)\n        if (strcmp(s, KEYWORDS[i]) == 0) return 1;\n    return 0;\n}",
       afterCode:"トークンに行番号（line）を記録しておくと、構文エラーのメッセージで「どの行か」を表示できます。多くの本格的なコンパイラはファイル名・行・カラムの3情報を持ちます。"},
-     {title:"Lexerの実装：ポインタ操作と先読み", body:`字句解析器の実装はポインタ操作の集積です。入力文字列をconst char *srcとして受け取り、srcを読み進めながらトークンを生成します。strtol()やstrtod()などのCスタンダードライブラリ関数を活用すると数値リテラルの解析が楽になります。
-
-文字列リテラルの処理はエスケープシーケンス（\n・\t・\\・\"）の処理が必要で、字句解析の中でも複雑な部分です。終端の"を見つけるまで読み進め、バックスラッシュを見つけたら次の文字をエスケープとして処理します。
-
-字句解析は構文解析から分離しておくべきです。next_token()を呼ぶたびに次のトークンを返すプル型のインターフェースが標準的です。コメントのスキップも字句解析レベルで行います。//から行末まで、/*から*/まではトークンとして返さずに読み飛ばします。`,
-      code:`Token lex_next(const char **src, int *line) {
-    // 空白・コメントをスキップ
-    while (**src) {
-        if (isspace(**src)) {
-            if (**src == '\\n') (*line)++;
-            (*src)++; continue;
-        }
-        if ((*src)[0]=='/' && (*src)[1]=='/') {
-            while (**src && **src != '\\n') (*src)++;
-            continue;
-        }
-        break;
-    }
-    if (!**src) return (Token){TK_EOF, "", *line};
-
-    Token tok = {.line = *line};
-
-    // 整数リテラル
-    if (isdigit(**src)) {
-        tok.kind = TK_INT;
-        char *end;
-        long v = strtol(*src, &end, 0);
-        snprintf(tok.value, sizeof(tok.value), "%ld", v);
-        *src = end;
-        return tok;
-    }
-
-    // 識別子・キーワード
-    if (isalpha(**src) || **src == '_') {
-        int i = 0;
-        while (isalnum(**src) || **src == '_')
-            tok.value[i++] = *(*src)++;
-        tok.value[i] = '\\0';
-        tok.kind = is_keyword(tok.value) ? TK_KEYWORD : TK_IDENT;
-        return tok;
-    }
-
-    // 2文字演算子
-    if ((*src)[0]=='=' && (*src)[1]=='=') {
-        *src += 2; tok.kind = TK_EQ; strcpy(tok.value,"=="); return tok;
-    }
-    // 1文字トークン
-    tok.value[0] = *(*src)++; tok.value[1] = '\\0';
-    switch (tok.value[0]) {
-        case '+': tok.kind = TK_PLUS; break;
-        case '-': tok.kind = TK_MINUS; break;
-        case ';': tok.kind = TK_SEMI; break;
-        default:  tok.kind = TK_EOF; break;
-    }
-    return tok;
-}`,
+     {title:"Lexerの実装：ポインタ操作と先読み", body:"字句解析器の実装はポインタ操作の集積です。入力文字列をconst char *srcとして受け取り、srcを読み進めながらトークンを生成します。strtol()やstrtod()などのCスタンダードライブラリ関数を活用すると数値リテラルの解析が楽になります。\n\n文字列リテラルの処理はエスケープシーケンス（\n・\t・\\・\"）の処理が必要で、字句解析の中でも複雑な部分です。終端の\"を見つけるまで読み進め、バックスラッシュを見つけたら次の文字をエスケープとして処理します。\n\n字句解析は構文解析から分離しておくべきです。next_token()を呼ぶたびに次のトークンを返すプル型のインターフェースが標準的です。コメントのスキップも字句解析レベルで行います。//から行末まで、/*から*/まではトークンとして返さずに読み飛ばします。",
+      code:"Token lex_next(const char **src, int *line) {\n    // 空白・コメントをスキップ\n    while (**src) {\n        if (isspace(**src)) {\n            if (**src == '\\n') (*line)++;\n            (*src)++; continue;\n        }\n        if ((*src)[0]=='/' && (*src)[1]=='/') {\n            while (**src && **src != '\\n') (*src)++;\n            continue;\n        }\n        break;\n    }\n    if (!**src) return (Token){TK_EOF, \"\", *line};\n\n    Token tok = {.line = *line};\n\n    // 整数リテラル\n    if (isdigit(**src)) {\n        tok.kind = TK_INT;\n        char *end;\n        long v = strtol(*src, &end, 0);\n        snprintf(tok.value, sizeof(tok.value), \"%ld\", v);\n        *src = end;\n        return tok;\n    }\n\n    // 識別子・キーワード\n    if (isalpha(**src) || **src == '_') {\n        int i = 0;\n        while (isalnum(**src) || **src == '_')\n            tok.value[i++] = *(*src)++;\n        tok.value[i] = '\\0';\n        tok.kind = is_keyword(tok.value) ? TK_KEYWORD : TK_IDENT;\n        return tok;\n    }\n\n    // 2文字演算子\n    if ((*src)[0]=='=' && (*src)[1]=='=') {\n        *src += 2; tok.kind = TK_EQ; strcpy(tok.value,\"==\"); return tok;\n    }\n    // 1文字トークン\n    tok.value[0] = *(*src)++; tok.value[1] = '\\0';\n    switch (tok.value[0]) {\n        case '+': tok.kind = TK_PLUS; break;\n        case '-': tok.kind = TK_MINUS; break;\n        case ';': tok.kind = TK_SEMI; break;\n        default:  tok.kind = TK_EOF; break;\n    }\n    return tok;\n}",
       afterCode:"strtol()の第3引数に0を渡すと、0xプレフィックスで16進数、0プレフィックスで8進数を自動判別します。Pythonのint('0xff', 0)と同じ挙動です。"}
    ]},
   {id:"ch2", num:2, title:"構文解析器（Parser）とAST", est:"70分",
    goal:"再帰下降法でCの算術式・比較式・if文・while文を解析し、ASTを生成してevalまたはコード生成に渡せる形にできる。",
    sections:[
-     {title:"再帰下降法とBNF文法", body:`再帰下降法はBNF（バッカス・ナウア記法）の各非終端記号を1つの関数として実装する構文解析手法です。expr → term ('+' term)*のような文法規則を、parse_expr関数として直接実装します。Pythonのrecipaの再帰的な定義と同じ考え方ですが、Cの関数ポインタと相互再帰を使います。
-
-演算子の優先順位は文法の階層で表現します。加減算より乗除算が先に評価されるためには、expr（加減算レベル）→ term（乗除算レベル）→ factor（括弧・リテラル）のように階層化します。各レベルの関数が低優先度の関数を呼び出し、高優先度の関数から始まって末端に達します。
-
-左再帰（expr → expr '+' term）はCの再帰呼び出しで直接表現できません。左再帰はwhileループに変換します（BNFのExtended BNF、EBNFで言えばexpr → term ('+' term)*）。これはほぼ全ての再帰下降パーサーで使うテクニックです。`,
-      code:`// BNF:
-// expr   → term (('+'|'-') term)*
-// term   → factor (('*'|'/') factor)*
-// factor → NUMBER | '(' expr ')' | IDENT
-
-#include <stdlib.h>
-#include <stdio.h>
-
-typedef enum { ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM, ND_VAR } NodeKind;
-typedef struct Node {
-    NodeKind kind;
-    struct Node *left, *right;
-    int ival;
-    char name[64];
-} Node;
-
-static Token current;
-static const char *src_ptr;
-static int line = 1;
-
-void advance(void) { current = lex_next(&src_ptr, &line); }
-int consume(TokenKind k) {
-    if (current.kind == k) { advance(); return 1; }
-    return 0;
-}
-
-Node *parse_factor(void) {
-    if (current.kind == TK_INT) {
-        Node *n = calloc(1, sizeof(Node));
-        n->kind = ND_NUM;
-        n->ival = atoi(current.value);
-        advance();
-        return n;
-    }
-    if (consume(TK_LPAREN)) {
-        Node *n = parse_expr();
-        if (!consume(TK_RPAREN))
-            fprintf(stderr, "行%d: ')' がありません\\n", line);
-        return n;
-    }
-    fprintf(stderr, "行%d: 式が期待されます\\n", line);
-    return NULL;
-}`,
+     {title:"再帰下降法とBNF文法", body:"再帰下降法はBNF（バッカス・ナウア記法）の各非終端記号を1つの関数として実装する構文解析手法です。expr → term ('+' term)*のような文法規則を、parse_expr関数として直接実装します。Pythonのrecipaの再帰的な定義と同じ考え方ですが、Cの関数ポインタと相互再帰を使います。\n\n演算子の優先順位は文法の階層で表現します。加減算より乗除算が先に評価されるためには、expr（加減算レベル）→ term（乗除算レベル）→ factor（括弧・リテラル）のように階層化します。各レベルの関数が低優先度の関数を呼び出し、高優先度の関数から始まって末端に達します。\n\n左再帰（expr → expr '+' term）はCの再帰呼び出しで直接表現できません。左再帰はwhileループに変換します（BNFのExtended BNF、EBNFで言えばexpr → term ('+' term)*）。これはほぼ全ての再帰下降パーサーで使うテクニックです。",
+      code:"// BNF:\n// expr   → term (('+'|'-') term)*\n// term   → factor (('*'|'/') factor)*\n// factor → NUMBER | '(' expr ')' | IDENT\n\n#include <stdlib.h>\n#include <stdio.h>\n\ntypedef enum { ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM, ND_VAR } NodeKind;\ntypedef struct Node {\n    NodeKind kind;\n    struct Node *left, *right;\n    int ival;\n    char name[64];\n} Node;\n\nstatic Token current;\nstatic const char *src_ptr;\nstatic int line = 1;\n\nvoid advance(void) { current = lex_next(&src_ptr, &line); }\nint consume(TokenKind k) {\n    if (current.kind == k) { advance(); return 1; }\n    return 0;\n}\n\nNode *parse_factor(void) {\n    if (current.kind == TK_INT) {\n        Node *n = calloc(1, sizeof(Node));\n        n->kind = ND_NUM;\n        n->ival = atoi(current.value);\n        advance();\n        return n;\n    }\n    if (consume(TK_LPAREN)) {\n        Node *n = parse_expr();\n        if (!consume(TK_RPAREN))\n            fprintf(stderr, \"行%d: ')' がありません\\n\", line);\n        return n;\n    }\n    fprintf(stderr, \"行%d: 式が期待されます\\n\", line);\n    return NULL;\n}",
       afterCode:"calloc(1, sizeof(Node))はmallocと異なり、全バイトを0に初期化します。NULLポインタのデフォルト値として安全で、初期化忘れによるバグを防ぎます。"},
-     {title:"ASTの評価とコード生成", body:`ASTを再帰的に評価（eval）することで、インタプリタを実装できます。ND_NUMノードはival値を返し、ND_ADDノードは左右のevalの和を返します。Pythonのast.literal_eval()と同じ原理ですが、自分で実装します。
-
-コード生成はASTを受け取り、ターゲットアーキテクチャの命令列を出力します。シンプルなスタックマシン向けのコード生成ならND_NUMで「定数をプッシュ」、ND_ADDで「2値をポップして加算してプッシュ」という命令を出力します。最終的にCのprintf("push %d\\n", n->ival)のような形で擬似アセンブリを出力します。
-
-変数スコープは環境（Environment）として実装します。名前から値へのマッピングをハッシュテーブルや連結リストで管理し、ブロックスコープのネストに対応するには親環境へのポインタを持つチェーン構造にします。PythonのchainMapと同じ考え方です。`,
-      code:`int eval(Node *node) {
-    if (!node) return 0;
-    switch (node->kind) {
-        case ND_NUM: return node->ival;
-        case ND_ADD: return eval(node->left) + eval(node->right);
-        case ND_SUB: return eval(node->left) - eval(node->right);
-        case ND_MUL: return eval(node->left) * eval(node->right);
-        case ND_DIV: {
-            int r = eval(node->right);
-            if (r == 0) { fprintf(stderr, "ゼロ除算\\n"); return 0; }
-            return eval(node->left) / r;
-        }
-        default:
-            fprintf(stderr, "不明なノード種別: %d\\n", node->kind);
-            return 0;
-    }
-}
-
-// スタックマシン向けコード生成
-void codegen(Node *node) {
-    if (node->kind == ND_NUM) {
-        printf("  push %d\\n", node->ival);
-        return;
-    }
-    codegen(node->left);
-    codegen(node->right);
-    switch (node->kind) {
-        case ND_ADD: printf("  add\\n"); break;
-        case ND_SUB: printf("  sub\\n"); break;
-        case ND_MUL: printf("  mul\\n"); break;
-        case ND_DIV: printf("  div\\n"); break;
-        default: break;
-    }
-}`,
+     {title:"ASTの評価とコード生成", body:"ASTを再帰的に評価（eval）することで、インタプリタを実装できます。ND_NUMノードはival値を返し、ND_ADDノードは左右のevalの和を返します。Pythonのast.literal_eval()と同じ原理ですが、自分で実装します。\n\nコード生成はASTを受け取り、ターゲットアーキテクチャの命令列を出力します。シンプルなスタックマシン向けのコード生成ならND_NUMで「定数をプッシュ」、ND_ADDで「2値をポップして加算してプッシュ」という命令を出力します。最終的にCのprintf(\"push %d\\n\", n->ival)のような形で擬似アセンブリを出力します。\n\n変数スコープは環境（Environment）として実装します。名前から値へのマッピングをハッシュテーブルや連結リストで管理し、ブロックスコープのネストに対応するには親環境へのポインタを持つチェーン構造にします。PythonのchainMapと同じ考え方です。",
+      code:"int eval(Node *node) {\n    if (!node) return 0;\n    switch (node->kind) {\n        case ND_NUM: return node->ival;\n        case ND_ADD: return eval(node->left) + eval(node->right);\n        case ND_SUB: return eval(node->left) - eval(node->right);\n        case ND_MUL: return eval(node->left) * eval(node->right);\n        case ND_DIV: {\n            int r = eval(node->right);\n            if (r == 0) { fprintf(stderr, \"ゼロ除算\\n\"); return 0; }\n            return eval(node->left) / r;\n        }\n        default:\n            fprintf(stderr, \"不明なノード種別: %d\\n\", node->kind);\n            return 0;\n    }\n}\n\n// スタックマシン向けコード生成\nvoid codegen(Node *node) {\n    if (node->kind == ND_NUM) {\n        printf(\"  push %d\\n\", node->ival);\n        return;\n    }\n    codegen(node->left);\n    codegen(node->right);\n    switch (node->kind) {\n        case ND_ADD: printf(\"  add\\n\"); break;\n        case ND_SUB: printf(\"  sub\\n\"); break;\n        case ND_MUL: printf(\"  mul\\n\"); break;\n        case ND_DIV: printf(\"  div\\n\"); break;\n        default: break;\n    }\n}",
       afterCode:"ASTの解放（メモリ管理）を忘れずに実装しましょう。free_node(node)を再帰的に呼んで左→右→自身の順に解放します。Valgrindでメモリリークを確認するのが定番です。"}
    ]},
   {id:"ch3", num:3, title:"Linuxカーネルモジュール開発", est:"65分",
    goal:"Linuxカーネルモジュールのビルド・ロード・アンロードができ、/proc・/sysfsのインターフェースを実装してユーザー空間と通信できる。",
    sections:[
-     {title:"カーネルモジュールの基礎", body:`Linuxカーネルモジュールはカーネルに動的にロードできるコードです。デバイスドライバ・ファイルシステム・ネットワークプロトコルなどの機能を、カーネルを再ビルドせずに追加できます。Pythonのdlopen/dlopenに相当するカーネルレベルの動的ロードです。
-
-カーネルモジュールはユーザー空間プログラムと大きく異なります。malloc/freeの代わりにkmalloc/kfree、printfの代わりにprintk/pr_infoを使います。例外処理（try/catch）がなく、クラッシュすればカーネルパニックで全システムが停止します。Pythonのようなガーベジコレクションがなく、メモリ管理は完全に手動です。
-
-MODULE_LICENSE("GPL")は必須で、GPLライセンスでないモジュールはGPLのみで利用可能なカーネルシンボルを使えません。__init・__exit属性はロード時・アンロード時に使われるコードをカーネルが特定のメモリセクションに配置し、初期化後に解放できるようにします。`,
-      code:`/* hello_module.c */
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/slab.h>  /* kmalloc/kfree */
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Your Name");
-MODULE_DESCRIPTION("Hello kernel module");
-MODULE_VERSION("1.0");
-
-static char *name = "World";
-module_param(name, charp, 0444);  /* insmodで--name=Xxxとして渡せる */
-MODULE_PARM_DESC(name, "名前 (デフォルト: World)");
-
-static int __init hello_init(void) {
-    pr_info("Hello, %s! (kernel module loaded)\\n", name);
-    /* カーネルメモリ確保 */
-    char *buf = kmalloc(64, GFP_KERNEL);
-    if (!buf) return -ENOMEM;
-    snprintf(buf, 64, "Hello from %s", name);
-    pr_info("buf: %s\\n", buf);
-    kfree(buf);
-    return 0;
-}
-
-static void __exit hello_exit(void) {
-    pr_info("Goodbye, %s!\\n", name);
-}
-
-module_init(hello_init);
-module_exit(hello_exit);`,
+     {title:"カーネルモジュールの基礎", body:"Linuxカーネルモジュールはカーネルに動的にロードできるコードです。デバイスドライバ・ファイルシステム・ネットワークプロトコルなどの機能を、カーネルを再ビルドせずに追加できます。Pythonのdlopen/dlopenに相当するカーネルレベルの動的ロードです。\n\nカーネルモジュールはユーザー空間プログラムと大きく異なります。malloc/freeの代わりにkmalloc/kfree、printfの代わりにprintk/pr_infoを使います。例外処理（try/catch）がなく、クラッシュすればカーネルパニックで全システムが停止します。Pythonのようなガーベジコレクションがなく、メモリ管理は完全に手動です。\n\nMODULE_LICENSE(\"GPL\")は必須で、GPLライセンスでないモジュールはGPLのみで利用可能なカーネルシンボルを使えません。__init・__exit属性はロード時・アンロード時に使われるコードをカーネルが特定のメモリセクションに配置し、初期化後に解放できるようにします。",
+      code:"/* hello_module.c */\n#include <linux/module.h>\n#include <linux/kernel.h>\n#include <linux/init.h>\n#include <linux/slab.h>  /* kmalloc/kfree */\n\nMODULE_LICENSE(\"GPL\");\nMODULE_AUTHOR(\"Your Name\");\nMODULE_DESCRIPTION(\"Hello kernel module\");\nMODULE_VERSION(\"1.0\");\n\nstatic char *name = \"World\";\nmodule_param(name, charp, 0444);  /* insmodで--name=Xxxとして渡せる */\nMODULE_PARM_DESC(name, \"名前 (デフォルト: World)\");\n\nstatic int __init hello_init(void) {\n    pr_info(\"Hello, %s! (kernel module loaded)\\n\", name);\n    /* カーネルメモリ確保 */\n    char *buf = kmalloc(64, GFP_KERNEL);\n    if (!buf) return -ENOMEM;\n    snprintf(buf, 64, \"Hello from %s\", name);\n    pr_info(\"buf: %s\\n\", buf);\n    kfree(buf);\n    return 0;\n}\n\nstatic void __exit hello_exit(void) {\n    pr_info(\"Goodbye, %s!\\n\", name);\n}\n\nmodule_init(hello_init);\nmodule_exit(hello_exit);",
       afterCode:"GFP_KERNELはスリープ可能なメモリ確保フラグです。割り込みコンテキストやスピンロック保持中にはGFP_ATOMICを使います（スリープ不可）。メモリが確保できない場合は必ず-ENOMEMを返してください。"},
-     {title:"/proc・/sysfsインターフェース", body:`カーネルモジュールとユーザー空間の通信には/proc・/sysfs・ioctl・netlink等の方法があります。/procはテキストベースの情報交換に、/sysfsはデバイス属性の読み書きに使います。proc_createとseq_fileを使うと読みやすいprocエントリが作れます。
-
-seq_file APIはカーネルの大量データを分割してユーザー空間に送るための仕組みです。seq_printfでバッファに書き込むと、readシステムコールが何度呼ばれても正しくページングされます。単純な1回読みはsingle_open()・single_release()で簡単に実装できます。
-
-/sysfsエントリはKOBJECTを通じてオブジェクトと関連付けられます。sysfs_create_file()でデバイスの属性ファイルを作成し、show()/store()関数で読み書きを制御します。Pythonでいえばプロパティのゲッター・セッターに相当します。`,
-      code:`#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
-#include <linux/uaccess.h>
-
-static unsigned long access_count = 0;
-static char message[256] = "Hello from kernel!";
-
-/* seq_file: 読み取りハンドラ */
-static int info_show(struct seq_file *m, void *v) {
-    access_count++;
-    seq_printf(m, "Message: %s\\n", message);
-    seq_printf(m, "Access count: %lu\\n", access_count);
-    seq_printf(m, "Kernel version: %s\\n", UTS_RELEASE);
-    return 0;
-}
-
-static int info_open(struct inode *inode, struct file *file) {
-    return single_open(file, info_show, NULL);
-}
-
-static const struct proc_ops info_fops = {
-    .proc_open    = info_open,
-    .proc_read    = seq_read,
-    .proc_lseek   = seq_lseek,
-    .proc_release = single_release,
-};
-
-static int __init mod_init(void) {
-    /* /proc/hello_info を作成 */
-    if (!proc_create("hello_info", 0444, NULL, &info_fops)) {
-        return -ENOMEM;
-    }
-    pr_info("procfs entry created\\n");
-    return 0;
-}
-
-static void __exit mod_exit(void) {
-    remove_proc_entry("hello_info", NULL);
-    pr_info("procfs entry removed\\n");
-}`,
+     {title:"/proc・/sysfsインターフェース", body:"カーネルモジュールとユーザー空間の通信には/proc・/sysfs・ioctl・netlink等の方法があります。/procはテキストベースの情報交換に、/sysfsはデバイス属性の読み書きに使います。proc_createとseq_fileを使うと読みやすいprocエントリが作れます。\n\nseq_file APIはカーネルの大量データを分割してユーザー空間に送るための仕組みです。seq_printfでバッファに書き込むと、readシステムコールが何度呼ばれても正しくページングされます。単純な1回読みはsingle_open()・single_release()で簡単に実装できます。\n\n/sysfsエントリはKOBJECTを通じてオブジェクトと関連付けられます。sysfs_create_file()でデバイスの属性ファイルを作成し、show()/store()関数で読み書きを制御します。Pythonでいえばプロパティのゲッター・セッターに相当します。",
+      code:"#include <linux/proc_fs.h>\n#include <linux/seq_file.h>\n#include <linux/uaccess.h>\n\nstatic unsigned long access_count = 0;\nstatic char message[256] = \"Hello from kernel!\";\n\n/* seq_file: 読み取りハンドラ */\nstatic int info_show(struct seq_file *m, void *v) {\n    access_count++;\n    seq_printf(m, \"Message: %s\\n\", message);\n    seq_printf(m, \"Access count: %lu\\n\", access_count);\n    seq_printf(m, \"Kernel version: %s\\n\", UTS_RELEASE);\n    return 0;\n}\n\nstatic int info_open(struct inode *inode, struct file *file) {\n    return single_open(file, info_show, NULL);\n}\n\nstatic const struct proc_ops info_fops = {\n    .proc_open    = info_open,\n    .proc_read    = seq_read,\n    .proc_lseek   = seq_lseek,\n    .proc_release = single_release,\n};\n\nstatic int __init mod_init(void) {\n    /* /proc/hello_info を作成 */\n    if (!proc_create(\"hello_info\", 0444, NULL, &info_fops)) {\n        return -ENOMEM;\n    }\n    pr_info(\"procfs entry created\\n\");\n    return 0;\n}\n\nstatic void __exit mod_exit(void) {\n    remove_proc_entry(\"hello_info\", NULL);\n    pr_info(\"procfs entry removed\\n\");\n}",
       afterCode:"proc_opsはLinux 5.6以降の新しいAPIです。古いカーネルでは struct file_operations を使います。カーネルバージョンの確認はLINUX_VERSION_CODEマクロとKERNEL_VERSION()マクロを使います。"}
    ]},
   {id:"ch4", num:4, title:"ガーベジコレクタ実装", est:"70分",
    goal:"Mark-and-SweepガーベジコレクタをCで実装し、ルートセットからの到達可能性でメモリを管理できる。停止世界（Stop-the-World）GCの仕組みを説明できる。",
    sections:[
-     {title:"GCの設計とオブジェクトヘッダ", body:`ガーベジコレクタ（GC）は不要になったメモリを自動的に解放する仕組みです。Pythonの参照カウント方式（CPython）とは異なり、ここでは到達可能性（Reachability）に基づくMark-and-Sweep方式を実装します。「ルートセット（スタック上のポインタ・グローバル変数）から到達できないオブジェクト」を解放します。
-
-全てのGC管理オブジェクトは共通のヘッダを持ちます。markedフラグ（マーク済みか）・sizeフィールド（オブジェクトサイズ）・nextポインタ（全オブジェクトの連結リスト）が最低限必要です。GCはこの連結リスト（ヒープリスト）を走査してスウィープします。
-
-GC_malloc()はmallocをラップして確保したオブジェクトをヒープリストに登録します。GCがないC言語でmalloc/freeを管理するのとは全く異なり、freeを呼ぶ責任がなくなります。代わりにGCが自動的に不要なメモリを解放します。`,
-      code:`#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
-
-#define MAX_ROOTS 256
-#define MAX_REFS  8
-
-typedef struct Object {
-    bool marked;
-    size_t size;
-    struct Object *next; // ヒープ連結リスト
-    int num_refs;
-    struct Object *refs[MAX_REFS]; // 子オブジェクトへのポインタ
-    char data[]; // 可変長データ
-} Object;
-
-static Object *heap_head = NULL;
-static Object *roots[MAX_ROOTS];
-static int num_roots = 0;
-
-Object *gc_alloc(size_t data_size) {
-    Object *obj = malloc(sizeof(Object) + data_size);
-    if (!obj) return NULL;
-    memset(obj, 0, sizeof(Object));
-    obj->size = data_size;
-    obj->next = heap_head;
-    heap_head = obj;
-    return obj;
-}
-
-void gc_add_root(Object *obj) {
-    if (num_roots < MAX_ROOTS)
-        roots[num_roots++] = obj;
-}
-
-void gc_add_ref(Object *parent, Object *child) {
-    if (parent->num_refs < MAX_REFS)
-        parent->refs[parent->num_refs++] = child;
-}`,
+     {title:"GCの設計とオブジェクトヘッダ", body:"ガーベジコレクタ（GC）は不要になったメモリを自動的に解放する仕組みです。Pythonの参照カウント方式（CPython）とは異なり、ここでは到達可能性（Reachability）に基づくMark-and-Sweep方式を実装します。「ルートセット（スタック上のポインタ・グローバル変数）から到達できないオブジェクト」を解放します。\n\n全てのGC管理オブジェクトは共通のヘッダを持ちます。markedフラグ（マーク済みか）・sizeフィールド（オブジェクトサイズ）・nextポインタ（全オブジェクトの連結リスト）が最低限必要です。GCはこの連結リスト（ヒープリスト）を走査してスウィープします。\n\nGC_malloc()はmallocをラップして確保したオブジェクトをヒープリストに登録します。GCがないC言語でmalloc/freeを管理するのとは全く異なり、freeを呼ぶ責任がなくなります。代わりにGCが自動的に不要なメモリを解放します。",
+      code:"#include <stdlib.h>\n#include <stdio.h>\n#include <stdbool.h>\n#include <string.h>\n\n#define MAX_ROOTS 256\n#define MAX_REFS  8\n\ntypedef struct Object {\n    bool marked;\n    size_t size;\n    struct Object *next; // ヒープ連結リスト\n    int num_refs;\n    struct Object *refs[MAX_REFS]; // 子オブジェクトへのポインタ\n    char data[]; // 可変長データ\n} Object;\n\nstatic Object *heap_head = NULL;\nstatic Object *roots[MAX_ROOTS];\nstatic int num_roots = 0;\n\nObject *gc_alloc(size_t data_size) {\n    Object *obj = malloc(sizeof(Object) + data_size);\n    if (!obj) return NULL;\n    memset(obj, 0, sizeof(Object));\n    obj->size = data_size;\n    obj->next = heap_head;\n    heap_head = obj;\n    return obj;\n}\n\nvoid gc_add_root(Object *obj) {\n    if (num_roots < MAX_ROOTS)\n        roots[num_roots++] = obj;\n}\n\nvoid gc_add_ref(Object *parent, Object *child) {\n    if (parent->num_refs < MAX_REFS)\n        parent->refs[parent->num_refs++] = child;\n}",
       afterCode:"Object構造体のdata[]は柔軟配列メンバー（C99以降）です。sizeof(Object) + data_sizeのメモリを確保することで、ヘッダとデータを隣接したメモリに配置でき、キャッシュ効率が良くなります。"},
-     {title:"Mark・Sweepの実装", body:`Markフェーズはルートセットから出発してグラフを深さ優先探索し、到達したオブジェクトにmarkedフラグを立てます。既にマーク済みのオブジェクトを再訪しないことが重要で、循環参照があってもこのチェックがあれば無限ループになりません。Pythonのdfs関数と全く同じアルゴリズムです。
-
-Sweepフェーズはヒープリストを先頭から末尾まで走査します。markedでないオブジェクトはアクセス不能（ゴミ）なのでfreeします。markedなオブジェクトはmarkedをfalseにリセットして次のGCサイクルに備えます。連結リストの「前のノードのnextを変える」操作はダブルポインタ（**curr）で実装します。
-
-Stop-the-WorldはGC実行中にユーザープログラムの実行を停止することです。マーク中に別スレッドがオブジェクトグラフを変更するとマーク結果が正しくなくなるためです。Pythonのstop-the-worldもCPythonのGILと組み合わせてこの問題を解決しています。`,
-      code:`/* Mark: ルートセットからDFS */
-static void mark(Object *obj) {
-    if (!obj || obj->marked) return;
-    obj->marked = true;
-    for (int i = 0; i < obj->num_refs; i++)
-        mark(obj->refs[i]);
-}
-
-/* Sweep: マークされていないオブジェクトを解放 */
-static void sweep(void) {
-    Object **curr = &heap_head;
-    int freed = 0, kept = 0;
-    while (*curr) {
-        Object *obj = *curr;
-        if (!obj->marked) {
-            *curr = obj->next; // リストから除去
-            free(obj);
-            freed++;
-        } else {
-            obj->marked = false; // フラグをリセット
-            curr = &obj->next;
-            kept++;
-        }
-    }
-    printf("GC: freed=%d kept=%d\\n", freed, kept);
-}
-
-void gc_collect(void) {
-    /* Mark phase */
-    for (int i = 0; i < num_roots; i++)
-        mark(roots[i]);
-    /* Sweep phase */
-    sweep();
-}`,
+     {title:"Mark・Sweepの実装", body:"Markフェーズはルートセットから出発してグラフを深さ優先探索し、到達したオブジェクトにmarkedフラグを立てます。既にマーク済みのオブジェクトを再訪しないことが重要で、循環参照があってもこのチェックがあれば無限ループになりません。Pythonのdfs関数と全く同じアルゴリズムです。\n\nSweepフェーズはヒープリストを先頭から末尾まで走査します。markedでないオブジェクトはアクセス不能（ゴミ）なのでfreeします。markedなオブジェクトはmarkedをfalseにリセットして次のGCサイクルに備えます。連結リストの「前のノードのnextを変える」操作はダブルポインタ（**curr）で実装します。\n\nStop-the-WorldはGC実行中にユーザープログラムの実行を停止することです。マーク中に別スレッドがオブジェクトグラフを変更するとマーク結果が正しくなくなるためです。Pythonのstop-the-worldもCPythonのGILと組み合わせてこの問題を解決しています。",
+      code:"/* Mark: ルートセットからDFS */\nstatic void mark(Object *obj) {\n    if (!obj || obj->marked) return;\n    obj->marked = true;\n    for (int i = 0; i < obj->num_refs; i++)\n        mark(obj->refs[i]);\n}\n\n/* Sweep: マークされていないオブジェクトを解放 */\nstatic void sweep(void) {\n    Object **curr = &heap_head;\n    int freed = 0, kept = 0;\n    while (*curr) {\n        Object *obj = *curr;\n        if (!obj->marked) {\n            *curr = obj->next; // リストから除去\n            free(obj);\n            freed++;\n        } else {\n            obj->marked = false; // フラグをリセット\n            curr = &obj->next;\n            kept++;\n        }\n    }\n    printf(\"GC: freed=%d kept=%d\\n\", freed, kept);\n}\n\nvoid gc_collect(void) {\n    /* Mark phase */\n    for (int i = 0; i < num_roots; i++)\n        mark(roots[i]);\n    /* Sweep phase */\n    sweep();\n}",
       afterCode:"このGCは深さ優先再帰でMarkしているため、深いオブジェクトグラフではスタックオーバーフローが起きます。本番品質のGCでは自前のスタックかキューを使って非再帰的にMarkします。世代別GC・インクリメンタルGCはさらに高度な技術です。"}
    ]},
   {id:"ch5", num:5, title:"ELFバイナリ解析", est:"65分",
    goal:"ELFファイルフォーマットを理解し、Cプログラムでヘッダ・セクション・シンボルテーブルを解析して表示できる。readelfコマンドの基本機能を再現できる。",
    sections:[
-     {title:"ELFフォーマットの構造", body:`ELF（Executable and Linkable Format）はLinux/Unixの標準実行形式・オブジェクトファイル形式です。Windows の PEフォーマット、macOSのMach-Oフォーマットに相当します。Pythonのpickleのように、バイナリ形式でデータを構造化して格納します。
-
-ELFファイルはELFヘッダ・プログラムヘッダテーブル（実行時用）・セクションヘッダテーブル（リンク時用）・セクションデータから構成されます。ELFヘッダの先頭16バイト（e_ident）はマジックナンバー（0x7f ELF）・クラス（32/64ビット）・エンディアン・バージョンを含みます。
-
-<elf.h>ヘッダにはElf64_Ehdr（ELFヘッダ）・Elf64_Shdr（セクションヘッダ）・Elf64_Sym（シンボル）などの構造体が定義されています。Cの構造体が実際のバイナリ配置を直接表現しているため、正確なオフセット計算なしにバイナリを解釈できます。これはPythonのstructモジュールで手動フォーマットを書くより格段に楽です。`,
-      code:`#include <stdio.h>
-#include <stdlib.h>
-#include <elf.h>
-
-void print_elf_info(const char *filename) {
-    FILE *f = fopen(filename, "rb");
-    if (!f) { perror(filename); return; }
-
-    Elf64_Ehdr ehdr;
-    if (fread(&ehdr, sizeof(ehdr), 1, f) != 1) {
-        fprintf(stderr, "ELFヘッダ読み込みエラー\\n");
-        fclose(f); return;
-    }
-
-    /* マジックナンバー確認 */
-    if (ehdr.e_ident[EI_MAG0] != ELFMAG0 ||
-        ehdr.e_ident[EI_MAG1] != ELFMAG1) {
-        fprintf(stderr, "ELFファイルではありません\\n");
-        fclose(f); return;
-    }
-
-    static const char *types[] = {
-        "NONE", "REL", "EXEC", "DYN", "CORE"
-    };
-    printf("ELFタイプ  : %s\\n",
-           ehdr.e_type < 5 ? types[ehdr.e_type] : "OTHER");
-    printf("アーキテクチャ: %u\\n", ehdr.e_machine);
-    printf("エントリポイント: 0x%lx\\n", ehdr.e_entry);
-    printf("セクション数: %u\\n", ehdr.e_shnum);
-    printf("プログラムヘッダ数: %u\\n", ehdr.e_phnum);
-    fclose(f);
-}`,
+     {title:"ELFフォーマットの構造", body:"ELF（Executable and Linkable Format）はLinux/Unixの標準実行形式・オブジェクトファイル形式です。Windows の PEフォーマット、macOSのMach-Oフォーマットに相当します。Pythonのpickleのように、バイナリ形式でデータを構造化して格納します。\n\nELFファイルはELFヘッダ・プログラムヘッダテーブル（実行時用）・セクションヘッダテーブル（リンク時用）・セクションデータから構成されます。ELFヘッダの先頭16バイト（e_ident）はマジックナンバー（0x7f ELF）・クラス（32/64ビット）・エンディアン・バージョンを含みます。\n\n<elf.h>ヘッダにはElf64_Ehdr（ELFヘッダ）・Elf64_Shdr（セクションヘッダ）・Elf64_Sym（シンボル）などの構造体が定義されています。Cの構造体が実際のバイナリ配置を直接表現しているため、正確なオフセット計算なしにバイナリを解釈できます。これはPythonのstructモジュールで手動フォーマットを書くより格段に楽です。",
+      code:"#include <stdio.h>\n#include <stdlib.h>\n#include <elf.h>\n\nvoid print_elf_info(const char *filename) {\n    FILE *f = fopen(filename, \"rb\");\n    if (!f) { perror(filename); return; }\n\n    Elf64_Ehdr ehdr;\n    if (fread(&ehdr, sizeof(ehdr), 1, f) != 1) {\n        fprintf(stderr, \"ELFヘッダ読み込みエラー\\n\");\n        fclose(f); return;\n    }\n\n    /* マジックナンバー確認 */\n    if (ehdr.e_ident[EI_MAG0] != ELFMAG0 ||\n        ehdr.e_ident[EI_MAG1] != ELFMAG1) {\n        fprintf(stderr, \"ELFファイルではありません\\n\");\n        fclose(f); return;\n    }\n\n    static const char *types[] = {\n        \"NONE\", \"REL\", \"EXEC\", \"DYN\", \"CORE\"\n    };\n    printf(\"ELFタイプ  : %s\\n\",\n           ehdr.e_type < 5 ? types[ehdr.e_type] : \"OTHER\");\n    printf(\"アーキテクチャ: %u\\n\", ehdr.e_machine);\n    printf(\"エントリポイント: 0x%lx\\n\", ehdr.e_entry);\n    printf(\"セクション数: %u\\n\", ehdr.e_shnum);\n    printf(\"プログラムヘッダ数: %u\\n\", ehdr.e_phnum);\n    fclose(f);\n}",
       afterCode:"e_machine値は0x3E（62）がx86-64、0xB7がAArch64（ARM64）、0xF3がRISC-Vです。/usr/include/elf.hのEM_*マクロで定義されています。"},
-     {title:"シンボルテーブルの解析", body:`シンボルテーブル（.symtabセクション）は関数名・グローバル変数名とそのアドレスのマッピングを格納します。デバッガがブレークポイントを関数名で設定できるのもこのテーブルがあるためです。Pythonのinspect.getmembers()が返す情報に相当します。
-
-各シンボルはElf64_Sym構造体で表現されます。st_nameはシンボル名文字列テーブル（.strtab）へのオフセット、st_valueはアドレス、st_sizeはサイズ、st_infoはシンボルの種類（関数・変数・ファイル）とバインディング（ローカル・グローバル・弱い）を格納します。
-
-動的リンクに使われる.dynsymは.symtabのサブセットで、共有ライブラリからエクスポートされるシンボルのみ含みます。nm、objdump -tコマンドはシンボルテーブルを表示するツールで、自分で実装してみることでELFの理解が深まります。`,
-      code:`void print_symbols(const char *filename) {
-    FILE *f = fopen(filename, "rb");
-    if (!f) { perror(filename); return; }
-
-    Elf64_Ehdr ehdr;
-    fread(&ehdr, sizeof(ehdr), 1, f);
-
-    /* セクションヘッダテーブルを読み込む */
-    Elf64_Shdr *shdrs = malloc(ehdr.e_shnum * sizeof(Elf64_Shdr));
-    fseek(f, ehdr.e_shoff, SEEK_SET);
-    fread(shdrs, sizeof(Elf64_Shdr), ehdr.e_shnum, f);
-
-    /* セクション名テーブル (shstrtab) */
-    char *shstrtab = malloc(shdrs[ehdr.e_shstrndx].sh_size);
-    fseek(f, shdrs[ehdr.e_shstrndx].sh_offset, SEEK_SET);
-    fread(shstrtab, shdrs[ehdr.e_shstrndx].sh_size, 1, f);
-
-    /* .symtab を探してシンボルを表示 */
-    for (int i = 0; i < ehdr.e_shnum; i++) {
-        if (shdrs[i].sh_type != SHT_SYMTAB) continue;
-
-        /* 対応する文字列テーブル */
-        Elf64_Shdr *strtab_hdr = &shdrs[shdrs[i].sh_link];
-        char *strtab = malloc(strtab_hdr->sh_size);
-        fseek(f, strtab_hdr->sh_offset, SEEK_SET);
-        fread(strtab, strtab_hdr->sh_size, 1, f);
-
-        int nsym = shdrs[i].sh_size / sizeof(Elf64_Sym);
-        Elf64_Sym *syms = malloc(shdrs[i].sh_size);
-        fseek(f, shdrs[i].sh_offset, SEEK_SET);
-        fread(syms, sizeof(Elf64_Sym), nsym, f);
-
-        for (int j = 0; j < nsym; j++) {
-            if (syms[j].st_name == 0) continue;
-            printf("0x%016lx  %s\\n",
-                   syms[j].st_value, strtab + syms[j].st_name);
-        }
-        free(strtab); free(syms);
-    }
-    free(shdrs); free(shstrtab); fclose(f);
-}`,
+     {title:"シンボルテーブルの解析", body:"シンボルテーブル（.symtabセクション）は関数名・グローバル変数名とそのアドレスのマッピングを格納します。デバッガがブレークポイントを関数名で設定できるのもこのテーブルがあるためです。Pythonのinspect.getmembers()が返す情報に相当します。\n\n各シンボルはElf64_Sym構造体で表現されます。st_nameはシンボル名文字列テーブル（.strtab）へのオフセット、st_valueはアドレス、st_sizeはサイズ、st_infoはシンボルの種類（関数・変数・ファイル）とバインディング（ローカル・グローバル・弱い）を格納します。\n\n動的リンクに使われる.dynsymは.symtabのサブセットで、共有ライブラリからエクスポートされるシンボルのみ含みます。nm、objdump -tコマンドはシンボルテーブルを表示するツールで、自分で実装してみることでELFの理解が深まります。",
+      code:"void print_symbols(const char *filename) {\n    FILE *f = fopen(filename, \"rb\");\n    if (!f) { perror(filename); return; }\n\n    Elf64_Ehdr ehdr;\n    fread(&ehdr, sizeof(ehdr), 1, f);\n\n    /* セクションヘッダテーブルを読み込む */\n    Elf64_Shdr *shdrs = malloc(ehdr.e_shnum * sizeof(Elf64_Shdr));\n    fseek(f, ehdr.e_shoff, SEEK_SET);\n    fread(shdrs, sizeof(Elf64_Shdr), ehdr.e_shnum, f);\n\n    /* セクション名テーブル (shstrtab) */\n    char *shstrtab = malloc(shdrs[ehdr.e_shstrndx].sh_size);\n    fseek(f, shdrs[ehdr.e_shstrndx].sh_offset, SEEK_SET);\n    fread(shstrtab, shdrs[ehdr.e_shstrndx].sh_size, 1, f);\n\n    /* .symtab を探してシンボルを表示 */\n    for (int i = 0; i < ehdr.e_shnum; i++) {\n        if (shdrs[i].sh_type != SHT_SYMTAB) continue;\n\n        /* 対応する文字列テーブル */\n        Elf64_Shdr *strtab_hdr = &shdrs[shdrs[i].sh_link];\n        char *strtab = malloc(strtab_hdr->sh_size);\n        fseek(f, strtab_hdr->sh_offset, SEEK_SET);\n        fread(strtab, strtab_hdr->sh_size, 1, f);\n\n        int nsym = shdrs[i].sh_size / sizeof(Elf64_Sym);\n        Elf64_Sym *syms = malloc(shdrs[i].sh_size);\n        fseek(f, shdrs[i].sh_offset, SEEK_SET);\n        fread(syms, sizeof(Elf64_Sym), nsym, f);\n\n        for (int j = 0; j < nsym; j++) {\n            if (syms[j].st_name == 0) continue;\n            printf(\"0x%016lx  %s\\n\",\n                   syms[j].st_value, strtab + syms[j].st_name);\n        }\n        free(strtab); free(syms);\n    }\n    free(shdrs); free(shstrtab); fclose(f);\n}",
       afterCode:"shdrs[i].sh_linkはリンクされたセクションのインデックスです。.symtabの場合は対応する.strtabのインデックスになっています。SHT_RELAの場合は対象セクションのインデックスです。"}
    ]},
   {id:"ch6", num:6, title:"高性能HTTPサーバ（epoll）", est:"70分",
    goal:"epollを使ったノンブロッキングI/OでHTTP/1.1サーバを実装し、1000以上の同時接続をC10K問題を意識して処理できる。",
    sections:[
-     {title:"C10K問題とepollの仕組み", body:`C10K問題とは「1台のサーバで10000同時接続を処理できるか」という課題で、2000年代初頭に定式化されました。伝統的なスレッド/プロセスモデル（接続ごとに1スレッド）では、10000スレッドのコンテキストスワップオーバーヘッドが無視できないレベルになります。これを解決するためにepoll（Linux）・kqueue（FreeBSD/macOS）・IOCP（Windows）が開発されました。
-
-epollはLinux固有のI/O多重化APIです。epoll_create1()でepollファイルディスクリプタを作成し、epoll_ctl()で監視したいfdを登録・削除し、epoll_wait()で「準備できたfd」のリストを受け取ります。Pythonのselectorsモジュールのselect.DefaultSelectorが内部でepollを使っています。
-
-Level-Triggered（LT、デフォルト）とEdge-Triggered（ET、EPOLLETフラグ）の2モードがあります。LTは「fdがまだ読み取り可能」なら毎回通知し、ETは「fdの状態が変化した瞬間」だけ通知します。ETはより高性能ですが、「一度のwakeupで全データを読み切る」実装が必要です。`,
-      code:`#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-
-#define MAX_EVENTS 1024
-#define PORT 8080
-
-int create_server_socket(void) {
-    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-    if (fd < 0) { perror("socket"); exit(1); }
-
-    int opt = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
-
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(PORT),
-        .sin_addr.s_addr = INADDR_ANY,
-    };
-    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        perror("bind"); exit(1);
-    }
-    if (listen(fd, SOMAXCONN) < 0) { perror("listen"); exit(1); }
-    return fd;
-}`,
+     {title:"C10K問題とepollの仕組み", body:"C10K問題とは「1台のサーバで10000同時接続を処理できるか」という課題で、2000年代初頭に定式化されました。伝統的なスレッド/プロセスモデル（接続ごとに1スレッド）では、10000スレッドのコンテキストスワップオーバーヘッドが無視できないレベルになります。これを解決するためにepoll（Linux）・kqueue（FreeBSD/macOS）・IOCP（Windows）が開発されました。\n\nepollはLinux固有のI/O多重化APIです。epoll_create1()でepollファイルディスクリプタを作成し、epoll_ctl()で監視したいfdを登録・削除し、epoll_wait()で「準備できたfd」のリストを受け取ります。Pythonのselectorsモジュールのselect.DefaultSelectorが内部でepollを使っています。\n\nLevel-Triggered（LT、デフォルト）とEdge-Triggered（ET、EPOLLETフラグ）の2モードがあります。LTは「fdがまだ読み取り可能」なら毎回通知し、ETは「fdの状態が変化した瞬間」だけ通知します。ETはより高性能ですが、「一度のwakeupで全データを読み切る」実装が必要です。",
+      code:"#include <sys/epoll.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n#include <fcntl.h>\n#include <unistd.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <errno.h>\n\n#define MAX_EVENTS 1024\n#define PORT 8080\n\nint create_server_socket(void) {\n    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);\n    if (fd < 0) { perror(\"socket\"); exit(1); }\n\n    int opt = 1;\n    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));\n    setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));\n\n    struct sockaddr_in addr = {\n        .sin_family = AF_INET,\n        .sin_port = htons(PORT),\n        .sin_addr.s_addr = INADDR_ANY,\n    };\n    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {\n        perror(\"bind\"); exit(1);\n    }\n    if (listen(fd, SOMAXCONN) < 0) { perror(\"listen\"); exit(1); }\n    return fd;\n}",
       afterCode:"SO_REUSEPORTはLinux 3.9以降で使え、複数プロセスが同じポートでlistenしてカーネルが負荷分散します。nginxがこれを使って複数workerで受け付けを分担しています。"},
-     {title:"HTTPリクエスト解析とレスポンス生成", body:`HTTP/1.1のリクエスト解析はヘッダの終端（\\r\\n\\r\\n）を検出するだけでも基本的な動作が実現できます。メソッド（GET・POST）・URIパス・Hostヘッダを抽出し、静的ファイルを返すシンプルなサーバが実装できます。Pythonのhttp.serverモジュールと同じことをCで手動実装します。
-
-send()・write()は全バイトを一度に送信できる保証がありません。返り値が要求バイト数より少ない場合は残りを再度送信する必要があります。この「繰り返し送信」処理をwrite_allまたはsend_allとして実装するのがCのネットワークプログラミングの基本パターンです。
-
-HTTP Keep-Aliveは同一TCP接続上で複数のHTTPリクエストを処理する機能です。接続ごとに状態（ヘッダを読み込み中か・ボディを読み込み中か・レスポンスを送信中か）を管理する構造体が必要です。この接続状態の管理がHTTPサーバ実装の核心部分です。`,
-      code:`#include <sys/sendfile.h>
-
-#define BUF_SIZE 8192
-
-typedef struct {
-    int fd;
-    char buf[BUF_SIZE];
-    int buf_len;
-    enum { STATE_READING_HEADER, STATE_WRITING } state;
-} Connection;
-
-ssize_t write_all(int fd, const void *buf, size_t len) {
-    size_t sent = 0;
-    while (sent < len) {
-        ssize_t r = send(fd, (const char*)buf + sent, len - sent, MSG_NOSIGNAL);
-        if (r <= 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
-            return -1;
-        }
-        sent += r;
-    }
-    return sent;
-}
-
-void handle_request(int client_fd, const char *req, int req_len) {
-    /* GETリクエストのパス抽出（最小実装） */
-    char path[256] = "/";
-    sscanf(req, "GET %255s HTTP", path);
-
-    const char *body = "<h1>Hello, World!</h1>";
-    char header[512];
-    int hlen = snprintf(header, sizeof(header),
-        "HTTP/1.1 200 OK\\r\\n"
-        "Content-Type: text/html; charset=utf-8\\r\\n"
-        "Content-Length: %zu\\r\\n"
-        "Connection: close\\r\\n"
-        "\\r\\n", strlen(body));
-
-    write_all(client_fd, header, hlen);
-    write_all(client_fd, body, strlen(body));
-    close(client_fd);
-}`,
+     {title:"HTTPリクエスト解析とレスポンス生成", body:"HTTP/1.1のリクエスト解析はヘッダの終端（\\r\\n\\r\\n）を検出するだけでも基本的な動作が実現できます。メソッド（GET・POST）・URIパス・Hostヘッダを抽出し、静的ファイルを返すシンプルなサーバが実装できます。Pythonのhttp.serverモジュールと同じことをCで手動実装します。\n\nsend()・write()は全バイトを一度に送信できる保証がありません。返り値が要求バイト数より少ない場合は残りを再度送信する必要があります。この「繰り返し送信」処理をwrite_allまたはsend_allとして実装するのがCのネットワークプログラミングの基本パターンです。\n\nHTTP Keep-Aliveは同一TCP接続上で複数のHTTPリクエストを処理する機能です。接続ごとに状態（ヘッダを読み込み中か・ボディを読み込み中か・レスポンスを送信中か）を管理する構造体が必要です。この接続状態の管理がHTTPサーバ実装の核心部分です。",
+      code:"#include <sys/sendfile.h>\n\n#define BUF_SIZE 8192\n\ntypedef struct {\n    int fd;\n    char buf[BUF_SIZE];\n    int buf_len;\n    enum { STATE_READING_HEADER, STATE_WRITING } state;\n} Connection;\n\nssize_t write_all(int fd, const void *buf, size_t len) {\n    size_t sent = 0;\n    while (sent < len) {\n        ssize_t r = send(fd, (const char*)buf + sent, len - sent, MSG_NOSIGNAL);\n        if (r <= 0) {\n            if (errno == EAGAIN || errno == EWOULDBLOCK) continue;\n            return -1;\n        }\n        sent += r;\n    }\n    return sent;\n}\n\nvoid handle_request(int client_fd, const char *req, int req_len) {\n    /* GETリクエストのパス抽出（最小実装） */\n    char path[256] = \"/\";\n    sscanf(req, \"GET %255s HTTP\", path);\n\n    const char *body = \"<h1>Hello, World!</h1>\";\n    char header[512];\n    int hlen = snprintf(header, sizeof(header),\n        \"HTTP/1.1 200 OK\\r\\n\"\n        \"Content-Type: text/html; charset=utf-8\\r\\n\"\n        \"Content-Length: %zu\\r\\n\"\n        \"Connection: close\\r\\n\"\n        \"\\r\\n\", strlen(body));\n\n    write_all(client_fd, header, hlen);\n    write_all(client_fd, body, strlen(body));\n    close(client_fd);\n}",
       afterCode:"MSG_NOSIGNALフラグを使うと、接続が切れてもSIGPIPEシグナルが発生しません。SIGPIPE のデフォルト動作はプロセス終了なので、サーバプロセスがクライアント切断で落ちないようにするために重要です。"}
    ]},
   {id:"ch7", num:7, title:"メモリプール・カスタムアロケータ", est:"65分",
    goal:"固定サイズ・可変サイズのメモリプールを実装し、Buddy Systemアロケータの基本動作を理解できる。フラグメンテーションの問題と解決策を説明できる。",
    sections:[
-     {title:"メモリプールの設計と実装", body:`標準のmalloc/freeはコンテキスト切り替えを要するヒープ管理のため、頻繁な小さなアロケーションでは遅くなります。メモリプールは決まったサイズのブロックを事前に確保しておき、O(1)でalloc/freeできるようにします。ゲームエンジン・データベース・Webサーバのホットパスでよく使われます。
-
-固定サイズプールはimplicity simple（実装が簡単）です。大きな配列を事前に確保し、使用中フラグの配列で管理します。pool_alloc()は未使用ブロックを線形探索して返し、pool_free()は該当ブロックのフラグを0にします。フリーリスト（解放済みブロックを連結リストで管理）にすると線形探索を避けO(1)になります。
-
-アライメントはCPUが効率的にメモリアクセスするための配置要求です。x86-64では8バイト境界が基本で、SSE命令は16バイト、AVX命令は32バイトアライメントが必要です。mallocはmax_align_t（通常16バイト）のアライメントを保証します。カスタムアロケータでもアライメントを保証するためにブロックサイズをアライメント単位に切り上げる処理が必要です。`,
-      code:`#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdio.h>
-
-/* アライメント: sizeをalignの倍数に切り上げ */
-#define ALIGN_UP(size, align) \
-    (((size) + (align) - 1) & ~((align) - 1))
-
-#define BLOCK_SIZE  64
-#define POOL_BLOCKS 512
-#define ALIGN       16
-
-typedef struct FreeNode { struct FreeNode *next; } FreeNode;
-
-typedef struct {
-    uint8_t memory[POOL_BLOCKS * BLOCK_SIZE] __attribute__((aligned(16)));
-    FreeNode *free_head;
-    int alloc_count;
-    int free_count;
-} MemPool;
-
-void pool_init(MemPool *pool) {
-    pool->free_head = NULL;
-    pool->alloc_count = pool->free_count = 0;
-    /* 全ブロックをフリーリストに登録 */
-    for (int i = POOL_BLOCKS - 1; i >= 0; i--) {
-        FreeNode *node = (FreeNode *)(pool->memory + i * BLOCK_SIZE);
-        node->next = pool->free_head;
-        pool->free_head = node;
-    }
-}
-
-void *pool_alloc(MemPool *pool) {
-    if (!pool->free_head) return NULL;
-    FreeNode *node = pool->free_head;
-    pool->free_head = node->next;
-    pool->alloc_count++;
-    return node;
-}
-
-void pool_free(MemPool *pool, void *ptr) {
-    FreeNode *node = (FreeNode *)ptr;
-    node->next = pool->free_head;
-    pool->free_head = node;
-    pool->free_count++;
-}`,
+     {title:"メモリプールの設計と実装", body:"標準のmalloc/freeはコンテキスト切り替えを要するヒープ管理のため、頻繁な小さなアロケーションでは遅くなります。メモリプールは決まったサイズのブロックを事前に確保しておき、O(1)でalloc/freeできるようにします。ゲームエンジン・データベース・Webサーバのホットパスでよく使われます。\n\n固定サイズプールはimplicity simple（実装が簡単）です。大きな配列を事前に確保し、使用中フラグの配列で管理します。pool_alloc()は未使用ブロックを線形探索して返し、pool_free()は該当ブロックのフラグを0にします。フリーリスト（解放済みブロックを連結リストで管理）にすると線形探索を避けO(1)になります。\n\nアライメントはCPUが効率的にメモリアクセスするための配置要求です。x86-64では8バイト境界が基本で、SSE命令は16バイト、AVX命令は32バイトアライメントが必要です。mallocはmax_align_t（通常16バイト）のアライメントを保証します。カスタムアロケータでもアライメントを保証するためにブロックサイズをアライメント単位に切り上げる処理が必要です。",
+      code:"#include <stddef.h>\n#include <stdint.h>\n#include <string.h>\n#include <stdio.h>\n\n/* アライメント: sizeをalignの倍数に切り上げ */\n#define ALIGN_UP(size, align) \
+    (((size) + (align) - 1) & ~((align) - 1))\n\n#define BLOCK_SIZE  64\n#define POOL_BLOCKS 512\n#define ALIGN       16\n\ntypedef struct FreeNode { struct FreeNode *next; } FreeNode;\n\ntypedef struct {\n    uint8_t memory[POOL_BLOCKS * BLOCK_SIZE] __attribute__((aligned(16)));\n    FreeNode *free_head;\n    int alloc_count;\n    int free_count;\n} MemPool;\n\nvoid pool_init(MemPool *pool) {\n    pool->free_head = NULL;\n    pool->alloc_count = pool->free_count = 0;\n    /* 全ブロックをフリーリストに登録 */\n    for (int i = POOL_BLOCKS - 1; i >= 0; i--) {\n        FreeNode *node = (FreeNode *)(pool->memory + i * BLOCK_SIZE);\n        node->next = pool->free_head;\n        pool->free_head = node;\n    }\n}\n\nvoid *pool_alloc(MemPool *pool) {\n    if (!pool->free_head) return NULL;\n    FreeNode *node = pool->free_head;\n    pool->free_head = node->next;\n    pool->alloc_count++;\n    return node;\n}\n\nvoid pool_free(MemPool *pool, void *ptr) {\n    FreeNode *node = (FreeNode *)ptr;\n    node->next = pool->free_head;\n    pool->free_head = node;\n    pool->free_count++;\n}",
       afterCode:"__attribute__((aligned(16)))はGCC拡張でメモリのアライメントを指定します。C11のaligned_as()マクロも同じ効果があります。SIMDを使うコードのバッファには適切なアライメントが必須です。"},
-     {title:"Buddy Systemアロケータ", body:`Buddy Systemは2の累乗サイズのブロックを管理するアロケータです。Linuxカーネルの物理メモリ管理（ページアロケータ）で使われています。要求サイズを2の累乗に切り上げ、そのサイズのフリーリストからブロックを取り出します。フリーリストが空なら上位サイズのブロックを半分に分割（スプリット）して使います。
-
-解放時は「バディ」（同サイズの隣接ブロック）も解放されていればマージ（コアレス）します。バディのアドレスはXOR演算で計算できます：buddy = address XOR size。これによりフラグメンテーション（連続した空きがあるのに大きなブロックが確保できない問題）を大幅に削減します。
-
-スラブアロケータはBuddy Systemの上に実装される別の最適化です。Linuxカーネルのkmallocはスラブキャッシュを使って同じサイズのオブジェクト（task_struct・inode等）を管理します。malloc/freeのオーバーヘッドを最小化するために現代のOSカーネルが広く採用しています。`,
-      code:`#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-
-#define MIN_ORDER 4    /* 最小ブロック: 2^4 = 16バイト */
-#define MAX_ORDER 12   /* 最大ブロック: 2^12 = 4096バイト */
-#define POOL_SIZE (1 << MAX_ORDER)
-
-typedef struct Block { struct Block *next; } Block;
-
-static uint8_t pool[POOL_SIZE] __attribute__((aligned(4096)));
-static Block *free_lists[MAX_ORDER + 1];
-
-/* 最小の2の累乗orderを返す */
-int order_of(size_t size) {
-    int order = MIN_ORDER;
-    while ((1 << order) < (int)size) order++;
-    return order;
-}
-
-void *buddy_alloc(size_t size) {
-    int order = order_of(size);
-    /* 要求order以上のフリーリストを探す */
-    for (int o = order; o <= MAX_ORDER; o++) {
-        if (!free_lists[o]) continue;
-        Block *block = free_lists[o];
-        free_lists[o] = block->next;
-        /* 必要ならスプリット */
-        while (o > order) {
-            o--;
-            /* バディをフリーリストに追加 */
-            Block *buddy = (Block *)((uint8_t *)block + (1 << o));
-            buddy->next = free_lists[o];
-            free_lists[o] = buddy;
-        }
-        return block;
-    }
-    return NULL;
-}`,
+     {title:"Buddy Systemアロケータ", body:"Buddy Systemは2の累乗サイズのブロックを管理するアロケータです。Linuxカーネルの物理メモリ管理（ページアロケータ）で使われています。要求サイズを2の累乗に切り上げ、そのサイズのフリーリストからブロックを取り出します。フリーリストが空なら上位サイズのブロックを半分に分割（スプリット）して使います。\n\n解放時は「バディ」（同サイズの隣接ブロック）も解放されていればマージ（コアレス）します。バディのアドレスはXOR演算で計算できます：buddy = address XOR size。これによりフラグメンテーション（連続した空きがあるのに大きなブロックが確保できない問題）を大幅に削減します。\n\nスラブアロケータはBuddy Systemの上に実装される別の最適化です。Linuxカーネルのkmallocはスラブキャッシュを使って同じサイズのオブジェクト（task_struct・inode等）を管理します。malloc/freeのオーバーヘッドを最小化するために現代のOSカーネルが広く採用しています。",
+      code:"#include <stdio.h>\n#include <stdlib.h>\n#include <stdint.h>\n\n#define MIN_ORDER 4    /* 最小ブロック: 2^4 = 16バイト */\n#define MAX_ORDER 12   /* 最大ブロック: 2^12 = 4096バイト */\n#define POOL_SIZE (1 << MAX_ORDER)\n\ntypedef struct Block { struct Block *next; } Block;\n\nstatic uint8_t pool[POOL_SIZE] __attribute__((aligned(4096)));\nstatic Block *free_lists[MAX_ORDER + 1];\n\n/* 最小の2の累乗orderを返す */\nint order_of(size_t size) {\n    int order = MIN_ORDER;\n    while ((1 << order) < (int)size) order++;\n    return order;\n}\n\nvoid *buddy_alloc(size_t size) {\n    int order = order_of(size);\n    /* 要求order以上のフリーリストを探す */\n    for (int o = order; o <= MAX_ORDER; o++) {\n        if (!free_lists[o]) continue;\n        Block *block = free_lists[o];\n        free_lists[o] = block->next;\n        /* 必要ならスプリット */\n        while (o > order) {\n            o--;\n            /* バディをフリーリストに追加 */\n            Block *buddy = (Block *)((uint8_t *)block + (1 << o));\n            buddy->next = free_lists[o];\n            free_lists[o] = buddy;\n        }\n        return block;\n    }\n    return NULL;\n}",
       afterCode:"Buddy Systemの内部フラグメンテーションは最大50%です（要求サイズを2の累乗に切り上げるため）。小さなオブジェクト（8バイト・16バイト）が多い場合はスラブキャッシュと組み合わせてフラグメンテーションを削減します。"}
    ]},
   {id:"ch8", num:8, title:"セキュリティ・バッファオーバーフロー対策", est:"65分",
    goal:"バッファオーバーフロー・整数オーバーフロー・フォーマット文字列攻撃の原理を理解し、スタック保護・ASLR・Sanitizerを活用して安全なCコードを書ける。",
    sections:[
-     {title:"バッファオーバーフローの原理と防御", body:`バッファオーバーフローはCのセキュリティ脆弱性の最も代表的なものです。配列の境界チェックがないCでは、固定長バッファに長すぎる入力をstrcpy()すると、スタック上の隣接データ（リターンアドレス・saved EBP）を上書きできます。攻撃者はリターンアドレスをシェルコードのアドレスに書き換えて任意コードを実行します。
-
-防御策は複数あります。コンパイラのStack Canary（-fstack-protectorオプション）はスタックフレームの末尾に乱数を配置し、関数リターン前にチェックします。ASLR（Address Space Layout Randomization）はスタック・ヒープ・ライブラリのアドレスをランダム化して予測困難にします。NX bit（W^Xポリシー）はスタックページを実行不可にします。
-
-安全な文字列関数を使うことが基本的な対策です。strcpy→strlcpy（またはstrncpy+手動NUL終端）、sprintf→snprintf、gets→fgets（またはgetline）。POSIX.1-2008以降ではgetline()が推奨されます。C11のAnnex K（bounds-checking interfaces）にはstrcpy_s・sprintf_sが定義されていますが、実装が任意なため普及していません。`,
-      code:`#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-
-/* 安全な文字列操作のユーティリティ */
-
-/* strlcpyが使えない環境向けの安全な実装 */
-size_t safe_strlcpy(char *dst, const char *src, size_t size) {
-    size_t src_len = strlen(src);
-    if (size > 0) {
-        size_t copy_len = src_len < size - 1 ? src_len : size - 1;
-        memcpy(dst, src, copy_len);
-        dst[copy_len] = '\\0';
-    }
-    return src_len; // truncateしたかどうかは: src_len >= size で判定
-}
-
-/* 安全なgets代替 (行入力) */
-char *safe_getline(char **lineptr, size_t *n, FILE *stream) {
-    if (!*lineptr || *n == 0) {
-        *n = 128;
-        *lineptr = malloc(*n);
-        if (!*lineptr) return NULL;
-    }
-    size_t len = 0;
-    int c;
-    while ((c = fgetc(stream)) != EOF && c != '\\n') {
-        if (len + 2 > *n) {
-            *n *= 2;
-            char *new_ptr = realloc(*lineptr, *n);
-            if (!new_ptr) return NULL;
-            *lineptr = new_ptr;
-        }
-        (*lineptr)[len++] = c;
-    }
-    if (len == 0 && c == EOF) return NULL;
-    (*lineptr)[len] = '\\0';
-    return *lineptr;
-}`,
+     {title:"バッファオーバーフローの原理と防御", body:"バッファオーバーフローはCのセキュリティ脆弱性の最も代表的なものです。配列の境界チェックがないCでは、固定長バッファに長すぎる入力をstrcpy()すると、スタック上の隣接データ（リターンアドレス・saved EBP）を上書きできます。攻撃者はリターンアドレスをシェルコードのアドレスに書き換えて任意コードを実行します。\n\n防御策は複数あります。コンパイラのStack Canary（-fstack-protectorオプション）はスタックフレームの末尾に乱数を配置し、関数リターン前にチェックします。ASLR（Address Space Layout Randomization）はスタック・ヒープ・ライブラリのアドレスをランダム化して予測困難にします。NX bit（W^Xポリシー）はスタックページを実行不可にします。\n\n安全な文字列関数を使うことが基本的な対策です。strcpy→strlcpy（またはstrncpy+手動NUL終端）、sprintf→snprintf、gets→fgets（またはgetline）。POSIX.1-2008以降ではgetline()が推奨されます。C11のAnnex K（bounds-checking interfaces）にはstrcpy_s・sprintf_sが定義されていますが、実装が任意なため普及していません。",
+      code:"#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n\n/* 安全な文字列操作のユーティリティ */\n\n/* strlcpyが使えない環境向けの安全な実装 */\nsize_t safe_strlcpy(char *dst, const char *src, size_t size) {\n    size_t src_len = strlen(src);\n    if (size > 0) {\n        size_t copy_len = src_len < size - 1 ? src_len : size - 1;\n        memcpy(dst, src, copy_len);\n        dst[copy_len] = '\\0';\n    }\n    return src_len; // truncateしたかどうかは: src_len >= size で判定\n}\n\n/* 安全なgets代替 (行入力) */\nchar *safe_getline(char **lineptr, size_t *n, FILE *stream) {\n    if (!*lineptr || *n == 0) {\n        *n = 128;\n        *lineptr = malloc(*n);\n        if (!*lineptr) return NULL;\n    }\n    size_t len = 0;\n    int c;\n    while ((c = fgetc(stream)) != EOF && c != '\\n') {\n        if (len + 2 > *n) {\n            *n *= 2;\n            char *new_ptr = realloc(*lineptr, *n);\n            if (!new_ptr) return NULL;\n            *lineptr = new_ptr;\n        }\n        (*lineptr)[len++] = c;\n    }\n    if (len == 0 && c == EOF) return NULL;\n    (*lineptr)[len] = '\\0';\n    return *lineptr;\n}",
       afterCode:"-fsanitize=address（AddressSanitizer）をコンパイラオプションに追加するとバッファオーバーフロー・use-after-free・heap-buffer-overflowをランタイムで検出します。開発時に必ず使いましょう。本番バイナリでは外します（10〜20倍の性能低下）。"},
-     {title:"整数オーバーフローとフォーマット文字列攻撃", body:`整数オーバーフローは符号なし整数がラップアラウンドする（UINTMAXの次が0になる）挙動を攻撃に利用します。典型的な攻撃パターンは、malloc(user_count * sizeof(struct))の計算でuser_countが非常に大きい場合、乗算がオーバーフローして小さなサイズのバッファが確保され、後続の書き込みでオーバーフローが起きます。
-
-C99のstdint.h・<limits.h>を使ってオーバーフローを検出します。符号付き整数のオーバーフローはC言語では未定義動作（UB）です。コンパイラはUBを前提に最適化を行うため、「オーバーフロー後の動作」を仮定したコードは全く別のコードにコンパイルされる可能性があります。GCC/Clangの-fwrapvオプションでラップアラウンドを定義済みにできますが、UBをなくすためには根本的に検査を追加します。
-
-フォーマット文字列攻撃はprintf(user_input)のように書式文字列をユーザー入力にする脆弱性です。%xを含む入力でスタックの中身が読め、%nでスタックへの書き込みが可能になります。常にprintf("%s", user_input)と書いてください。-Wformat-securityオプションでコンパイラが警告します。`,
-      code:`#include <stdint.h>
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-/* 整数オーバーフローの安全な検出 */
-
-/* 安全な符号なし乗算 */
-int safe_mul_size(size_t a, size_t b, size_t *result) {
-    if (b != 0 && a > SIZE_MAX / b) {
-        return -1; // オーバーフロー
-    }
-    *result = a * b;
-    return 0;
-}
-
-/* GCCの__builtin_*_overflow 関数 (C23ではckd_add等) */
-int safe_add_int(int a, int b, int *result) {
-    return __builtin_sadd_overflow(a, b, result);
-    /* 戻り値: 0=安全, 1=オーバーフロー */
-}
-
-/* フォーマット文字列: 常に書式を固定 */
-void safe_log(const char *user_message) {
-    /* 危険: printf(user_message);       → %n攻撃可能 */
-    /* 安全: */ printf("[LOG] %s\\n", user_message); /* 書式を固定 */
-}
-
-/* 使用例: 安全なメモリ確保 */
-void *safe_alloc_array(size_t count, size_t elem_size) {
-    size_t total;
-    if (safe_mul_size(count, elem_size, &total) != 0) {
-        fprintf(stderr, "整数オーバーフロー: count=%zu elem_size=%zu\\n",
-                count, elem_size);
-        return NULL;
-    }
-    return calloc(1, total); // callocは内部でもオーバーフローチェック
-}`,
+     {title:"整数オーバーフローとフォーマット文字列攻撃", body:"整数オーバーフローは符号なし整数がラップアラウンドする（UINTMAXの次が0になる）挙動を攻撃に利用します。典型的な攻撃パターンは、malloc(user_count * sizeof(struct))の計算でuser_countが非常に大きい場合、乗算がオーバーフローして小さなサイズのバッファが確保され、後続の書き込みでオーバーフローが起きます。\n\nC99のstdint.h・<limits.h>を使ってオーバーフローを検出します。符号付き整数のオーバーフローはC言語では未定義動作（UB）です。コンパイラはUBを前提に最適化を行うため、「オーバーフロー後の動作」を仮定したコードは全く別のコードにコンパイルされる可能性があります。GCC/Clangの-fwrapvオプションでラップアラウンドを定義済みにできますが、UBをなくすためには根本的に検査を追加します。\n\nフォーマット文字列攻撃はprintf(user_input)のように書式文字列をユーザー入力にする脆弱性です。%xを含む入力でスタックの中身が読め、%nでスタックへの書き込みが可能になります。常にprintf(\"%s\", user_input)と書いてください。-Wformat-securityオプションでコンパイラが警告します。",
+      code:"#include <stdint.h>\n#include <limits.h>\n#include <stdio.h>\n#include <stdlib.h>\n\n/* 整数オーバーフローの安全な検出 */\n\n/* 安全な符号なし乗算 */\nint safe_mul_size(size_t a, size_t b, size_t *result) {\n    if (b != 0 && a > SIZE_MAX / b) {\n        return -1; // オーバーフロー\n    }\n    *result = a * b;\n    return 0;\n}\n\n/* GCCの__builtin_*_overflow 関数 (C23ではckd_add等) */\nint safe_add_int(int a, int b, int *result) {\n    return __builtin_sadd_overflow(a, b, result);\n    /* 戻り値: 0=安全, 1=オーバーフロー */\n}\n\n/* フォーマット文字列: 常に書式を固定 */\nvoid safe_log(const char *user_message) {\n    /* 危険: printf(user_message);       → %n攻撃可能 */\n    /* 安全: */ printf(\"[LOG] %s\\n\", user_message); /* 書式を固定 */\n}\n\n/* 使用例: 安全なメモリ確保 */\nvoid *safe_alloc_array(size_t count, size_t elem_size) {\n    size_t total;\n    if (safe_mul_size(count, elem_size, &total) != 0) {\n        fprintf(stderr, \"整数オーバーフロー: count=%zu elem_size=%zu\\n\",\n                count, elem_size);\n        return NULL;\n    }\n    return calloc(1, total); // callocは内部でもオーバーフローチェック\n}",
       afterCode:"-fsanitize=undefined（UndefinedBehaviorSanitizer）は整数オーバーフロー・ゼロ除算・NULLポインタ逆参照などの未定義動作を実行時に検出します。-fsanitize=address,undefinedの組み合わせが最も包括的です。CI/CDパイプラインに組み込みましょう。"}
    ]},
 ];

@@ -22,468 +22,67 @@ const { useState } = React;
 const EX = {
   ch1: [
     {diff:2, q:"Starletteのカスタムミドルウェアを書き、全リクエストにX-Request-IDヘッダーを付与してください。",
-     code:`from starlette.middleware.base import BaseHTTPMiddleware
-import uuid
-
-class RequestIDMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        # request_idを生成してリクエストとレスポンスに付与
-        pass`,
-     answer:`from starlette.middleware.base import BaseHTTPMiddleware
-import uuid
-
-class RequestIDMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        request_id = str(uuid.uuid4())
-        request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        return response
-
-app.add_middleware(RequestIDMiddleware)`},
+     code:"from starlette.middleware.base import BaseHTTPMiddleware\nimport uuid\n\nclass RequestIDMiddleware(BaseHTTPMiddleware):\n    async def dispatch(self, request, call_next):\n        # request_idを生成してリクエストとレスポンスに付与\n        pass",
+     answer:"from starlette.middleware.base import BaseHTTPMiddleware\nimport uuid\n\nclass RequestIDMiddleware(BaseHTTPMiddleware):\n    async def dispatch(self, request, call_next):\n        request_id = str(uuid.uuid4())\n        request.state.request_id = request_id\n        response = await call_next(request)\n        response.headers[\"X-Request-ID\"] = request_id\n        return response\n\napp.add_middleware(RequestIDMiddleware)"},
     {diff:3, q:"ASGIアプリを直接実装し、/pingにGETリクエストが来たら{'ping':'pong'}をJSONで返してください。",
-     code:`import json
-
-async def app(scope, receive, send):
-    if scope["type"] == "http":
-        # /pingのGETリクエストに応答
-        pass`,
-     answer:`import json
-
-async def app(scope, receive, send):
-    if scope["type"] != "http":
-        return
-    path = scope["path"]
-    method = scope["method"]
-    if path == "/ping" and method == "GET":
-        body = json.dumps({"ping": "pong"}).encode()
-        await send({"type":"http.response.start","status":200,
-                    "headers":[[b"content-type",b"application/json"]]})
-        await send({"type":"http.response.body","body":body})`}
+     code:"import json\n\nasync def app(scope, receive, send):\n    if scope[\"type\"] == \"http\":\n        # /pingのGETリクエストに応答\n        pass",
+     answer:"import json\n\nasync def app(scope, receive, send):\n    if scope[\"type\"] != \"http\":\n        return\n    path = scope[\"path\"]\n    method = scope[\"method\"]\n    if path == \"/ping\" and method == \"GET\":\n        body = json.dumps({\"ping\": \"pong\"}).encode()\n        await send({\"type\":\"http.response.start\",\"status\":200,\n                    \"headers\":[[b\"content-type\",b\"application/json\"]]})\n        await send({\"type\":\"http.response.body\",\"body\":body})"}
   ],
   ch2: [
     {diff:2, q:"CQRSパターンのコマンドハンドラを実装してください。CreateOrderCommandを受け取り、OrderCreatedEventを発行します。",
-     code:`from dataclasses import dataclass
-from typing import Protocol
-
-@dataclass
-class CreateOrderCommand:
-    user_id: str
-    items: list[dict]
-
-class EventBus(Protocol):
-    async def publish(self, event: object) -> None: ...
-
-async def handle_create_order(cmd: CreateOrderCommand, bus: EventBus):
-    # バリデーション → 集約生成 → イベント発行`,
-     answer:`@dataclass
-class OrderCreatedEvent:
-    order_id: str
-    user_id: str
-    items: list[dict]
-
-async def handle_create_order(cmd: CreateOrderCommand, bus: EventBus):
-    if not cmd.items:
-        raise ValueError("注文には最低1つの商品が必要です")
-    order_id = str(uuid.uuid4())
-    event = OrderCreatedEvent(
-        order_id=order_id,
-        user_id=cmd.user_id,
-        items=cmd.items,
-    )
-    await bus.publish(event)
-    return order_id`},
+     code:"from dataclasses import dataclass\nfrom typing import Protocol\n\n@dataclass\nclass CreateOrderCommand:\n    user_id: str\n    items: list[dict]\n\nclass EventBus(Protocol):\n    async def publish(self, event: object) -> None: ...\n\nasync def handle_create_order(cmd: CreateOrderCommand, bus: EventBus):\n    # バリデーション → 集約生成 → イベント発行",
+     answer:"@dataclass\nclass OrderCreatedEvent:\n    order_id: str\n    user_id: str\n    items: list[dict]\n\nasync def handle_create_order(cmd: CreateOrderCommand, bus: EventBus):\n    if not cmd.items:\n        raise ValueError(\"注文には最低1つの商品が必要です\")\n    order_id = str(uuid.uuid4())\n    event = OrderCreatedEvent(\n        order_id=order_id,\n        user_id=cmd.user_id,\n        items=cmd.items,\n    )\n    await bus.publish(event)\n    return order_id"},
     {diff:3, q:"イベントソーシングのイベントストアをSQLiteで実装してください。append_event()とget_events()を実装してください。",
-     code:`import sqlite3, json
-from dataclasses import dataclass
-
-@dataclass
-class DomainEvent:
-    aggregate_id: str
-    event_type: str
-    payload: dict
-
-class EventStore:
-    def __init__(self, db_path: str): ...
-    async def append_event(self, event: DomainEvent) -> None: ...
-    async def get_events(self, aggregate_id: str) -> list[DomainEvent]: ...`,
-     answer:`class EventStore:
-    def __init__(self, db_path: str):
-        self.conn = sqlite3.connect(db_path)
-        self.conn.execute("""CREATE TABLE IF NOT EXISTS events(
-            id INTEGER PRIMARY KEY,
-            aggregate_id TEXT, event_type TEXT,
-            payload TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )""")
-
-    async def append_event(self, event: DomainEvent) -> None:
-        self.conn.execute(
-            "INSERT INTO events(aggregate_id,event_type,payload) VALUES(?,?,?)",
-            (event.aggregate_id, event.event_type, json.dumps(event.payload))
-        )
-        self.conn.commit()
-
-    async def get_events(self, aggregate_id: str) -> list[DomainEvent]:
-        rows = self.conn.execute(
-            "SELECT aggregate_id,event_type,payload FROM events WHERE aggregate_id=?",
-            (aggregate_id,)).fetchall()
-        return [DomainEvent(r[0], r[1], json.loads(r[2])) for r in rows]`}
+     code:"import sqlite3, json\nfrom dataclasses import dataclass\n\n@dataclass\nclass DomainEvent:\n    aggregate_id: str\n    event_type: str\n    payload: dict\n\nclass EventStore:\n    def __init__(self, db_path: str): ...\n    async def append_event(self, event: DomainEvent) -> None: ...\n    async def get_events(self, aggregate_id: str) -> list[DomainEvent]: ...",
+     answer:"class EventStore:\n    def __init__(self, db_path: str):\n        self.conn = sqlite3.connect(db_path)\n        self.conn.execute(\"\"\"CREATE TABLE IF NOT EXISTS events(\n            id INTEGER PRIMARY KEY,\n            aggregate_id TEXT, event_type TEXT,\n            payload TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n        )\"\"\")\n\n    async def append_event(self, event: DomainEvent) -> None:\n        self.conn.execute(\n            \"INSERT INTO events(aggregate_id,event_type,payload) VALUES(?,?,?)\",\n            (event.aggregate_id, event.event_type, json.dumps(event.payload))\n        )\n        self.conn.commit()\n\n    async def get_events(self, aggregate_id: str) -> list[DomainEvent]:\n        rows = self.conn.execute(\n            \"SELECT aggregate_id,event_type,payload FROM events WHERE aggregate_id=?\",\n            (aggregate_id,)).fetchall()\n        return [DomainEvent(r[0], r[1], json.loads(r[2])) for r in rows]"}
   ],
   ch3: [
     {diff:2, q:"aiokafkaを使ってFastAPIのlifespan内でKafkaプロデューサーを起動・停止してください。",
-     code:`from contextlib import asynccontextmanager
-from aiokafka import AIOKafkaProducer
-from fastapi import FastAPI
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # プロデューサーを起動してapp.stateに格納
-    # yieldの後にstop
-    pass`,
-     answer:`@asynccontextmanager
-async def lifespan(app: FastAPI):
-    producer = AIOKafkaProducer(
-        bootstrap_servers='localhost:9092',
-        value_serializer=lambda v: json.dumps(v).encode()
-    )
-    await producer.start()
-    app.state.kafka_producer = producer
-    yield
-    await producer.stop()
-
-app = FastAPI(lifespan=lifespan)`},
+     code:"from contextlib import asynccontextmanager\nfrom aiokafka import AIOKafkaProducer\nfrom fastapi import FastAPI\n\n@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    # プロデューサーを起動してapp.stateに格納\n    # yieldの後にstop\n    pass",
+     answer:"@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    producer = AIOKafkaProducer(\n        bootstrap_servers='localhost:9092',\n        value_serializer=lambda v: json.dumps(v).encode()\n    )\n    await producer.start()\n    app.state.kafka_producer = producer\n    yield\n    await producer.stop()\n\napp = FastAPI(lifespan=lifespan)"},
     {diff:3, q:"Kafkaコンシューマーグループを使って、order-eventsトピックを並列消費するWorkerクラスを実装してください。",
-     code:`from aiokafka import AIOKafkaConsumer
-
-class OrderEventWorker:
-    def __init__(self, group_id: str, num_workers: int): ...
-    async def start(self) -> None: ...
-    async def stop(self) -> None: ...`,
-     answer:`class OrderEventWorker:
-    def __init__(self, group_id: str, num_workers: int):
-        self.group_id = group_id
-        self.num_workers = num_workers
-        self._consumers: list[AIOKafkaConsumer] = []
-
-    async def start(self) -> None:
-        for _ in range(self.num_workers):
-            consumer = AIOKafkaConsumer(
-                "order-events",
-                bootstrap_servers="localhost:9092",
-                group_id=self.group_id,
-            )
-            await consumer.start()
-            self._consumers.append(consumer)
-            asyncio.create_task(self._consume(consumer))
-
-    async def _consume(self, consumer):
-        async for msg in consumer:
-            data = json.loads(msg.value)
-            await self._handle(data)
-
-    async def stop(self):
-        for c in self._consumers:
-            await c.stop()`}
+     code:"from aiokafka import AIOKafkaConsumer\n\nclass OrderEventWorker:\n    def __init__(self, group_id: str, num_workers: int): ...\n    async def start(self) -> None: ...\n    async def stop(self) -> None: ...",
+     answer:"class OrderEventWorker:\n    def __init__(self, group_id: str, num_workers: int):\n        self.group_id = group_id\n        self.num_workers = num_workers\n        self._consumers: list[AIOKafkaConsumer] = []\n\n    async def start(self) -> None:\n        for _ in range(self.num_workers):\n            consumer = AIOKafkaConsumer(\n                \"order-events\",\n                bootstrap_servers=\"localhost:9092\",\n                group_id=self.group_id,\n            )\n            await consumer.start()\n            self._consumers.append(consumer)\n            asyncio.create_task(self._consume(consumer))\n\n    async def _consume(self, consumer):\n        async for msg in consumer:\n            data = json.loads(msg.value)\n            await self._handle(data)\n\n    async def stop(self):\n        for c in self._consumers:\n            await c.stop()"}
   ],
   ch4: [
     {diff:2, q:"FastAPIのエンドポイントからTorchServeの推論APIにHTTPリクエストを送るクライアント関数を実装してください。",
-     code:`import httpx
-from fastapi import FastAPI
-
-async def predict_with_torchserve(
-    model_name: str, payload: dict
-) -> dict:
-    # TorchServeのREST API (http://localhost:8080/predictions/{model_name})
-    # にPOSTしてレスポンスを返す`,
-     answer:`async def predict_with_torchserve(
-    model_name: str, payload: dict
-) -> dict:
-    url = f"http://localhost:8080/predictions/{model_name}"
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(url, json=payload)
-        response.raise_for_status()
-        return response.json()`},
+     code:"import httpx\nfrom fastapi import FastAPI\n\nasync def predict_with_torchserve(\n    model_name: str, payload: dict\n) -> dict:\n    # TorchServeのREST API (http://localhost:8080/predictions/{model_name})\n    # にPOSTしてレスポンスを返す",
+     answer:"async def predict_with_torchserve(\n    model_name: str, payload: dict\n) -> dict:\n    url = f\"http://localhost:8080/predictions/{model_name}\"\n    async with httpx.AsyncClient(timeout=30.0) as client:\n        response = await client.post(url, json=payload)\n        response.raise_for_status()\n        return response.json()"},
     {diff:3, q:"モデル推論エンドポイントにリクエストキューイングを実装し、同時実行数を制限してください（asyncio.Semaphoreを使用）。",
-     code:`import asyncio
-from fastapi import FastAPI, HTTPException
-
-MAX_CONCURRENT = 4
-semaphore = asyncio.Semaphore(MAX_CONCURRENT)
-
-@app.post("/predict")
-async def predict(payload: dict):
-    # semaphoreで同時実行数を制限
-    # タイムアウト付きで取得できなければ503を返す`,
-     answer:`@app.post("/predict")
-async def predict(payload: dict):
-    try:
-        await asyncio.wait_for(semaphore.acquire(), timeout=5.0)
-    except asyncio.TimeoutError:
-        raise HTTPException(503, "サービスが混雑しています。しばらく後に再試行してください。")
-    try:
-        result = await predict_with_torchserve("my_model", payload)
-        return result
-    finally:
-        semaphore.release()`}
+     code:"import asyncio\nfrom fastapi import FastAPI, HTTPException\n\nMAX_CONCURRENT = 4\nsemaphore = asyncio.Semaphore(MAX_CONCURRENT)\n\n@app.post(\"/predict\")\nasync def predict(payload: dict):\n    # semaphoreで同時実行数を制限\n    # タイムアウト付きで取得できなければ503を返す",
+     answer:"@app.post(\"/predict\")\nasync def predict(payload: dict):\n    try:\n        await asyncio.wait_for(semaphore.acquire(), timeout=5.0)\n    except asyncio.TimeoutError:\n        raise HTTPException(503, \"サービスが混雑しています。しばらく後に再試行してください。\")\n    try:\n        result = await predict_with_torchserve(\"my_model\", payload)\n        return result\n    finally:\n        semaphore.release()"}
   ],
   ch5: [
     {diff:2, q:"MangumでFastAPIアプリをAWS Lambda用にラップし、SAMテンプレートの最小構成を書いてください。",
-     code:`# app.py
-from fastapi import FastAPI
-from mangum import Mangum
-
-app = FastAPI()
-
-@app.get("/")
-def root():
-    return {"hello": "world"}
-
-# LambdaハンドラーをMangumで作成
-handler = ...`,
-     answer:`# app.py
-from fastapi import FastAPI
-from mangum import Mangum
-
-app = FastAPI(root_path="/prod")  # API Gatewayのステージ名
-
-@app.get("/")
-def root():
-    return {"hello": "world"}
-
-handler = Mangum(app, lifespan="off")
-
-# template.yaml (SAM)
-# Resources:
-#   FastAPIFunction:
-#     Type: AWS::Serverless::Function
-#     Properties:
-#       Handler: app.handler
-#       Runtime: python3.12
-#       Events:
-#         Api: {Type: Api, Properties: {Path: "/{proxy+}", Method: ANY}}`},
+     code:"# app.py\nfrom fastapi import FastAPI\nfrom mangum import Mangum\n\napp = FastAPI()\n\n@app.get(\"/\")\ndef root():\n    return {\"hello\": \"world\"}\n\n# LambdaハンドラーをMangumで作成\nhandler = ...",
+     answer:"# app.py\nfrom fastapi import FastAPI\nfrom mangum import Mangum\n\napp = FastAPI(root_path=\"/prod\")  # API Gatewayのステージ名\n\n@app.get(\"/\")\ndef root():\n    return {\"hello\": \"world\"}\n\nhandler = Mangum(app, lifespan=\"off\")\n\n# template.yaml (SAM)\n# Resources:\n#   FastAPIFunction:\n#     Type: AWS::Serverless::Function\n#     Properties:\n#       Handler: app.handler\n#       Runtime: python3.12\n#       Events:\n#         Api: {Type: Api, Properties: {Path: \"/{proxy+}\", Method: ANY}}"},
     {diff:3, q:"Lambda関数のコールドスタートを削減するため、グローバルスコープで初期化すべきリソースと、ハンドラ内で初期化すべきリソースを分けて実装してください。",
-     code:`import boto3
-from fastapi import FastAPI
-
-# グローバルスコープ (コールドスタート時のみ実行)
-# ハンドラスコープ (毎リクエスト実行)`,
-     answer:`import boto3
-import json
-from mangum import Mangum
-from fastapi import FastAPI
-
-# グローバルスコープ: 初期化コストが高いが再利用できるもの
-app = FastAPI()
-s3_client = boto3.client("s3")      # 接続を再利用
-_model_cache = {}                    # モデルをキャッシュ
-
-def get_model(name: str):
-    if name not in _model_cache:
-        # 初回のみS3からダウンロード
-        _model_cache[name] = load_model_from_s3(name)
-    return _model_cache[name]
-
-@app.post("/predict/{model_name}")
-async def predict(model_name: str, data: dict):
-    model = get_model(model_name)  # キャッシュから取得
-    return {"result": model.predict(data)}
-
-handler = Mangum(app)`}
+     code:"import boto3\nfrom fastapi import FastAPI\n\n# グローバルスコープ (コールドスタート時のみ実行)\n# ハンドラスコープ (毎リクエスト実行)",
+     answer:"import boto3\nimport json\nfrom mangum import Mangum\nfrom fastapi import FastAPI\n\n# グローバルスコープ: 初期化コストが高いが再利用できるもの\napp = FastAPI()\ns3_client = boto3.client(\"s3\")      # 接続を再利用\n_model_cache = {}                    # モデルをキャッシュ\n\ndef get_model(name: str):\n    if name not in _model_cache:\n        # 初回のみS3からダウンロード\n        _model_cache[name] = load_model_from_s3(name)\n    return _model_cache[name]\n\n@app.post(\"/predict/{model_name}\")\nasync def predict(model_name: str, data: dict):\n    model = get_model(model_name)  # キャッシュから取得\n    return {\"result\": model.predict(data)}\n\nhandler = Mangum(app)"}
   ],
   ch6: [
     {diff:2, q:"Nginxをリバースプロキシとして使い、FastAPIに転送する最小限のnginx.confを書いてください。upstream設定とlocation設定を含めてください。",
-     code:`# /etc/nginx/conf.d/fastapi.conf
-upstream fastapi_backend {
-    # FastAPIが8000番でリッスン、3インスタンス
-}
-
-server {
-    listen 80;
-    # location / の設定
-}`,
-     answer:`upstream fastapi_backend {
-    server 127.0.0.1:8000;
-    server 127.0.0.1:8001;
-    server 127.0.0.1:8002;
-    keepalive 32;
-}
-
-server {
-    listen 80;
-    server_name api.example.com;
-
-    location / {
-        proxy_pass http://fastapi_backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";  # keepaliveのため
-    }
-}`},
+     code:"# /etc/nginx/conf.d/fastapi.conf\nupstream fastapi_backend {\n    # FastAPIが8000番でリッスン、3インスタンス\n}\n\nserver {\n    listen 80;\n    # location / の設定\n}",
+     answer:"upstream fastapi_backend {\n    server 127.0.0.1:8000;\n    server 127.0.0.1:8001;\n    server 127.0.0.1:8002;\n    keepalive 32;\n}\n\nserver {\n    listen 80;\n    server_name api.example.com;\n\n    location / {\n        proxy_pass http://fastapi_backend;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_http_version 1.1;\n        proxy_set_header Connection \"\";  # keepaliveのため\n    }\n}"},
     {diff:3, q:"FastAPIにAPI Gatewayとしての機能を持たせるミドルウェアを実装してください。レートリミット（IPごとに1分間60リクエスト）を実装してください。",
-     code:`from starlette.middleware.base import BaseHTTPMiddleware
-from collections import defaultdict
-import time
-
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, max_requests=60, window=60):
-        super().__init__(app)
-        # カウンターとウィンドウの管理
-
-    async def dispatch(self, request, call_next):
-        # IPを取得してレートチェック`,
-     answer:`from starlette.middleware.base import BaseHTTPMiddleware
-from collections import defaultdict
-import time
-
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, max_requests=60, window=60):
-        super().__init__(app)
-        self.max_requests = max_requests
-        self.window = window
-        self.requests: dict[str, list[float]] = defaultdict(list)
-
-    async def dispatch(self, request, call_next):
-        ip = request.client.host
-        now = time.time()
-        # 古いリクエストを削除
-        self.requests[ip] = [t for t in self.requests[ip] if now - t < self.window]
-        if len(self.requests[ip]) >= self.max_requests:
-            from starlette.responses import JSONResponse
-            return JSONResponse({"detail":"Rate limit exceeded"}, status_code=429)
-        self.requests[ip].append(now)
-        return await call_next(request)`}
+     code:"from starlette.middleware.base import BaseHTTPMiddleware\nfrom collections import defaultdict\nimport time\n\nclass RateLimitMiddleware(BaseHTTPMiddleware):\n    def __init__(self, app, max_requests=60, window=60):\n        super().__init__(app)\n        # カウンターとウィンドウの管理\n\n    async def dispatch(self, request, call_next):\n        # IPを取得してレートチェック",
+     answer:"from starlette.middleware.base import BaseHTTPMiddleware\nfrom collections import defaultdict\nimport time\n\nclass RateLimitMiddleware(BaseHTTPMiddleware):\n    def __init__(self, app, max_requests=60, window=60):\n        super().__init__(app)\n        self.max_requests = max_requests\n        self.window = window\n        self.requests: dict[str, list[float]] = defaultdict(list)\n\n    async def dispatch(self, request, call_next):\n        ip = request.client.host\n        now = time.time()\n        # 古いリクエストを削除\n        self.requests[ip] = [t for t in self.requests[ip] if now - t < self.window]\n        if len(self.requests[ip]) >= self.max_requests:\n            from starlette.responses import JSONResponse\n            return JSONResponse({\"detail\":\"Rate limit exceeded\"}, status_code=429)\n        self.requests[ip].append(now)\n        return await call_next(request)"}
   ],
   ch7: [
     {diff:2, q:"FastAPIにプラグインシステムを実装してください。Pluginプロトコルクラスを定義し、PluginManagerでプラグインを動的に登録・実行できるようにしてください。",
-     code:`from typing import Protocol
-from fastapi import FastAPI
-
-class Plugin(Protocol):
-    name: str
-    async def on_startup(self, app: FastAPI) -> None: ...
-    async def on_request(self, request, call_next): ...
-
-class PluginManager:
-    def register(self, plugin: Plugin) -> None: ...
-    async def run_startup(self, app: FastAPI) -> None: ...`,
-     answer:`from typing import Protocol
-from fastapi import FastAPI
-
-class Plugin(Protocol):
-    name: str
-    async def on_startup(self, app: FastAPI) -> None: ...
-    async def on_request(self, request, call_next): ...
-
-class PluginManager:
-    def __init__(self):
-        self._plugins: list[Plugin] = []
-
-    def register(self, plugin: Plugin) -> None:
-        self._plugins.append(plugin)
-        print(f"Plugin registered: {plugin.name}")
-
-    async def run_startup(self, app: FastAPI) -> None:
-        for plugin in self._plugins:
-            await plugin.on_startup(app)
-
-plugin_manager = PluginManager()
-
-class LoggingPlugin:
-    name = "logging"
-    async def on_startup(self, app): print("Logging plugin started")
-    async def on_request(self, request, call_next):
-        print(f"Request: {request.method} {request.url}")
-        return await call_next(request)`},
+     code:"from typing import Protocol\nfrom fastapi import FastAPI\n\nclass Plugin(Protocol):\n    name: str\n    async def on_startup(self, app: FastAPI) -> None: ...\n    async def on_request(self, request, call_next): ...\n\nclass PluginManager:\n    def register(self, plugin: Plugin) -> None: ...\n    async def run_startup(self, app: FastAPI) -> None: ...",
+     answer:"from typing import Protocol\nfrom fastapi import FastAPI\n\nclass Plugin(Protocol):\n    name: str\n    async def on_startup(self, app: FastAPI) -> None: ...\n    async def on_request(self, request, call_next): ...\n\nclass PluginManager:\n    def __init__(self):\n        self._plugins: list[Plugin] = []\n\n    def register(self, plugin: Plugin) -> None:\n        self._plugins.append(plugin)\n        print(f\"Plugin registered: {plugin.name}\")\n\n    async def run_startup(self, app: FastAPI) -> None:\n        for plugin in self._plugins:\n            await plugin.on_startup(app)\n\nplugin_manager = PluginManager()\n\nclass LoggingPlugin:\n    name = \"logging\"\n    async def on_startup(self, app): print(\"Logging plugin started\")\n    async def on_request(self, request, call_next):\n        print(f\"Request: {request.method} {request.url}\")\n        return await call_next(request)"},
     {diff:3, q:"依存性注入コンテナをFastAPIと統合してください。サービスのライフサイクル（singleton/transient）を管理できるContainerクラスを実装してください。",
-     code:`from typing import TypeVar, Type, Callable
-T = TypeVar('T')
-
-class Container:
-    def register_singleton(self, interface: Type[T], factory: Callable[[], T]) -> None: ...
-    def register_transient(self, interface: Type[T], factory: Callable[[], T]) -> None: ...
-    def resolve(self, interface: Type[T]) -> T: ...`,
-     answer:`class Container:
-    def __init__(self):
-        self._singletons: dict = {}
-        self._transients: dict = {}
-        self._instances: dict = {}
-
-    def register_singleton(self, interface, factory):
-        self._singletons[interface] = factory
-
-    def register_transient(self, interface, factory):
-        self._transients[interface] = factory
-
-    def resolve(self, interface):
-        if interface in self._singletons:
-            if interface not in self._instances:
-                self._instances[interface] = self._singletons[interface]()
-            return self._instances[interface]
-        if interface in self._transients:
-            return self._transients[interface]()
-        raise KeyError(f"Not registered: {interface}")
-
-container = Container()
-# 使用例
-# container.register_singleton(DatabaseService, lambda: DatabaseService(url))
-# db = container.resolve(DatabaseService)`}
+     code:"from typing import TypeVar, Type, Callable\nT = TypeVar('T')\n\nclass Container:\n    def register_singleton(self, interface: Type[T], factory: Callable[[], T]) -> None: ...\n    def register_transient(self, interface: Type[T], factory: Callable[[], T]) -> None: ...\n    def resolve(self, interface: Type[T]) -> T: ...",
+     answer:"class Container:\n    def __init__(self):\n        self._singletons: dict = {}\n        self._transients: dict = {}\n        self._instances: dict = {}\n\n    def register_singleton(self, interface, factory):\n        self._singletons[interface] = factory\n\n    def register_transient(self, interface, factory):\n        self._transients[interface] = factory\n\n    def resolve(self, interface):\n        if interface in self._singletons:\n            if interface not in self._instances:\n                self._instances[interface] = self._singletons[interface]()\n            return self._instances[interface]\n        if interface in self._transients:\n            return self._transients[interface]()\n        raise KeyError(f\"Not registered: {interface}\")\n\ncontainer = Container()\n# 使用例\n# container.register_singleton(DatabaseService, lambda: DatabaseService(url))\n# db = container.resolve(DatabaseService)"}
   ],
   ch8: [
     {diff:2, q:"cProfileとsnakevizを使ってFastAPIエンドポイントのプロファイリングを行うためのミドルウェアを実装してください。",
-     code:`import cProfile, pstats, io
-from starlette.middleware.base import BaseHTTPMiddleware
-
-class ProfilingMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, profile_path: str = "/profile"):
-        # /profileへのリクエストのみプロファイリング
-        pass`,
-     answer:`import cProfile, pstats, io
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import PlainTextResponse
-
-class ProfilingMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, profile_path="/profile"):
-        super().__init__(app)
-        self.profile_path = profile_path
-
-    async def dispatch(self, request, call_next):
-        if not request.url.path.startswith(self.profile_path):
-            return await call_next(request)
-        profiler = cProfile.Profile()
-        profiler.enable()
-        response = await call_next(request)
-        profiler.disable()
-        sio = io.StringIO()
-        ps = pstats.Stats(profiler, stream=sio).sort_stats("cumulative")
-        ps.print_stats(20)
-        return PlainTextResponse(sio.getvalue())`},
+     code:"import cProfile, pstats, io\nfrom starlette.middleware.base import BaseHTTPMiddleware\n\nclass ProfilingMiddleware(BaseHTTPMiddleware):\n    def __init__(self, app, profile_path: str = \"/profile\"):\n        # /profileへのリクエストのみプロファイリング\n        pass",
+     answer:"import cProfile, pstats, io\nfrom starlette.middleware.base import BaseHTTPMiddleware\nfrom starlette.responses import PlainTextResponse\n\nclass ProfilingMiddleware(BaseHTTPMiddleware):\n    def __init__(self, app, profile_path=\"/profile\"):\n        super().__init__(app)\n        self.profile_path = profile_path\n\n    async def dispatch(self, request, call_next):\n        if not request.url.path.startswith(self.profile_path):\n            return await call_next(request)\n        profiler = cProfile.Profile()\n        profiler.enable()\n        response = await call_next(request)\n        profiler.disable()\n        sio = io.StringIO()\n        ps = pstats.Stats(profiler, stream=sio).sort_stats(\"cumulative\")\n        ps.print_stats(20)\n        return PlainTextResponse(sio.getvalue())"},
     {diff:3, q:"uvicornをGunicornワーカーとして起動し、本番環境に最適化された設定を記述してください。CPUコア数に基づいてワーカー数を自動計算してください。",
-     code:`# gunicorn_config.py
-import multiprocessing
-
-# ワーカー数: (CPUコア数 * 2) + 1 が目安
-workers = ...
-worker_class = ...
-# その他の本番設定`,
-     answer:`# gunicorn_config.py
-import multiprocessing
-
-workers = multiprocessing.cpu_count() * 2 + 1
-worker_class = "uvicorn.workers.UvicornWorker"
-bind = "0.0.0.0:8000"
-timeout = 30
-keepalive = 5
-max_requests = 1000        # ワーカーのメモリリーク対策
-max_requests_jitter = 100  # 同時再起動を防ぐランダム幅
-preload_app = True         # フォーク前にアプリをロード（メモリ共有）
-accesslog = "-"
-errorlog = "-"
-loglevel = "info"
-
-# 起動コマンド:
-# gunicorn -c gunicorn_config.py app:app`}
+     code:"# gunicorn_config.py\nimport multiprocessing\n\n# ワーカー数: (CPUコア数 * 2) + 1 が目安\nworkers = ...\nworker_class = ...\n# その他の本番設定",
+     answer:"# gunicorn_config.py\nimport multiprocessing\n\nworkers = multiprocessing.cpu_count() * 2 + 1\nworker_class = \"uvicorn.workers.UvicornWorker\"\nbind = \"0.0.0.0:8000\"\ntimeout = 30\nkeepalive = 5\nmax_requests = 1000        # ワーカーのメモリリーク対策\nmax_requests_jitter = 100  # 同時再起動を防ぐランダム幅\npreload_app = True         # フォーク前にアプリをロード（メモリ共有）\naccesslog = \"-\"\nerrorlog = \"-\"\nloglevel = \"info\"\n\n# 起動コマンド:\n# gunicorn -c gunicorn_config.py app:app"}
   ],
 };
 
@@ -491,676 +90,82 @@ const chapters = [
   {id:"ch1", num:1, title:"ASGIプロトコルとStarlette内部構造", est:"70分",
    goal:"ASGIのscope/receive/send三要素を理解し、Starletteのルーティング・ミドルウェアの仕組みを説明できる。生のASGIアプリを実装できる。",
    sections:[
-     {title:"ASGIプロトコルの仕組み", body:`ASGIはAsynchronous Server Gateway Interfaceの略で、Pythonの非同期Webサーバーとアプリケーション間の標準インターフェースです。古いWSGIと違い、WebSocket・HTTP/2・SSEなど非同期接続を標準でサポートします。FastAPIはASGIアプリケーションであり、その下にStarletteが、さらにその下にuvicornがあります。
-
-ASGIアプリはasync def app(scope, receive, send)というシグネチャを持つ非同期関数または呼び出し可能オブジェクトです。scopeは接続の情報（HTTP/WebSocket・パス・メソッド・ヘッダーなど）を持つ辞書です。receiveはクライアントからのイベントを受け取るコルーチン、sendはクライアントへイベントを送るコルーチンです。
-
-FastAPIのRouterやミドルウェアは全てこの三要素を抽象化したラッパーです。uvicornはHTTPリクエストをASGIのscope・receive・sendに変換してFastAPIに渡します。低レベルを理解することで、パフォーマンスの問題やデバッグが格段に楽になります。`,
-      code:`# 生のASGIアプリ実装
-import json
-
-async def simple_app(scope, receive, send):
-    """HTTPのみ対応する最小ASGIアプリ"""
-    if scope["type"] != "http":
-        return
-
-    # リクエストボディを受け取る
-    body = b""
-    while True:
-        event = await receive()
-        body += event.get("body", b"")
-        if not event.get("more_body", False):
-            break
-
-    # レスポンスを送る
-    path = scope["path"]
-    response_data = {"path": path, "method": scope["method"]}
-    response_body = json.dumps(response_data).encode()
-
-    await send({
-        "type": "http.response.start",
-        "status": 200,
-        "headers": [
-            [b"content-type", b"application/json"],
-            [b"content-length", str(len(response_body)).encode()],
-        ],
-    })
-    await send({
-        "type": "http.response.body",
-        "body": response_body,
-    })`,
+     {title:"ASGIプロトコルの仕組み", body:"ASGIはAsynchronous Server Gateway Interfaceの略で、Pythonの非同期Webサーバーとアプリケーション間の標準インターフェースです。古いWSGIと違い、WebSocket・HTTP/2・SSEなど非同期接続を標準でサポートします。FastAPIはASGIアプリケーションであり、その下にStarletteが、さらにその下にuvicornがあります。\n\nASGIアプリはasync def app(scope, receive, send)というシグネチャを持つ非同期関数または呼び出し可能オブジェクトです。scopeは接続の情報（HTTP/WebSocket・パス・メソッド・ヘッダーなど）を持つ辞書です。receiveはクライアントからのイベントを受け取るコルーチン、sendはクライアントへイベントを送るコルーチンです。\n\nFastAPIのRouterやミドルウェアは全てこの三要素を抽象化したラッパーです。uvicornはHTTPリクエストをASGIのscope・receive・sendに変換してFastAPIに渡します。低レベルを理解することで、パフォーマンスの問題やデバッグが格段に楽になります。",
+      code:"# 生のASGIアプリ実装\nimport json\n\nasync def simple_app(scope, receive, send):\n    \"\"\"HTTPのみ対応する最小ASGIアプリ\"\"\"\n    if scope[\"type\"] != \"http\":\n        return\n\n    # リクエストボディを受け取る\n    body = b\"\"\n    while True:\n        event = await receive()\n        body += event.get(\"body\", b\"\")\n        if not event.get(\"more_body\", False):\n            break\n\n    # レスポンスを送る\n    path = scope[\"path\"]\n    response_data = {\"path\": path, \"method\": scope[\"method\"]}\n    response_body = json.dumps(response_data).encode()\n\n    await send({\n        \"type\": \"http.response.start\",\n        \"status\": 200,\n        \"headers\": [\n            [b\"content-type\", b\"application/json\"],\n            [b\"content-length\", str(len(response_body)).encode()],\n        ],\n    })\n    await send({\n        \"type\": \"http.response.body\",\n        \"body\": response_body,\n    })",
       afterCode:"uvicornで生のASGIアプリを起動: uvicorn app:simple_app --reload。FastAPIはこのsimple_appと全く同じインターフェースを実装したクラスです。"},
-     {title:"Starletteミドルウェアスタック", body:`Starletteのミドルウェアはオニオンアーキテクチャで動作します。リクエストは外側から内側に向かってミドルウェアを通過し、レスポンスは内側から外側に向かって戻ります。app.add_middleware()で追加した順の逆順で実行されます。
-
-BaseHTTPMiddlewareはASGIミドルウェアを簡単に書けるヘルパークラスです。ただし、すべてのリクエストボディをメモリにバッファリングするためStreamingResponseとの相性が悪いという既知の問題があります。パフォーマンスが重要な場合は生のASGIミドルウェア（__init__・__call__を持つクラス）を書きます。
-
-ミドルウェアの追加順序に注意してください。後からadd_middleware()したものが外側（先に実行）になります。認証ミドルウェアはレートリミットより内側に置き、認証前にレートリミットを行う設計が一般的です。`,
-      code:`from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp, Receive, Scope, Send
-import time, logging
-
-# 方法1: BaseHTTPMiddleware（シンプルだが制限あり）
-class TimingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        start = time.perf_counter()
-        response = await call_next(request)
-        elapsed = time.perf_counter() - start
-        response.headers["X-Process-Time"] = f"{elapsed:.3f}s"
-        return response
-
-# 方法2: 生のASGIミドルウェア（高パフォーマンス）
-class RawTimingMiddleware:
-    def __init__(self, app: ASGIApp):
-        self.app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send):
-        if scope["type"] == "http":
-            start = time.perf_counter()
-            async def send_wrapper(message):
-                if message["type"] == "http.response.start":
-                    elapsed = time.perf_counter() - start
-                    headers = list(message.get("headers", []))
-                    headers.append([b"x-process-time", f"{elapsed:.3f}s".encode()])
-                    message = {**message, "headers": headers}
-                await send(message)
-            await self.app(scope, receive, send_wrapper)
-        else:
-            await self.app(scope, receive, send)`,
+     {title:"Starletteミドルウェアスタック", body:"Starletteのミドルウェアはオニオンアーキテクチャで動作します。リクエストは外側から内側に向かってミドルウェアを通過し、レスポンスは内側から外側に向かって戻ります。app.add_middleware()で追加した順の逆順で実行されます。\n\nBaseHTTPMiddlewareはASGIミドルウェアを簡単に書けるヘルパークラスです。ただし、すべてのリクエストボディをメモリにバッファリングするためStreamingResponseとの相性が悪いという既知の問題があります。パフォーマンスが重要な場合は生のASGIミドルウェア（__init__・__call__を持つクラス）を書きます。\n\nミドルウェアの追加順序に注意してください。後からadd_middleware()したものが外側（先に実行）になります。認証ミドルウェアはレートリミットより内側に置き、認証前にレートリミットを行う設計が一般的です。",
+      code:"from starlette.middleware.base import BaseHTTPMiddleware\nfrom starlette.types import ASGIApp, Receive, Scope, Send\nimport time, logging\n\n# 方法1: BaseHTTPMiddleware（シンプルだが制限あり）\nclass TimingMiddleware(BaseHTTPMiddleware):\n    async def dispatch(self, request, call_next):\n        start = time.perf_counter()\n        response = await call_next(request)\n        elapsed = time.perf_counter() - start\n        response.headers[\"X-Process-Time\"] = f\"{elapsed:.3f}s\"\n        return response\n\n# 方法2: 生のASGIミドルウェア（高パフォーマンス）\nclass RawTimingMiddleware:\n    def __init__(self, app: ASGIApp):\n        self.app = app\n\n    async def __call__(self, scope: Scope, receive: Receive, send: Send):\n        if scope[\"type\"] == \"http\":\n            start = time.perf_counter()\n            async def send_wrapper(message):\n                if message[\"type\"] == \"http.response.start\":\n                    elapsed = time.perf_counter() - start\n                    headers = list(message.get(\"headers\", []))\n                    headers.append([b\"x-process-time\", f\"{elapsed:.3f}s\".encode()])\n                    message = {**message, \"headers\": headers}\n                await send(message)\n            await self.app(scope, receive, send_wrapper)\n        else:\n            await self.app(scope, receive, send)",
       afterCode:"生のASGIミドルウェアはBaseHTTPMiddlewareと異なり、ストリーミングレスポンスも正しく処理できます。大量のトラフィックがある本番環境では生のASGIミドルウェアが推奨されます。"}
    ]},
   {id:"ch2", num:2, title:"CQRSパターンとイベントソーシング", est:"70分",
    goal:"CQRSのコマンド・クエリ分離の原則を理解し、イベントソーシングでシステムの状態変化を永続化できる。集約ルートとドメインイベントを実装できる。",
    sections:[
-     {title:"CQRSの設計と実装", body:`CQRS（Command Query Responsibility Segregation）はコマンド（状態変更）とクエリ（参照）を分離するアーキテクチャパターンです。Djangoのビュー関数が読み書き両方を担当するのとは対照的に、CQRSではコマンド用のライトモデルとクエリ用のリードモデルを完全に分離します。
-
-コマンドは「何をしたいか」を表すデータ構造です。CreateOrderCommand・UpdateUserCommandのように命令形で名付けます。コマンドハンドラはコマンドを受け取りビジネスロジックを実行してドメインイベントを発行します。Pythonのdataclassがコマンドの定義に最適です。
-
-クエリはリードモデルから効率的にデータを取得します。ライトモデルとは別のデータストア（例: Elasticsearchやリードレプリカ）を使うこともあります。FastAPIではコマンド用のPOST/PUT/DELETEエンドポイントとクエリ用のGETエンドポイントをRouter単位で分離します。`,
-      code:`from dataclasses import dataclass, field
-from typing import Protocol
-import uuid, datetime
-
-# コマンド定義
-@dataclass
-class CreateOrderCommand:
-    user_id: str
-    items: list[dict]
-    command_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-
-# ドメインイベント
-@dataclass
-class OrderCreatedEvent:
-    aggregate_id: str
-    user_id: str
-    items: list[dict]
-    occurred_at: datetime.datetime = field(
-        default_factory=datetime.datetime.utcnow)
-
-# コマンドバス
-class CommandBus:
-    def __init__(self):
-        self._handlers: dict = {}
-
-    def register(self, command_type, handler):
-        self._handlers[command_type] = handler
-
-    async def dispatch(self, command):
-        handler = self._handlers.get(type(command))
-        if not handler:
-            raise ValueError(f"No handler for {type(command)}")
-        return await handler(command)`,
+     {title:"CQRSの設計と実装", body:"CQRS（Command Query Responsibility Segregation）はコマンド（状態変更）とクエリ（参照）を分離するアーキテクチャパターンです。Djangoのビュー関数が読み書き両方を担当するのとは対照的に、CQRSではコマンド用のライトモデルとクエリ用のリードモデルを完全に分離します。\n\nコマンドは「何をしたいか」を表すデータ構造です。CreateOrderCommand・UpdateUserCommandのように命令形で名付けます。コマンドハンドラはコマンドを受け取りビジネスロジックを実行してドメインイベントを発行します。Pythonのdataclassがコマンドの定義に最適です。\n\nクエリはリードモデルから効率的にデータを取得します。ライトモデルとは別のデータストア（例: Elasticsearchやリードレプリカ）を使うこともあります。FastAPIではコマンド用のPOST/PUT/DELETEエンドポイントとクエリ用のGETエンドポイントをRouter単位で分離します。",
+      code:"from dataclasses import dataclass, field\nfrom typing import Protocol\nimport uuid, datetime\n\n# コマンド定義\n@dataclass\nclass CreateOrderCommand:\n    user_id: str\n    items: list[dict]\n    command_id: str = field(default_factory=lambda: str(uuid.uuid4()))\n\n# ドメインイベント\n@dataclass\nclass OrderCreatedEvent:\n    aggregate_id: str\n    user_id: str\n    items: list[dict]\n    occurred_at: datetime.datetime = field(\n        default_factory=datetime.datetime.utcnow)\n\n# コマンドバス\nclass CommandBus:\n    def __init__(self):\n        self._handlers: dict = {}\n\n    def register(self, command_type, handler):\n        self._handlers[command_type] = handler\n\n    async def dispatch(self, command):\n        handler = self._handlers.get(type(command))\n        if not handler:\n            raise ValueError(f\"No handler for {type(command)}\")\n        return await handler(command)",
       afterCode:"CommandBusはMediatrパターンの実装です。Pythonライブラリではpyfastcqrsやpymediatorが同様の機能を提供します。DIコンテナと組み合わせると依存性の管理が容易になります。"},
-     {title:"イベントソーシングの実装", body:`イベントソーシングは、システムの状態をデータベースに直接保存するのではなく、状態変化のイベントをシーケンシャルに保存するパターンです。Pythonのgitリポジトリがコミット履歴を保持するのと同じ発想です。「現在の状態」はイベントを最初から再生（リプレイ）することで復元できます。
-
-集約（Aggregate）はドメインオブジェクトの一貫性の境界です。OrderAggregate内でOrderCreated・ItemAdded・OrderCancelledなどのイベントを発行し、それを基に状態を構築します。外から直接フィールドを変更するのではなく、必ずコマンドメソッドを通じて変更します。
-
-スナップショットは最適化技術で、全イベントを最初から再生するコストを削減します。例えば1000イベントを500イベントごとにスナップショットを取れば、最大で500イベントのリプレイで済みます。`,
-      code:`from dataclasses import dataclass, field
-from typing import Any
-import json
-
-@dataclass
-class Order:
-    """注文集約"""
-    id: str
-    user_id: str
-    items: list[dict] = field(default_factory=list)
-    status: str = "pending"
-    _events: list = field(default_factory=list, repr=False)
-
-    @classmethod
-    def create(cls, user_id: str, items: list[dict]) -> "Order":
-        order = cls(id=str(uuid.uuid4()), user_id=user_id)
-        event = OrderCreatedEvent(
-            aggregate_id=order.id, user_id=user_id, items=items)
-        order._apply(event)
-        order._events.append(event)
-        return order
-
-    def cancel(self):
-        if self.status != "pending":
-            raise ValueError("キャンセルできるのはpending状態のみです")
-        event = {"type": "OrderCancelled", "aggregate_id": self.id}
-        self._apply(event)
-        self._events.append(event)
-
-    def _apply(self, event):
-        if isinstance(event, OrderCreatedEvent):
-            self.items = event.items
-            self.status = "pending"
-        elif isinstance(event, dict) and event["type"] == "OrderCancelled":
-            self.status = "cancelled"
-
-    def pop_events(self) -> list:
-        events, self._events = self._events, []
-        return events`,
+     {title:"イベントソーシングの実装", body:"イベントソーシングは、システムの状態をデータベースに直接保存するのではなく、状態変化のイベントをシーケンシャルに保存するパターンです。Pythonのgitリポジトリがコミット履歴を保持するのと同じ発想です。「現在の状態」はイベントを最初から再生（リプレイ）することで復元できます。\n\n集約（Aggregate）はドメインオブジェクトの一貫性の境界です。OrderAggregate内でOrderCreated・ItemAdded・OrderCancelledなどのイベントを発行し、それを基に状態を構築します。外から直接フィールドを変更するのではなく、必ずコマンドメソッドを通じて変更します。\n\nスナップショットは最適化技術で、全イベントを最初から再生するコストを削減します。例えば1000イベントを500イベントごとにスナップショットを取れば、最大で500イベントのリプレイで済みます。",
+      code:"from dataclasses import dataclass, field\nfrom typing import Any\nimport json\n\n@dataclass\nclass Order:\n    \"\"\"注文集約\"\"\"\n    id: str\n    user_id: str\n    items: list[dict] = field(default_factory=list)\n    status: str = \"pending\"\n    _events: list = field(default_factory=list, repr=False)\n\n    @classmethod\n    def create(cls, user_id: str, items: list[dict]) -> \"Order\":\n        order = cls(id=str(uuid.uuid4()), user_id=user_id)\n        event = OrderCreatedEvent(\n            aggregate_id=order.id, user_id=user_id, items=items)\n        order._apply(event)\n        order._events.append(event)\n        return order\n\n    def cancel(self):\n        if self.status != \"pending\":\n            raise ValueError(\"キャンセルできるのはpending状態のみです\")\n        event = {\"type\": \"OrderCancelled\", \"aggregate_id\": self.id}\n        self._apply(event)\n        self._events.append(event)\n\n    def _apply(self, event):\n        if isinstance(event, OrderCreatedEvent):\n            self.items = event.items\n            self.status = \"pending\"\n        elif isinstance(event, dict) and event[\"type\"] == \"OrderCancelled\":\n            self.status = \"cancelled\"\n\n    def pop_events(self) -> list:\n        events, self._events = self._events, []\n        return events",
       afterCode:"pop_events()で未コミットのイベントを取り出してイベントストアに保存します。集約はイベントを自分で管理し、外部から直接stateを変更できないようにすることが重要です。"}
    ]},
   {id:"ch3", num:3, title:"Kafkaとメッセージキュー統合", est:"65分",
    goal:"aiokafkaでFastAPIアプリからKafkaにメッセージを発行・消費し、デッドレターキューと再試行ロジックを実装できる。",
    sections:[
-     {title:"aiokafkaの基本とFastAPI統合", body:`Kafkaは高スループット・永続的なメッセージキューです。RabbitMQと異なり、メッセージを一定期間保持（デフォルト7日）し、複数のコンシューマーが独立して読み取れます。Pythonのaiokafkaは非同期のKafkaクライアントで、FastAPIのasync/awaitと完全に統合できます。
-
-FastAPIのlifespan（コンテキストマネージャー形式のstartup/shutdown）を使ってKafkaの接続管理をします。yieldの前がstartup、後がshutdownです。プロデューサーとコンシューマーをapp.stateに格納することで、依存性注入を通じてエンドポイントから参照できます。
-
-メッセージのシリアライズにはJSONが一般的ですが、大量データの場合はMsgpackやAvroを使います。Avroは「スキーマ付きJSON」とも言え、Schema Registryと組み合わせてスキーマの進化を管理できます。`,
-      code:`from contextlib import asynccontextmanager
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
-from fastapi import FastAPI, Depends
-import asyncio, json
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # プロデューサー起動
-    producer = AIOKafkaProducer(
-        bootstrap_servers='localhost:9092',
-        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-        key_serializer=lambda k: k.encode('utf-8') if k else None,
-    )
-    await producer.start()
-    app.state.producer = producer
-
-    # コンシューマータスクをバックグラウンドで起動
-    consumer_task = asyncio.create_task(consume_events(app))
-    yield
-    consumer_task.cancel()
-    await producer.stop()
-
-async def consume_events(app: FastAPI):
-    consumer = AIOKafkaConsumer(
-        "order-events",
-        bootstrap_servers='localhost:9092',
-        group_id="fastapi-consumer-group",
-        auto_offset_reset="earliest",
-    )
-    await consumer.start()
-    try:
-        async for msg in consumer:
-            data = json.loads(msg.value)
-            await handle_order_event(data)
-    finally:
-        await consumer.stop()`,
+     {title:"aiokafkaの基本とFastAPI統合", body:"Kafkaは高スループット・永続的なメッセージキューです。RabbitMQと異なり、メッセージを一定期間保持（デフォルト7日）し、複数のコンシューマーが独立して読み取れます。Pythonのaiokafkaは非同期のKafkaクライアントで、FastAPIのasync/awaitと完全に統合できます。\n\nFastAPIのlifespan（コンテキストマネージャー形式のstartup/shutdown）を使ってKafkaの接続管理をします。yieldの前がstartup、後がshutdownです。プロデューサーとコンシューマーをapp.stateに格納することで、依存性注入を通じてエンドポイントから参照できます。\n\nメッセージのシリアライズにはJSONが一般的ですが、大量データの場合はMsgpackやAvroを使います。Avroは「スキーマ付きJSON」とも言え、Schema Registryと組み合わせてスキーマの進化を管理できます。",
+      code:"from contextlib import asynccontextmanager\nfrom aiokafka import AIOKafkaProducer, AIOKafkaConsumer\nfrom fastapi import FastAPI, Depends\nimport asyncio, json\n\n@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    # プロデューサー起動\n    producer = AIOKafkaProducer(\n        bootstrap_servers='localhost:9092',\n        value_serializer=lambda v: json.dumps(v).encode('utf-8'),\n        key_serializer=lambda k: k.encode('utf-8') if k else None,\n    )\n    await producer.start()\n    app.state.producer = producer\n\n    # コンシューマータスクをバックグラウンドで起動\n    consumer_task = asyncio.create_task(consume_events(app))\n    yield\n    consumer_task.cancel()\n    await producer.stop()\n\nasync def consume_events(app: FastAPI):\n    consumer = AIOKafkaConsumer(\n        \"order-events\",\n        bootstrap_servers='localhost:9092',\n        group_id=\"fastapi-consumer-group\",\n        auto_offset_reset=\"earliest\",\n    )\n    await consumer.start()\n    try:\n        async for msg in consumer:\n            data = json.loads(msg.value)\n            await handle_order_event(data)\n    finally:\n        await consumer.stop()",
       afterCode:"asyncio.create_task()でコンシューマーをバックグラウンドで実行します。タスクのキャンセルはconsumer_task.cancel()で行い、finallyブロックでconsumer.stop()を確実に呼びます。"},
-     {title:"デッドレターキューと再試行ロジック", body:`メッセージ処理は必ず失敗する可能性があります。外部APIの障害・データ不整合・バグなどで処理できなかったメッセージをデッドレターキュー（DLQ）に送り、後で調査・再処理できるようにします。これはPythonのCeleryのtask_rejectsルーティングに相当します。
-
-再試行ロジックは指数バックオフを使います。最初の失敗後1秒、次は2秒、4秒と待ち時間を増やします。Kafkaには組み込みの再試行機能はないため、自前で実装します。失敗カウンタをメッセージのヘッダーに埋め込み、最大試行回数に達したらDLQに送ります。
-
-テナシティ（tenacity）ライブラリを使うと再試行ロジックをシンプルに書けます。@retry(wait=wait_exponential(), stop=stop_after_attempt(3))のデコレータで宣言的に設定できます。`,
-      code:`import asyncio
-from tenacity import retry, wait_exponential, stop_after_attempt, RetryError
-
-MAX_RETRIES = 3
-
-async def handle_with_retry(producer, message: dict, topic: str = "order-events"):
-    """再試行付きメッセージ処理"""
-    retry_count = message.get("_retry_count", 0)
-
-    try:
-        await process_message(message)
-    except Exception as e:
-        if retry_count >= MAX_RETRIES:
-            # 最大試行回数超過 → DLQへ
-            dlq_message = {
-                **message,
-                "_error": str(e),
-                "_failed_at": datetime.datetime.utcnow().isoformat(),
-                "_original_topic": topic,
-            }
-            await producer.send(f"{topic}-dlq", dlq_message)
-            print(f"DLQに送信: {dlq_message}")
-            return
-
-        # 再試行: 指数バックオフ
-        wait_seconds = 2 ** retry_count
-        await asyncio.sleep(wait_seconds)
-        retry_message = {**message, "_retry_count": retry_count + 1}
-        await producer.send(topic, retry_message)
-        print(f"再試行 {retry_count + 1}/{MAX_RETRIES}: {wait_seconds}秒後")`,
+     {title:"デッドレターキューと再試行ロジック", body:"メッセージ処理は必ず失敗する可能性があります。外部APIの障害・データ不整合・バグなどで処理できなかったメッセージをデッドレターキュー（DLQ）に送り、後で調査・再処理できるようにします。これはPythonのCeleryのtask_rejectsルーティングに相当します。\n\n再試行ロジックは指数バックオフを使います。最初の失敗後1秒、次は2秒、4秒と待ち時間を増やします。Kafkaには組み込みの再試行機能はないため、自前で実装します。失敗カウンタをメッセージのヘッダーに埋め込み、最大試行回数に達したらDLQに送ります。\n\nテナシティ（tenacity）ライブラリを使うと再試行ロジックをシンプルに書けます。@retry(wait=wait_exponential(), stop=stop_after_attempt(3))のデコレータで宣言的に設定できます。",
+      code:"import asyncio\nfrom tenacity import retry, wait_exponential, stop_after_attempt, RetryError\n\nMAX_RETRIES = 3\n\nasync def handle_with_retry(producer, message: dict, topic: str = \"order-events\"):\n    \"\"\"再試行付きメッセージ処理\"\"\"\n    retry_count = message.get(\"_retry_count\", 0)\n\n    try:\n        await process_message(message)\n    except Exception as e:\n        if retry_count >= MAX_RETRIES:\n            # 最大試行回数超過 → DLQへ\n            dlq_message = {\n                **message,\n                \"_error\": str(e),\n                \"_failed_at\": datetime.datetime.utcnow().isoformat(),\n                \"_original_topic\": topic,\n            }\n            await producer.send(f\"{topic}-dlq\", dlq_message)\n            print(f\"DLQに送信: {dlq_message}\")\n            return\n\n        # 再試行: 指数バックオフ\n        wait_seconds = 2 ** retry_count\n        await asyncio.sleep(wait_seconds)\n        retry_message = {**message, \"_retry_count\": retry_count + 1}\n        await producer.send(topic, retry_message)\n        print(f\"再試行 {retry_count + 1}/{MAX_RETRIES}: {wait_seconds}秒後\")",
       afterCode:"DLQのメッセージは監視ツールで定期的に確認し、根本原因を修正後に再処理（replay）します。Kafkaのメッセージ保持期間内であれば、オフセットを巻き戻して再処理することもできます。"}
    ]},
   {id:"ch4", num:4, title:"MLサービング（TorchServe・Triton）", est:"65分",
    goal:"TorchServeまたはTriton Inference ServerをFastAPIから呼び出し、バッチ推論・キューイング・モデルバージョン管理を実装できる。",
    sections:[
-     {title:"MLサービングアーキテクチャ", body:`MLモデルをAPIとして公開する方法は大きく3つあります。FastAPI内に直接モデルをロードする方法（シンプルだがスケールしにくい）、TorchServeやTriton Inference Serverなど専用サービングサーバーを使う方法（高スループット・GPU最適化）、BentoML・Rayなどのフレームワークを使う方法です。
-
-TorchServeはPyTorchが公式に提供するサービングサーバーです。モデルアーカイブ（.mar）形式にパッケージして管理API・推論APIを分離して公開します。GPU割り当て・バッチ推論・A/Bテストをサポートします。FastAPIはリクエストを受け取り、TorchServeのREST APIにプロキシするゲートウェイとして機能します。
-
-Triton Inference ServerはNVIDIAが開発し、TensorFlow・PyTorch・ONNX・TensorRTなど複数のフレームワークをサポートします。動的バッチング・モデルアンサンブル・シーケンスバッチング（RNN用）などの高度な機能を持ちます。gRPCとREST両方のインターフェースを提供します。`,
-      code:`import httpx
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import asyncio
-
-app = FastAPI()
-
-class PredictionRequest(BaseModel):
-    model_name: str
-    instances: list[list[float]]  # バッチ入力
-
-class PredictionResponse(BaseModel):
-    predictions: list[float]
-    model_version: str
-
-TORCHSERVE_URL = "http://localhost:8080"
-
-@app.post("/predict", response_model=PredictionResponse)
-async def predict(req: PredictionRequest):
-    url = f"{TORCHSERVE_URL}/predictions/{req.model_name}"
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            response = await client.post(url, json={"instances": req.instances})
-            response.raise_for_status()
-            data = response.json()
-            return PredictionResponse(
-                predictions=data["predictions"],
-                model_version=response.headers.get("X-Model-Version", "unknown")
-            )
-        except httpx.HTTPStatusError as e:
-            raise HTTPException(502, f"モデルサーバーエラー: {e.response.status_code}")
-        except httpx.TimeoutException:
-            raise HTTPException(504, "推論タイムアウト")`,
+     {title:"MLサービングアーキテクチャ", body:"MLモデルをAPIとして公開する方法は大きく3つあります。FastAPI内に直接モデルをロードする方法（シンプルだがスケールしにくい）、TorchServeやTriton Inference Serverなど専用サービングサーバーを使う方法（高スループット・GPU最適化）、BentoML・Rayなどのフレームワークを使う方法です。\n\nTorchServeはPyTorchが公式に提供するサービングサーバーです。モデルアーカイブ（.mar）形式にパッケージして管理API・推論APIを分離して公開します。GPU割り当て・バッチ推論・A/Bテストをサポートします。FastAPIはリクエストを受け取り、TorchServeのREST APIにプロキシするゲートウェイとして機能します。\n\nTriton Inference ServerはNVIDIAが開発し、TensorFlow・PyTorch・ONNX・TensorRTなど複数のフレームワークをサポートします。動的バッチング・モデルアンサンブル・シーケンスバッチング（RNN用）などの高度な機能を持ちます。gRPCとREST両方のインターフェースを提供します。",
+      code:"import httpx\nfrom fastapi import FastAPI, HTTPException\nfrom pydantic import BaseModel\nimport asyncio\n\napp = FastAPI()\n\nclass PredictionRequest(BaseModel):\n    model_name: str\n    instances: list[list[float]]  # バッチ入力\n\nclass PredictionResponse(BaseModel):\n    predictions: list[float]\n    model_version: str\n\nTORCHSERVE_URL = \"http://localhost:8080\"\n\n@app.post(\"/predict\", response_model=PredictionResponse)\nasync def predict(req: PredictionRequest):\n    url = f\"{TORCHSERVE_URL}/predictions/{req.model_name}\"\n    async with httpx.AsyncClient(timeout=30.0) as client:\n        try:\n            response = await client.post(url, json={\"instances\": req.instances})\n            response.raise_for_status()\n            data = response.json()\n            return PredictionResponse(\n                predictions=data[\"predictions\"],\n                model_version=response.headers.get(\"X-Model-Version\", \"unknown\")\n            )\n        except httpx.HTTPStatusError as e:\n            raise HTTPException(502, f\"モデルサーバーエラー: {e.response.status_code}\")\n        except httpx.TimeoutException:\n            raise HTTPException(504, \"推論タイムアウト\")",
       afterCode:"httpxの非同期クライアントを使うことで、TorchServeへのリクエスト中もFastAPIのイベントループをブロックせず、他のリクエストを処理できます。"},
-     {title:"バッチ推論とキューイング", body:`単一リクエストを個別に推論するより、複数リクエストをまとめてバッチ処理する方がGPU効率が高まります。Dynamic Batchingは個別のリクエストをある時間（例: 10ms）待ってからまとめてGPUに送る技術です。TorchServeとTritonは内部でこれをサポートします。
-
-FastAPI側でもキューイングを実装できます。asyncio.Queueを使ってリクエストを貯め、バックグラウンドワーカーがバッチとして処理します。リクエストごとにFutureを作成し、処理完了時にresult()をセットして待機している呼び出し元に結果を返します。
-
-GPUサーバーへのリクエストは同時実行数を制限することが重要です。asyncio.Semaphoreで制限しないとGPUメモリが枯渇します。一般的にGPUサーバー1台あたり4〜8の同時推論リクエストが目安です。`,
-      code:`import asyncio
-from dataclasses import dataclass
-
-@dataclass
-class BatchRequest:
-    instances: list
-    future: asyncio.Future
-
-BATCH_SIZE = 32
-BATCH_TIMEOUT = 0.01  # 10ms
-
-class BatchProcessor:
-    def __init__(self):
-        self._queue: asyncio.Queue[BatchRequest] = asyncio.Queue()
-        self._task: asyncio.Task | None = None
-
-    async def start(self):
-        self._task = asyncio.create_task(self._batch_loop())
-
-    async def predict(self, instances: list) -> list:
-        future = asyncio.get_event_loop().create_future()
-        await self._queue.put(BatchRequest(instances, future))
-        return await future
-
-    async def _batch_loop(self):
-        while True:
-            batch: list[BatchRequest] = []
-            try:
-                req = await asyncio.wait_for(self._queue.get(), BATCH_TIMEOUT)
-                batch.append(req)
-                while len(batch) < BATCH_SIZE:
-                    try:
-                        req = self._queue.get_nowait()
-                        batch.append(req)
-                    except asyncio.QueueEmpty:
-                        break
-            except asyncio.TimeoutError:
-                continue
-            if batch:
-                all_instances = [i for r in batch for i in r.instances]
-                results = await self._run_inference(all_instances)
-                # 各リクエストに結果を返す
-                idx = 0
-                for req in batch:
-                    n = len(req.instances)
-                    req.future.set_result(results[idx:idx+n])
-                    idx += n`,
+     {title:"バッチ推論とキューイング", body:"単一リクエストを個別に推論するより、複数リクエストをまとめてバッチ処理する方がGPU効率が高まります。Dynamic Batchingは個別のリクエストをある時間（例: 10ms）待ってからまとめてGPUに送る技術です。TorchServeとTritonは内部でこれをサポートします。\n\nFastAPI側でもキューイングを実装できます。asyncio.Queueを使ってリクエストを貯め、バックグラウンドワーカーがバッチとして処理します。リクエストごとにFutureを作成し、処理完了時にresult()をセットして待機している呼び出し元に結果を返します。\n\nGPUサーバーへのリクエストは同時実行数を制限することが重要です。asyncio.Semaphoreで制限しないとGPUメモリが枯渇します。一般的にGPUサーバー1台あたり4〜8の同時推論リクエストが目安です。",
+      code:"import asyncio\nfrom dataclasses import dataclass\n\n@dataclass\nclass BatchRequest:\n    instances: list\n    future: asyncio.Future\n\nBATCH_SIZE = 32\nBATCH_TIMEOUT = 0.01  # 10ms\n\nclass BatchProcessor:\n    def __init__(self):\n        self._queue: asyncio.Queue[BatchRequest] = asyncio.Queue()\n        self._task: asyncio.Task | None = None\n\n    async def start(self):\n        self._task = asyncio.create_task(self._batch_loop())\n\n    async def predict(self, instances: list) -> list:\n        future = asyncio.get_event_loop().create_future()\n        await self._queue.put(BatchRequest(instances, future))\n        return await future\n\n    async def _batch_loop(self):\n        while True:\n            batch: list[BatchRequest] = []\n            try:\n                req = await asyncio.wait_for(self._queue.get(), BATCH_TIMEOUT)\n                batch.append(req)\n                while len(batch) < BATCH_SIZE:\n                    try:\n                        req = self._queue.get_nowait()\n                        batch.append(req)\n                    except asyncio.QueueEmpty:\n                        break\n            except asyncio.TimeoutError:\n                continue\n            if batch:\n                all_instances = [i for r in batch for i in r.instances]\n                results = await self._run_inference(all_instances)\n                # 各リクエストに結果を返す\n                idx = 0\n                for req in batch:\n                    n = len(req.instances)\n                    req.future.set_result(results[idx:idx+n])\n                    idx += n",
       afterCode:"Dynamic Batchingにより、個別リクエストの低レイテンシとGPUの高スループットを両立できます。BATCH_TIMEOUTを短くするとレイテンシが改善し、長くするとスループットが向上します。"}
    ]},
   {id:"ch5", num:5, title:"サーバレスデプロイ（AWS Lambda・Mangum）", est:"60分",
    goal:"MangumでFastAPIをAWS Lambdaにデプロイし、コールドスタートの最小化・環境変数管理・SAMでのIaC化ができる。",
    sections:[
-     {title:"MangumとASGI-Lambda変換", body:`MangumはASGIアプリをAWS Lambdaのイベント形式に変換するアダプターです。API Gateway（REST API・HTTP API・ALB）からのイベントをASGIのscope/receive/sendに変換し、FastAPIの応答をLambdaのレスポンス形式に戻します。これはWSGIとLambdaの変換を行うZappaに相当するASGI版です。
-
-Lambdaのコールドスタートとはコンテナの初回起動時間のことで、Pythonでは1〜3秒かかることがあります。グローバルスコープでDBコネクション・ML モデル・ライブラリのインポートを済ませておくことで、2回目以降のウォームスタートでは初期化コストを省けます。Provisioned Concurrencyを使うとコールドスタートを完全になくせますが費用がかかります。
-
-LambdaのメモリはデフォルトでCPU性能にも影響します。512MBより1769MB（実質1vCPU相当）に設定するとPythonの処理が2〜3倍速くなることがあります。費用対効果を計測しながら最適なメモリサイズを選びます。`,
-      code:`# app.py
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from mangum import Mangum
-import os
-
-# グローバルスコープ: Lambdaコンテナ間で再利用される
-DATABASE_URL = os.environ["DATABASE_URL"]
-_db_pool = None  # 遅延初期化
-
-async def get_db_pool():
-    global _db_pool
-    if _db_pool is None:
-        import asyncpg
-        _db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
-    return _db_pool
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # ウォームアップ: DBプールを事前に作成
-    await get_db_pool()
-    yield
-
-app = FastAPI(
-    title="Serverless API",
-    lifespan=lifespan,
-    root_path=os.environ.get("API_GATEWAY_STAGE", ""),
-)
-
-@app.get("/health")
-async def health():
-    return {"status": "ok", "region": os.environ.get("AWS_REGION")}
-
-# LambdaハンドラーのエントリーポイントはManagumでラップ
-handler = Mangum(app, lifespan="auto")`,
+     {title:"MangumとASGI-Lambda変換", body:"MangumはASGIアプリをAWS Lambdaのイベント形式に変換するアダプターです。API Gateway（REST API・HTTP API・ALB）からのイベントをASGIのscope/receive/sendに変換し、FastAPIの応答をLambdaのレスポンス形式に戻します。これはWSGIとLambdaの変換を行うZappaに相当するASGI版です。\n\nLambdaのコールドスタートとはコンテナの初回起動時間のことで、Pythonでは1〜3秒かかることがあります。グローバルスコープでDBコネクション・ML モデル・ライブラリのインポートを済ませておくことで、2回目以降のウォームスタートでは初期化コストを省けます。Provisioned Concurrencyを使うとコールドスタートを完全になくせますが費用がかかります。\n\nLambdaのメモリはデフォルトでCPU性能にも影響します。512MBより1769MB（実質1vCPU相当）に設定するとPythonの処理が2〜3倍速くなることがあります。費用対効果を計測しながら最適なメモリサイズを選びます。",
+      code:"# app.py\nfrom contextlib import asynccontextmanager\nfrom fastapi import FastAPI\nfrom mangum import Mangum\nimport os\n\n# グローバルスコープ: Lambdaコンテナ間で再利用される\nDATABASE_URL = os.environ[\"DATABASE_URL\"]\n_db_pool = None  # 遅延初期化\n\nasync def get_db_pool():\n    global _db_pool\n    if _db_pool is None:\n        import asyncpg\n        _db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)\n    return _db_pool\n\n@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    # ウォームアップ: DBプールを事前に作成\n    await get_db_pool()\n    yield\n\napp = FastAPI(\n    title=\"Serverless API\",\n    lifespan=lifespan,\n    root_path=os.environ.get(\"API_GATEWAY_STAGE\", \"\"),\n)\n\n@app.get(\"/health\")\nasync def health():\n    return {\"status\": \"ok\", \"region\": os.environ.get(\"AWS_REGION\")}\n\n# LambdaハンドラーのエントリーポイントはManagumでラップ\nhandler = Mangum(app, lifespan=\"auto\")",
       afterCode:"lifespan='auto'はLambdaの呼び出しごとにlifespanを実行します。コールドスタートを考慮するなら'off'にしてグローバルスコープで初期化するほうが高速です。"},
-     {title:"SAMとCI/CDパイプライン", body:`AWS SAM（Serverless Application Model）はLambda・API Gateway・DynamoDBなどのAWSリソースをコードで管理するフレームワークです。CloudFormationのラッパーで、AWSリソースをYAMLで宣言的に定義できます。PythonのTerraformやpulumiに相当しますが、AWSに特化しています。
-
-SAM CLIはローカルでLambdaをエミュレートできます。sam local start-apiでAPI Gatewayをローカル起動し、実際のLambdaに近い環境でデバッグできます。sam buildでDockerを使ったビルドも可能で、ネイティブ拡張ライブラリ（numpy・scipy）を含む場合に重要です。
-
-Lambda Layersを使うと依存ライブラリを関数コードから分離できます。ライブラリを含むLayerを1つ作り、複数のLambda関数で共有することでデプロイパッケージのサイズを削減します。FastAPIとその依存関係（starlette・pydantic・uvicorn）だけで50MB程度になります。`,
-      code:`# template.yaml (SAM)
-AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
-
-Globals:
-  Function:
-    Timeout: 30
-    MemorySize: 1769  # 1vCPU相当
-    Environment:
-      Variables:
-        DATABASE_URL: !Sub "{{resolve:ssm:/myapp/database_url}}"
-
-Resources:
-  FastAPIFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: .
-      Handler: app.handler
-      Runtime: python3.12
-      Layers:
-        - !Ref DependencyLayer
-      Events:
-        Root:
-          Type: HttpApi
-          Properties:
-            Path: /{proxy+}
-            Method: ANY
-
-  DependencyLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      ContentUri: dependencies/
-      CompatibleRuntimes: [python3.12]
-    Metadata:
-      BuildMethod: python3.12`,
+     {title:"SAMとCI/CDパイプライン", body:"AWS SAM（Serverless Application Model）はLambda・API Gateway・DynamoDBなどのAWSリソースをコードで管理するフレームワークです。CloudFormationのラッパーで、AWSリソースをYAMLで宣言的に定義できます。PythonのTerraformやpulumiに相当しますが、AWSに特化しています。\n\nSAM CLIはローカルでLambdaをエミュレートできます。sam local start-apiでAPI Gatewayをローカル起動し、実際のLambdaに近い環境でデバッグできます。sam buildでDockerを使ったビルドも可能で、ネイティブ拡張ライブラリ（numpy・scipy）を含む場合に重要です。\n\nLambda Layersを使うと依存ライブラリを関数コードから分離できます。ライブラリを含むLayerを1つ作り、複数のLambda関数で共有することでデプロイパッケージのサイズを削減します。FastAPIとその依存関係（starlette・pydantic・uvicorn）だけで50MB程度になります。",
+      code:"# template.yaml (SAM)\nAWSTemplateFormatVersion: '2010-09-09'\nTransform: AWS::Serverless-2016-10-31\n\nGlobals:\n  Function:\n    Timeout: 30\n    MemorySize: 1769  # 1vCPU相当\n    Environment:\n      Variables:\n        DATABASE_URL: !Sub \"{{resolve:ssm:/myapp/database_url}}\"\n\nResources:\n  FastAPIFunction:\n    Type: AWS::Serverless::Function\n    Properties:\n      CodeUri: .\n      Handler: app.handler\n      Runtime: python3.12\n      Layers:\n        - !Ref DependencyLayer\n      Events:\n        Root:\n          Type: HttpApi\n          Properties:\n            Path: /{proxy+}\n            Method: ANY\n\n  DependencyLayer:\n    Type: AWS::Serverless::LayerVersion\n    Properties:\n      ContentUri: dependencies/\n      CompatibleRuntimes: [python3.12]\n    Metadata:\n      BuildMethod: python3.12",
       afterCode:"!Sub '{{resolve:ssm:...}}'でSSM Parameter Storeから秘密情報を取得します。DATABASE_URLやAPIキーをコードやtemplate.yamlに直接書かないことが重要です。"}
    ]},
   {id:"ch6", num:6, title:"API Gateway・サービスメッシュ", est:"65分",
    goal:"NginxやTraefikをリバースプロキシとして設定し、FastAPIへのIPレートリミット・認証・サーキットブレーカーをミドルウェアで実装できる。",
    sections:[
-     {title:"Nginxリバースプロキシとロードバランシング", body:`本番のFastAPIはNginxをリバースプロキシの前に置くのが一般的な構成です。NginxはSSL終端・静的ファイル配信・ロードバランシング・接続数制限を担当し、FastAPIはビジネスロジックに集中できます。Djangoをgunicornでデプロイするのと同じ考え方ですが、ASGIとuvicornを使う点が異なります。
-
-Nginxのworker_processesとworker_connectionsの積が同時接続数の上限です。upstream keepaliveを設定してFastAPIとの接続を再利用することでオーバーヘッドを削減できます。proxy_buffering offを設定するとストリーミングレスポンス（SSE）が正しく動作します。
-
-Traefikはコンテナ環境（Kubernetes・Docker Swarm）向けの動的リバースプロキシです。コンテナのラベルからルーティングを自動検出し、Let's EncryptのSSL証明書を自動取得・更新します。Nginxの静的設定と異なり、サービスの追加・削除に動的に対応します。`,
-      code:`# docker-compose.yml
-version: '3.8'
-services:
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
-    depends_on: [api1, api2]
-
-  api1:
-    build: .
-    command: uvicorn app:app --host 0.0.0.0 --port 8000
-    environment:
-      - DATABASE_URL=postgresql://...
-
-  api2:
-    build: .
-    command: uvicorn app:app --host 0.0.0.0 --port 8000
-
-# nginx.conf
-# upstream fastapi {
-#     server api1:8000;
-#     server api2:8000;
-#     keepalive 32;
-# }
-# limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;
-# location /api/ {
-#     limit_req zone=api burst=20 nodelay;
-#     proxy_pass http://fastapi/;
-# }`,
+     {title:"Nginxリバースプロキシとロードバランシング", body:"本番のFastAPIはNginxをリバースプロキシの前に置くのが一般的な構成です。NginxはSSL終端・静的ファイル配信・ロードバランシング・接続数制限を担当し、FastAPIはビジネスロジックに集中できます。Djangoをgunicornでデプロイするのと同じ考え方ですが、ASGIとuvicornを使う点が異なります。\n\nNginxのworker_processesとworker_connectionsの積が同時接続数の上限です。upstream keepaliveを設定してFastAPIとの接続を再利用することでオーバーヘッドを削減できます。proxy_buffering offを設定するとストリーミングレスポンス（SSE）が正しく動作します。\n\nTraefikはコンテナ環境（Kubernetes・Docker Swarm）向けの動的リバースプロキシです。コンテナのラベルからルーティングを自動検出し、Let's EncryptのSSL証明書を自動取得・更新します。Nginxの静的設定と異なり、サービスの追加・削除に動的に対応します。",
+      code:"# docker-compose.yml\nversion: '3.8'\nservices:\n  nginx:\n    image: nginx:alpine\n    ports:\n      - \"80:80\"\n      - \"443:443\"\n    volumes:\n      - ./nginx.conf:/etc/nginx/conf.d/default.conf\n    depends_on: [api1, api2]\n\n  api1:\n    build: .\n    command: uvicorn app:app --host 0.0.0.0 --port 8000\n    environment:\n      - DATABASE_URL=postgresql://...\n\n  api2:\n    build: .\n    command: uvicorn app:app --host 0.0.0.0 --port 8000\n\n# nginx.conf\n# upstream fastapi {\n#     server api1:8000;\n#     server api2:8000;\n#     keepalive 32;\n# }\n# limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;\n# location /api/ {\n#     limit_req zone=api burst=20 nodelay;\n#     proxy_pass http://fastapi/;\n# }",
       afterCode:"limit_req_zoneとlimit_reqでNginxレベルのレートリミットを実装できます。Nginxはリクエストがアプリに到達する前にレートオーバーを403で返すため、FastAPIのCPUを節約できます。"},
-     {title:"サーキットブレーカーとサービスヘルス管理", body:`サーキットブレーカーは外部サービス（DB・API）の障害を検知し、障害中のリクエストを即座に失敗させるパターンです。障害が伝播してシステム全体がダウンするカスケード障害を防ぎます。Pythonのpycircuitbreakerまたはtenacityで実装できます。
-
-サーキットブレーカーには3つの状態があります。CLOSEDは正常状態で全リクエストを通します。OPENは障害状態で全リクエストを即座に拒否します（fallbackを返す）。HALF_OPENは回復を試みる状態で、一部のリクエストを通して成否を確認します。
-
-FastAPIの/healthエンドポイントでDB・Redis・外部APIの疎通を確認するヘルスチェックを実装します。Kubernetes LivenessProbe・ReadinessProbeでこのエンドポイントを監視すれば、障害時に自動的にポッドを再起動・切り離しできます。`,
-      code:`from enum import Enum
-import asyncio, time
-
-class CircuitState(Enum):
-    CLOSED = "closed"
-    OPEN = "open"
-    HALF_OPEN = "half_open"
-
-class CircuitBreaker:
-    def __init__(self, failure_threshold=5, recovery_timeout=30.0):
-        self.failure_threshold = failure_threshold
-        self.recovery_timeout = recovery_timeout
-        self.failure_count = 0
-        self.last_failure_time = 0.0
-        self.state = CircuitState.CLOSED
-
-    async def call(self, func, *args, **kwargs):
-        if self.state == CircuitState.OPEN:
-            if time.time() - self.last_failure_time > self.recovery_timeout:
-                self.state = CircuitState.HALF_OPEN
-            else:
-                raise Exception("Circuit breaker is OPEN")
-
-        try:
-            result = await func(*args, **kwargs)
-            if self.state == CircuitState.HALF_OPEN:
-                self.state = CircuitState.CLOSED
-                self.failure_count = 0
-            return result
-        except Exception as e:
-            self.failure_count += 1
-            self.last_failure_time = time.time()
-            if self.failure_count >= self.failure_threshold:
-                self.state = CircuitState.OPEN
-            raise`,
+     {title:"サーキットブレーカーとサービスヘルス管理", body:"サーキットブレーカーは外部サービス（DB・API）の障害を検知し、障害中のリクエストを即座に失敗させるパターンです。障害が伝播してシステム全体がダウンするカスケード障害を防ぎます。Pythonのpycircuitbreakerまたはtenacityで実装できます。\n\nサーキットブレーカーには3つの状態があります。CLOSEDは正常状態で全リクエストを通します。OPENは障害状態で全リクエストを即座に拒否します（fallbackを返す）。HALF_OPENは回復を試みる状態で、一部のリクエストを通して成否を確認します。\n\nFastAPIの/healthエンドポイントでDB・Redis・外部APIの疎通を確認するヘルスチェックを実装します。Kubernetes LivenessProbe・ReadinessProbeでこのエンドポイントを監視すれば、障害時に自動的にポッドを再起動・切り離しできます。",
+      code:"from enum import Enum\nimport asyncio, time\n\nclass CircuitState(Enum):\n    CLOSED = \"closed\"\n    OPEN = \"open\"\n    HALF_OPEN = \"half_open\"\n\nclass CircuitBreaker:\n    def __init__(self, failure_threshold=5, recovery_timeout=30.0):\n        self.failure_threshold = failure_threshold\n        self.recovery_timeout = recovery_timeout\n        self.failure_count = 0\n        self.last_failure_time = 0.0\n        self.state = CircuitState.CLOSED\n\n    async def call(self, func, *args, **kwargs):\n        if self.state == CircuitState.OPEN:\n            if time.time() - self.last_failure_time > self.recovery_timeout:\n                self.state = CircuitState.HALF_OPEN\n            else:\n                raise Exception(\"Circuit breaker is OPEN\")\n\n        try:\n            result = await func(*args, **kwargs)\n            if self.state == CircuitState.HALF_OPEN:\n                self.state = CircuitState.CLOSED\n                self.failure_count = 0\n            return result\n        except Exception as e:\n            self.failure_count += 1\n            self.last_failure_time = time.time()\n            if self.failure_count >= self.failure_threshold:\n                self.state = CircuitState.OPEN\n            raise",
       afterCode:"CircuitBreakerをFastAPIの依存性注入（Depends）で管理すると、エンドポイントごとに独立したブレーカーを設定できます。障害状態を監視するPrometheus metricsと組み合わせると運用監視が容易になります。"}
    ]},
   {id:"ch7", num:7, title:"カスタムミドルウェア・プラグインシステム", est:"60分",
    goal:"FastAPI用のカスタムミドルウェアを設計・実装し、プラグインアーキテクチャでアプリの機能を動的に拡張できる。",
    sections:[
-     {title:"高度なミドルウェア設計", body:`本番FastAPIでは複数のミドルウェアを組み合わせます。リクエストID付与・ロギング・認証・レートリミット・トレーシングがよくある組み合わせです。ミドルウェアの実行順序はadd_middleware()の逆順なので、外側から内側（認証よりレートリミットが先）という設計を意識します。
-
-OpenTelemetryミドルウェアを使うとDistributed Tracingが実現できます。各リクエストにtrace-idを付与し、Jaeger・Zipkin・Datadogでリクエストが複数のサービスをまたいでどう流れるかを可視化できます。Pythonのlogging.setLogRecordFactory()でtrace-idをログに自動付与すると、ログとトレースを相関させられます。
-
-Prometheusメトリクスミドルウェアは、リクエスト数・レイテンシ・エラー率などをPrometheusのフォーマットで公開します。prometheus-fastapi-instrumentatorライブラリを使うと数行で実装できます。Grafanaでダッシュボードを作成して本番を監視します。`,
-      code:`from starlette.types import ASGIApp, Scope, Receive, Send
-import time, logging, uuid
-
-logger = logging.getLogger(__name__)
-
-class ObservabilityMiddleware:
-    """リクエストID・ロギング・メトリクスを統合したミドルウェア"""
-    def __init__(self, app: ASGIApp):
-        self.app = app
-        self._request_count = 0
-        self._error_count = 0
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send):
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        request_id = str(uuid.uuid4())
-        start_time = time.perf_counter()
-        self._request_count += 1
-        status_code = 200
-
-        async def send_wrapper(message):
-            nonlocal status_code
-            if message["type"] == "http.response.start":
-                status_code = message["status"]
-                if status_code >= 500:
-                    self._error_count += 1
-                headers = list(message.get("headers", []))
-                headers.append([b"x-request-id", request_id.encode()])
-                message = {**message, "headers": headers}
-            await send(message)
-
-        try:
-            await self.app(scope, receive, send_wrapper)
-        finally:
-            elapsed = time.perf_counter() - start_time
-            path = scope.get("path", "")
-            method = scope.get("method", "")
-            logger.info(f"{method} {path} {status_code} {elapsed:.3f}s [{request_id}]")`,
+     {title:"高度なミドルウェア設計", body:"本番FastAPIでは複数のミドルウェアを組み合わせます。リクエストID付与・ロギング・認証・レートリミット・トレーシングがよくある組み合わせです。ミドルウェアの実行順序はadd_middleware()の逆順なので、外側から内側（認証よりレートリミットが先）という設計を意識します。\n\nOpenTelemetryミドルウェアを使うとDistributed Tracingが実現できます。各リクエストにtrace-idを付与し、Jaeger・Zipkin・Datadogでリクエストが複数のサービスをまたいでどう流れるかを可視化できます。Pythonのlogging.setLogRecordFactory()でtrace-idをログに自動付与すると、ログとトレースを相関させられます。\n\nPrometheusメトリクスミドルウェアは、リクエスト数・レイテンシ・エラー率などをPrometheusのフォーマットで公開します。prometheus-fastapi-instrumentatorライブラリを使うと数行で実装できます。Grafanaでダッシュボードを作成して本番を監視します。",
+      code:"from starlette.types import ASGIApp, Scope, Receive, Send\nimport time, logging, uuid\n\nlogger = logging.getLogger(__name__)\n\nclass ObservabilityMiddleware:\n    \"\"\"リクエストID・ロギング・メトリクスを統合したミドルウェア\"\"\"\n    def __init__(self, app: ASGIApp):\n        self.app = app\n        self._request_count = 0\n        self._error_count = 0\n\n    async def __call__(self, scope: Scope, receive: Receive, send: Send):\n        if scope[\"type\"] != \"http\":\n            await self.app(scope, receive, send)\n            return\n\n        request_id = str(uuid.uuid4())\n        start_time = time.perf_counter()\n        self._request_count += 1\n        status_code = 200\n\n        async def send_wrapper(message):\n            nonlocal status_code\n            if message[\"type\"] == \"http.response.start\":\n                status_code = message[\"status\"]\n                if status_code >= 500:\n                    self._error_count += 1\n                headers = list(message.get(\"headers\", []))\n                headers.append([b\"x-request-id\", request_id.encode()])\n                message = {**message, \"headers\": headers}\n            await send(message)\n\n        try:\n            await self.app(scope, receive, send_wrapper)\n        finally:\n            elapsed = time.perf_counter() - start_time\n            path = scope.get(\"path\", \"\")\n            method = scope.get(\"method\", \"\")\n            logger.info(f\"{method} {path} {status_code} {elapsed:.3f}s [{request_id}]\")",
       afterCode:"生のASGIミドルウェア（__call__メソッド）はBaseHTTPMiddlewareと異なり、StreamingResponseやWebSocketも正しく処理できます。本番環境の高トラフィックな場合は生のASGIミドルウェアが推奨されます。"},
-     {title:"プラグインシステムの設計", body:`大規模なFastAPIアプリは機能をプラグインとして分離することで保守性が向上します。Djangoのdjango.apps.AppConfigに相当するプラグインシステムをFastAPIで実装できます。各プラグインはルーター・ミドルウェア・依存性・スタートアップロジックをまとめたモジュールとして定義します。
-
-Pythonのentry_points（setuptools）を使うと、外部パッケージとしてプラグインを配布できます。pip install my-fastapi-pluginするだけでアプリが機能を検出・登録します。大規模なFastAPIフレームワークであるLitestarはこのアプローチを採用しています。
-
-プラグインの依存性注入はFastAPIのProviderパターンで管理します。プラグインが提供するサービスをDependsで注入できるようにすることで、疎結合を維持しつつ機能を拡張できます。`,
-      code:`from abc import ABC, abstractmethod
-from fastapi import FastAPI, APIRouter
-from typing import Sequence
-
-class FastAPIPlugin(ABC):
-    """プラグインの基底クラス"""
-    @property
-    @abstractmethod
-    def name(self) -> str: ...
-
-    def get_router(self) -> APIRouter | None:
-        return None
-
-    async def on_startup(self, app: FastAPI) -> None:
-        pass
-
-    async def on_shutdown(self, app: FastAPI) -> None:
-        pass
-
-class PluginRegistry:
-    def __init__(self):
-        self._plugins: list[FastAPIPlugin] = []
-
-    def register(self, plugin: FastAPIPlugin) -> "PluginRegistry":
-        self._plugins.append(plugin)
-        return self  # メソッドチェーン用
-
-    def apply(self, app: FastAPI) -> None:
-        for plugin in self._plugins:
-            router = plugin.get_router()
-            if router:
-                app.include_router(router)
-        # lifespanにフックを追加
-        original_lifespan = app.router.lifespan_context
-        # ... lifespanのラップ処理
-
-registry = PluginRegistry()`,
+     {title:"プラグインシステムの設計", body:"大規模なFastAPIアプリは機能をプラグインとして分離することで保守性が向上します。Djangoのdjango.apps.AppConfigに相当するプラグインシステムをFastAPIで実装できます。各プラグインはルーター・ミドルウェア・依存性・スタートアップロジックをまとめたモジュールとして定義します。\n\nPythonのentry_points（setuptools）を使うと、外部パッケージとしてプラグインを配布できます。pip install my-fastapi-pluginするだけでアプリが機能を検出・登録します。大規模なFastAPIフレームワークであるLitestarはこのアプローチを採用しています。\n\nプラグインの依存性注入はFastAPIのProviderパターンで管理します。プラグインが提供するサービスをDependsで注入できるようにすることで、疎結合を維持しつつ機能を拡張できます。",
+      code:"from abc import ABC, abstractmethod\nfrom fastapi import FastAPI, APIRouter\nfrom typing import Sequence\n\nclass FastAPIPlugin(ABC):\n    \"\"\"プラグインの基底クラス\"\"\"\n    @property\n    @abstractmethod\n    def name(self) -> str: ...\n\n    def get_router(self) -> APIRouter | None:\n        return None\n\n    async def on_startup(self, app: FastAPI) -> None:\n        pass\n\n    async def on_shutdown(self, app: FastAPI) -> None:\n        pass\n\nclass PluginRegistry:\n    def __init__(self):\n        self._plugins: list[FastAPIPlugin] = []\n\n    def register(self, plugin: FastAPIPlugin) -> \"PluginRegistry\":\n        self._plugins.append(plugin)\n        return self  # メソッドチェーン用\n\n    def apply(self, app: FastAPI) -> None:\n        for plugin in self._plugins:\n            router = plugin.get_router()\n            if router:\n                app.include_router(router)\n        # lifespanにフックを追加\n        original_lifespan = app.router.lifespan_context\n        # ... lifespanのラップ処理\n\nregistry = PluginRegistry()",
       afterCode:"FastAPIPlugin基底クラスを継承してプラグインを作ることで、アプリのコアを変更せずに機能を追加できます。テストではモックプラグインに差し替えることもできます。"}
    ]},
   {id:"ch8", num:8, title:"パフォーマンスプロファイリング・本番最適化", est:"65分",
    goal:"cProfile・py-spy・locustを使ってFastAPIアプリのボトルネックを特定し、データベースクエリ・非同期処理・uvicorn設定を最適化できる。",
    sections:[
-     {title:"プロファイリングとボトルネット分析", body:`パフォーマンス最適化の第一原則は「計測してから最適化する」ことです。直感に頼った最適化はしばしば間違った場所に注力します。FastAPIのプロファイリングにはcProfile・py-spy・memory_profilerを使います。
-
-py-spyはサンプリング型プロファイラーで、本番環境で動作中のプロセスに対してもプロファイリングできます。プロセスIDを指定するだけで実行でき、フレームグラフ（flamegraph）でCPU時間の内訳を視覚化します。Djangoのdjango-silk・django-debug-toolbarに相当するインサイトを非同期アプリで得られます。
-
-Locustは負荷テストツールで、Pythonで書いたユーザーシナリオで実際のAPIに負荷をかけます。レスポンスタイム・スループット（req/s）・エラー率を計測し、スケールの限界を見つけます。k6やGatlingと比べてPythonで書けるのが強みです。`,
-      code:`# locustfile.py: 負荷テスト
-from locust import HttpUser, task, between
-
-class TodoAPIUser(HttpUser):
-    wait_time = between(0.1, 0.5)
-
-    def on_start(self):
-        """セッション開始時にトークン取得"""
-        response = self.client.post("/auth/token",
-            data={"username": "test", "password": "test"})
-        self.token = response.json()["access_token"]
-
-    @task(3)  # 重み: GETを3回、POSTを1回の割合で実行
-    def get_todos(self):
-        self.client.get("/api/todos",
-            headers={"Authorization": f"Bearer {self.token}"})
-
-    @task(1)
-    def create_todo(self):
-        self.client.post("/api/todos",
-            json={"text": "テストTodo", "priority": "medium"},
-            headers={"Authorization": f"Bearer {self.token}"})
-
-# 実行: locust -f locustfile.py --host=http://localhost:8000
-# Webダッシュボード: http://localhost:8089`,
+     {title:"プロファイリングとボトルネット分析", body:"パフォーマンス最適化の第一原則は「計測してから最適化する」ことです。直感に頼った最適化はしばしば間違った場所に注力します。FastAPIのプロファイリングにはcProfile・py-spy・memory_profilerを使います。\n\npy-spyはサンプリング型プロファイラーで、本番環境で動作中のプロセスに対してもプロファイリングできます。プロセスIDを指定するだけで実行でき、フレームグラフ（flamegraph）でCPU時間の内訳を視覚化します。Djangoのdjango-silk・django-debug-toolbarに相当するインサイトを非同期アプリで得られます。\n\nLocustは負荷テストツールで、Pythonで書いたユーザーシナリオで実際のAPIに負荷をかけます。レスポンスタイム・スループット（req/s）・エラー率を計測し、スケールの限界を見つけます。k6やGatlingと比べてPythonで書けるのが強みです。",
+      code:"# locustfile.py: 負荷テスト\nfrom locust import HttpUser, task, between\n\nclass TodoAPIUser(HttpUser):\n    wait_time = between(0.1, 0.5)\n\n    def on_start(self):\n        \"\"\"セッション開始時にトークン取得\"\"\"\n        response = self.client.post(\"/auth/token\",\n            data={\"username\": \"test\", \"password\": \"test\"})\n        self.token = response.json()[\"access_token\"]\n\n    @task(3)  # 重み: GETを3回、POSTを1回の割合で実行\n    def get_todos(self):\n        self.client.get(\"/api/todos\",\n            headers={\"Authorization\": f\"Bearer {self.token}\"})\n\n    @task(1)\n    def create_todo(self):\n        self.client.post(\"/api/todos\",\n            json={\"text\": \"テストTodo\", \"priority\": \"medium\"},\n            headers={\"Authorization\": f\"Bearer {self.token}\"})\n\n# 実行: locust -f locustfile.py --host=http://localhost:8000\n# Webダッシュボード: http://localhost:8089",
       afterCode:"locustはWebダッシュボードからユーザー数・スパン率をリアルタイムで調整できます。段階的に負荷を増やしてレスポンスタイムが急増する変曲点がシステムの限界です。"},
      {title:"本番環境のuvicorn・DB最適化", est:"60分",
-      body:`uvicornのワーカー数はCPUコア数×2+1が目安ですが、I/O待ちが多いFastAPIはより多くのワーカーを使えます。GunicornでuvicornワーカーをプロセスとしてフォークすることでCPUコアを並列活用します。各ワーカーは独立したPythonプロセスなのでGIL（Global Interpreter Lock）の制約を受けません。
-
-SQLAlchemyのConnectionPoolをチューニングすることでDB接続のオーバーヘッドを削減できます。pool_size（常時保持する接続数）・max_overflow（一時的な上限）・pool_timeout（接続待機タイムアウト）の設定が重要です。Djangoのpersistent_connectionsに相当します。
-
-N+1クエリ問題はORMを使う際の典型的な落とし穴です。SQLAlchemyのselectinload・joinedloadでリレーションを事前に取得し、ループ内でのクエリを排除します。SQLAlchemy EventシステムでSQLのloggingを有効にしてどのクエリが実行されているかを確認します。`,
-      code:`# gunicorn_config.py
-import multiprocessing
-
-# ワーカー数: I/O bound なので CPUコア数 * 2 + 1 が目安
-workers = multiprocessing.cpu_count() * 2 + 1
-worker_class = "uvicorn.workers.UvicornWorker"
-worker_connections = 1000
-bind = "unix:/tmp/fastapi.sock"  # Unixソケットが最速
-timeout = 30
-keepalive = 5
-max_requests = 1000       # メモリリーク対策で定期再起動
-max_requests_jitter = 100
-
-# database.py: SQLAlchemy接続プール設定
-from sqlalchemy.ext.asyncio import create_async_engine
-
-engine = create_async_engine(
-    DATABASE_URL,
-    pool_size=10,        # 常時接続数
-    max_overflow=20,     # 最大追加接続数 (合計30)
-    pool_timeout=30,     # 接続取得タイムアウト(秒)
-    pool_recycle=1800,   # 接続を30分で再作成（MySQLの8時間問題対策）
-    echo=False,          # 本番ではSQLログを無効に
-)`,
+      body:"uvicornのワーカー数はCPUコア数×2+1が目安ですが、I/O待ちが多いFastAPIはより多くのワーカーを使えます。GunicornでuvicornワーカーをプロセスとしてフォークすることでCPUコアを並列活用します。各ワーカーは独立したPythonプロセスなのでGIL（Global Interpreter Lock）の制約を受けません。\n\nSQLAlchemyのConnectionPoolをチューニングすることでDB接続のオーバーヘッドを削減できます。pool_size（常時保持する接続数）・max_overflow（一時的な上限）・pool_timeout（接続待機タイムアウト）の設定が重要です。Djangoのpersistent_connectionsに相当します。\n\nN+1クエリ問題はORMを使う際の典型的な落とし穴です。SQLAlchemyのselectinload・joinedloadでリレーションを事前に取得し、ループ内でのクエリを排除します。SQLAlchemy EventシステムでSQLのloggingを有効にしてどのクエリが実行されているかを確認します。",
+      code:"# gunicorn_config.py\nimport multiprocessing\n\n# ワーカー数: I/O bound なので CPUコア数 * 2 + 1 が目安\nworkers = multiprocessing.cpu_count() * 2 + 1\nworker_class = \"uvicorn.workers.UvicornWorker\"\nworker_connections = 1000\nbind = \"unix:/tmp/fastapi.sock\"  # Unixソケットが最速\ntimeout = 30\nkeepalive = 5\nmax_requests = 1000       # メモリリーク対策で定期再起動\nmax_requests_jitter = 100\n\n# database.py: SQLAlchemy接続プール設定\nfrom sqlalchemy.ext.asyncio import create_async_engine\n\nengine = create_async_engine(\n    DATABASE_URL,\n    pool_size=10,        # 常時接続数\n    max_overflow=20,     # 最大追加接続数 (合計30)\n    pool_timeout=30,     # 接続取得タイムアウト(秒)\n    pool_recycle=1800,   # 接続を30分で再作成（MySQLの8時間問題対策）\n    echo=False,          # 本番ではSQLログを無効に\n)",
       afterCode:"Unixソケット（unix:/tmp/fastapi.sock）はTCPより低レイテンシで接続できます。NginxとFastAPIが同じサーバーにある場合はUnixソケットを使うのが最適です。本番ではHTTPS終端はNginxに任せましょう。"}
    ]},
 ];

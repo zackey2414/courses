@@ -120,525 +120,90 @@ const EX = {
   ch1: [{
     diff: 2,
     q: "以下の関数は Hidden Class の問題を抱えています。\nどこが問題か説明し、最適化版に書き直してください。",
-    code: `function makePoint(x, y) {
-  const p = {};
-  if (x !== undefined) p.x = x;
-  if (y !== undefined) p.y = y;
-  return p;
-}
-// 1000万回呼ぶループで遅い`,
-    answer: `// 問題: プロパティを動的に追加するたびに Hidden Class が分岐する。
-// V8 はオブジェクト形状（Shape）ごとに最適化するが、
-// 形状が異なるオブジェクトが混在するとインラインキャッシュが汚染される。
-
-// 修正版: 常に同じ形状のオブジェクトを返す
-function makePoint(x = 0, y = 0) {
-  return { x, y };  // 必ず同じ Hidden Class
-}
-
-// モノモーフィック呼び出し例
-const pts = [];
-for (let i = 0; i < 10_000_000; i++) {
-  pts.push(makePoint(i, i * 2));
-}
-// 同じ形状のオブジェクトが連続するため TurboFan が最適化しやすい`
+    code: "function makePoint(x, y) {\n  const p = {};\n  if (x !== undefined) p.x = x;\n  if (y !== undefined) p.y = y;\n  return p;\n}\n// 1000万回呼ぶループで遅い",
+    answer: "// 問題: プロパティを動的に追加するたびに Hidden Class が分岐する。\n// V8 はオブジェクト形状（Shape）ごとに最適化するが、\n// 形状が異なるオブジェクトが混在するとインラインキャッシュが汚染される。\n\n// 修正版: 常に同じ形状のオブジェクトを返す\nfunction makePoint(x = 0, y = 0) {\n  return { x, y };  // 必ず同じ Hidden Class\n}\n\n// モノモーフィック呼び出し例\nconst pts = [];\nfor (let i = 0; i < 10_000_000; i++) {\n  pts.push(makePoint(i, i * 2));\n}\n// 同じ形状のオブジェクトが連続するため TurboFan が最適化しやすい"
   }, {
     diff: 3,
     q: "GC プレッシャーを下げるため、オブジェクトプールを実装してください。\nPoint オブジェクトを再利用し、GC を減らすパターンです。",
-    code: `// オブジェクトプールを使って Point を使い回す
-class PointPool {
-  // acquire() と release() を実装
-}`,
-    answer: `class PointPool {
-  #pool = [];
-  #size;
-
-  constructor(size = 1000) {
-    this.#size = size;
-    for (let i = 0; i < size; i++) {
-      this.#pool.push({ x: 0, y: 0 }); // 事前確保
-    }
-  }
-
-  acquire(x = 0, y = 0) {
-    const p = this.#pool.pop();
-    if (!p) return { x, y }; // プール枯渇時はフォールバック
-    p.x = x; p.y = y;
-    return p;
-  }
-
-  release(p) {
-    if (this.#pool.length < this.#size) {
-      this.#pool.push(p); // 使い終わったら返却
-    }
-  }
-}
-
-const pool = new PointPool();
-const p = pool.acquire(10, 20);
-console.log(p); // { x: 10, y: 20 }
-pool.release(p); // GC させずに再利用`
+    code: "// オブジェクトプールを使って Point を使い回す\nclass PointPool {\n  // acquire() と release() を実装\n}",
+    answer: "class PointPool {\n  #pool = [];\n  #size;\n\n  constructor(size = 1000) {\n    this.#size = size;\n    for (let i = 0; i < size; i++) {\n      this.#pool.push({ x: 0, y: 0 }); // 事前確保\n    }\n  }\n\n  acquire(x = 0, y = 0) {\n    const p = this.#pool.pop();\n    if (!p) return { x, y }; // プール枯渇時はフォールバック\n    p.x = x; p.y = y;\n    return p;\n  }\n\n  release(p) {\n    if (this.#pool.length < this.#size) {\n      this.#pool.push(p); // 使い終わったら返却\n    }\n  }\n}\n\nconst pool = new PointPool();\nconst p = pool.acquire(10, 20);\nconsole.log(p); // { x: 10, y: 20 }\npool.release(p); // GC させずに再利用"
   }],
   ch2: [{
     diff: 2,
     q: "以下のコードの実行順序を答え、なぜその順になるか説明してください。",
-    code: `console.log('A');
-setTimeout(() => console.log('B'), 0);
-Promise.resolve().then(() => console.log('C'));
-queueMicrotask(() => console.log('D'));
-console.log('E');`,
-    answer: `// 実行順序: A → E → C → D → B
-
-// 解説:
-// 1. 'A' — 同期コード（コールスタック）
-// 2. setTimeout のコールバックをタスクキューに登録
-// 3. Promise.then のコールバックをマイクロタスクキューに登録
-// 4. queueMicrotask のコールバックをマイクロタスクキューに登録
-// 5. 'E' — 同期コード（コールスタック）
-//
-// コールスタックが空になった後:
-// マイクロタスクキューをすべて処理 → 'C' → 'D'
-// その後タスクキューから1件処理 → 'B'
-//
-// 重要: マイクロタスクは「タスクとタスクの間」を埋める形で全件処理される。
-// setTimeoutは0msでも必ず次のタスクとして後回しにされる。`
+    code: "console.log('A');\nsetTimeout(() => console.log('B'), 0);\nPromise.resolve().then(() => console.log('C'));\nqueueMicrotask(() => console.log('D'));\nconsole.log('E');",
+    answer: "// 実行順序: A → E → C → D → B\n\n// 解説:\n// 1. 'A' — 同期コード（コールスタック）\n// 2. setTimeout のコールバックをタスクキューに登録\n// 3. Promise.then のコールバックをマイクロタスクキューに登録\n// 4. queueMicrotask のコールバックをマイクロタスクキューに登録\n// 5. 'E' — 同期コード（コールスタック）\n//\n// コールスタックが空になった後:\n// マイクロタスクキューをすべて処理 → 'C' → 'D'\n// その後タスクキューから1件処理 → 'B'\n//\n// 重要: マイクロタスクは「タスクとタスクの間」を埋める形で全件処理される。\n// setTimeoutは0msでも必ず次のタスクとして後回しにされる。"
   }, {
     diff: 2,
     q: "Node.js で setImmediate と process.nextTick の違いを示すコードを書き、\n実行順序を説明してください。",
-    code: `// Node.js 専用 (ブラウザでは動かない)
-setImmediate(() => console.log('immediate'));
-process.nextTick(() => console.log('nextTick'));
-Promise.resolve().then(() => console.log('promise'));
-console.log('sync');`,
-    answer: `// 実行順序: sync → nextTick → promise → immediate
-
-// process.nextTick は Promise マイクロタスクよりさらに優先される
-// 「次のイベントループティックの開始前」に必ず実行される
-
-// setImmediate は I/O コールバックの後、タイマーの前に実行される
-// setTimeout(fn, 0) とほぼ同じタイミングだが、
-// I/O コールバック内で呼ぶと setImmediate が先になる保証がある
-
-// 実務ポイント:
-// - process.nextTick は再帰的に呼ぶとスタックオーバーフローに近い状態になる
-// - 深いネストには setImmediate か Promise を使う
-// - Node.js 22 では process.nextTick の過度な使用を避けることが推奨されている`
+    code: "// Node.js 専用 (ブラウザでは動かない)\nsetImmediate(() => console.log('immediate'));\nprocess.nextTick(() => console.log('nextTick'));\nPromise.resolve().then(() => console.log('promise'));\nconsole.log('sync');",
+    answer: "// 実行順序: sync → nextTick → promise → immediate\n\n// process.nextTick は Promise マイクロタスクよりさらに優先される\n// 「次のイベントループティックの開始前」に必ず実行される\n\n// setImmediate は I/O コールバックの後、タイマーの前に実行される\n// setTimeout(fn, 0) とほぼ同じタイミングだが、\n// I/O コールバック内で呼ぶと setImmediate が先になる保証がある\n\n// 実務ポイント:\n// - process.nextTick は再帰的に呼ぶとスタックオーバーフローに近い状態になる\n// - 深いネストには setImmediate か Promise を使う\n// - Node.js 22 では process.nextTick の過度な使用を避けることが推奨されている"
   }],
   ch3: [{
     diff: 2,
     q: "Symbol.iterator を使ってフィボナッチ数列を生成する\nイテラブルオブジェクトを実装してください。",
-    code: `const fibonacci = {
-  // Symbol.iterator を実装して for...of で使えるようにする
-  // 引数で上限値を受け取れるようにする
-};`,
-    answer: `function makeFibonacci(limit) {
-  return {
-    [Symbol.iterator]() {
-      let a = 0, b = 1;
-      return {
-        next() {
-          if (a > limit) return { done: true, value: undefined };
-          const value = a;
-          [a, b] = [b, a + b];
-          return { done: false, value };
-        }
-      };
-    }
-  };
-}
-
-for (const n of makeFibonacci(100)) {
-  console.log(n); // 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
-}
-
-// スプレッドでも使える（Symbol.iterator があるため）
-const arr = [...makeFibonacci(50)]; // [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]`
+    code: "const fibonacci = {\n  // Symbol.iterator を実装して for...of で使えるようにする\n  // 引数で上限値を受け取れるようにする\n};",
+    answer: "function makeFibonacci(limit) {\n  return {\n    [Symbol.iterator]() {\n      let a = 0, b = 1;\n      return {\n        next() {\n          if (a > limit) return { done: true, value: undefined };\n          const value = a;\n          [a, b] = [b, a + b];\n          return { done: false, value };\n        }\n      };\n    }\n  };\n}\n\nfor (const n of makeFibonacci(100)) {\n  console.log(n); // 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89\n}\n\n// スプレッドでも使える（Symbol.iterator があるため）\nconst arr = [...makeFibonacci(50)]; // [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]"
   }, {
     diff: 3,
     q: "Proxy を使ってプロパティアクセスをログに記録し、\n存在しないプロパティへのアクセスで例外を投げる\n「厳格オブジェクト」を実装してください。",
-    code: `function strict(obj) {
-  // Proxy で get トラップを実装
-}
-
-const s = strict({ name: 'Alice', age: 30 });
-console.log(s.name); // 'Alice'（ログ出力）
-console.log(s.phone); // エラー: property 'phone' does not exist`,
-    answer: `function strict(obj) {
-  return new Proxy(obj, {
-    get(target, prop, receiver) {
-      if (!(prop in target)) {
-        throw new ReferenceError(\`property '\${String(prop)}' does not exist\`);
-      }
-      console.log(\`[access] \${String(prop)} = \${target[prop]}\`);
-      return Reflect.get(target, prop, receiver);
-    },
-    set(target, prop, value, receiver) {
-      if (!(prop in target)) {
-        throw new ReferenceError(\`cannot set unknown property '\${String(prop)}'\`);
-      }
-      return Reflect.set(target, prop, value, receiver);
-    }
-  });
-}
-
-const s = strict({ name: 'Alice', age: 30 });
-console.log(s.name); // [access] name = Alice  →  'Alice'
-// s.phone → ReferenceError: property 'phone' does not exist`
+    code: "function strict(obj) {\n  // Proxy で get トラップを実装\n}\n\nconst s = strict({ name: 'Alice', age: 30 });\nconsole.log(s.name); // 'Alice'（ログ出力）\nconsole.log(s.phone); // エラー: property 'phone' does not exist",
+    answer: "function strict(obj) {\n  return new Proxy(obj, {\n    get(target, prop, receiver) {\n      if (!(prop in target)) {\n        throw new ReferenceError(`property '\${String(prop)}' does not exist`);\n      }\n      console.log(`[access] \${String(prop)} = \${target[prop]}`);\n      return Reflect.get(target, prop, receiver);\n    },\n    set(target, prop, value, receiver) {\n      if (!(prop in target)) {\n        throw new ReferenceError(`cannot set unknown property '\${String(prop)}'`);\n      }\n      return Reflect.set(target, prop, value, receiver);\n    }\n  });\n}\n\nconst s = strict({ name: 'Alice', age: 30 });\nconsole.log(s.name); // [access] name = Alice  →  'Alice'\n// s.phone → ReferenceError: property 'phone' does not exist"
   }],
   ch4: [{
     diff: 2,
     q: "以下の WAT (WebAssembly Text Format) を読んで、\nこのモジュールが何をするか説明し、JS から呼び出すコードを書いてください。",
-    code: `(module
-  (func $add (export "add")
-    (param $a i32) (param $b i32)
-    (result i32)
-    local.get $a
-    local.get $b
-    i32.add)
-  (func $factorial (export "factorial")
-    (param $n i32) (result i32)
-    (if (result i32)
-      (i32.le_s (local.get $n) (i32.const 1))
-      (then (i32.const 1))
-      (else
-        (i32.mul
-          (local.get $n)
-          (call $factorial (i32.sub (local.get $n) (i32.const 1)))
-        )
-      )
-    )
-  )
-)`,
-    answer: `// このモジュールは2つの関数を export している:
-// - add(a, b): 2つの32bit整数を加算
-// - factorial(n): n の階乗（再帰）
-
-// WAT を wasm にコンパイルしてから JS で呼ぶ:
-// wat2wasm math.wat -o math.wasm  (wabt ツールが必要)
-
-// JS から呼び出し
-const response = await fetch('math.wasm');
-const buffer = await response.arrayBuffer();
-const { instance } = await WebAssembly.instantiate(buffer);
-
-const { add, factorial } = instance.exports;
-console.log(add(3, 4));       // 7
-console.log(factorial(10));   // 3628800
-
-// 注意: WASM の i32 は符号付き32bit整数
-// factorial(13) = 1932053504 (オーバーフロー！)
-// 大きな数には BigInt + i64 を使う`
+    code: "(module\n  (func $add (export \"add\")\n    (param $a i32) (param $b i32)\n    (result i32)\n    local.get $a\n    local.get $b\n    i32.add)\n  (func $factorial (export \"factorial\")\n    (param $n i32) (result i32)\n    (if (result i32)\n      (i32.le_s (local.get $n) (i32.const 1))\n      (then (i32.const 1))\n      (else\n        (i32.mul\n          (local.get $n)\n          (call $factorial (i32.sub (local.get $n) (i32.const 1)))\n        )\n      )\n    )\n  )\n)",
+    answer: "// このモジュールは2つの関数を export している:\n// - add(a, b): 2つの32bit整数を加算\n// - factorial(n): n の階乗（再帰）\n\n// WAT を wasm にコンパイルしてから JS で呼ぶ:\n// wat2wasm math.wat -o math.wasm  (wabt ツールが必要)\n\n// JS から呼び出し\nconst response = await fetch('math.wasm');\nconst buffer = await response.arrayBuffer();\nconst { instance } = await WebAssembly.instantiate(buffer);\n\nconst { add, factorial } = instance.exports;\nconsole.log(add(3, 4));       // 7\nconsole.log(factorial(10));   // 3628800\n\n// 注意: WASM の i32 は符号付き32bit整数\n// factorial(13) = 1932053504 (オーバーフロー！)\n// 大きな数には BigInt + i64 を使う"
   }, {
     diff: 3,
     q: "JavaScript から WASM モジュールにメモリを通じて文字列を渡す方法を説明し、\nサンプルコードを書いてください（Emscripten 使用を想定）。",
-    code: `// WASM のメモリに文字列を書き込み、WASM 側で処理させる
-// instance.exports.memory を使う`,
-    answer: `// WASM モジュールはネイティブ文字列を知らない。
-// JS → WASM へ文字列を渡すには線形メモリ上にバイト列として書き込む。
-
-async function loadWasm() {
-  const { instance } = await WebAssembly.instantiateStreaming(fetch('str.wasm'));
-  return instance;
-}
-
-function writeString(memory, str, ptr) {
-  // UTF-8 エンコードして WASM メモリに書き込む
-  const encoded = new TextEncoder().encode(str + '\0'); // null終端
-  const view = new Uint8Array(memory.buffer, ptr, encoded.length);
-  view.set(encoded);
-}
-
-const inst = await loadWasm();
-const { memory, processString, malloc, free } = inst.exports;
-
-const str = 'Hello, WASM!';
-const ptr = malloc(str.length + 1); // WASM側でメモリ確保
-writeString(memory, str, ptr);
-processString(ptr);                 // WASM側で処理
-free(ptr);                          // 解放
-
-// ポイント: JS↔WASM の境界を越えるたびにコストが発生する
-// 頻繁なやり取りより、WASM 側でまとめて処理する設計が効率的`
+    code: "// WASM のメモリに文字列を書き込み、WASM 側で処理させる\n// instance.exports.memory を使う",
+    answer: "// WASM モジュールはネイティブ文字列を知らない。\n// JS → WASM へ文字列を渡すには線形メモリ上にバイト列として書き込む。\n\nasync function loadWasm() {\n  const { instance } = await WebAssembly.instantiateStreaming(fetch('str.wasm'));\n  return instance;\n}\n\nfunction writeString(memory, str, ptr) {\n  // UTF-8 エンコードして WASM メモリに書き込む\n  const encoded = new TextEncoder().encode(str + '\0'); // null終端\n  const view = new Uint8Array(memory.buffer, ptr, encoded.length);\n  view.set(encoded);\n}\n\nconst inst = await loadWasm();\nconst { memory, processString, malloc, free } = inst.exports;\n\nconst str = 'Hello, WASM!';\nconst ptr = malloc(str.length + 1); // WASM側でメモリ確保\nwriteString(memory, str, ptr);\nprocessString(ptr);                 // WASM側で処理\nfree(ptr);                          // 解放\n\n// ポイント: JS↔WASM の境界を越えるたびにコストが発生する\n// 頻繁なやり取りより、WASM 側でまとめて処理する設計が効率的"
   }],
   ch5: [{
     diff: 2,
     q: "Conditional Types を使って、Promise<T> の T を取り出す型ユーティリティ\n`Awaited<T>` を自前実装してください（標準組込みは使わずに）。",
-    code: `// MyAwaited<T> を実装する
-// Promise<string> → string
-// Promise<Promise<number>> → number
-// string → string (非Promiseはそのまま)`,
-    answer: `// infer で Promise の型引数を取り出す
-type MyAwaited<T> =
-  T extends Promise<infer U>
-    ? MyAwaited<U>  // 再帰でネストした Promise も展開
-    : T;
-
-// テスト
-type A = MyAwaited<Promise<string>>;           // string
-type B = MyAwaited<Promise<Promise<number>>>;  // number
-type C = MyAwaited<string>;                    // string
-
-// satisfies との組み合わせ例
-const config = {
-  port: 3000,
-  host: 'localhost',
-} satisfies Record<string, string | number>;
-
-// config.port は number 型として推論される（as より安全）
-const p: number = config.port; // OK`
+    code: "// MyAwaited<T> を実装する\n// Promise<string> → string\n// Promise<Promise<number>> → number\n// string → string (非Promiseはそのまま)",
+    answer: "// infer で Promise の型引数を取り出す\ntype MyAwaited<T> =\n  T extends Promise<infer U>\n    ? MyAwaited<U>  // 再帰でネストした Promise も展開\n    : T;\n\n// テスト\ntype A = MyAwaited<Promise<string>>;           // string\ntype B = MyAwaited<Promise<Promise<number>>>;  // number\ntype C = MyAwaited<string>;                    // string\n\n// satisfies との組み合わせ例\nconst config = {\n  port: 3000,\n  host: 'localhost',\n} satisfies Record<string, string | number>;\n\n// config.port は number 型として推論される（as より安全）\nconst p: number = config.port; // OK"
   }, {
     diff: 3,
     q: "Mapped Types と Template Literal Types を組み合わせて、\nオブジェクトの各プロパティに対する getter 名の型を生成してください。\n例: { name: string } → { getName: () => string }",
-    code: `// Getterify<T> を実装する
-type Getterify<T> = {
-  // { name: string } → { getName: () => string }
-};`,
-    answer: `type Capitalize<S extends string> =
-  S extends \`\${infer F}\${infer R}\` ? \`\${Uppercase<F>}\${R}\` : S;
-
-type Getterify<T> = {
-  [K in keyof T as \`get\${Capitalize<string & K>}\`]: () => T[K];
-};
-
-// テスト
-type User = { name: string; age: number; email: string };
-type UserGetters = Getterify<User>;
-// {
-//   getName: () => string;
-//   getAge: () => number;
-//   getEmail: () => string;
-// }
-
-// 実装例
-function createGetters<T extends object>(obj: T): Getterify<T> {
-  const result = {} as any;
-  for (const key of Object.keys(obj) as (keyof T)[]) {
-    const getterName = \`get\${String(key).charAt(0).toUpperCase() + String(key).slice(1)}\`;
-    result[getterName] = () => obj[key];
-  }
-  return result;
-}
-
-const user = createGetters({ name: 'Alice', age: 30, email: 'a@example.com' });
-console.log(user.getName()); // 'Alice'`
+    code: "// Getterify<T> を実装する\ntype Getterify<T> = {\n  // { name: string } → { getName: () => string }\n};",
+    answer: "type Capitalize<S extends string> =\n  S extends `\${infer F}\${infer R}` ? `\${Uppercase<F>}\${R}` : S;\n\ntype Getterify<T> = {\n  [K in keyof T as `get\${Capitalize<string & K>}`]: () => T[K];\n};\n\n// テスト\ntype User = { name: string; age: number; email: string };\ntype UserGetters = Getterify<User>;\n// {\n//   getName: () => string;\n//   getAge: () => number;\n//   getEmail: () => string;\n// }\n\n// 実装例\nfunction createGetters<T extends object>(obj: T): Getterify<T> {\n  const result = {} as any;\n  for (const key of Object.keys(obj) as (keyof T)[]) {\n    const getterName = `get\${String(key).charAt(0).toUpperCase() + String(key).slice(1)}`;\n    result[getterName] = () => obj[key];\n  }\n  return result;\n}\n\nconst user = createGetters({ name: 'Alice', age: 30, email: 'a@example.com' });\nconsole.log(user.getName()); // 'Alice'"
   }],
   ch6: [{
     diff: 2,
     q: "SharedArrayBuffer と Atomics を使って、\nメインスレッドと Worker が安全に共有カウンタをインクリメントする\nコードを書いてください。",
-    code: `// main.js — Worker を起動して共有カウンタをインクリメントさせる
-// worker.js — 共有バッファを受け取ってアトミックにインクリメント`,
-    answer: `// main.js
-const sab = new SharedArrayBuffer(4); // 4バイト = int32 x 1
-const counter = new Int32Array(sab);
-Atomics.store(counter, 0, 0); // 初期値 0
-
-const workers = [];
-for (let i = 0; i < 4; i++) {
-  const w = new Worker('./worker.js');
-  w.postMessage({ sab, iterations: 25_000 });
-  workers.push(w);
-}
-
-let done = 0;
-for (const w of workers) {
-  w.addEventListener('message', () => {
-    if (++done === workers.length) {
-      console.log(Atomics.load(counter, 0)); // 100000 (競合なし)
-    }
-  });
-}
-
-// worker.js
-self.addEventListener('message', ({ data: { sab, iterations } }) => {
-  const counter = new Int32Array(sab);
-  for (let i = 0; i < iterations; i++) {
-    Atomics.add(counter, 0, 1); // アトミックな加算
-  }
-  self.postMessage('done');
-});`
+    code: "// main.js — Worker を起動して共有カウンタをインクリメントさせる\n// worker.js — 共有バッファを受け取ってアトミックにインクリメント",
+    answer: "// main.js\nconst sab = new SharedArrayBuffer(4); // 4バイト = int32 x 1\nconst counter = new Int32Array(sab);\nAtomics.store(counter, 0, 0); // 初期値 0\n\nconst workers = [];\nfor (let i = 0; i < 4; i++) {\n  const w = new Worker('./worker.js');\n  w.postMessage({ sab, iterations: 25_000 });\n  workers.push(w);\n}\n\nlet done = 0;\nfor (const w of workers) {\n  w.addEventListener('message', () => {\n    if (++done === workers.length) {\n      console.log(Atomics.load(counter, 0)); // 100000 (競合なし)\n    }\n  });\n}\n\n// worker.js\nself.addEventListener('message', ({ data: { sab, iterations } }) => {\n  const counter = new Int32Array(sab);\n  for (let i = 0; i < iterations; i++) {\n    Atomics.add(counter, 0, 1); // アトミックな加算\n  }\n  self.postMessage('done');\n});"
   }, {
     diff: 3,
     q: "Node.js の worker_threads を使って、CPU バウンドな素数計算を\n並列化してください。メインスレッドはブロックされてはいけません。",
-    code: `// Node.js worker_threads でピタゴラス数を並列探索
-// npm: worker_threads は組込みなのでインストール不要`,
-    answer: `// primes-worker.js
-const { workerData, parentPort } = require('worker_threads');
-const { from, to } = workerData;
-
-function isPrime(n) {
-  if (n < 2) return false;
-  for (let i = 2; i <= Math.sqrt(n); i++) {
-    if (n % i === 0) return false;
-  }
-  return true;
-}
-
-const primes = [];
-for (let i = from; i <= to; i++) {
-  if (isPrime(i)) primes.push(i);
-}
-parentPort.postMessage(primes);
-
-// main.js
-const { Worker } = require('worker_threads');
-
-function findPrimesInRange(from, to) {
-  return new Promise((resolve, reject) => {
-    const w = new Worker('./primes-worker.js', { workerData: { from, to } });
-    w.on('message', resolve);
-    w.on('error', reject);
-  });
-}
-
-const cpus = 4;
-const total = 1_000_000;
-const chunk = total / cpus;
-
-const tasks = Array.from({ length: cpus }, (_, i) =>
-  findPrimesInRange(i * chunk + 1, (i + 1) * chunk)
-);
-
-const results = await Promise.all(tasks);
-const all = results.flat().sort((a, b) => a - b);
-console.log('素数の個数:', all.length); // 78498`
+    code: "// Node.js worker_threads でピタゴラス数を並列探索\n// npm: worker_threads は組込みなのでインストール不要",
+    answer: "// primes-worker.js\nconst { workerData, parentPort } = require('worker_threads');\nconst { from, to } = workerData;\n\nfunction isPrime(n) {\n  if (n < 2) return false;\n  for (let i = 2; i <= Math.sqrt(n); i++) {\n    if (n % i === 0) return false;\n  }\n  return true;\n}\n\nconst primes = [];\nfor (let i = from; i <= to; i++) {\n  if (isPrime(i)) primes.push(i);\n}\nparentPort.postMessage(primes);\n\n// main.js\nconst { Worker } = require('worker_threads');\n\nfunction findPrimesInRange(from, to) {\n  return new Promise((resolve, reject) => {\n    const w = new Worker('./primes-worker.js', { workerData: { from, to } });\n    w.on('message', resolve);\n    w.on('error', reject);\n  });\n}\n\nconst cpus = 4;\nconst total = 1_000_000;\nconst chunk = total / cpus;\n\nconst tasks = Array.from({ length: cpus }, (_, i) =>\n  findPrimesInRange(i * chunk + 1, (i + 1) * chunk)\n);\n\nconst results = await Promise.all(tasks);\nconst all = results.flat().sort((a, b) => a - b);\nconsole.log('素数の個数:', all.length); // 78498"
   }],
   ch7: [{
     diff: 2,
     q: "performance.mark と performance.measure を使って、\n関数の実行時間を計測するデコレータ（高階関数）を実装してください。",
-    code: `// measure(fn, name) — fn を実行して計測結果を返す高階関数
-function measure(fn, name = fn.name) {
-  // performance API を使う
-}`,
-    answer: `function measure(fn, name = fn.name) {
-  return async function(...args) {
-    const startMark = \`\${name}-start\`;
-    const endMark = \`\${name}-end\`;
-    performance.mark(startMark);
-    const result = await fn.apply(this, args);
-    performance.mark(endMark);
-    performance.measure(name, startMark, endMark);
-    const [entry] = performance.getEntriesByName(name, 'measure');
-    console.log(\`[\${name}] \${entry.duration.toFixed(2)}ms\`);
-    performance.clearMarks(startMark);
-    performance.clearMarks(endMark);
-    performance.clearMeasures(name);
-    return result;
-  };
-}
-
-// 使用例
-async function fetchData(url) {
-  const res = await fetch(url);
-  return res.json();
-}
-
-const measuredFetch = measure(fetchData, 'fetchData');
-const data = await measuredFetch('https://api.example.com/data');
-// [fetchData] 123.45ms`
+    code: "// measure(fn, name) — fn を実行して計測結果を返す高階関数\nfunction measure(fn, name = fn.name) {\n  // performance API を使う\n}",
+    answer: "function measure(fn, name = fn.name) {\n  return async function(...args) {\n    const startMark = `\${name}-start`;\n    const endMark = `\${name}-end`;\n    performance.mark(startMark);\n    const result = await fn.apply(this, args);\n    performance.mark(endMark);\n    performance.measure(name, startMark, endMark);\n    const [entry] = performance.getEntriesByName(name, 'measure');\n    console.log(`[\${name}] \${entry.duration.toFixed(2)}ms`);\n    performance.clearMarks(startMark);\n    performance.clearMarks(endMark);\n    performance.clearMeasures(name);\n    return result;\n  };\n}\n\n// 使用例\nasync function fetchData(url) {\n  const res = await fetch(url);\n  return res.json();\n}\n\nconst measuredFetch = measure(fetchData, 'fetchData');\nconst data = await measuredFetch('https://api.example.com/data');\n// [fetchData] 123.45ms"
   }, {
     diff: 2,
     q: "Layout Thrashing を引き起こすコードと、\nそれを修正したコードを対比して示してください。",
-    code: `// NG: Layout Thrashing が発生するコード
-const boxes = document.querySelectorAll('.box');
-boxes.forEach(box => {
-  // ここで何が問題か？
-  const h = box.offsetHeight;
-  box.style.height = (h * 2) + 'px';
-});`,
-    answer: `// 問題: 読み取り（offsetHeight）と書き込み（style.height）が交互に発生すると
-// ブラウザは毎回レイアウト計算（Reflow）を強制される。
-// 10要素なら10回 Reflow が走る = Layout Thrashing
-
-// NG: 読み書きが混在
-boxes.forEach(box => {
-  const h = box.offsetHeight; // 読み取り（Reflow 強制）
-  box.style.height = (h * 2) + 'px'; // 書き込み（dirty flag）
-});
-
-// OK: 読み取りをまとめて先に行い、書き込みをまとめて後から
-const heights = Array.from(boxes).map(box => box.offsetHeight); // 読み取り一括
-heights.forEach((h, i) => {
-  boxes[i].style.height = (h * 2) + 'px'; // 書き込み一括
-});
-
-// さらに良い: requestAnimationFrame でバッチ処理
-requestAnimationFrame(() => {
-  const heights = Array.from(boxes).map(b => b.offsetHeight);
-  heights.forEach((h, i) => { boxes[i].style.height = (h * 2) + 'px'; });
-});
-// ブラウザのペイントタイミングに合わせるため最も効率的`
+    code: "// NG: Layout Thrashing が発生するコード\nconst boxes = document.querySelectorAll('.box');\nboxes.forEach(box => {\n  // ここで何が問題か？\n  const h = box.offsetHeight;\n  box.style.height = (h * 2) + 'px';\n});",
+    answer: "// 問題: 読み取り（offsetHeight）と書き込み（style.height）が交互に発生すると\n// ブラウザは毎回レイアウト計算（Reflow）を強制される。\n// 10要素なら10回 Reflow が走る = Layout Thrashing\n\n// NG: 読み書きが混在\nboxes.forEach(box => {\n  const h = box.offsetHeight; // 読み取り（Reflow 強制）\n  box.style.height = (h * 2) + 'px'; // 書き込み（dirty flag）\n});\n\n// OK: 読み取りをまとめて先に行い、書き込みをまとめて後から\nconst heights = Array.from(boxes).map(box => box.offsetHeight); // 読み取り一括\nheights.forEach((h, i) => {\n  boxes[i].style.height = (h * 2) + 'px'; // 書き込み一括\n});\n\n// さらに良い: requestAnimationFrame でバッチ処理\nrequestAnimationFrame(() => {\n  const heights = Array.from(boxes).map(b => b.offsetHeight);\n  heights.forEach((h, i) => { boxes[i].style.height = (h * 2) + 'px'; });\n});\n// ブラウザのペイントタイミングに合わせるため最も効率的"
   }],
   ch8: [{
     diff: 2,
     q: "Tree-Shakeable な named export のみを持つライブラリ設計と、\nrollup / tsup でデュアル CJS/ESM を出力する package.json を書いてください。",
-    code: `// src/index.ts — Tree-Shaking に適した export の仕方
-// package.json — exports フィールドで CJS/ESM を出し分け`,
-    answer: `// src/index.ts (Tree-Shakeable: default export を避ける)
-export { add } from './math.js';
-export { formatDate } from './date.js';
-export type { Point } from './types.js';
-// default export は避ける（バンドラが全体を取り込んでしまうため）
-
-// package.json
-{
-  "name": "my-lib",
-  "version": "1.0.0",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "files": ["dist"],
-  "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts"
-  }
-}
-// tsup は tsconfig を読んで ESM (.js) と CJS (.cjs) を同時生成し
-// .d.ts も自動的に出力してくれる`
+    code: "// src/index.ts — Tree-Shaking に適した export の仕方\n// package.json — exports フィールドで CJS/ESM を出し分け",
+    answer: "// src/index.ts (Tree-Shakeable: default export を避ける)\nexport { add } from './math.js';\nexport { formatDate } from './date.js';\nexport type { Point } from './types.js';\n// default export は避ける（バンドラが全体を取り込んでしまうため）\n\n// package.json\n{\n  \"name\": \"my-lib\",\n  \"version\": \"1.0.0\",\n  \"main\": \"./dist/index.cjs\",\n  \"module\": \"./dist/index.js\",\n  \"types\": \"./dist/index.d.ts\",\n  \"exports\": {\n    \".\": {\n      \"import\": \"./dist/index.js\",\n      \"require\": \"./dist/index.cjs\",\n      \"types\": \"./dist/index.d.ts\"\n    }\n  },\n  \"files\": [\"dist\"],\n  \"scripts\": {\n    \"build\": \"tsup src/index.ts --format esm,cjs --dts\"\n  }\n}\n// tsup は tsconfig を読んで ESM (.js) と CJS (.cjs) を同時生成し\n// .d.ts も自動的に出力してくれる"
   }, {
     diff: 3,
     q: "JSDoc で型情報を付与し、TypeScript なしに型安全にライブラリを使える\nコードを書いてください。また、そのコードの .d.ts 定義ファイルも書いてください。",
-    code: `// utils.js — JSDoc で型アノテーション
-// utils.d.ts — 型定義ファイル`,
-    answer: `// utils.js
-/**
- * 2つの数値を加算する
- * @param {number} a
- * @param {number} b
- * @returns {number}
- */
-export function add(a, b) {
-  return a + b;
-}
-
-/**
- * ユーザーオブジェクトを生成する
- * @param {string} name
- * @param {number} age
- * @returns {{ id: string, name: string, age: number, createdAt: Date }}
- */
-export function createUser(name, age) {
-  return { id: crypto.randomUUID(), name, age, createdAt: new Date() };
-}
-
-// utils.d.ts (手書き or tsc --allowJs --declaration で自動生成)
-export declare function add(a: number, b: number): number;
-
-export interface User {
-  id: string;
-  name: string;
-  age: number;
-  createdAt: Date;
-}
-
-export declare function createUser(name: string, age: number): User;
-
-// tsconfig.json で checkJs: true にすれば JSDoc を TS が検証してくれる`
+    code: "// utils.js — JSDoc で型アノテーション\n// utils.d.ts — 型定義ファイル",
+    answer: "// utils.js\n/**\n * 2つの数値を加算する\n * @param {number} a\n * @param {number} b\n * @returns {number}\n */\nexport function add(a, b) {\n  return a + b;\n}\n\n/**\n * ユーザーオブジェクトを生成する\n * @param {string} name\n * @param {number} age\n * @returns {{ id: string, name: string, age: number, createdAt: Date }}\n */\nexport function createUser(name, age) {\n  return { id: crypto.randomUUID(), name, age, createdAt: new Date() };\n}\n\n// utils.d.ts (手書き or tsc --allowJs --declaration で自動生成)\nexport declare function add(a: number, b: number): number;\n\nexport interface User {\n  id: string;\n  name: string;\n  age: number;\n  createdAt: Date;\n}\n\nexport declare function createUser(name: string, age: number): User;\n\n// tsconfig.json で checkJs: true にすれば JSDoc を TS が検証してくれる"
   }]
 };
 
@@ -657,21 +222,7 @@ const chapters = [{
   }, {
     title: "Hidden Class とインラインキャッシュ",
     body: "動的型言語でプロパティアクセスを高速化するために V8 が採用しているのが Hidden Class（内部的には Shape/Map と呼ばれる）という概念です。同じプロパティを同じ順序で持つオブジェクトは同じ Hidden Class を共有し、V8 はそのオフセット情報をキャッシュして直接メモリアクセスに近い速度でプロパティを読み取れます。\n\nインラインキャッシュ（IC）はこれをさらに推し進めた最適化で、プロパティアクセスのサイト（コード上の位置）が「いつも同じ Hidden Class のオブジェクトを受け取る」パターン（モノモーフィック）を検出して、型チェックをスキップした高速パスを生成します。複数の Hidden Class が混在する場合（ポリモーフィック〜メガモーフィック）はこのキャッシュが機能しなくなります。",
-    code: `// 悪い例: Hidden Class が分岐する
-function bad(obj) {
-  obj.x = 1; // Shape A
-  if (Math.random() > 0.5) obj.y = 2; // Shape A か Shape B か不定
-}
-
-// 良い例: 常に同じ Hidden Class
-function good(x, y) {
-  return { x, y }; // 常に { x, y } の Shape
-}
-
-// プロパティは定義順に影響する
-const a = { x: 1, y: 2 }; // Shape X
-const b = { y: 2, x: 1 }; // Shape Y（別 Class！）
-// a と b は同じプロパティを持つが Hidden Class が異なる`,
+    code: "// 悪い例: Hidden Class が分岐する\nfunction bad(obj) {\n  obj.x = 1; // Shape A\n  if (Math.random() > 0.5) obj.y = 2; // Shape A か Shape B か不定\n}\n\n// 良い例: 常に同じ Hidden Class\nfunction good(x, y) {\n  return { x, y }; // 常に { x, y } の Shape\n}\n\n// プロパティは定義順に影響する\nconst a = { x: 1, y: 2 }; // Shape X\nconst b = { y: 2, x: 1 }; // Shape Y（別 Class！）\n// a と b は同じプロパティを持つが Hidden Class が異なる",
     afterCode: "実務では delete 演算子でプロパティを削除するのも Hidden Class の変化を引き起こします。不要なプロパティは undefined を代入して「形状」を保つか、最初から設計に含めないことが推奨されます。"
   }, {
     title: "Orinoco GC — メモリ管理の仕組み",
@@ -688,14 +239,7 @@ const b = { y: 2, x: 1 }; // Shape Y（別 Class！）
   sections: [{
     title: "コールスタックとイベントループ",
     body: "JavaScript はシングルスレッドです。同時に実行できるコードは常に1つだけで、その実行状態を管理するのがコールスタックです。関数を呼ぶと積まれ、returnすると取り出されます。イベントループは「コールスタックが空になったら、キューから次のタスクを取り出して実行する」という単純なループです。\n\nPython でも GIL があるためマルチスレッドは同時実行されませんが、asyncio はコルーチンを「await ポイント」で切り替えることで並行実行を実現しています。JavaScript のイベントループも同じ発想で、await（= Promiseの解決待ち）はコールスタックから関数を取り除き、他のコードが実行できる隙間を作ります。",
-    code: `// イベントループの擬似コード
-while (true) {
-  // 1. コールスタックが空になるまで実行
-  // 2. マイクロタスクキューをすべて処理（Promise.then, queueMicrotask）
-  // 3. 必要ならレンダリング（ブラウザのみ）
-  // 4. タスクキューから1件取り出して実行（setTimeout, I/O）
-  //    → 1に戻る
-}`,
+    code: "// イベントループの擬似コード\nwhile (true) {\n  // 1. コールスタックが空になるまで実行\n  // 2. マイクロタスクキューをすべて処理（Promise.then, queueMicrotask）\n  // 3. 必要ならレンダリング（ブラウザのみ）\n  // 4. タスクキューから1件取り出して実行（setTimeout, I/O）\n  //    → 1に戻る\n}",
     afterCode: "重要: ステップ2のマイクロタスクは「すべて処理」します。マイクロタスクの中でさらにマイクロタスクを登録し続けると、タスクキューに制御が戻らずUIがフリーズします。この無限ループはエラーにならず、ブラウザが「応答なし」になる原因です。"
   }, {
     title: "タスクキュー vs マイクロタスクキュー",
@@ -705,21 +249,7 @@ while (true) {
   }, {
     title: "Node.js の libuv と非同期 I/O",
     body: "Node.js がシングルスレッドでも高い I/O スループットを発揮できる理由は、libuv というクロスプラットフォームの非同期 I/O ライブラリにあります。ファイル読み込みやネットワーク通信は libuv がOSの非同期 API（Linux: epoll、macOS: kqueue、Windows: IOCP）に委譲し、完了したらイベントキューに積み直します。\n\nlibuv はスレッドプールも管理しており、OS がネイティブで非同期をサポートしない操作（一部のファイルシステム操作や DNS ルックアップなど）はスレッドプール内で実行されます。デフォルトサイズは4スレッドで、UV_THREADPOOL_SIZE 環境変数で増やせます。これは Python の ThreadPoolExecutor と似た概念ですが、Node.js 側から意識する必要はほとんどありません。",
-    code: `// Node.js の非同期 I/O の流れ
-import fs from 'fs/promises';
-
-// この呼び出しは libuv に委譲される
-const data = await fs.readFile('large.json', 'utf-8');
-// readFile の間、イベントループは他のリクエストを処理できる
-
-// CPU バウンドな処理はイベントループをブロックする（NG）
-function slowSync() {
-  // 100ms かかる同期処理はすべてのリクエストをブロック
-  const result = JSON.parse(hugeJsonString);
-  return result;
-}
-
-// Worker Threads に逃がすのが正解（Ch.6 で詳説）`,
+    code: "// Node.js の非同期 I/O の流れ\nimport fs from 'fs/promises';\n\n// この呼び出しは libuv に委譲される\nconst data = await fs.readFile('large.json', 'utf-8');\n// readFile の間、イベントループは他のリクエストを処理できる\n\n// CPU バウンドな処理はイベントループをブロックする（NG）\nfunction slowSync() {\n  // 100ms かかる同期処理はすべてのリクエストをブロック\n  const result = JSON.parse(hugeJsonString);\n  return result;\n}\n\n// Worker Threads に逃がすのが正解（Ch.6 で詳説）",
     afterCode: "注意: I/O バウンドな処理はイベントループをブロックしませんが、CPU バウンドな処理（重い計算・巨大 JSON パース）は同期実行されるためブロックします。Node.js サーバで重い計算が必要なら Worker Threads に委譲することが重要です。"
   }]
 }, {
@@ -736,64 +266,12 @@ function slowSync() {
   }, {
     title: "Proxy と Reflect の実用パターン",
     body: "Proxy はオブジェクトへの操作をインターセプトするラッパーで、プロパティの読み取り（get）・書き込み（set）・削除（deleteProperty）・関数呼び出し（apply）など13種類のトラップを定義できます。Python の __getattr__・__setattr__ に相当しますが、より細かい粒度でコントロールできます。\n\nReflect は Proxy のトラップと対応する静的メソッドを提供し、「デフォルトの挙動をそのまま実行しつつ何か追加する」というパターンを書きやすくします。Reflect.get(target, prop, receiver) は target[prop] と同じですが、Proxy 内で使うことで継承チェーンやアクセサを正しく扱えます。",
-    code: `// バリデーション付きプロキシ
-function validated(obj, schema) {
-  return new Proxy(obj, {
-    set(target, prop, value, receiver) {
-      const validator = schema[prop];
-      if (validator && !validator(value)) {
-        throw new TypeError(\`Invalid value for \${String(prop)}: \${value}\`);
-      }
-      return Reflect.set(target, prop, value, receiver);
-    }
-  });
-}
-
-const user = validated(
-  { name: '', age: 0 },
-  {
-    name: v => typeof v === 'string' && v.length > 0,
-    age: v => Number.isInteger(v) && v >= 0 && v <= 150
-  }
-);
-
-user.name = 'Alice'; // OK
-user.age = 30;       // OK
-user.age = -1;       // TypeError: Invalid value for age: -1`,
+    code: "// バリデーション付きプロキシ\nfunction validated(obj, schema) {\n  return new Proxy(obj, {\n    set(target, prop, value, receiver) {\n      const validator = schema[prop];\n      if (validator && !validator(value)) {\n        throw new TypeError(`Invalid value for \${String(prop)}: \${value}`);\n      }\n      return Reflect.set(target, prop, value, receiver);\n    }\n  });\n}\n\nconst user = validated(\n  { name: '', age: 0 },\n  {\n    name: v => typeof v === 'string' && v.length > 0,\n    age: v => Number.isInteger(v) && v >= 0 && v <= 150\n  }\n);\n\nuser.name = 'Alice'; // OK\nuser.age = 30;       // OK\nuser.age = -1;       // TypeError: Invalid value for age: -1",
     afterCode: "Proxy の性能コストは小さくはありません。頻繁に呼ばれるホットパスに使うと TurboFan の最適化が妨げられることがあります。バリデーションや設定オブジェクトのような「書き込みが少ないもの」に使うのが実務的です。"
   }, {
     title: "Decorators (Stage 3)",
     body: "Decorators は TC39 Stage 3（2024年時点）のプロポーザルで、クラスのメソッドやフィールドに宣言的にメタデータや動作を付加する構文です。Python の @decorator と非常に似た概念ですが、JavaScript の Decorators は関数だけでなくクラス・フィールド・アクセサなども対象にできます。TypeScript 5.0 以降で実験的フラグなしに使えるようになっています。\n\nDecorators の典型的なユースケースは、ロギング・メモ化・バリデーション・依存性注入です。Angular や NestJS などのフレームワークはすでにこのパターンを多用しており、@Component・@Injectable などのアノテーションがすべて Decorators で実装されています。",
-    code: `// TypeScript 5.0+ での Decorator 実装例
-function log(target, context) {
-  const name = context.name;
-  return function(...args) {
-    console.log(\`\${name} called with\`, args);
-    const result = target.apply(this, args);
-    console.log(\`\${name} returned\`, result);
-    return result;
-  };
-}
-
-function memoize(target, context) {
-  const cache = new Map();
-  return function(...args) {
-    const key = JSON.stringify(args);
-    if (cache.has(key)) return cache.get(key);
-    const result = target.apply(this, args);
-    cache.set(key, result);
-    return result;
-  };
-}
-
-class Calculator {
-  @log
-  @memoize
-  fibonacci(n) {
-    if (n <= 1) return n;
-    return this.fibonacci(n - 1) + this.fibonacci(n - 2);
-  }
-}`,
+    code: "// TypeScript 5.0+ での Decorator 実装例\nfunction log(target, context) {\n  const name = context.name;\n  return function(...args) {\n    console.log(`\${name} called with`, args);\n    const result = target.apply(this, args);\n    console.log(`\${name} returned`, result);\n    return result;\n  };\n}\n\nfunction memoize(target, context) {\n  const cache = new Map();\n  return function(...args) {\n    const key = JSON.stringify(args);\n    if (cache.has(key)) return cache.get(key);\n    const result = target.apply(this, args);\n    cache.set(key, result);\n    return result;\n  };\n}\n\nclass Calculator {\n  @log\n  @memoize\n  fibonacci(n) {\n    if (n <= 1) return n;\n    return this.fibonacci(n - 1) + this.fibonacci(n - 2);\n  }\n}",
     afterCode: "注意: Decorators の仕様は長い歴史の中で何度も変更されています。TypeScript の experimentalDecorators（旧仕様）と ECMAScript 標準の Decorators（新仕様）は動作が異なります。2024年以降のプロジェクトでは tsconfig の useDefineForClassFields: true を確認してから使いましょう。"
   }]
 }, {
@@ -810,52 +288,12 @@ class Calculator {
   }, {
     title: "JS から WASM を呼ぶ — インスタンス化と境界コスト",
     body: "JavaScript から WASM を呼ぶには WebAssembly.instantiate() または WebAssembly.instantiateStreaming() を使います。後者は fetch のレスポンスを直接受け取りストリーミングでコンパイルするため、より高速です。インスタンス化された WASM モジュールは instance.exports 経由で関数・メモリ・グローバル変数にアクセスできます。\n\nJS↔WASM の境界を越えるたびにオーバーヘッドが発生します。関数呼び出しのコストは小さいですが、文字列や複雑なデータ構造は WASM の線形メモリ上にバイト列として書き込む必要があるため、大量のデータのやり取りは避けるべきです。設計の原則は「大きな仕事を WASM に渡し、結果だけを JS で受け取る」です。",
-    code: `// WASM モジュールのインスタンス化
-async function loadWasm(path, imports = {}) {
-  if (WebAssembly.instantiateStreaming) {
-    const { instance } = await WebAssembly.instantiateStreaming(
-      fetch(path), imports
-    );
-    return instance;
-  }
-  // フォールバック（古いブラウザ）
-  const resp = await fetch(path);
-  const buf = await resp.arrayBuffer();
-  const { instance } = await WebAssembly.instantiate(buf, imports);
-  return instance;
-}
-
-// imports: JS関数をWASMに渡す（境界を渡るコールバック）
-const imports = {
-  env: {
-    log: (x) => console.log('from wasm:', x) // WASM から JS を呼ぶ
-  }
-};
-
-const inst = await loadWasm('./math.wasm', imports);
-console.log(inst.exports.add(3, 4)); // 7`,
+    code: "// WASM モジュールのインスタンス化\nasync function loadWasm(path, imports = {}) {\n  if (WebAssembly.instantiateStreaming) {\n    const { instance } = await WebAssembly.instantiateStreaming(\n      fetch(path), imports\n    );\n    return instance;\n  }\n  // フォールバック（古いブラウザ）\n  const resp = await fetch(path);\n  const buf = await resp.arrayBuffer();\n  const { instance } = await WebAssembly.instantiate(buf, imports);\n  return instance;\n}\n\n// imports: JS関数をWASMに渡す（境界を渡るコールバック）\nconst imports = {\n  env: {\n    log: (x) => console.log('from wasm:', x) // WASM から JS を呼ぶ\n  }\n};\n\nconst inst = await loadWasm('./math.wasm', imports);\nconsole.log(inst.exports.add(3, 4)); // 7",
     afterCode: "WASM の Memory は ArrayBuffer の拡張版で、grow() で動的に拡張できます。Rust の wasm-bindgen や AssemblyScript を使うと、メモリ管理や型変換のグルーコードを自動生成してくれるため、実務では直接 WAT を書くことは稀です。"
   }, {
     title: "WASI — サーバサイド WASM",
     body: "WASI（WebAssembly System Interface）はブラウザ外で WASM を実行するための標準 API セットです。POSIX ライクなファイル・ネットワーク・プロセスの API を提供し、WASM バイナリをブラウザ・Node.js・Deno・Wasmtime（スタンドアロンランタイム）など複数の環境で動かせます。Docker の代替として注目されており、「一度コンパイルしてどこでも安全に実行」がコンセプトです。\n\nNode.js 21 以降では WASI の実験的サポートが組み込まれており、node:wasi モジュールを通じて使えます。Python の ctypes でシステムコールを使うのと似ていますが、WASI はサンドボックス内で許可されたリソースへしかアクセスできないため、より安全なプラグインシステムや FaaS の実行環境として有望です。",
-    code: `// Node.js で WASI を使う例（Node.js 21+）
-import { WASI } from 'node:wasi';
-import { readFile } from 'node:fs/promises';
-
-const wasi = new WASI({
-  version: 'preview1',
-  args: ['wasm-app', '--flag'],
-  env: { HOME: '/tmp' },
-  preopens: { '/sandbox': '/tmp/sandbox' } // 許可するディレクトリ
-});
-
-const wasmBuffer = await readFile('app.wasm');
-const { instance } = await WebAssembly.instantiate(
-  wasmBuffer,
-  wasi.getImportObject()
-);
-
-wasi.start(instance); // _start (main関数相当) を呼ぶ`,
+    code: "// Node.js で WASI を使う例（Node.js 21+）\nimport { WASI } from 'node:wasi';\nimport { readFile } from 'node:fs/promises';\n\nconst wasi = new WASI({\n  version: 'preview1',\n  args: ['wasm-app', '--flag'],\n  env: { HOME: '/tmp' },\n  preopens: { '/sandbox': '/tmp/sandbox' } // 許可するディレクトリ\n});\n\nconst wasmBuffer = await readFile('app.wasm');\nconst { instance } = await WebAssembly.instantiate(\n  wasmBuffer,\n  wasi.getImportObject()\n);\n\nwasi.start(instance); // _start (main関数相当) を呼ぶ",
     afterCode: "WASI はまだ preview1/preview2 と仕様が進化中です（2024年時点）。本番利用前に対象ランタイムのサポートバージョンを確認してください。Cloudflare Workers・Fastly Compute でも WASM + WASI 対応が広まっており、エッジコンピューティングの文脈で注目されています。"
   }]
 }, {
@@ -872,55 +310,12 @@ wasi.start(instance); // _start (main関数相当) を呼ぶ`,
   }, {
     title: "Mapped Types と Template Literal Types",
     body: "Mapped Types は `{ [K in keyof T]: ... }` 構文で、既存の型のすべてのプロパティに変換を適用した新しい型を生成します。Partial<T>・Readonly<T>・Required<T>・Pick<T,K>・Omit<T,K> など、TypeScript 標準のユーティリティ型はすべて Mapped Types で実装されています。プロパティを追加・削除・変更する型変換を宣言的に記述できる強力な機能です。\n\nTemplate Literal Types は文字列の型を文字列テンプレートのように組み合わせる機能です。`type EventName = \`on\${Capitalize<string>}\`` のように書くと onFoo・onBar などの文字列パターンを型として表現できます。Mapped Types と組み合わせると、APIのエンドポイント名やイベント名を型安全に管理するユーティリティが作れます。",
-    code: `// Mapped Types: すべてのメソッドを Promise 化する
-type Promisify<T> = {
-  [K in keyof T]: T[K] extends (...args: infer A) => infer R
-    ? (...args: A) => Promise<R>
-    : T[K];
-};
-
-// Template Literal Types: イベントハンドラ名の生成
-type EventMap = { click: MouseEvent; focus: FocusEvent; input: InputEvent };
-type HandlerMap = {
-  [K in keyof EventMap as \`on\${Capitalize<string & K>}\`]:
-    (e: EventMap[K]) => void
-};
-// HandlerMap = { onClick: (e: MouseEvent) => void; ... }
-
-// satisfies: 型チェックしつつ推論を保持
-const palette = {
-  red: [255, 0, 0],
-  green: '#00ff00',
-} satisfies Record<string, string | number[]>;
-
-palette.red.map(v => v * 2); // OK: number[] として推論される
-// 'as' だと unknown になってしまう箇所が安全になる`,
+    code: "// Mapped Types: すべてのメソッドを Promise 化する\ntype Promisify<T> = {\n  [K in keyof T]: T[K] extends (...args: infer A) => infer R\n    ? (...args: A) => Promise<R>\n    : T[K];\n};\n\n// Template Literal Types: イベントハンドラ名の生成\ntype EventMap = { click: MouseEvent; focus: FocusEvent; input: InputEvent };\ntype HandlerMap = {\n  [K in keyof EventMap as `on\${Capitalize<string & K>}`]:\n    (e: EventMap[K]) => void\n};\n// HandlerMap = { onClick: (e: MouseEvent) => void; ... }\n\n// satisfies: 型チェックしつつ推論を保持\nconst palette = {\n  red: [255, 0, 0],\n  green: '#00ff00',\n} satisfies Record<string, string | number[]>;\n\npalette.red.map(v => v * 2); // OK: number[] として推論される\n// 'as' だと unknown になってしまう箇所が安全になる",
     afterCode: "satisfies は TypeScript 4.9 で導入されました。`const x: T = value` とすると x の型は T になりますが、`const x = value satisfies T` なら x は value から推論された具体的な型のまま、T への適合チェックだけが行われます。ライブラリの設定オブジェクト定義に特に便利です。"
   }, {
     title: "実用的な型パターン集",
     body: "TypeScript の型システムは、設計を誤ると「型のための型」を大量生産してしまいます。実務では「型の表現力」よりも「チームが読んで理解できるか」を優先することが重要です。ここでは実用頻度が高く、コードの品質向上に直結する型パターンをまとめます。\n\nDiscriminated Union（判別可能な共用体型）は、kind・type・tag などの共通のリテラル型フィールドで分岐するパターンで、TypeScript の型絞り込みと非常に相性が良いです。Redux のアクション型や API レスポンスの分岐、状態管理の状態遷移を表現する際に多用されます。Python の Enum + match 文に近い役割を果たします。",
-    code: `// Discriminated Union: 型安全な状態管理
-type FetchState<T> =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'success'; data: T }
-  | { status: 'error'; error: Error };
-
-function renderUser(state: FetchState<User>) {
-  switch (state.status) {
-    case 'idle':    return 'まだ読み込んでいません';
-    case 'loading': return '読み込み中...';
-    case 'success': return state.data.name; // state.data は User 型
-    case 'error':   return state.error.message;
-  }
-}
-
-// Branded Types: 型エイリアスに意味を持たせる
-type UserId = string & { __brand: 'UserId' };
-type OrderId = string & { __brand: 'OrderId' };
-
-function getUser(id: UserId) { /* ... */ }
-// getUser('abc' as UserId); // キャスト必要 → 意図しない混在を防ぐ`,
+    code: "// Discriminated Union: 型安全な状態管理\ntype FetchState<T> =\n  | { status: 'idle' }\n  | { status: 'loading' }\n  | { status: 'success'; data: T }\n  | { status: 'error'; error: Error };\n\nfunction renderUser(state: FetchState<User>) {\n  switch (state.status) {\n    case 'idle':    return 'まだ読み込んでいません';\n    case 'loading': return '読み込み中...';\n    case 'success': return state.data.name; // state.data は User 型\n    case 'error':   return state.error.message;\n  }\n}\n\n// Branded Types: 型エイリアスに意味を持たせる\ntype UserId = string & { __brand: 'UserId' };\ntype OrderId = string & { __brand: 'OrderId' };\n\nfunction getUser(id: UserId) { /* ... */ }\n// getUser('abc' as UserId); // キャスト必要 → 意図しない混在を防ぐ",
     afterCode: "Branded Types は実行時には通常の string ですが、型レベルでは別の型として扱われます。UserId と OrderId を誤って入れ替えるバグをコンパイル時に検出できます。ユーザー入力を検証してBranded Typeにキャストするファクトリ関数（parseUserId 等）を作るパターンが実務で一般的です。"
   }]
 }, {
@@ -937,48 +332,12 @@ function getUser(id: UserId) { /* ... */ }
   }, {
     title: "Worker Threads (Node.js)",
     body: "Node.js の worker_threads モジュールはスレッドベースの並列実行を提供します。ブラウザの Web Workers と似ていますが、worker_threads は同じプロセス内でメモリを（SharedArrayBufferで）共有でき、Node.js のモジュールシステムをそのまま使えます。Python の multiprocessing モジュールはプロセスを分離しますが、worker_threads はスレッドなのでオーバーヘッドが小さい点が特徴です。\n\nCPUバウンドな処理（画像処理・暗号計算・データ変換）を Worker に逃がすことで、メインスレッドのイベントループを解放できます。実際の設計では Worker を使い回す「ワーカープール」を作るのが効率的で、piscina というライブラリがこのパターンを提供しています。",
-    code: `// ワーカープールの簡易実装
-// npm install piscina (本番では推奨)
-import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
-
-if (isMainThread) {
-  // メインスレッド: Worker を生成してタスクを投げる
-  function runInWorker(data) {
-    return new Promise((resolve, reject) => {
-      const w = new Worker(new URL(import.meta.url), { workerData: data });
-      w.on('message', resolve);
-      w.on('error', reject);
-    });
-  }
-  const result = await runInWorker({ n: 40 });
-  console.log('fib(40) =', result); // 102334155
-} else {
-  // Worker スレッド: CPU バウンドな計算
-  function fib(n) {
-    return n <= 1 ? n : fib(n - 1) + fib(n - 2);
-  }
-  parentPort.postMessage(fib(workerData.n));
-}`,
+    code: "// ワーカープールの簡易実装\n// npm install piscina (本番では推奨)\nimport { Worker, isMainThread, parentPort, workerData } from 'worker_threads';\n\nif (isMainThread) {\n  // メインスレッド: Worker を生成してタスクを投げる\n  function runInWorker(data) {\n    return new Promise((resolve, reject) => {\n      const w = new Worker(new URL(import.meta.url), { workerData: data });\n      w.on('message', resolve);\n      w.on('error', reject);\n    });\n  }\n  const result = await runInWorker({ n: 40 });\n  console.log('fib(40) =', result); // 102334155\n} else {\n  // Worker スレッド: CPU バウンドな計算\n  function fib(n) {\n    return n <= 1 ? n : fib(n - 1) + fib(n - 2);\n  }\n  parentPort.postMessage(fib(workerData.n));\n}",
     afterCode: "isMainThread を使うと1ファイルにメインスレッドと Worker の両方のコードを書けます。import.meta.url は現在のファイルの URL を返すため、Worker のスクリプトパスとして自分自身を指定できます。これは Python の if __name__ == '__main__' に相当するパターンです。"
   }, {
     title: "ブラウザの Web Workers とマルチスレッドパターン",
     body: "ブラウザの Web Workers はメインスレッドとは別のグローバルスコープで動作します。DOM・window・document へのアクセスは完全に禁止されており、postMessage によるメッセージパッシングのみで通信します。通信コストを最小化するには、Transferable Objects（ArrayBuffer・MessagePort・OffscreenCanvas等）を使います。これらは転送時にコピーではなく「所有権移転」されるため、ゼロコピーで大きなデータを渡せます。\n\nOffscreenCanvas は Web Worker 内でキャンバス描画を行えるAPIで、WebGL の描画処理をバックグラウンドに追い出しメインスレッドをUIの応答性維持に専念させることができます。また、Service Worker はネットワークリクエストをインターセプトするための特殊な Worker で、オフラインキャッシュや Push 通知の処理に使われます。",
-    code: `// Transferable Object でゼロコピー転送
-const buffer = new ArrayBuffer(1024 * 1024 * 100); // 100MB
-const worker = new Worker('worker.js');
-
-// transfer: buffer の所有権を Worker に移す（メインスレッドはアクセス不可に）
-worker.postMessage({ buffer }, [buffer]);
-// buffer を postMessage に渡した後はアクセスできない
-// console.log(buffer.byteLength); // 0 (転送済み)
-
-// worker.js 内
-self.addEventListener('message', ({ data }) => {
-  const view = new Uint8Array(data.buffer);
-  // 100MB の処理...
-  // 処理後はメインスレッドに返せる
-  self.postMessage({ result: view.slice(0, 10) }, [data.buffer]);
-});`,
+    code: "// Transferable Object でゼロコピー転送\nconst buffer = new ArrayBuffer(1024 * 1024 * 100); // 100MB\nconst worker = new Worker('worker.js');\n\n// transfer: buffer の所有権を Worker に移す（メインスレッドはアクセス不可に）\nworker.postMessage({ buffer }, [buffer]);\n// buffer を postMessage に渡した後はアクセスできない\n// console.log(buffer.byteLength); // 0 (転送済み)\n\n// worker.js 内\nself.addEventListener('message', ({ data }) => {\n  const view = new Uint8Array(data.buffer);\n  // 100MB の処理...\n  // 処理後はメインスレッドに返せる\n  self.postMessage({ result: view.slice(0, 10) }, [data.buffer]);\n});",
     afterCode: "Service Worker はページが閉じても動作し続けるため、Push 通知の受信やバックグラウンド同期に使えます。ただしインストール・アクティベーション・フェッチのライフサイクルを正しく管理しないと古いキャッシュが残り続ける問題が発生します。Workbox ライブラリを使うと安全に管理できます。"
   }]
 }, {
@@ -995,53 +354,12 @@ self.addEventListener('message', ({ data }) => {
   }, {
     title: "Layout Thrashing と描画最適化",
     body: "ブラウザのレンダリングパイプラインは「JavaScript実行 → スタイル計算 → レイアウト → ペイント → コンポジット」の順に進みます。Layout Thrashing（強制同期レイアウト）は、JavaScript がレイアウトに影響するプロパティ（offsetHeight・scrollTop・getBoundingClientRect 等）を読み取った直後に、スタイルを変更した場合に発生します。ブラウザは「最新の値を返すため」に強制的にレイアウト計算を行う必要があり、これが繰り返されると深刻な性能低下を引き起こします。\n\nRAIL モデル（Response・Animation・Idle・Load）はGoogleが提唱するパフォーマンス目標の枠組みです。Response（応答）は100ms以内、Animation（アニメーション）は16ms/フレーム（60fps）、Load（ロード）はTime to Interactive 5秒以内が目安です。これらの目標に基づいて最適化の優先度を決めることが重要で、「測定してから最適化する」というアプローチが基本です。",
-    code: `// Layout Thrashing を検出・修正する
-// FastDOM ライブラリのパターンを自前実装
-const reads = [];
-const writes = [];
-let scheduled = false;
-
-function read(fn) { reads.push(fn); schedule(); }
-function write(fn) { writes.push(fn); schedule(); }
-
-function schedule() {
-  if (scheduled) return;
-  scheduled = true;
-  requestAnimationFrame(() => {
-    const r = reads.splice(0);
-    const w = writes.splice(0);
-    r.forEach(fn => fn()); // 読み取りをまとめて実行
-    w.forEach(fn => fn()); // 書き込みをまとめて実行
-    scheduled = false;
-  });
-}
-
-// 使い方
-read(() => { const h = el.offsetHeight; write(() => { el.style.height = h * 2 + 'px'; }); });`,
+    code: "// Layout Thrashing を検出・修正する\n// FastDOM ライブラリのパターンを自前実装\nconst reads = [];\nconst writes = [];\nlet scheduled = false;\n\nfunction read(fn) { reads.push(fn); schedule(); }\nfunction write(fn) { writes.push(fn); schedule(); }\n\nfunction schedule() {\n  if (scheduled) return;\n  scheduled = true;\n  requestAnimationFrame(() => {\n    const r = reads.splice(0);\n    const w = writes.splice(0);\n    r.forEach(fn => fn()); // 読み取りをまとめて実行\n    w.forEach(fn => fn()); // 書き込みをまとめて実行\n    scheduled = false;\n  });\n}\n\n// 使い方\nread(() => { const h = el.offsetHeight; write(() => { el.style.height = h * 2 + 'px'; }); });",
     afterCode: "will-change: transform を CSS で指定すると、要素をコンポジターレイヤーに昇格させてGPUで処理されます。アニメーション対象の要素に使うと Layout・Paint をスキップできますが、多用するとVRAM消費が増えます。transform・opacity のみをアニメーションする限りコンポジットのみで処理されるため、これら2つが「アニメーション安全プロパティ」と呼ばれます。"
   }, {
     title: "Lighthouse CI とパフォーマンス予算",
     body: "Lighthouse は Google が提供するウェブアプリの品質計測ツールで、パフォーマンス・アクセシビリティ・SEO・PWA の各カテゴリをスコア化します。Lighthouse CI は Lighthouse をCI/CDパイプラインに組み込むためのツールで、PRごとにスコアを計測し、設定した閾値を下回ったらビルドを失敗させる「パフォーマンス予算」を実施できます。\n\nCore Web Vitals（LCP・INP・CLS）はGoogleの検索ランキングにも影響するため、本番サービスでは継続的な計測が重要です。LCP（Largest Contentful Paint）は最大要素の描画時間で2.5秒以内、INP（Interaction to Next Paint）はインタラクションから次の描画まで200ms以内、CLS（Cumulative Layout Shift）はレイアウトのずれが0.1以下が合格基準です。",
-    code: `# Lighthouse CI のセットアップ
-npm install -g @lhci/cli
-
-# lighthouserc.js を作成
-# module.exports = {
-#   ci: {
-#     collect: { startServerCommand: 'npm start', url: ['http://localhost:3000'] },
-#     assert: {
-#       assertions: {
-#         'categories:performance': ['warn', { minScore: 0.9 }],
-#         'first-contentful-paint': ['error', { maxNumericValue: 2000 }],
-#         'interactive': ['error', { maxNumericValue: 5000 }]
-#       }
-#     },
-#     upload: { target: 'temporary-public-storage' }
-#   }
-# };
-
-# GitHub Actions での実行例
-# - run: lhci autorun`,
+    code: "# Lighthouse CI のセットアップ\nnpm install -g @lhci/cli\n\n# lighthouserc.js を作成\n# module.exports = {\n#   ci: {\n#     collect: { startServerCommand: 'npm start', url: ['http://localhost:3000'] },\n#     assert: {\n#       assertions: {\n#         'categories:performance': ['warn', { minScore: 0.9 }],\n#         'first-contentful-paint': ['error', { maxNumericValue: 2000 }],\n#         'interactive': ['error', { maxNumericValue: 5000 }]\n#       }\n#     },\n#     upload: { target: 'temporary-public-storage' }\n#   }\n# };\n\n# GitHub Actions での実行例\n# - run: lhci autorun",
     afterCode: "パフォーマンス予算の設定は「何を計測するか」から始めましょう。全てのスコアを100にすることが目的ではなく、ユーザー体験に影響する指標（LCP・INP）を中心に目標値を設定するのが現実的です。Lighthouse のスコアはラボデータ（合成テスト）であり、実ユーザーのデータとは差異があることも認識しておく必要があります。"
   }]
 }, {
@@ -1058,51 +376,12 @@ npm install -g @lhci/cli
   }, {
     title: "JSDoc による型情報付与と .d.ts 生成",
     body: "TypeScript を使わない JavaScript プロジェクトでも、JSDoc コメントで型アノテーションを書くと VS Code や TypeScript の型チェッカーがその情報を活用します。tsconfig.json で allowJs: true と checkJs: true を設定すると、JS ファイルに対して型チェックが走ります。Python の型ヒント（mypy）と同様に、既存コードに段階的に型情報を追加していくことができます。\n\n.d.ts ファイルは TypeScript の型定義のみを含む宣言ファイルです。ライブラリを TypeScript ユーザー向けに配布する際に必要で、tsc --declaration または tsup --dts で自動生成できます。npm の @types/xxx パッケージは、JS ライブラリに対して後付けで .d.ts を提供するパターンです（DefinitelyTyped リポジトリで管理）。",
-    code: `// tsconfig.json (型チェック + 宣言ファイル生成)
-{
-  "compilerOptions": {
-    "allowJs": true,
-    "checkJs": true,
-    "declaration": true,
-    "declarationMap": true,
-    "emitDeclarationOnly": true,
-    "outDir": "./dist",
-    "strict": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler"
-  },
-  "include": ["src/**/*"]
-}
-
-// 生成コマンド
-// tsc --emitDeclarationOnly  → dist/ に .d.ts を生成
-// tsup src/index.ts --dts    → .js + .cjs + .d.ts を一括生成`,
+    code: "// tsconfig.json (型チェック + 宣言ファイル生成)\n{\n  \"compilerOptions\": {\n    \"allowJs\": true,\n    \"checkJs\": true,\n    \"declaration\": true,\n    \"declarationMap\": true,\n    \"emitDeclarationOnly\": true,\n    \"outDir\": \"./dist\",\n    \"strict\": true,\n    \"module\": \"ESNext\",\n    \"moduleResolution\": \"bundler\"\n  },\n  \"include\": [\"src/**/*\"]\n}\n\n// 生成コマンド\n// tsc --emitDeclarationOnly  → dist/ に .d.ts を生成\n// tsup src/index.ts --dts    → .js + .cjs + .d.ts を一括生成",
     afterCode: "declarationMap: true を設定すると .d.ts.map が生成され、型定義からソースの JS/TS ファイルへ「定義へ移動」できるようになります。ライブラリ利用者が型定義を見てすぐに実装を確認できるため、開発体験が向上します。"
   }, {
     title: "npm publish と Changeset によるリリース管理",
     body: "ライブラリを npm に公開する前に、セマンティックバージョニング（SemVer）の原則を理解しておく必要があります。major.minor.patch の3部構成で、破壊的変更は major、後方互換の機能追加は minor、バグ修正は patch を上げます。npm version コマンドは package.json の更新と git tag の作成を一括で行ってくれます。\n\nChangeset はモノレポ（複数パッケージをひとつのリポジトリで管理）でのバージョン管理・CHANGELOG 生成・公開を自動化するツールです。PR ごとに changeset ファイルを追加し、リリース時にまとめてバージョンを上げる運用をとることで、大規模なライブラリ管理でも混乱なくリリースを行えます。Python のポエトリや twine に相当するワークフローを提供します。",
-    code: `# Changeset を使ったリリースフロー
-npm install -D @changesets/cli
-npx changeset init
-
-# 機能を追加したら PR ごとに changeset を追加
-npx changeset add
-# → 対話的に変更種別(major/minor/patch)とサマリーを入力
-
-# リリース時: バージョン更新 + CHANGELOG 生成
-npx changeset version
-
-# npm に公開
-npx changeset publish
-
-# .changeset/config.json (モノレポ設定例)
-# {
-#   "changelog": "@changesets/cli/changelog",
-#   "commit": false,
-#   "linked": [],
-#   "access": "public",
-#   "baseBranch": "main"
-# }`,
+    code: "# Changeset を使ったリリースフロー\nnpm install -D @changesets/cli\nnpx changeset init\n\n# 機能を追加したら PR ごとに changeset を追加\nnpx changeset add\n# → 対話的に変更種別(major/minor/patch)とサマリーを入力\n\n# リリース時: バージョン更新 + CHANGELOG 生成\nnpx changeset version\n\n# npm に公開\nnpx changeset publish\n\n# .changeset/config.json (モノレポ設定例)\n# {\n#   \"changelog\": \"@changesets/cli/changelog\",\n#   \"commit\": false,\n#   \"linked\": [],\n#   \"access\": \"public\",\n#   \"baseBranch\": \"main\"\n# }",
     afterCode: "npm publish --provenance フラグ（npm 9.5+）を使うと、公開パッケージに GitHub Actions の実行情報が署名として付与され、パッケージのサプライチェーン攻撃を防ぐための透明性を提供できます。セキュリティを重視するライブラリでは積極的に使うことが推奨されます。"
   }]
 }];

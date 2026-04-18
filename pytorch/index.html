@@ -22,367 +22,67 @@ const { useState } = React;
 const EX = {
   ch1: [
     {diff:1, q:"NumPy配列からPyTorchテンソルを作成し、形状・データ型・デバイスを確認してください。",
-     code:`import torch
-import numpy as np
-
-arr = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)
-# テンソルに変換してshape, dtype, deviceを表示`,
-     answer:`import torch
-import numpy as np
-
-arr = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)
-t = torch.from_numpy(arr)
-print(t.shape)   # torch.Size([2, 3])
-print(t.dtype)   # torch.float32
-print(t.device)  # cpu
-# GPUへ移動: t = t.to('cuda') または t.cuda()`},
+     code:"import torch\nimport numpy as np\n\narr = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)\n# テンソルに変換してshape, dtype, deviceを表示",
+     answer:"import torch\nimport numpy as np\n\narr = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)\nt = torch.from_numpy(arr)\nprint(t.shape)   # torch.Size([2, 3])\nprint(t.dtype)   # torch.float32\nprint(t.device)  # cpu\n# GPUへ移動: t = t.to('cuda') または t.cuda()"},
     {diff:2, q:"(3, 4, 5)形状のランダムテンソルを作り、最初の次元でスライスして(2, 4, 5)のテンソルを取り出してください。また、最後の2次元の合計を計算してください。",
-     code:`import torch
-
-t = torch.randn(3, 4, 5)
-# 最初の2要素をスライス (インデックス0と1)
-# 最後の2次元(dim=1, dim=2)の合計`,
-     answer:`import torch
-
-t = torch.randn(3, 4, 5)
-sliced = t[:2]                    # shape: (2, 4, 5)
-print(sliced.shape)
-
-# 最後の2次元の合計: dim=(1,2)で集約
-total = t.sum(dim=(1, 2))         # shape: (3,) — 各バッチの合計
-print(total)
-print(total.shape)               # torch.Size([3])`}
+     code:"import torch\n\nt = torch.randn(3, 4, 5)\n# 最初の2要素をスライス (インデックス0と1)\n# 最後の2次元(dim=1, dim=2)の合計",
+     answer:"import torch\n\nt = torch.randn(3, 4, 5)\nsliced = t[:2]                    # shape: (2, 4, 5)\nprint(sliced.shape)\n\n# 最後の2次元の合計: dim=(1,2)で集約\ntotal = t.sum(dim=(1, 2))         # shape: (3,) — 各バッチの合計\nprint(total)\nprint(total.shape)               # torch.Size([3])"}
   ],
   ch2: [
     {diff:1, q:"y = x^2 の微分をAutogradで計算し、x=3.0での勾配を求めてください。",
-     code:`import torch
-
-x = torch.tensor(3.0, requires_grad=True)
-y = x ** 2
-# 逆伝播して勾配を取得`,
-     answer:`import torch
-
-x = torch.tensor(3.0, requires_grad=True)
-y = x ** 2
-y.backward()
-print(x.grad)  # tensor(6.)  (dy/dx = 2x = 6)`},
+     code:"import torch\n\nx = torch.tensor(3.0, requires_grad=True)\ny = x ** 2\n# 逆伝播して勾配を取得",
+     answer:"import torch\n\nx = torch.tensor(3.0, requires_grad=True)\ny = x ** 2\ny.backward()\nprint(x.grad)  # tensor(6.)  (dy/dx = 2x = 6)"},
     {diff:2, q:"torch.no_grad()を使って推論モードでの計算を行い、requires_grad=Trueのテンソルを含む計算でも勾配が計算されないことを確認してください。",
-     code:`import torch
-
-w = torch.tensor(2.0, requires_grad=True)
-x = torch.tensor(3.0)
-
-# torch.no_grad()で包んだ計算
-with torch.no_grad():
-    y = w * x
-# y.requires_grad を確認`,
-     answer:`import torch
-
-w = torch.tensor(2.0, requires_grad=True)
-x = torch.tensor(3.0)
-
-with torch.no_grad():
-    y = w * x
-
-print(y)                   # tensor(6.)
-print(y.requires_grad)     # False
-# y.backward() を呼ぶとエラー
-# 推論時はno_gradを使いメモリと計算コストを削減する`}
+     code:"import torch\n\nw = torch.tensor(2.0, requires_grad=True)\nx = torch.tensor(3.0)\n\n# torch.no_grad()で包んだ計算\nwith torch.no_grad():\n    y = w * x\n# y.requires_grad を確認",
+     answer:"import torch\n\nw = torch.tensor(2.0, requires_grad=True)\nx = torch.tensor(3.0)\n\nwith torch.no_grad():\n    y = w * x\n\nprint(y)                   # tensor(6.)\nprint(y.requires_grad)     # False\n# y.backward() を呼ぶとエラー\n# 推論時はno_gradを使いメモリと計算コストを削減する"}
   ],
   ch3: [
     {diff:1, q:"nn.Moduleを継承して、入力次元64・隠れ層128・出力次元10の2層MLPを実装してください。ReLU活性化を使用してください。",
-     code:`import torch.nn as nn
-
-class MLP(nn.Module):
-    def __init__(self):
-        super().__init__()
-        # Linear層とReLUを定義
-
-    def forward(self, x):
-        # forwardを実装`,
-     answer:`import torch.nn as nn
-
-class MLP(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc1 = nn.Linear(64, 128)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(128, 10)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.fc2(x)
-        return x
-
-model = MLP()
-print(model)`},
+     code:"import torch.nn as nn\n\nclass MLP(nn.Module):\n    def __init__(self):\n        super().__init__()\n        # Linear層とReLUを定義\n\n    def forward(self, x):\n        # forwardを実装",
+     answer:"import torch.nn as nn\n\nclass MLP(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc1 = nn.Linear(64, 128)\n        self.relu = nn.ReLU()\n        self.fc2 = nn.Linear(128, 10)\n\n    def forward(self, x):\n        x = self.fc1(x)\n        x = self.relu(x)\n        x = self.fc2(x)\n        return x\n\nmodel = MLP()\nprint(model)"},
     {diff:2, q:"nn.Sequentialを使って同じ2層MLPを簡潔に定義し、model.parameters()で全パラメータ数を計算してください。",
-     code:`import torch
-import torch.nn as nn
-
-model = nn.Sequential(
-    # 64→128→ReLU→10
-)
-# 全パラメータ数を計算`,
-     answer:`import torch
-import torch.nn as nn
-
-model = nn.Sequential(
-    nn.Linear(64, 128),
-    nn.ReLU(),
-    nn.Linear(128, 10),
-)
-
-total_params = sum(p.numel() for p in model.parameters())
-trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(f"全パラメータ: {total_params:,}")     # 9,482
-print(f"訓練可能: {trainable:,}")`}
+     code:"import torch\nimport torch.nn as nn\n\nmodel = nn.Sequential(\n    # 64→128→ReLU→10\n)\n# 全パラメータ数を計算",
+     answer:"import torch\nimport torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(64, 128),\n    nn.ReLU(),\n    nn.Linear(128, 10),\n)\n\ntotal_params = sum(p.numel() for p in model.parameters())\ntrainable = sum(p.numel() for p in model.parameters() if p.requires_grad)\nprint(f\"全パラメータ: {total_params:,}\")     # 9,482\nprint(f\"訓練可能: {trainable:,}\")"}
   ],
   ch4: [
     {diff:1, q:"MSE損失関数とSGDオプティマイザを使って、1ステップの勾配更新を実装してください。",
-     code:`import torch
-import torch.nn as nn
-
-model = nn.Linear(4, 1)
-criterion = nn.MSELoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-
-x = torch.randn(8, 4)
-y_true = torch.randn(8, 1)
-# 1ステップの訓練`,
-     answer:`import torch
-import torch.nn as nn
-
-model = nn.Linear(4, 1)
-criterion = nn.MSELoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-
-x = torch.randn(8, 4)
-y_true = torch.randn(8, 1)
-
-optimizer.zero_grad()      # 勾配をリセット
-y_pred = model(x)          # 順伝播
-loss = criterion(y_pred, y_true)  # 損失計算
-loss.backward()            # 逆伝播
-optimizer.step()           # パラメータ更新
-print(f"Loss: {loss.item():.4f}")`},
+     code:"import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(4, 1)\ncriterion = nn.MSELoss()\noptimizer = torch.optim.SGD(model.parameters(), lr=0.01)\n\nx = torch.randn(8, 4)\ny_true = torch.randn(8, 1)\n# 1ステップの訓練",
+     answer:"import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(4, 1)\ncriterion = nn.MSELoss()\noptimizer = torch.optim.SGD(model.parameters(), lr=0.01)\n\nx = torch.randn(8, 4)\ny_true = torch.randn(8, 1)\n\noptimizer.zero_grad()      # 勾配をリセット\ny_pred = model(x)          # 順伝播\nloss = criterion(y_pred, y_true)  # 損失計算\nloss.backward()            # 逆伝播\noptimizer.step()           # パラメータ更新\nprint(f\"Loss: {loss.item():.4f}\")"},
     {diff:2, q:"AdamオプティマイザにCosineAnnealingLRスケジューラを組み合わせ、10エポック分の学習率の変化を出力してください。",
-     code:`import torch
-import torch.nn as nn
-
-model = nn.Linear(10, 1)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-    optimizer, T_max=10
-)
-# 10エポック分の学習率を表示`,
-     answer:`import torch
-import torch.nn as nn
-
-model = nn.Linear(10, 1)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-    optimizer, T_max=10)
-
-for epoch in range(10):
-    # 訓練ループ（省略）
-    optimizer.step()
-    scheduler.step()
-    current_lr = scheduler.get_last_lr()[0]
-    print(f"Epoch {epoch+1}: lr={current_lr:.6f}")`}
+     code:"import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(10, 1)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.01)\nscheduler = torch.optim.lr_scheduler.CosineAnnealingLR(\n    optimizer, T_max=10\n)\n# 10エポック分の学習率を表示",
+     answer:"import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(10, 1)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.01)\nscheduler = torch.optim.lr_scheduler.CosineAnnealingLR(\n    optimizer, T_max=10)\n\nfor epoch in range(10):\n    # 訓練ループ（省略）\n    optimizer.step()\n    scheduler.step()\n    current_lr = scheduler.get_last_lr()[0]\n    print(f\"Epoch {epoch+1}: lr={current_lr:.6f}\")"}
   ],
   ch5: [
     {diff:1, q:"TensorDatasetを使って、特徴量XとラベルyからDataLoaderを作成し、バッチサイズ32で反復してください。",
-     code:`import torch
-from torch.utils.data import TensorDataset, DataLoader
-
-X = torch.randn(1000, 20)
-y = torch.randint(0, 5, (1000,))
-# DataLoaderを作成してバッチ数を確認`,
-     answer:`import torch
-from torch.utils.data import TensorDataset, DataLoader
-
-X = torch.randn(1000, 20)
-y = torch.randint(0, 5, (1000,))
-
-dataset = TensorDataset(X, y)
-loader = DataLoader(dataset, batch_size=32, shuffle=True)
-
-print(f"バッチ数: {len(loader)}")   # 32 (1000/32を切り上げ)
-
-for x_batch, y_batch in loader:
-    print(x_batch.shape, y_batch.shape)
-    break  # torch.Size([32, 20]) torch.Size([32])`},
+     code:"import torch\nfrom torch.utils.data import TensorDataset, DataLoader\n\nX = torch.randn(1000, 20)\ny = torch.randint(0, 5, (1000,))\n# DataLoaderを作成してバッチ数を確認",
+     answer:"import torch\nfrom torch.utils.data import TensorDataset, DataLoader\n\nX = torch.randn(1000, 20)\ny = torch.randint(0, 5, (1000,))\n\ndataset = TensorDataset(X, y)\nloader = DataLoader(dataset, batch_size=32, shuffle=True)\n\nprint(f\"バッチ数: {len(loader)}\")   # 32 (1000/32を切り上げ)\n\nfor x_batch, y_batch in loader:\n    print(x_batch.shape, y_batch.shape)\n    break  # torch.Size([32, 20]) torch.Size([32])"},
     {diff:2, q:"カスタムDatasetクラスを実装してください。CSVファイルのパスを受け取り、__len__と__getitem__を実装してください。",
-     code:`import torch
-from torch.utils.data import Dataset
-import pandas as pd
-
-class CSVDataset(Dataset):
-    def __init__(self, csv_path: str, target_col: str):
-        # CSVを読み込み、特徴量とターゲットを分離
-
-    def __len__(self):
-        pass
-
-    def __getitem__(self, idx):
-        pass`,
-     answer:`import torch
-from torch.utils.data import Dataset
-import pandas as pd
-
-class CSVDataset(Dataset):
-    def __init__(self, csv_path: str, target_col: str):
-        df = pd.read_csv(csv_path)
-        self.y = torch.tensor(df[target_col].values, dtype=torch.float32)
-        self.X = torch.tensor(
-            df.drop(columns=[target_col]).values, dtype=torch.float32)
-
-    def __len__(self):
-        return len(self.y)
-
-    def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]`}
+     code:"import torch\nfrom torch.utils.data import Dataset\nimport pandas as pd\n\nclass CSVDataset(Dataset):\n    def __init__(self, csv_path: str, target_col: str):\n        # CSVを読み込み、特徴量とターゲットを分離\n\n    def __len__(self):\n        pass\n\n    def __getitem__(self, idx):\n        pass",
+     answer:"import torch\nfrom torch.utils.data import Dataset\nimport pandas as pd\n\nclass CSVDataset(Dataset):\n    def __init__(self, csv_path: str, target_col: str):\n        df = pd.read_csv(csv_path)\n        self.y = torch.tensor(df[target_col].values, dtype=torch.float32)\n        self.X = torch.tensor(\n            df.drop(columns=[target_col]).values, dtype=torch.float32)\n\n    def __len__(self):\n        return len(self.y)\n\n    def __getitem__(self, idx):\n        return self.X[idx], self.y[idx]"}
   ],
   ch6: [
     {diff:1, q:"train_one_epoch関数を実装してください。DataLoaderを受け取り、1エポック分の訓練ループを実行して平均損失を返してください。",
-     code:`import torch
-
-def train_one_epoch(model, loader, criterion, optimizer, device):
-    model.train()
-    total_loss = 0.0
-    # ループ実装
-    return total_loss / len(loader)`,
-     answer:`import torch
-
-def train_one_epoch(model, loader, criterion, optimizer, device):
-    model.train()
-    total_loss = 0.0
-    for X_batch, y_batch in loader:
-        X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-        optimizer.zero_grad()
-        y_pred = model(X_batch)
-        loss = criterion(y_pred, y_batch)
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item()
-    return total_loss / len(loader)`},
+     code:"import torch\n\ndef train_one_epoch(model, loader, criterion, optimizer, device):\n    model.train()\n    total_loss = 0.0\n    # ループ実装\n    return total_loss / len(loader)",
+     answer:"import torch\n\ndef train_one_epoch(model, loader, criterion, optimizer, device):\n    model.train()\n    total_loss = 0.0\n    for X_batch, y_batch in loader:\n        X_batch, y_batch = X_batch.to(device), y_batch.to(device)\n        optimizer.zero_grad()\n        y_pred = model(X_batch)\n        loss = criterion(y_pred, y_batch)\n        loss.backward()\n        optimizer.step()\n        total_loss += loss.item()\n    return total_loss / len(loader)"},
     {diff:2, q:"evaluate関数を実装してください。検証データを使い、損失と正解率を計算して返してください。",
-     code:`import torch
-
-def evaluate(model, loader, criterion, device):
-    model.eval()
-    total_loss = 0.0
-    correct = 0
-    total = 0
-    # torch.no_grad()を使って評価`,
-     answer:`import torch
-
-def evaluate(model, loader, criterion, device):
-    model.eval()
-    total_loss = 0.0
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for X_batch, y_batch in loader:
-            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-            y_pred = model(X_batch)
-            loss = criterion(y_pred, y_batch)
-            total_loss += loss.item()
-            preds = y_pred.argmax(dim=1)
-            correct += (preds == y_batch).sum().item()
-            total += len(y_batch)
-    return total_loss / len(loader), correct / total`}
+     code:"import torch\n\ndef evaluate(model, loader, criterion, device):\n    model.eval()\n    total_loss = 0.0\n    correct = 0\n    total = 0\n    # torch.no_grad()を使って評価",
+     answer:"import torch\n\ndef evaluate(model, loader, criterion, device):\n    model.eval()\n    total_loss = 0.0\n    correct = 0\n    total = 0\n    with torch.no_grad():\n        for X_batch, y_batch in loader:\n            X_batch, y_batch = X_batch.to(device), y_batch.to(device)\n            y_pred = model(X_batch)\n            loss = criterion(y_pred, y_batch)\n            total_loss += loss.item()\n            preds = y_pred.argmax(dim=1)\n            correct += (preds == y_batch).sum().item()\n            total += len(y_batch)\n    return total_loss / len(loader), correct / total"}
   ],
   ch7: [
     {diff:1, q:"訓練済みモデルをtorch.saveで保存し、torch.loadで読み込んでください。state_dictを使った方法で実装してください。",
-     code:`import torch
-
-model = MLP()  # 定義済みとする
-# モデルをmodel.pthとして保存
-# 新しいモデルインスタンスに読み込む`,
-     answer:`import torch
-
-model = MLP()
-# 保存: state_dictのみを保存（推奨）
-torch.save(model.state_dict(), 'model.pth')
-
-# 読み込み: モデル構造を先に定義してからweight読み込み
-new_model = MLP()
-new_model.load_state_dict(torch.load('model.pth', map_location='cpu'))
-new_model.eval()
-print("読み込み完了")`},
+     code:"import torch\n\nmodel = MLP()  # 定義済みとする\n# モデルをmodel.pthとして保存\n# 新しいモデルインスタンスに読み込む",
+     answer:"import torch\n\nmodel = MLP()\n# 保存: state_dictのみを保存（推奨）\ntorch.save(model.state_dict(), 'model.pth')\n\n# 読み込み: モデル構造を先に定義してからweight読み込み\nnew_model = MLP()\nnew_model.load_state_dict(torch.load('model.pth', map_location='cpu'))\nnew_model.eval()\nprint(\"読み込み完了\")"},
     {diff:2, q:"torch.jit.scriptを使ってモデルをTorchScriptに変換し、ScriptModuleとして保存・読み込みしてください。",
-     code:`import torch
-
-model = MLP()  # 定義済みとする
-# TorchScriptに変換
-# traced_model.ptとして保存
-# 読み込んで推論`,
-     answer:`import torch
-
-model = MLP()
-model.eval()
-
-# torch.jit.scriptで変換 (制御フローがある場合)
-scripted = torch.jit.script(model)
-scripted.save("model_scripted.pt")
-
-# 読み込み (モデル定義不要)
-loaded = torch.jit.load("model_scripted.pt")
-x = torch.randn(1, 64)
-with torch.no_grad():
-    out = loaded(x)
-print(out.shape)  # torch.Size([1, 10])`}
+     code:"import torch\n\nmodel = MLP()  # 定義済みとする\n# TorchScriptに変換\n# traced_model.ptとして保存\n# 読み込んで推論",
+     answer:"import torch\n\nmodel = MLP()\nmodel.eval()\n\n# torch.jit.scriptで変換 (制御フローがある場合)\nscripted = torch.jit.script(model)\nscripted.save(\"model_scripted.pt\")\n\n# 読み込み (モデル定義不要)\nloaded = torch.jit.load(\"model_scripted.pt\")\nx = torch.randn(1, 64)\nwith torch.no_grad():\n    out = loaded(x)\nprint(out.shape)  # torch.Size([1, 10])"}
   ],
   ch8: [
     {diff:1, q:"TensorBoardのSummaryWriterを使って、訓練ループ中の損失と正解率を記録してください。",
-     code:`from torch.utils.tensorboard import SummaryWriter
-
-writer = SummaryWriter('runs/experiment_1')
-# エポックごとにlossとaccuracyを記録`,
-     answer:`from torch.utils.tensorboard import SummaryWriter
-
-writer = SummaryWriter('runs/experiment_1')
-
-for epoch in range(num_epochs):
-    train_loss = train_one_epoch(...)
-    val_loss, val_acc = evaluate(...)
-
-    writer.add_scalar('Loss/train', train_loss, epoch)
-    writer.add_scalar('Loss/val', val_loss, epoch)
-    writer.add_scalar('Accuracy/val', val_acc, epoch)
-
-writer.close()
-# tensorboard --logdir=runs で可視化`},
+     code:"from torch.utils.tensorboard import SummaryWriter\n\nwriter = SummaryWriter('runs/experiment_1')\n# エポックごとにlossとaccuracyを記録",
+     answer:"from torch.utils.tensorboard import SummaryWriter\n\nwriter = SummaryWriter('runs/experiment_1')\n\nfor epoch in range(num_epochs):\n    train_loss = train_one_epoch(...)\n    val_loss, val_acc = evaluate(...)\n\n    writer.add_scalar('Loss/train', train_loss, epoch)\n    writer.add_scalar('Loss/val', val_loss, epoch)\n    writer.add_scalar('Accuracy/val', val_acc, epoch)\n\nwriter.close()\n# tensorboard --logdir=runs で可視化"},
     {diff:2, q:"SummaryWriterを使って、モデルの計算グラフとパラメータのヒストグラムをTensorBoardに記録してください。",
-     code:`from torch.utils.tensorboard import SummaryWriter
-import torch
-
-model = MLP()
-writer = SummaryWriter('runs/exp')
-# 計算グラフを追加
-# パラメータのヒストグラムを追加`,
-     answer:`from torch.utils.tensorboard import SummaryWriter
-import torch
-
-model = MLP()
-writer = SummaryWriter('runs/exp')
-
-# 計算グラフを記録
-dummy_input = torch.randn(1, 64)
-writer.add_graph(model, dummy_input)
-
-# パラメータのヒストグラムを記録（エポックごと）
-for epoch in range(10):
-    # 訓練...
-    for name, param in model.named_parameters():
-        writer.add_histogram(name, param, epoch)
-        if param.grad is not None:
-            writer.add_histogram(f'{name}.grad', param.grad, epoch)
-
-writer.close()`}
+     code:"from torch.utils.tensorboard import SummaryWriter\nimport torch\n\nmodel = MLP()\nwriter = SummaryWriter('runs/exp')\n# 計算グラフを追加\n# パラメータのヒストグラムを追加",
+     answer:"from torch.utils.tensorboard import SummaryWriter\nimport torch\n\nmodel = MLP()\nwriter = SummaryWriter('runs/exp')\n\n# 計算グラフを記録\ndummy_input = torch.randn(1, 64)\nwriter.add_graph(model, dummy_input)\n\n# パラメータのヒストグラムを記録（エポックごと）\nfor epoch in range(10):\n    # 訓練...\n    for name, param in model.named_parameters():\n        writer.add_histogram(name, param, epoch)\n        if param.grad is not None:\n            writer.add_histogram(f'{name}.grad', param.grad, epoch)\n\nwriter.close()"}
   ],
 };
 
@@ -390,562 +90,81 @@ const chapters = [
   {id:"ch1", num:1, title:"テンソル操作", est:"45分",
    goal:"PyTorchテンソルの作成・形状変換・スライシング・数学演算を自在に行え、NumPy配列との変換もできる。",
    sections:[
-     {title:"テンソルの基礎と作成方法", body:`テンソルはPyTorchの基本データ構造で、NumPyのndarrayに似ていますが、GPUで計算できる・自動微分をサポートするという大きな違いがあります。Pythonのリストがメモリ効率の悪い可変長配列なのに対し、テンソルは連続したメモリに固定型のデータを格納します。
-
-テンソルの作成方法はいくつかあります。torch.tensor()はリストやNumPy配列からコピーして作成します。torch.zeros()・torch.ones()・torch.randn()・torch.rand()は特定のパターンで初期化されたテンソルを作ります。from_numpy()はNumPy配列とメモリを共有するゼロコピーの変換です（one側を変更するともう一方も変わります）。
-
-dtypeの管理が重要です。PyTorchのデフォルトは浮動小数点数がtorch.float32（32ビット）、整数がtorch.int64です。ニューラルネットワークの計算は通常float32で行いますが、GPUメモリ節約のためにfloat16・bfloat16も使われます。`,
-      code:`import torch
-import numpy as np
-
-# 様々な作成方法
-t1 = torch.tensor([1.0, 2.0, 3.0])           # リストから
-t2 = torch.zeros(3, 4)                        # ゼロ行列 (3x4)
-t3 = torch.randn(2, 3, dtype=torch.float32)   # 正規乱数
-t4 = torch.arange(0, 10, step=2)              # [0,2,4,6,8]
-
-# NumPyとの変換
-arr = np.array([1, 2, 3], dtype=np.float32)
-t5 = torch.from_numpy(arr)  # ゼロコピー（メモリ共有）
-t6 = t3.numpy()             # → NumPy (CPUテンソルのみ)
-
-# 基本情報
-print(t3.shape)    # torch.Size([2, 3])
-print(t3.dtype)    # torch.float32
-print(t3.device)   # cpu`,
+     {title:"テンソルの基礎と作成方法", body:"テンソルはPyTorchの基本データ構造で、NumPyのndarrayに似ていますが、GPUで計算できる・自動微分をサポートするという大きな違いがあります。Pythonのリストがメモリ効率の悪い可変長配列なのに対し、テンソルは連続したメモリに固定型のデータを格納します。\n\nテンソルの作成方法はいくつかあります。torch.tensor()はリストやNumPy配列からコピーして作成します。torch.zeros()・torch.ones()・torch.randn()・torch.rand()は特定のパターンで初期化されたテンソルを作ります。from_numpy()はNumPy配列とメモリを共有するゼロコピーの変換です（one側を変更するともう一方も変わります）。\n\ndtypeの管理が重要です。PyTorchのデフォルトは浮動小数点数がtorch.float32（32ビット）、整数がtorch.int64です。ニューラルネットワークの計算は通常float32で行いますが、GPUメモリ節約のためにfloat16・bfloat16も使われます。",
+      code:"import torch\nimport numpy as np\n\n# 様々な作成方法\nt1 = torch.tensor([1.0, 2.0, 3.0])           # リストから\nt2 = torch.zeros(3, 4)                        # ゼロ行列 (3x4)\nt3 = torch.randn(2, 3, dtype=torch.float32)   # 正規乱数\nt4 = torch.arange(0, 10, step=2)              # [0,2,4,6,8]\n\n# NumPyとの変換\narr = np.array([1, 2, 3], dtype=np.float32)\nt5 = torch.from_numpy(arr)  # ゼロコピー（メモリ共有）\nt6 = t3.numpy()             # → NumPy (CPUテンソルのみ)\n\n# 基本情報\nprint(t3.shape)    # torch.Size([2, 3])\nprint(t3.dtype)    # torch.float32\nprint(t3.device)   # cpu",
       afterCode:"テンソルはtensor.to('cuda')またはtensor.cuda()でGPUに移動します。GPUとCPUのテンソルは直接演算できないので、デバイスを統一する必要があります。device変数を使って条件分岐するのがベストプラクティスです。"},
-     {title:"形状変換とブロードキャスト", body:`形状変換はDeep Learningで最も頻繁に行う操作の一つです。view()とreshape()は形状を変更します。view()はメモリが連続している必要がある（contiguous）のに対し、reshape()は必要ならコピーを作ります。permute()は次元の順序を変え、unsqueeze()・squeeze()は次元を追加・削除します。
-
-ブロードキャストはNumPyのルールと同じです。形状が異なるテンソル同士の演算で、小さい方を自動的に拡張します。(3, 1)と(1, 4)の加算は(3, 4)になります。Pythonのスカラーとリストの混在計算に似ていますが、次元が合わないとエラーになります。
-
-einsum（アインシュタイン記法）を使うと行列乗算・縮約・転置などを統一的に書けます。例えばtorch.einsum('ij,jk->ik', A, B)は行列積です。Pythonのリスト内包表記が複雑なループを1行で書けるように、einsumは複雑なテンソル演算を明示的に記述します。`,
-      code:`import torch
-
-t = torch.randn(2, 3, 4)
-
-# 形状変換
-t_flat = t.view(2, -1)         # (2, 12): -1は自動計算
-t_perm = t.permute(0, 2, 1)   # (2, 4, 3): 次元入れ替え
-t_uns = t.unsqueeze(0)         # (1, 2, 3, 4): 先頭に次元追加
-t_sq = t_uns.squeeze(0)        # (2, 3, 4): 次元1を削除
-
-# ブロードキャスト
-a = torch.randn(3, 1)   # (3, 1)
-b = torch.randn(1, 4)   # (1, 4)
-c = a + b               # (3, 4): 自動拡張
-
-# einsum
-A = torch.randn(2, 3)
-B = torch.randn(3, 4)
-C = torch.einsum('ij,jk->ik', A, B)  # 行列積 (2, 4)
-print(C.shape)  # torch.Size([2, 4])`,
+     {title:"形状変換とブロードキャスト", body:"形状変換はDeep Learningで最も頻繁に行う操作の一つです。view()とreshape()は形状を変更します。view()はメモリが連続している必要がある（contiguous）のに対し、reshape()は必要ならコピーを作ります。permute()は次元の順序を変え、unsqueeze()・squeeze()は次元を追加・削除します。\n\nブロードキャストはNumPyのルールと同じです。形状が異なるテンソル同士の演算で、小さい方を自動的に拡張します。(3, 1)と(1, 4)の加算は(3, 4)になります。Pythonのスカラーとリストの混在計算に似ていますが、次元が合わないとエラーになります。\n\neinsum（アインシュタイン記法）を使うと行列乗算・縮約・転置などを統一的に書けます。例えばtorch.einsum('ij,jk->ik', A, B)は行列積です。Pythonのリスト内包表記が複雑なループを1行で書けるように、einsumは複雑なテンソル演算を明示的に記述します。",
+      code:"import torch\n\nt = torch.randn(2, 3, 4)\n\n# 形状変換\nt_flat = t.view(2, -1)         # (2, 12): -1は自動計算\nt_perm = t.permute(0, 2, 1)   # (2, 4, 3): 次元入れ替え\nt_uns = t.unsqueeze(0)         # (1, 2, 3, 4): 先頭に次元追加\nt_sq = t_uns.squeeze(0)        # (2, 3, 4): 次元1を削除\n\n# ブロードキャスト\na = torch.randn(3, 1)   # (3, 1)\nb = torch.randn(1, 4)   # (1, 4)\nc = a + b               # (3, 4): 自動拡張\n\n# einsum\nA = torch.randn(2, 3)\nB = torch.randn(3, 4)\nC = torch.einsum('ij,jk->ik', A, B)  # 行列積 (2, 4)\nprint(C.shape)  # torch.Size([2, 4])",
       afterCode:"view()の代わりにreshape()を使うと安全です。メモリが連続でなくてもreshapeが処理してくれます。ただしreshapeが内部でコピーを作ることがあるため、パフォーマンスクリティカルな場所ではcontiguous().view()を使います。"}
    ]},
   {id:"ch2", num:2, title:"自動微分・autograd", est:"45分",
    goal:"requires_grad・backward()・勾配の蓄積と初期化を理解し、手動で勾配計算ができる。勾配テープの仕組みを説明できる。",
    sections:[
-     {title:"計算グラフとrequires_grad", body:`PyTorchのAutogradは動的計算グラフを使います。requires_grad=Trueのテンソルが計算に絡むと、その操作の履歴が計算グラフとして記録されます。backward()を呼ぶと逆伝播でこのグラフを遡り、各パラメータの勾配を計算します。TensorFlowの静的グラフと違い、Pythonのデバッガーで普通にステップ実行できます。
-
-勾配は各テンソルの.gradプロパティに蓄積されます。これはミニバッチ学習において、複数のbackward()呼び出しにわたって勾配を蓄積したい場合に有用です。ただし通常の訓練ループでは毎回optimizer.zero_grad()で勾配をリセットします。これを忘れると勾配が積み重なって誤った更新が起きます。
-
-torch.no_grad()コンテキストマネージャーは計算グラフの記録を無効にします。推論時・評価時・転移学習でパラメータを固定する場合に使います。これによりメモリ使用量が減り、計算も速くなります。Pythonのcontextlib.suppress()に似た使い方です。`,
-      code:`import torch
-
-# 基本的な自動微分
-x = torch.tensor(2.0, requires_grad=True)
-w = torch.tensor(3.0, requires_grad=True)
-b = torch.tensor(1.0, requires_grad=True)
-
-y = w * x + b       # y = 3*2 + 1 = 7
-loss = y ** 2       # loss = 49
-
-loss.backward()     # 逆伝播
-
-print(f"dy/dw = {w.grad}")  # dy/dw = 2*y*x = 2*7*2 = 28
-print(f"dy/dx = {x.grad}")  # dy/dx = 2*y*w = 2*7*3 = 42
-print(f"dy/db = {b.grad}")  # dy/db = 2*y*1 = 14
-
-# 勾配のリセット
-w.grad.zero_()  # インプレース操作でゼロ化`,
+     {title:"計算グラフとrequires_grad", body:"PyTorchのAutogradは動的計算グラフを使います。requires_grad=Trueのテンソルが計算に絡むと、その操作の履歴が計算グラフとして記録されます。backward()を呼ぶと逆伝播でこのグラフを遡り、各パラメータの勾配を計算します。TensorFlowの静的グラフと違い、Pythonのデバッガーで普通にステップ実行できます。\n\n勾配は各テンソルの.gradプロパティに蓄積されます。これはミニバッチ学習において、複数のbackward()呼び出しにわたって勾配を蓄積したい場合に有用です。ただし通常の訓練ループでは毎回optimizer.zero_grad()で勾配をリセットします。これを忘れると勾配が積み重なって誤った更新が起きます。\n\ntorch.no_grad()コンテキストマネージャーは計算グラフの記録を無効にします。推論時・評価時・転移学習でパラメータを固定する場合に使います。これによりメモリ使用量が減り、計算も速くなります。Pythonのcontextlib.suppress()に似た使い方です。",
+      code:"import torch\n\n# 基本的な自動微分\nx = torch.tensor(2.0, requires_grad=True)\nw = torch.tensor(3.0, requires_grad=True)\nb = torch.tensor(1.0, requires_grad=True)\n\ny = w * x + b       # y = 3*2 + 1 = 7\nloss = y ** 2       # loss = 49\n\nloss.backward()     # 逆伝播\n\nprint(f\"dy/dw = {w.grad}\")  # dy/dw = 2*y*x = 2*7*2 = 28\nprint(f\"dy/dx = {x.grad}\")  # dy/dx = 2*y*w = 2*7*3 = 42\nprint(f\"dy/db = {b.grad}\")  # dy/db = 2*y*1 = 14\n\n# 勾配のリセット\nw.grad.zero_()  # インプレース操作でゼロ化",
       afterCode:"勾配のリセットはoptimizer.zero_grad()で行います。これはmodel.parameters()の全パラメータのgradをゼロにします。PyTorch 1.7以降はzero_grad(set_to_none=True)が推奨されており、メモリ効率が改善されます。"},
-     {title:"勾配の詳細：retain_graph・grad_fn", body:`backward()はデフォルトでは一度しか呼べません。計算グラフは逆伝播後にメモリ解放されるためです。retain_graph=Trueを渡すとグラフが保持され、2回以上backward()できます。GAN（敵対的生成ネットワーク）や複数損失の組み合わせでこの機能が必要になります。
-
-各テンソルのgrad_fnプロパティは、そのテンソルを生成した操作（AddBackward・MulBackward等）を示します。PyTorchが計算グラフを辿る際に使います。デバッグ時にgrad_fnを確認することで、どの操作が勾配を持つかを追跡できます。
-
-torch.autograd.grad()は特定のテンソル間の勾配を明示的に計算します。loss.backward()と異なり、任意のテンソルの偏微分を求めることができます。メタラーニング（Model-Agnostic Meta-Learning）や二階微分の計算に使われます。`,
-      code:`import torch
-
-x = torch.randn(3, requires_grad=True)
-
-# 複数回backward (retain_graph=True)
-y = (x ** 2).sum()
-y.backward(retain_graph=True)
-grad_1 = x.grad.clone()
-
-x.grad.zero_()
-y.backward()  # 2回目のbackward
-grad_2 = x.grad.clone()
-
-print(torch.allclose(grad_1, grad_2))  # True: 同じ勾配
-
-# autograd.grad: 明示的な偏微分
-x = torch.randn(4, requires_grad=True)
-loss = (x ** 3).sum()
-grads = torch.autograd.grad(loss, x)
-print(grads[0])  # 3 * x^2
-# grad_fn の確認
-z = x * 2 + 1
-print(z.grad_fn)  # <AddBackward0 object>`,
+     {title:"勾配の詳細：retain_graph・grad_fn", body:"backward()はデフォルトでは一度しか呼べません。計算グラフは逆伝播後にメモリ解放されるためです。retain_graph=Trueを渡すとグラフが保持され、2回以上backward()できます。GAN（敵対的生成ネットワーク）や複数損失の組み合わせでこの機能が必要になります。\n\n各テンソルのgrad_fnプロパティは、そのテンソルを生成した操作（AddBackward・MulBackward等）を示します。PyTorchが計算グラフを辿る際に使います。デバッグ時にgrad_fnを確認することで、どの操作が勾配を持つかを追跡できます。\n\ntorch.autograd.grad()は特定のテンソル間の勾配を明示的に計算します。loss.backward()と異なり、任意のテンソルの偏微分を求めることができます。メタラーニング（Model-Agnostic Meta-Learning）や二階微分の計算に使われます。",
+      code:"import torch\n\nx = torch.randn(3, requires_grad=True)\n\n# 複数回backward (retain_graph=True)\ny = (x ** 2).sum()\ny.backward(retain_graph=True)\ngrad_1 = x.grad.clone()\n\nx.grad.zero_()\ny.backward()  # 2回目のbackward\ngrad_2 = x.grad.clone()\n\nprint(torch.allclose(grad_1, grad_2))  # True: 同じ勾配\n\n# autograd.grad: 明示的な偏微分\nx = torch.randn(4, requires_grad=True)\nloss = (x ** 3).sum()\ngrads = torch.autograd.grad(loss, x)\nprint(grads[0])  # 3 * x^2\n# grad_fn の確認\nz = x * 2 + 1\nprint(z.grad_fn)  # <AddBackward0 object>",
       afterCode:"二階微分はcreate_graph=Trueを渡して勾配自体を計算グラフに含めることで実現できます。ニュートン法・Hessian行列・MAML（メタ学習）でこの機能が必要になります。"}
    ]},
   {id:"ch3", num:3, title:"nn.Module・モデル定義", est:"50分",
    goal:"nn.Moduleを継承してニューラルネットワークを定義し、パラメータの管理・モデルの保存・転移学習の基本ができる。",
    sections:[
-     {title:"nn.Moduleの仕組みと層の定義", body:`nn.ModuleはPyTorchのすべてのニューラルネットワーク層の基底クラスです。__init__でnn.Linear・nn.Conv2d・nn.BatchNorm1dなどのサブモジュールを定義し、forward()で計算の流れを記述します。Pythonのクラス継承と同じ構文ですが、PyTorchが自動的にパラメータ管理・デバイス転送・シリアライズを処理します。
-
-self.fc = nn.Linear(in, out)のようにnn.Moduleのサブモジュールを属性として代入すると、そのパラメータがmodel.parameters()に自動的に登録されます。Pythonの普通のリストでサブモジュールを持つとパラメータが登録されないため、nn.ModuleList・nn.ModuleDict・nn.ParameterListを使います。
-
-forward()メソッドはモデルの순伝播を定義します。モデルを関数として呼び出す（output = model(input)）とforward()が実行されます。Pythonの__call__がオーバーライドされており、フック（register_forward_hook・register_backward_hook）なども透過的に実行されます。`,
-      code:`import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class ConvNet(nn.Module):
-    def __init__(self, num_classes=10):
-        super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, 2),
-        )
-        self.classifier = nn.Sequential(
-            nn.Dropout(0.5),
-            nn.Linear(64 * 7 * 7, 256),
-            nn.ReLU(inplace=True),
-            nn.Linear(256, num_classes),
-        )
-
-    def forward(self, x):
-        x = self.features(x)      # (N, 64, 7, 7)
-        x = x.flatten(1)          # (N, 64*7*7)
-        x = self.classifier(x)    # (N, 10)
-        return x`,
+     {title:"nn.Moduleの仕組みと層の定義", body:"nn.ModuleはPyTorchのすべてのニューラルネットワーク層の基底クラスです。__init__でnn.Linear・nn.Conv2d・nn.BatchNorm1dなどのサブモジュールを定義し、forward()で計算の流れを記述します。Pythonのクラス継承と同じ構文ですが、PyTorchが自動的にパラメータ管理・デバイス転送・シリアライズを処理します。\n\nself.fc = nn.Linear(in, out)のようにnn.Moduleのサブモジュールを属性として代入すると、そのパラメータがmodel.parameters()に自動的に登録されます。Pythonの普通のリストでサブモジュールを持つとパラメータが登録されないため、nn.ModuleList・nn.ModuleDict・nn.ParameterListを使います。\n\nforward()メソッドはモデルの순伝播を定義します。モデルを関数として呼び出す（output = model(input)）とforward()が実行されます。Pythonの__call__がオーバーライドされており、フック（register_forward_hook・register_backward_hook）なども透過的に実行されます。",
+      code:"import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass ConvNet(nn.Module):\n    def __init__(self, num_classes=10):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=3, padding=1),\n            nn.BatchNorm2d(32),\n            nn.ReLU(inplace=True),\n            nn.MaxPool2d(2, 2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1),\n            nn.ReLU(inplace=True),\n            nn.MaxPool2d(2, 2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Dropout(0.5),\n            nn.Linear(64 * 7 * 7, 256),\n            nn.ReLU(inplace=True),\n            nn.Linear(256, num_classes),\n        )\n\n    def forward(self, x):\n        x = self.features(x)      # (N, 64, 7, 7)\n        x = x.flatten(1)          # (N, 64*7*7)\n        x = self.classifier(x)    # (N, 10)\n        return x",
       afterCode:"nn.ReLU(inplace=True)はinplaceで計算し、中間テンソルのメモリを節約します。ただし一部の操作（retain_graphとの組み合わせ）でエラーになることがあるので注意が必要です。"},
-     {title:"転移学習とファインチューニング", body:`転移学習は事前学習済みモデルの重みを再利用して、少ないデータと計算リソースで高精度のモデルを作る技術です。Pythonのライブラリを再利用するのと同じ発想で、ImageNetで学習した特徴抽出器をそのまま使い、最終層だけを自分のタスク用に訓練します。
-
-torchvisionのresnet18・efficientnet・vit等の事前学習済みモデルはweights=...pretrainedパラメータで読み込めます。特徴抽出の場合は全層をフリーズ（requires_grad=False）して最終層のみ訓練します。ファインチューニングでは全層を低い学習率で訓練します。
-
-layer freezeとunfreezeをエポックごとに段階的に行うGradual Unfreezeingは実務でよく使われるテクニックです。最初は最終層のみ訓練し、徐々に前の層も学習対象に加えることで、特徴抽出器の破壊を防ぎながら効率よく学習できます。`,
-      code:`import torch
-import torch.nn as nn
-import torchvision.models as models
-
-# 事前学習済みResNet18を読み込む
-model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
-
-# 特徴抽出: 全層をフリーズ
-for param in model.parameters():
-    param.requires_grad = False
-
-# 最終層のみ置き換えて訓練可能にする
-num_features = model.fc.in_features
-model.fc = nn.Linear(num_features, 5)  # 5クラス分類
-
-# 確認: 訓練可能なパラメータのみ表示
-trainable = [(n, p.shape) for n, p in model.named_parameters()
-             if p.requires_grad]
-print(f"訓練可能層: {[n for n, _ in trainable]}")
-
-# オプティマイザは訓練可能パラメータのみに適用
-optimizer = torch.optim.Adam(
-    filter(lambda p: p.requires_grad, model.parameters()),
-    lr=1e-3
-)`,
+     {title:"転移学習とファインチューニング", body:"転移学習は事前学習済みモデルの重みを再利用して、少ないデータと計算リソースで高精度のモデルを作る技術です。Pythonのライブラリを再利用するのと同じ発想で、ImageNetで学習した特徴抽出器をそのまま使い、最終層だけを自分のタスク用に訓練します。\n\ntorchvisionのresnet18・efficientnet・vit等の事前学習済みモデルはweights=...pretrainedパラメータで読み込めます。特徴抽出の場合は全層をフリーズ（requires_grad=False）して最終層のみ訓練します。ファインチューニングでは全層を低い学習率で訓練します。\n\nlayer freezeとunfreezeをエポックごとに段階的に行うGradual Unfreezeingは実務でよく使われるテクニックです。最初は最終層のみ訓練し、徐々に前の層も学習対象に加えることで、特徴抽出器の破壊を防ぎながら効率よく学習できます。",
+      code:"import torch\nimport torch.nn as nn\nimport torchvision.models as models\n\n# 事前学習済みResNet18を読み込む\nmodel = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)\n\n# 特徴抽出: 全層をフリーズ\nfor param in model.parameters():\n    param.requires_grad = False\n\n# 最終層のみ置き換えて訓練可能にする\nnum_features = model.fc.in_features\nmodel.fc = nn.Linear(num_features, 5)  # 5クラス分類\n\n# 確認: 訓練可能なパラメータのみ表示\ntrainable = [(n, p.shape) for n, p in model.named_parameters()\n             if p.requires_grad]\nprint(f\"訓練可能層: {[n for n, _ in trainable]}\")\n\n# オプティマイザは訓練可能パラメータのみに適用\noptimizer = torch.optim.Adam(\n    filter(lambda p: p.requires_grad, model.parameters()),\n    lr=1e-3\n)",
       afterCode:"転移学習は医療画像・衛星画像・製造業の不良品検出など、学習データが少ない産業アプリケーションで特に有効です。imagenetで学習した低次元の特徴（エッジ・テクスチャ）は多くのドメインで汎用的に使えます。"}
    ]},
   {id:"ch4", num:4, title:"損失関数・最適化", est:"50分",
    goal:"タスクに合わせた損失関数を選択し、SGD・Adam・学習率スケジューラを組み合わせた最適化を実装できる。勾配クリッピングも使える。",
    sections:[
-     {title:"損失関数の種類と選択", body:`損失関数はモデルの予測と正解の「ずれ」を数値化します。タスクによって適切な損失関数が異なります。回帰問題にはMSE（Mean Squared Error）・MAE（Mean Absolute Error）、2値分類にはBCEWithLogitsLoss、多クラス分類にはCrossEntropyLossを使います。
-
-CrossEntropyLossはソフトマックスと負の対数尤度損失を一つにまとめたものです。モデルの出力（logits）を直接受け取るため、forward()でsoftmaxを適用しないのが通常です。nn.functional.cross_entropy()も同じですが、関数として使えます。Pythonでいえばクラスと関数で同じ機能を提供している関係です。
-
-カスタム損失関数はnn.Moduleまたは関数として実装します。テンソル演算だけで書けばautogradが自動的に勾配を計算します。Focal Loss（クラス不均衡対策）・Dice Loss（セグメンテーション用）など、標準外の損失関数は自前で実装する必要があります。`,
-      code:`import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-# 標準的な損失関数
-criterion_reg = nn.MSELoss()         # 回帰
-criterion_cls = nn.CrossEntropyLoss() # 多クラス分類
-criterion_bin = nn.BCEWithLogitsLoss() # 2値分類
-
-# 使用例
-logits = torch.randn(8, 10)   # バッチ8、クラス10
-labels = torch.randint(0, 10, (8,))
-loss = criterion_cls(logits, labels)
-
-# カスタム損失関数: Focal Loss
-class FocalLoss(nn.Module):
-    def __init__(self, gamma=2.0, alpha=0.25):
-        super().__init__()
-        self.gamma = gamma
-        self.alpha = alpha
-
-    def forward(self, logits, targets):
-        ce_loss = F.cross_entropy(logits, targets, reduction='none')
-        pt = torch.exp(-ce_loss)  # 予測確率
-        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
-        return focal_loss.mean()`,
+     {title:"損失関数の種類と選択", body:"損失関数はモデルの予測と正解の「ずれ」を数値化します。タスクによって適切な損失関数が異なります。回帰問題にはMSE（Mean Squared Error）・MAE（Mean Absolute Error）、2値分類にはBCEWithLogitsLoss、多クラス分類にはCrossEntropyLossを使います。\n\nCrossEntropyLossはソフトマックスと負の対数尤度損失を一つにまとめたものです。モデルの出力（logits）を直接受け取るため、forward()でsoftmaxを適用しないのが通常です。nn.functional.cross_entropy()も同じですが、関数として使えます。Pythonでいえばクラスと関数で同じ機能を提供している関係です。\n\nカスタム損失関数はnn.Moduleまたは関数として実装します。テンソル演算だけで書けばautogradが自動的に勾配を計算します。Focal Loss（クラス不均衡対策）・Dice Loss（セグメンテーション用）など、標準外の損失関数は自前で実装する必要があります。",
+      code:"import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\n# 標準的な損失関数\ncriterion_reg = nn.MSELoss()         # 回帰\ncriterion_cls = nn.CrossEntropyLoss() # 多クラス分類\ncriterion_bin = nn.BCEWithLogitsLoss() # 2値分類\n\n# 使用例\nlogits = torch.randn(8, 10)   # バッチ8、クラス10\nlabels = torch.randint(0, 10, (8,))\nloss = criterion_cls(logits, labels)\n\n# カスタム損失関数: Focal Loss\nclass FocalLoss(nn.Module):\n    def __init__(self, gamma=2.0, alpha=0.25):\n        super().__init__()\n        self.gamma = gamma\n        self.alpha = alpha\n\n    def forward(self, logits, targets):\n        ce_loss = F.cross_entropy(logits, targets, reduction='none')\n        pt = torch.exp(-ce_loss)  # 予測確率\n        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss\n        return focal_loss.mean()",
       afterCode:"CrossEntropyLossはlabel_smoothing引数（PyTorch 1.10+）をサポートしています。label_smoothing=0.1にすると過信を防いで汎化性能が改善することがあります。Transformerモデルの学習でよく使われます。"},
-     {title:"オプティマイザと学習率スケジューラ", body:`オプティマイザはパラメータを更新するアルゴリズムです。SGDは最もシンプルで、learning_rate×gradientだけパラメータを動かします。Adam（Adaptive Moment Estimation）は勾配の1次モーメント（平均）と2次モーメント（分散）を使って学習率を自動調整します。大半のディープラーニングタスクでAdam（またはAdamW）が使われます。
-
-学習率スケジューラは訓練の進行に合わせて学習率を変化させます。StepLR（Nエポックごとに半減）・CosineAnnealingLR（コサイン関数で減衰）・OneCycleLR（ウォームアップ→最大値→減衰）が代表的です。特にOneCycleLRはSGDと組み合わせると高速な収束と良い汎化性能が得られます（Super-Convergenceと呼ばれる現象）。
-
-AdamWはAdamの重み減衰（L2正則化）を修正したバージョンです。通常のAdamの実装では重み減衰とモーメントの計算が絡み合いますが、AdamWでは分離して適用します。TransformerモデルではAdamWが標準的に使われます。`,
-      code:`import torch
-import torch.optim as optim
-import torch.optim.lr_scheduler as lr_scheduler
-
-model = ConvNet()
-
-# AdamWオプティマイザ（Transformerの標準）
-optimizer = optim.AdamW(
-    model.parameters(),
-    lr=1e-3,
-    weight_decay=1e-4,  # L2正則化
-    betas=(0.9, 0.999)
-)
-
-# OneCycleLRスケジューラ
-steps_per_epoch = 100
-total_epochs = 30
-scheduler = lr_scheduler.OneCycleLR(
-    optimizer,
-    max_lr=1e-2,
-    steps_per_epoch=steps_per_epoch,
-    epochs=total_epochs,
-    pct_start=0.3,  # ウォームアップ割合
-)
-
-# 勾配クリッピング (exploding gradient対策)
-for epoch in range(total_epochs):
-    for X_batch, y_batch in loader:
-        optimizer.zero_grad()
-        loss = criterion(model(X_batch), y_batch)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        optimizer.step()
-        scheduler.step()  # OneCycleLRはバッチごとにstep`,
+     {title:"オプティマイザと学習率スケジューラ", body:"オプティマイザはパラメータを更新するアルゴリズムです。SGDは最もシンプルで、learning_rate×gradientだけパラメータを動かします。Adam（Adaptive Moment Estimation）は勾配の1次モーメント（平均）と2次モーメント（分散）を使って学習率を自動調整します。大半のディープラーニングタスクでAdam（またはAdamW）が使われます。\n\n学習率スケジューラは訓練の進行に合わせて学習率を変化させます。StepLR（Nエポックごとに半減）・CosineAnnealingLR（コサイン関数で減衰）・OneCycleLR（ウォームアップ→最大値→減衰）が代表的です。特にOneCycleLRはSGDと組み合わせると高速な収束と良い汎化性能が得られます（Super-Convergenceと呼ばれる現象）。\n\nAdamWはAdamの重み減衰（L2正則化）を修正したバージョンです。通常のAdamの実装では重み減衰とモーメントの計算が絡み合いますが、AdamWでは分離して適用します。TransformerモデルではAdamWが標準的に使われます。",
+      code:"import torch\nimport torch.optim as optim\nimport torch.optim.lr_scheduler as lr_scheduler\n\nmodel = ConvNet()\n\n# AdamWオプティマイザ（Transformerの標準）\noptimizer = optim.AdamW(\n    model.parameters(),\n    lr=1e-3,\n    weight_decay=1e-4,  # L2正則化\n    betas=(0.9, 0.999)\n)\n\n# OneCycleLRスケジューラ\nsteps_per_epoch = 100\ntotal_epochs = 30\nscheduler = lr_scheduler.OneCycleLR(\n    optimizer,\n    max_lr=1e-2,\n    steps_per_epoch=steps_per_epoch,\n    epochs=total_epochs,\n    pct_start=0.3,  # ウォームアップ割合\n)\n\n# 勾配クリッピング (exploding gradient対策)\nfor epoch in range(total_epochs):\n    for X_batch, y_batch in loader:\n        optimizer.zero_grad()\n        loss = criterion(model(X_batch), y_batch)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)\n        optimizer.step()\n        scheduler.step()  # OneCycleLRはバッチごとにstep",
       afterCode:"勾配クリッピング（clip_grad_norm_）はRNN・Transformerで勾配爆発を防ぐために重要です。max_norm=1.0が一般的なデフォルト値です。コンテンツLossが急激に増加する場合は勾配クリッピングを疑ってください。"}
    ]},
   {id:"ch5", num:5, title:"DataLoader・Dataset", est:"50分",
    goal:"Datasetを実装してDataLoaderで効率的にデータを供給し、前処理・拡張・サンプリングを設定できる。",
    sections:[
-     {title:"DatasetとDataLoaderの設計", body:`Datasetは__len__と__getitem__を実装する抽象クラスです。__getitem__(idx)はインデックスを受け取り（サンプル, ラベル）のタプルを返します。ファイルシステム上の画像・CSVファイル・データベースなど、どんなデータソースでも統一インターフェースで扱えます。Pythonのイテレータプロトコル（__iter__・__next__）に似た概念です。
-
-DataLoaderはDatasetをラップして、バッチの作成・シャッフル・並列読み込みを自動化します。num_workers>0を設定するとマルチプロセスで前処理を並列実行し、GPUの待機時間を削減します。pin_memory=TrueはCPUメモリをピン留めしてGPUへの転送を高速化します。
-
-collate_fnを指定すると、可変長データ（異なる長さのテキスト・画像）のバッチ作成をカスタマイズできます。自然言語処理でのパディング・パッキングはここで行います。torch.nn.utils.rnn.pad_sequenceを使うと可変長シーケンスのパディングが簡単です。`,
-      code:`import torch
-from torch.utils.data import Dataset, DataLoader, random_split
-from pathlib import Path
-from PIL import Image
-import torchvision.transforms as T
-
-class ImageFolderDataset(Dataset):
-    """ディレクトリ構造からクラスを自動検出するデータセット"""
-    def __init__(self, root: str, transform=None):
-        self.root = Path(root)
-        self.classes = sorted([d.name for d in self.root.iterdir()
-                               if d.is_dir()])
-        self.class_to_idx = {c: i for i, c in enumerate(self.classes)}
-        self.samples = [
-            (p, self.class_to_idx[p.parent.name])
-            for c in self.classes
-            for p in (self.root / c).glob('*.jpg')
-        ]
-        self.transform = transform
-
-    def __len__(self): return len(self.samples)
-
-    def __getitem__(self, idx):
-        path, label = self.samples[idx]
-        image = Image.open(path).convert('RGB')
-        if self.transform:
-            image = self.transform(image)
-        return image, label`,
+     {title:"DatasetとDataLoaderの設計", body:"Datasetは__len__と__getitem__を実装する抽象クラスです。__getitem__(idx)はインデックスを受け取り（サンプル, ラベル）のタプルを返します。ファイルシステム上の画像・CSVファイル・データベースなど、どんなデータソースでも統一インターフェースで扱えます。Pythonのイテレータプロトコル（__iter__・__next__）に似た概念です。\n\nDataLoaderはDatasetをラップして、バッチの作成・シャッフル・並列読み込みを自動化します。num_workers>0を設定するとマルチプロセスで前処理を並列実行し、GPUの待機時間を削減します。pin_memory=TrueはCPUメモリをピン留めしてGPUへの転送を高速化します。\n\ncollate_fnを指定すると、可変長データ（異なる長さのテキスト・画像）のバッチ作成をカスタマイズできます。自然言語処理でのパディング・パッキングはここで行います。torch.nn.utils.rnn.pad_sequenceを使うと可変長シーケンスのパディングが簡単です。",
+      code:"import torch\nfrom torch.utils.data import Dataset, DataLoader, random_split\nfrom pathlib import Path\nfrom PIL import Image\nimport torchvision.transforms as T\n\nclass ImageFolderDataset(Dataset):\n    \"\"\"ディレクトリ構造からクラスを自動検出するデータセット\"\"\"\n    def __init__(self, root: str, transform=None):\n        self.root = Path(root)\n        self.classes = sorted([d.name for d in self.root.iterdir()\n                               if d.is_dir()])\n        self.class_to_idx = {c: i for i, c in enumerate(self.classes)}\n        self.samples = [\n            (p, self.class_to_idx[p.parent.name])\n            for c in self.classes\n            for p in (self.root / c).glob('*.jpg')\n        ]\n        self.transform = transform\n\n    def __len__(self): return len(self.samples)\n\n    def __getitem__(self, idx):\n        path, label = self.samples[idx]\n        image = Image.open(path).convert('RGB')\n        if self.transform:\n            image = self.transform(image)\n        return image, label",
       afterCode:"num_workers設定はプラットフォームに依存します。Windowsでは__main__ガードが必要です。MPS（Apple Silicon GPU）でのマルチプロセスDataLoaderは注意が必要で、num_workers=0が安全です。"},
-     {title:"データ拡張とWeightedSampler", body:`データ拡張（Augmentation）は訓練データを人工的に増やして過学習を防ぐ技術です。画像では反転・回転・クロップ・輝度変換・ガウシアンノイズなどを訓練時のみ適用します。torchvisionのtransformsモジュールが標準的に使われ、Albumentationsライブラリはより多くの拡張とAlbumentations専用の高速変換を提供します。
-
-クラス不均衡（少数クラスがある）場合はWeightedRandomSamplerでバランスよくサンプリングします。各サンプルに重みを付けることで、少数クラスがより多くサンプリングされます。PythonのrandomモジュールのChoicesのweightに相当します。
-
-v2（torchvision.transforms.v2）はPyTorch 0.15以降の推奨APIです。バウンディングボックスやセグメンテーションマスクとの一貫した変換をサポートし、物体検出・セグメンテーションのデータ拡張が容易になります。`,
-      code:`import torch
-from torch.utils.data import DataLoader, WeightedRandomSampler
-import torchvision.transforms.v2 as T
-
-# 訓練用拡張
-train_transform = T.Compose([
-    T.RandomResizedCrop(224, scale=(0.8, 1.0)),
-    T.RandomHorizontalFlip(p=0.5),
-    T.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
-    T.ToImage(),
-    T.ToDtype(torch.float32, scale=True),  # [0,255] → [0,1]
-    T.Normalize(mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225]),  # ImageNet統計値
-])
-
-# クラス不均衡対策: WeightedRandomSampler
-class_counts = [800, 200]  # クラス0が800枚, クラス1が200枚
-class_weights = 1.0 / torch.tensor(class_counts, dtype=torch.float)
-sample_weights = class_weights[dataset.targets]  # 各サンプルの重み
-sampler = WeightedRandomSampler(
-    weights=sample_weights,
-    num_samples=len(sample_weights),
-    replacement=True
-)
-
-loader = DataLoader(dataset, batch_size=32, sampler=sampler,
-                    num_workers=4, pin_memory=True)`,
+     {title:"データ拡張とWeightedSampler", body:"データ拡張（Augmentation）は訓練データを人工的に増やして過学習を防ぐ技術です。画像では反転・回転・クロップ・輝度変換・ガウシアンノイズなどを訓練時のみ適用します。torchvisionのtransformsモジュールが標準的に使われ、Albumentationsライブラリはより多くの拡張とAlbumentations専用の高速変換を提供します。\n\nクラス不均衡（少数クラスがある）場合はWeightedRandomSamplerでバランスよくサンプリングします。各サンプルに重みを付けることで、少数クラスがより多くサンプリングされます。PythonのrandomモジュールのChoicesのweightに相当します。\n\nv2（torchvision.transforms.v2）はPyTorch 0.15以降の推奨APIです。バウンディングボックスやセグメンテーションマスクとの一貫した変換をサポートし、物体検出・セグメンテーションのデータ拡張が容易になります。",
+      code:"import torch\nfrom torch.utils.data import DataLoader, WeightedRandomSampler\nimport torchvision.transforms.v2 as T\n\n# 訓練用拡張\ntrain_transform = T.Compose([\n    T.RandomResizedCrop(224, scale=(0.8, 1.0)),\n    T.RandomHorizontalFlip(p=0.5),\n    T.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),\n    T.ToImage(),\n    T.ToDtype(torch.float32, scale=True),  # [0,255] → [0,1]\n    T.Normalize(mean=[0.485, 0.456, 0.406],\n                std=[0.229, 0.224, 0.225]),  # ImageNet統計値\n])\n\n# クラス不均衡対策: WeightedRandomSampler\nclass_counts = [800, 200]  # クラス0が800枚, クラス1が200枚\nclass_weights = 1.0 / torch.tensor(class_counts, dtype=torch.float)\nsample_weights = class_weights[dataset.targets]  # 各サンプルの重み\nsampler = WeightedRandomSampler(\n    weights=sample_weights,\n    num_samples=len(sample_weights),\n    replacement=True\n)\n\nloader = DataLoader(dataset, batch_size=32, sampler=sampler,\n                    num_workers=4, pin_memory=True)",
       afterCode:"Normalize変換のmean・stdはImageNetで学習したモデルを使う場合は[0.485,0.456,0.406]・[0.229,0.224,0.225]が標準です。独自データセットで学習する場合は自分のデータセットの統計値を計算します。"}
    ]},
   {id:"ch6", num:6, title:"訓練ループ", est:"50分",
    goal:"完全な訓練ループ（train/eval分岐・早期終了・checkpointing）を実装し、グラフィカルにロスと精度を追跡できる。",
    sections:[
-     {title:"完全な訓練ループの実装", body:`Pytorchの訓練ループには定形パターンがあります。エポックのループ内で、訓練フェーズ（model.train()）と検証フェーズ（model.eval()）を切り替えます。model.train()はDropoutをオンにしBatchNormを訓練モードにします。model.eval()はDropoutをオフにBatchNormを推論モードにします。この切り替えを忘れると再現性のない結果になります。
-
-Early Stopping（早期終了）は検証損失が一定エポック改善しなければ訓練を止めます。過学習を防ぎ、計算時間を節約します。patienceパラメータで「何エポック待つか」を設定します。PythonのContext Managerのような設計で、改善がなければraise StopTrainingのような仕組みです。
-
-Checkpointingは定期的にモデルの重みをファイルに保存します。最良の検証損失を持つモデルを保存しておき、訓練後に読み込みます。モデルだけでなく、optimizer・scheduler・epoch番号も保存すると訓練を途中から再開できます。`,
-      code:`import torch
-import torch.nn as nn
-
-def full_training_loop(model, train_loader, val_loader, num_epochs=50,
-                       patience=5, save_path='best_model.pth'):
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model.to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
-
-    best_val_loss = float('inf')
-    no_improve_count = 0
-
-    for epoch in range(num_epochs):
-        # 訓練フェーズ
-        model.train()
-        train_loss = 0.0
-        for X, y in train_loader:
-            X, y = X.to(device), y.to(device)
-            optimizer.zero_grad()
-            loss = criterion(model(X), y)
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-
-        # 検証フェーズ
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for X, y in val_loader:
-                X, y = X.to(device), y.to(device)
-                val_loss += criterion(model(X), y).item()
-
-        val_loss /= len(val_loader)
-        print(f"Epoch {epoch+1}: train={train_loss/len(train_loader):.4f} val={val_loss:.4f}")
-
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            torch.save(model.state_dict(), save_path)
-            no_improve_count = 0
-        else:
-            no_improve_count += 1
-            if no_improve_count >= patience:
-                print(f"Early stopping at epoch {epoch+1}")
-                break`,
+     {title:"完全な訓練ループの実装", body:"Pytorchの訓練ループには定形パターンがあります。エポックのループ内で、訓練フェーズ（model.train()）と検証フェーズ（model.eval()）を切り替えます。model.train()はDropoutをオンにしBatchNormを訓練モードにします。model.eval()はDropoutをオフにBatchNormを推論モードにします。この切り替えを忘れると再現性のない結果になります。\n\nEarly Stopping（早期終了）は検証損失が一定エポック改善しなければ訓練を止めます。過学習を防ぎ、計算時間を節約します。patienceパラメータで「何エポック待つか」を設定します。PythonのContext Managerのような設計で、改善がなければraise StopTrainingのような仕組みです。\n\nCheckpointingは定期的にモデルの重みをファイルに保存します。最良の検証損失を持つモデルを保存しておき、訓練後に読み込みます。モデルだけでなく、optimizer・scheduler・epoch番号も保存すると訓練を途中から再開できます。",
+      code:"import torch\nimport torch.nn as nn\n\ndef full_training_loop(model, train_loader, val_loader, num_epochs=50,\n                       patience=5, save_path='best_model.pth'):\n    device = 'cuda' if torch.cuda.is_available() else 'cpu'\n    model.to(device)\n    criterion = nn.CrossEntropyLoss()\n    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)\n\n    best_val_loss = float('inf')\n    no_improve_count = 0\n\n    for epoch in range(num_epochs):\n        # 訓練フェーズ\n        model.train()\n        train_loss = 0.0\n        for X, y in train_loader:\n            X, y = X.to(device), y.to(device)\n            optimizer.zero_grad()\n            loss = criterion(model(X), y)\n            loss.backward()\n            optimizer.step()\n            train_loss += loss.item()\n\n        # 検証フェーズ\n        model.eval()\n        val_loss = 0.0\n        with torch.no_grad():\n            for X, y in val_loader:\n                X, y = X.to(device), y.to(device)\n                val_loss += criterion(model(X), y).item()\n\n        val_loss /= len(val_loader)\n        print(f\"Epoch {epoch+1}: train={train_loss/len(train_loader):.4f} val={val_loss:.4f}\")\n\n        if val_loss < best_val_loss:\n            best_val_loss = val_loss\n            torch.save(model.state_dict(), save_path)\n            no_improve_count = 0\n        else:\n            no_improve_count += 1\n            if no_improve_count >= patience:\n                print(f\"Early stopping at epoch {epoch+1}\")\n                break",
       afterCode:"torch.cuda.is_available()でGPUの有無を確認します。Apple Siliconの場合はtorch.backends.mps.is_available()でMPSデバイスを確認します。device = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'という条件分岐が完全な対応です。"},
-     {title:"Mixed Precision訓練とGradient Accumulation", body:`Mixed Precision訓練はfloat32とfloat16を混在させてGPUメモリを削減し計算を高速化します。torch.cuda.amp（Automatic Mixed Precision）を使います。GradScalerはfloat16で勾配がアンダーフロー（ゼロになる）するのを防ぐためスケーリングを行います。Nvidiaは最新GPU（Ampere以降）でbfloat16の使用を推奨しています。
-
-Gradient Accumulationは大きなバッチサイズをGPUメモリ内に収まる小さなバッチに分割して計算し、複数バッチ分の勾配を蓄積してから1回の更新を行います。有効バッチサイズ=バッチサイズ×蓄積ステップ数です。GPUメモリが少ない環境で大きなバッチサイズを模倣できます。
-
-これらの技術を組み合わせることで、コンシューマーGPUでも大規模モデルの訓練が可能になります。HuggingFaceのTrainerやPyTorch Lightningはこれらを自動的に管理します。`,
-      code:`import torch
-from torch.cuda.amp import autocast, GradScaler
-
-def train_with_amp(model, loader, optimizer, accumulation_steps=4):
-    device = 'cuda'
-    scaler = GradScaler()   # 勾配スケーリング
-    model.train()
-    optimizer.zero_grad()
-
-    for step, (X, y) in enumerate(loader):
-        X, y = X.to(device), y.to(device)
-
-        # autocastでfloat16計算
-        with autocast(device_type='cuda', dtype=torch.float16):
-            logits = model(X)
-            loss = criterion(logits, y)
-            loss = loss / accumulation_steps  # 勾配を正規化
-
-        scaler.scale(loss).backward()
-
-        # accumulation_steps毎に更新
-        if (step + 1) % accumulation_steps == 0:
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            scaler.step(optimizer)
-            scaler.update()
-            optimizer.zero_grad()`,
+     {title:"Mixed Precision訓練とGradient Accumulation", body:"Mixed Precision訓練はfloat32とfloat16を混在させてGPUメモリを削減し計算を高速化します。torch.cuda.amp（Automatic Mixed Precision）を使います。GradScalerはfloat16で勾配がアンダーフロー（ゼロになる）するのを防ぐためスケーリングを行います。Nvidiaは最新GPU（Ampere以降）でbfloat16の使用を推奨しています。\n\nGradient Accumulationは大きなバッチサイズをGPUメモリ内に収まる小さなバッチに分割して計算し、複数バッチ分の勾配を蓄積してから1回の更新を行います。有効バッチサイズ=バッチサイズ×蓄積ステップ数です。GPUメモリが少ない環境で大きなバッチサイズを模倣できます。\n\nこれらの技術を組み合わせることで、コンシューマーGPUでも大規模モデルの訓練が可能になります。HuggingFaceのTrainerやPyTorch Lightningはこれらを自動的に管理します。",
+      code:"import torch\nfrom torch.cuda.amp import autocast, GradScaler\n\ndef train_with_amp(model, loader, optimizer, accumulation_steps=4):\n    device = 'cuda'\n    scaler = GradScaler()   # 勾配スケーリング\n    model.train()\n    optimizer.zero_grad()\n\n    for step, (X, y) in enumerate(loader):\n        X, y = X.to(device), y.to(device)\n\n        # autocastでfloat16計算\n        with autocast(device_type='cuda', dtype=torch.float16):\n            logits = model(X)\n            loss = criterion(logits, y)\n            loss = loss / accumulation_steps  # 勾配を正規化\n\n        scaler.scale(loss).backward()\n\n        # accumulation_steps毎に更新\n        if (step + 1) % accumulation_steps == 0:\n            scaler.unscale_(optimizer)\n            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)\n            scaler.step(optimizer)\n            scaler.update()\n            optimizer.zero_grad()",
       afterCode:"GradScalerのscale・unscale_・update()のセットは必ずセットで使います。unscale_後にclip_grad_norm_を使うことで、スケーリング後の実際の勾配サイズに対してクリッピングが適用されます。"}
    ]},
   {id:"ch7", num:7, title:"モデル保存・読み込み", est:"40分",
    goal:"state_dictを使ったモデルの保存・読み込み・チェックポイント管理ができる。TorchScriptとONNXエクスポートの基本を理解できる。",
    sections:[
-     {title:"state_dictとチェックポイント管理", body:`PyTorchでモデルを保存する方法は2種類あります。torch.save(model, path)でモデルオブジェクト全体を保存する方法と、torch.save(model.state_dict(), path)でパラメータ辞書のみを保存する方法です。後者が推奨で、クラス定義があれば別環境でも読み込め、PickleのバージョンやPythonのバージョン依存が少なくなります。
-
-フルチェックポイントはモデルだけでなく、optimizer・scheduler・epoch・最良スコアも保存します。これにより中断した訓練を完全に再開できます。Pythonのpickleでオブジェクトを丸ごと保存するのと同じ考え方で、dict{}に必要なものをまとめてtorch.saveします。
-
-セキュリティ上の注意点として、torch.load()はデフォルトで任意のPythonコードを実行できるpickleを使います。信頼できないソースのモデルファイルを読み込む場合はweights_only=Trueを使います。これはモデルのstate_dictのみを読み込み、任意のPythonオブジェクトの実行を防ぎます。`,
-      code:`import torch
-
-# フルチェックポイントの保存
-def save_checkpoint(model, optimizer, scheduler, epoch, val_loss, path):
-    checkpoint = {
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
-        'val_loss': val_loss,
-    }
-    torch.save(checkpoint, path)
-    print(f"Checkpoint saved: epoch={epoch}, val_loss={val_loss:.4f}")
-
-def load_checkpoint(path, model, optimizer=None, scheduler=None):
-    checkpoint = torch.load(path, map_location='cpu', weights_only=False)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    if optimizer and checkpoint.get('optimizer_state_dict'):
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    if scheduler and checkpoint.get('scheduler_state_dict'):
-        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-    return checkpoint['epoch'], checkpoint['val_loss']`,
+     {title:"state_dictとチェックポイント管理", body:"PyTorchでモデルを保存する方法は2種類あります。torch.save(model, path)でモデルオブジェクト全体を保存する方法と、torch.save(model.state_dict(), path)でパラメータ辞書のみを保存する方法です。後者が推奨で、クラス定義があれば別環境でも読み込め、PickleのバージョンやPythonのバージョン依存が少なくなります。\n\nフルチェックポイントはモデルだけでなく、optimizer・scheduler・epoch・最良スコアも保存します。これにより中断した訓練を完全に再開できます。Pythonのpickleでオブジェクトを丸ごと保存するのと同じ考え方で、dict{}に必要なものをまとめてtorch.saveします。\n\nセキュリティ上の注意点として、torch.load()はデフォルトで任意のPythonコードを実行できるpickleを使います。信頼できないソースのモデルファイルを読み込む場合はweights_only=Trueを使います。これはモデルのstate_dictのみを読み込み、任意のPythonオブジェクトの実行を防ぎます。",
+      code:"import torch\n\n# フルチェックポイントの保存\ndef save_checkpoint(model, optimizer, scheduler, epoch, val_loss, path):\n    checkpoint = {\n        'epoch': epoch,\n        'model_state_dict': model.state_dict(),\n        'optimizer_state_dict': optimizer.state_dict(),\n        'scheduler_state_dict': scheduler.state_dict() if scheduler else None,\n        'val_loss': val_loss,\n    }\n    torch.save(checkpoint, path)\n    print(f\"Checkpoint saved: epoch={epoch}, val_loss={val_loss:.4f}\")\n\ndef load_checkpoint(path, model, optimizer=None, scheduler=None):\n    checkpoint = torch.load(path, map_location='cpu', weights_only=False)\n    model.load_state_dict(checkpoint['model_state_dict'])\n    if optimizer and checkpoint.get('optimizer_state_dict'):\n        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])\n    if scheduler and checkpoint.get('scheduler_state_dict'):\n        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])\n    return checkpoint['epoch'], checkpoint['val_loss']",
       afterCode:"map_location='cpu'を指定すると、GPUで訓練したモデルをCPU環境で読み込めます。本番環境がCPUの場合に重要です。逆にCPUで保存したモデルをGPUに転送するにはmodel.to('cuda')を使います。"},
-     {title:"TorchScriptとONNXエクスポート", body:`TorchScriptはPyTorchモデルをPythonから独立した形式で保存します。C++・Java・Rust等のPythonが使えない環境でも実行でき、本番デプロイ・モバイル（TorchMobile）に使います。torch.jit.script()はPythonのコードを解析してTorchScriptに変換し、torch.jit.trace()は入力を追跡して変換します。
-
-ONNXはOpen Neural Network Exchangeの略で、フレームワーク間でモデルを交換する標準形式です。PyTorchからONNXにエクスポートし、ONNX RuntimeやTensorRT・CoreMLで推論できます。MLをプロダクションに乗せる場合、Python不要の高速推論エンジンを使うためにONNXが重要になります。
-
-量子化はモデルのfloat32重みをint8に変換してモデルサイズを約4分の1にする技術です。PyTorchはPost-Training Quantization（PTQ）とQuantization-Aware Training（QAT）をサポートします。エッジデバイス・モバイルデプロイでメモリと速度が重要な場合に使います。`,
-      code:`import torch
-
-model = ConvNet()
-model.eval()
-
-# TorchScript: torch.jit.trace（動的制御フローなしモデル向け）
-dummy_input = torch.randn(1, 1, 28, 28)
-traced = torch.jit.trace(model, dummy_input)
-traced.save('model_traced.pt')
-
-# TorchScript: torch.jit.script（if文・forループがあるモデル向け）
-scripted = torch.jit.script(model)
-scripted.save('model_scripted.pt')
-
-# ONNXエクスポート
-torch.onnx.export(
-    model,
-    dummy_input,
-    'model.onnx',
-    input_names=['input'],
-    output_names=['output'],
-    dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}},
-    opset_version=17,
-)
-print("ONNXエクスポート完了")
-
-# 検証: onnxruntimeで確認
-# import onnxruntime as ort
-# sess = ort.InferenceSession('model.onnx')
-# result = sess.run(None, {'input': dummy_input.numpy()})`,
+     {title:"TorchScriptとONNXエクスポート", body:"TorchScriptはPyTorchモデルをPythonから独立した形式で保存します。C++・Java・Rust等のPythonが使えない環境でも実行でき、本番デプロイ・モバイル（TorchMobile）に使います。torch.jit.script()はPythonのコードを解析してTorchScriptに変換し、torch.jit.trace()は入力を追跡して変換します。\n\nONNXはOpen Neural Network Exchangeの略で、フレームワーク間でモデルを交換する標準形式です。PyTorchからONNXにエクスポートし、ONNX RuntimeやTensorRT・CoreMLで推論できます。MLをプロダクションに乗せる場合、Python不要の高速推論エンジンを使うためにONNXが重要になります。\n\n量子化はモデルのfloat32重みをint8に変換してモデルサイズを約4分の1にする技術です。PyTorchはPost-Training Quantization（PTQ）とQuantization-Aware Training（QAT）をサポートします。エッジデバイス・モバイルデプロイでメモリと速度が重要な場合に使います。",
+      code:"import torch\n\nmodel = ConvNet()\nmodel.eval()\n\n# TorchScript: torch.jit.trace（動的制御フローなしモデル向け）\ndummy_input = torch.randn(1, 1, 28, 28)\ntraced = torch.jit.trace(model, dummy_input)\ntraced.save('model_traced.pt')\n\n# TorchScript: torch.jit.script（if文・forループがあるモデル向け）\nscripted = torch.jit.script(model)\nscripted.save('model_scripted.pt')\n\n# ONNXエクスポート\ntorch.onnx.export(\n    model,\n    dummy_input,\n    'model.onnx',\n    input_names=['input'],\n    output_names=['output'],\n    dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}},\n    opset_version=17,\n)\nprint(\"ONNXエクスポート完了\")\n\n# 検証: onnxruntimeで確認\n# import onnxruntime as ort\n# sess = ort.InferenceSession('model.onnx')\n# result = sess.run(None, {'input': dummy_input.numpy()})",
       afterCode:"dynamic_axesで指定した次元は動的になり、バッチサイズが変わっても同じONNXモデルを使えます。エクスポート時のopset_versionはデプロイ先のONNX Runtimeのバージョンと合わせます。"}
    ]},
   {id:"ch8", num:8, title:"TensorBoard可視化", est:"40分",
    goal:"TensorBoardで訓練ロス・精度・モデルグラフ・特徴マップを可視化し、ハイパーパラメータチューニングにHParamsを使える。",
    sections:[
-     {title:"SummaryWriterによる基本的な可視化", body:`TensorBoardはGoogle Brain（現Google DeepMind）が開発した訓練の可視化ツールです。PyTorchのtorch.utils.tensorboard.SummaryWriterを使ってログを記録し、tensorboard --logdirコマンドでブラウザから確認します。Pythonのloggingモジュールのように、必要なデータをコードの随所に記録します。
-
-add_scalar()でスカラー値（損失・精度・学習率）を記録します。第1引数はタグ名（スラッシュで階層化できます）、第2引数は値、第3引数はステップ（x軸）です。同じタグに複数の値を記録すると折れ線グラフになります。TensorFlowのtf.summaryと同じAPIです。
-
-add_images()で画像バッチを記録できます。誤分類されたサンプルを可視化したり、データ拡張の結果を確認したりするのに便利です。add_embedding()はt-SNEやPCAを使って高次元特徴量を2D/3Dに次元削減して可視化します。クラスターの分離具合でモデルの特徴抽出の質を評価できます。`,
-      code:`from torch.utils.tensorboard import SummaryWriter
-import torch
-import torch.nn as nn
-
-# ログディレクトリはrun名を含めると管理しやすい
-writer = SummaryWriter('runs/resnet18_lr1e3_bs32')
-
-# 訓練ループ内での記録
-global_step = 0
-for epoch in range(num_epochs):
-    for X, y in train_loader:
-        loss = train_step(X, y)
-        writer.add_scalar('Loss/train', loss, global_step)
-        global_step += 1
-
-    val_loss, val_acc = validate()
-    writer.add_scalar('Loss/val', val_loss, epoch)
-    writer.add_scalar('Accuracy/val', val_acc, epoch)
-
-    # 学習率の記録
-    current_lr = optimizer.param_groups[0]['lr']
-    writer.add_scalar('Learning Rate', current_lr, epoch)
-
-    # モデルパラメータのヒストグラム
-    for name, param in model.named_parameters():
-        writer.add_histogram(f'Parameters/{name}', param.data, epoch)
-
-writer.close()
-# tensorboard --logdir=runs --port=6006`,
+     {title:"SummaryWriterによる基本的な可視化", body:"TensorBoardはGoogle Brain（現Google DeepMind）が開発した訓練の可視化ツールです。PyTorchのtorch.utils.tensorboard.SummaryWriterを使ってログを記録し、tensorboard --logdirコマンドでブラウザから確認します。Pythonのloggingモジュールのように、必要なデータをコードの随所に記録します。\n\nadd_scalar()でスカラー値（損失・精度・学習率）を記録します。第1引数はタグ名（スラッシュで階層化できます）、第2引数は値、第3引数はステップ（x軸）です。同じタグに複数の値を記録すると折れ線グラフになります。TensorFlowのtf.summaryと同じAPIです。\n\nadd_images()で画像バッチを記録できます。誤分類されたサンプルを可視化したり、データ拡張の結果を確認したりするのに便利です。add_embedding()はt-SNEやPCAを使って高次元特徴量を2D/3Dに次元削減して可視化します。クラスターの分離具合でモデルの特徴抽出の質を評価できます。",
+      code:"from torch.utils.tensorboard import SummaryWriter\nimport torch\nimport torch.nn as nn\n\n# ログディレクトリはrun名を含めると管理しやすい\nwriter = SummaryWriter('runs/resnet18_lr1e3_bs32')\n\n# 訓練ループ内での記録\nglobal_step = 0\nfor epoch in range(num_epochs):\n    for X, y in train_loader:\n        loss = train_step(X, y)\n        writer.add_scalar('Loss/train', loss, global_step)\n        global_step += 1\n\n    val_loss, val_acc = validate()\n    writer.add_scalar('Loss/val', val_loss, epoch)\n    writer.add_scalar('Accuracy/val', val_acc, epoch)\n\n    # 学習率の記録\n    current_lr = optimizer.param_groups[0]['lr']\n    writer.add_scalar('Learning Rate', current_lr, epoch)\n\n    # モデルパラメータのヒストグラム\n    for name, param in model.named_parameters():\n        writer.add_histogram(f'Parameters/{name}', param.data, epoch)\n\nwriter.close()\n# tensorboard --logdir=runs --port=6006",
       afterCode:"複数の実験を比較するには、runsディレクトリ以下に実験名でサブディレクトリを作ります。TensorBoardはそれらを自動的に読み込み、グラフ上で重ねて比較できます。"},
-     {title:"HParamsとモデルグラフの可視化", body:`HParams（ハイパーパラメータ）のTrackingはTensorBoardで実験を組織的に管理します。各実験のハイパーパラメータ（学習率・バッチサイズ・モデルアーキテクチャ）と結果（最終精度・損失）を記録し、表形式で比較できます。Pythonのdict比較やスプレッドシートで実験管理するより格段に見やすくなります。
-
-モデルグラフの可視化にはadd_graph()を使います。ダミー入力を渡すとモデルの計算グラフ（トポロジー）がTensorBoard上で確認できます。各層の接続・形状を視覚的に確認でき、設計ミスの発見に役立ちます。
-
-Pytorchの代替可視化ツールとしてWandb（Weights & Biases）・MLflow・Neptune.aiがあります。これらはクラウドベースでチーム共有が容易で、本番機械学習の実験管理に広く使われます。TensorBoardよりリッチな機能（モデルバージョン管理・コード記録・Artifactsなど）を持ちます。`,
-      code:`from torch.utils.tensorboard import SummaryWriter
-from torch.utils.tensorboard.summary import hparams
-
-def run_experiment(lr: float, batch_size: int, hidden_size: int):
-    writer = SummaryWriter(f'runs/lr{lr}_bs{batch_size}_h{hidden_size}')
-
-    hparam_dict = {
-        'lr': lr,
-        'batch_size': batch_size,
-        'hidden_size': hidden_size,
-    }
-
-    # 訓練実行（省略）
-    final_acc = 0.87  # 例
-
-    # HParamsとメトリクスを記録
-    metric_dict = {
-        'hparam/accuracy': final_acc,
-        'hparam/loss': 0.42,
-    }
-    writer.add_hparams(hparam_dict, metric_dict)
-
-    # モデルグラフを記録
-    dummy_input = torch.randn(1, 64)
-    model = MLP()
-    writer.add_graph(model, dummy_input)
-
-    writer.close()
-
-# グリッドサーチ
-for lr in [1e-2, 1e-3, 1e-4]:
-    for bs in [32, 64, 128]:
-        run_experiment(lr=lr, batch_size=bs, hidden_size=256)`,
+     {title:"HParamsとモデルグラフの可視化", body:"HParams（ハイパーパラメータ）のTrackingはTensorBoardで実験を組織的に管理します。各実験のハイパーパラメータ（学習率・バッチサイズ・モデルアーキテクチャ）と結果（最終精度・損失）を記録し、表形式で比較できます。Pythonのdict比較やスプレッドシートで実験管理するより格段に見やすくなります。\n\nモデルグラフの可視化にはadd_graph()を使います。ダミー入力を渡すとモデルの計算グラフ（トポロジー）がTensorBoard上で確認できます。各層の接続・形状を視覚的に確認でき、設計ミスの発見に役立ちます。\n\nPytorchの代替可視化ツールとしてWandb（Weights & Biases）・MLflow・Neptune.aiがあります。これらはクラウドベースでチーム共有が容易で、本番機械学習の実験管理に広く使われます。TensorBoardよりリッチな機能（モデルバージョン管理・コード記録・Artifactsなど）を持ちます。",
+      code:"from torch.utils.tensorboard import SummaryWriter\nfrom torch.utils.tensorboard.summary import hparams\n\ndef run_experiment(lr: float, batch_size: int, hidden_size: int):\n    writer = SummaryWriter(f'runs/lr{lr}_bs{batch_size}_h{hidden_size}')\n\n    hparam_dict = {\n        'lr': lr,\n        'batch_size': batch_size,\n        'hidden_size': hidden_size,\n    }\n\n    # 訓練実行（省略）\n    final_acc = 0.87  # 例\n\n    # HParamsとメトリクスを記録\n    metric_dict = {\n        'hparam/accuracy': final_acc,\n        'hparam/loss': 0.42,\n    }\n    writer.add_hparams(hparam_dict, metric_dict)\n\n    # モデルグラフを記録\n    dummy_input = torch.randn(1, 64)\n    model = MLP()\n    writer.add_graph(model, dummy_input)\n\n    writer.close()\n\n# グリッドサーチ\nfor lr in [1e-2, 1e-3, 1e-4]:\n    for bs in [32, 64, 128]:\n        run_experiment(lr=lr, batch_size=bs, hidden_size=256)",
       afterCode:"TensorBoardのHParamsタブを開くとパラメータと結果の相関表・散布図が表示されます。どのハイパーパラメータが結果に最も影響しているかを視覚的に分析できます。Optunaと組み合わせるとベイズ最適化による自動チューニングもできます。"}
    ]},
 ];

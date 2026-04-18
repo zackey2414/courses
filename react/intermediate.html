@@ -103,749 +103,90 @@ const EX = {
   ch1: [{
     diff: 1,
     q: "useReducer を使って以下の状態を管理してください。\n・count（数値）\n・step（増減幅、デフォルト1）\nアクション: INCREMENT / DECREMENT / SET_STEP / RESET",
-    code: `// CounterReducer.tsx
-// action type を定義し、reducer 関数を実装する
-// useReducer(reducer, { count: 0, step: 1 }) で初期化`,
-    answer: `type Action =
-  | { type: 'INCREMENT' }
-  | { type: 'DECREMENT' }
-  | { type: 'SET_STEP'; payload: number }
-  | { type: 'RESET' };
-
-interface State { count: number; step: number; }
-
-function reducer(state: State, action: Action): State {
-  switch (action.type) {
-    case 'INCREMENT': return { ...state, count: state.count + state.step };
-    case 'DECREMENT': return { ...state, count: state.count - state.step };
-    case 'SET_STEP':  return { ...state, step: action.payload };
-    case 'RESET':     return { count: 0, step: state.step };
-    default:          return state;
-  }
-}
-
-function Counter() {
-  const [state, dispatch] = React.useReducer(reducer, { count: 0, step: 1 });
-  return (
-    <div>
-      <p>count: {state.count} (step: {state.step})</p>
-      <button onClick={() => dispatch({ type: 'DECREMENT' })}>-</button>
-      <button onClick={() => dispatch({ type: 'INCREMENT' })}>+</button>
-      <input type="number" value={state.step}
-        onChange={e => dispatch({ type: 'SET_STEP', payload: +e.target.value })} />
-      <button onClick={() => dispatch({ type: 'RESET' })}>Reset</button>
-    </div>
-  );
-}`
+    code: "// CounterReducer.tsx\n// action type を定義し、reducer 関数を実装する\n// useReducer(reducer, { count: 0, step: 1 }) で初期化",
+    answer: "type Action =\n  | { type: 'INCREMENT' }\n  | { type: 'DECREMENT' }\n  | { type: 'SET_STEP'; payload: number }\n  | { type: 'RESET' };\n\ninterface State { count: number; step: number; }\n\nfunction reducer(state: State, action: Action): State {\n  switch (action.type) {\n    case 'INCREMENT': return { ...state, count: state.count + state.step };\n    case 'DECREMENT': return { ...state, count: state.count - state.step };\n    case 'SET_STEP':  return { ...state, step: action.payload };\n    case 'RESET':     return { count: 0, step: state.step };\n    default:          return state;\n  }\n}\n\nfunction Counter() {\n  const [state, dispatch] = React.useReducer(reducer, { count: 0, step: 1 });\n  return (\n    <div>\n      <p>count: {state.count} (step: {state.step})</p>\n      <button onClick={() => dispatch({ type: 'DECREMENT' })}>-</button>\n      <button onClick={() => dispatch({ type: 'INCREMENT' })}>+</button>\n      <input type=\"number\" value={state.step}\n        onChange={e => dispatch({ type: 'SET_STEP', payload: +e.target.value })} />\n      <button onClick={() => dispatch({ type: 'RESET' })}>Reset</button>\n    </div>\n  );\n}"
   }, {
     diff: 2,
     q: "useMemo と useCallback を組み合わせて最適化してください。\n・todos（配列）と filter（文字列）を状態で持つ\n・filteredTodos を useMemo で計算\n・addTodo, deleteTodo を useCallback でメモ化\n・子コンポーネントは React.memo でラップ",
-    code: `// App.tsx
-// React.memo でラップした TodoList コンポーネントに
-// useCallback でメモ化した関数を渡す`,
-    answer: `const { useState, useMemo, useCallback, memo } = React;
-
-const TodoList = memo(function TodoList({ todos, onDelete }) {
-  console.log('TodoList rendered');
-  return (
-    <ul>
-      {todos.map(t => (
-        <li key={t.id}>
-          {t.text}
-          <button onClick={() => onDelete(t.id)}>削除</button>
-        </li>
-      ))}
-    </ul>
-  );
-});
-
-function App() {
-  const [todos, setTodos] = useState([]);
-  const [filter, setFilter] = useState('all');
-  const [input, setInput] = useState('');
-
-  const filteredTodos = useMemo(() =>
-    filter === 'done' ? todos.filter(t => t.done)
-    : filter === 'active' ? todos.filter(t => !t.done)
-    : todos
-  , [todos, filter]);
-
-  const addTodo = useCallback((text) => {
-    setTodos(prev => [...prev, { id: Date.now(), text, done: false }]);
-  }, []);
-
-  const deleteTodo = useCallback((id) => {
-    setTodos(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  return (
-    <div>
-      <input value={input} onChange={e => setInput(e.target.value)} />
-      <button onClick={() => { addTodo(input); setInput(''); }}>追加</button>
-      <TodoList todos={filteredTodos} onDelete={deleteTodo} />
-    </div>
-  );
-}`
+    code: "// App.tsx\n// React.memo でラップした TodoList コンポーネントに\n// useCallback でメモ化した関数を渡す",
+    answer: "const { useState, useMemo, useCallback, memo } = React;\n\nconst TodoList = memo(function TodoList({ todos, onDelete }) {\n  console.log('TodoList rendered');\n  return (\n    <ul>\n      {todos.map(t => (\n        <li key={t.id}>\n          {t.text}\n          <button onClick={() => onDelete(t.id)}>削除</button>\n        </li>\n      ))}\n    </ul>\n  );\n});\n\nfunction App() {\n  const [todos, setTodos] = useState([]);\n  const [filter, setFilter] = useState('all');\n  const [input, setInput] = useState('');\n\n  const filteredTodos = useMemo(() =>\n    filter === 'done' ? todos.filter(t => t.done)\n    : filter === 'active' ? todos.filter(t => !t.done)\n    : todos\n  , [todos, filter]);\n\n  const addTodo = useCallback((text) => {\n    setTodos(prev => [...prev, { id: Date.now(), text, done: false }]);\n  }, []);\n\n  const deleteTodo = useCallback((id) => {\n    setTodos(prev => prev.filter(t => t.id !== id));\n  }, []);\n\n  return (\n    <div>\n      <input value={input} onChange={e => setInput(e.target.value)} />\n      <button onClick={() => { addTodo(input); setInput(''); }}>追加</button>\n      <TodoList todos={filteredTodos} onDelete={deleteTodo} />\n    </div>\n  );\n}"
   }],
   ch2: [{
     diff: 1,
     q: "useLocalStorage カスタムフックを実装してください。\n・初期値を引数で受け取る\n・setValueで更新するとlocalStorageにも保存\n・ページリロード後も値が復元される",
-    code: `// hooks/useLocalStorage.ts
-// useState の初期値に localStorage の値を使う
-// setValue で state と localStorage を同時更新`,
-    answer: `function useLocalStorage(key, initialValue) {
-  const [value, setValue] = React.useState(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      return item !== null ? JSON.parse(item) : initialValue;
-    } catch {
-      return initialValue;
-    }
-  });
-
-  const setStoredValue = React.useCallback((newValue) => {
-    setValue(newValue);
-    try {
-      window.localStorage.setItem(key, JSON.stringify(newValue));
-    } catch (e) {
-      console.error('localStorage write error:', e);
-    }
-  }, [key]);
-
-  return [value, setStoredValue];
-}
-
-// 使い方
-function App() {
-  const [name, setName] = useLocalStorage('username', '');
-  return (
-    <input
-      value={name}
-      onChange={e => setName(e.target.value)}
-      placeholder="名前（リロードしても保持）"
-    />
-  );
-}`
+    code: "// hooks/useLocalStorage.ts\n// useState の初期値に localStorage の値を使う\n// setValue で state と localStorage を同時更新",
+    answer: "function useLocalStorage(key, initialValue) {\n  const [value, setValue] = React.useState(() => {\n    try {\n      const item = window.localStorage.getItem(key);\n      return item !== null ? JSON.parse(item) : initialValue;\n    } catch {\n      return initialValue;\n    }\n  });\n\n  const setStoredValue = React.useCallback((newValue) => {\n    setValue(newValue);\n    try {\n      window.localStorage.setItem(key, JSON.stringify(newValue));\n    } catch (e) {\n      console.error('localStorage write error:', e);\n    }\n  }, [key]);\n\n  return [value, setStoredValue];\n}\n\n// 使い方\nfunction App() {\n  const [name, setName] = useLocalStorage('username', '');\n  return (\n    <input\n      value={name}\n      onChange={e => setName(e.target.value)}\n      placeholder=\"名前（リロードしても保持）\"\n    />\n  );\n}"
   }, {
     diff: 2,
     q: "useFetch カスタムフックを実装してください。\n・url を受け取り { data, loading, error } を返す\n・url が変わると再フェッチ\n・コンポーネントがアンマウントされた後に setState しない（AbortController利用）",
-    code: `// hooks/useFetch.ts
-// AbortController でクリーンアップ
-// url の変化で useEffect が再実行される`,
-    answer: `function useFetch(url) {
-  const [state, setState] = React.useState({
-    data: null, loading: true, error: null
-  });
-
-  React.useEffect(() => {
-    if (!url) return;
-    const controller = new AbortController();
-    setState({ data: null, loading: true, error: null });
-
-    fetch(url, { signal: controller.signal })
-      .then(res => {
-        if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
-        return res.json();
-      })
-      .then(data => setState({ data, loading: false, error: null }))
-      .catch(err => {
-        if (err.name === 'AbortError') return; // アンマウント時は無視
-        setState({ data: null, loading: false, error: err.message });
-      });
-
-    return () => controller.abort();
-  }, [url]);
-
-  return state;
-}
-
-// 使い方
-function UserCard({ userId }) {
-  const { data, loading, error } = useFetch(
-    userId ? \`https://jsonplaceholder.typicode.com/users/\${userId}\` : null
-  );
-  if (loading) return <p>読み込み中...</p>;
-  if (error) return <p>エラー: {error}</p>;
-  return <p>{data?.name}</p>;
-}`
+    code: "// hooks/useFetch.ts\n// AbortController でクリーンアップ\n// url の変化で useEffect が再実行される",
+    answer: "function useFetch(url) {\n  const [state, setState] = React.useState({\n    data: null, loading: true, error: null\n  });\n\n  React.useEffect(() => {\n    if (!url) return;\n    const controller = new AbortController();\n    setState({ data: null, loading: true, error: null });\n\n    fetch(url, { signal: controller.signal })\n      .then(res => {\n        if (!res.ok) throw new Error(`HTTP \${res.status}`);\n        return res.json();\n      })\n      .then(data => setState({ data, loading: false, error: null }))\n      .catch(err => {\n        if (err.name === 'AbortError') return; // アンマウント時は無視\n        setState({ data: null, loading: false, error: err.message });\n      });\n\n    return () => controller.abort();\n  }, [url]);\n\n  return state;\n}\n\n// 使い方\nfunction UserCard({ userId }) {\n  const { data, loading, error } = useFetch(\n    userId ? `https://jsonplaceholder.typicode.com/users/\${userId}` : null\n  );\n  if (loading) return <p>読み込み中...</p>;\n  if (error) return <p>エラー: {error}</p>;\n  return <p>{data?.name}</p>;\n}"
   }],
   ch3: [{
     diff: 1,
     q: "createContext と useContext を使って、テーマ（ライト/ダーク）を切り替えるグローバル状態を実装してください。\n・ThemeContext を作成\n・useTheme カスタムフックでコンテキストを取得\n・任意のコンポーネントからテーマを切り替えられること",
-    code: `// contexts/ThemeContext.tsx
-// createContext → Provider → useTheme フック
-// App をラップして任意の子から切替可能に`,
-    answer: `const ThemeContext = React.createContext(null);
-
-function ThemeProvider({ children }) {
-  const [theme, setTheme] = React.useState('light');
-  const toggle = React.useCallback(
-    () => setTheme(t => t === 'light' ? 'dark' : 'light'),
-    []
-  );
-  const value = React.useMemo(() => ({ theme, toggle }), [theme, toggle]);
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
-  );
-}
-
-function useTheme() {
-  const ctx = React.useContext(ThemeContext);
-  if (!ctx) throw new Error('useTheme must be used inside ThemeProvider');
-  return ctx;
-}
-
-function ThemeToggle() {
-  const { theme, toggle } = useTheme();
-  return (
-    <button onClick={toggle}
-      style={{ background: theme === 'dark' ? '#1e1b4b' : '#eef2ff', color: theme === 'dark' ? '#fff' : '#1e1b4b', padding: '8px 16px', border: 'none', borderRadius: 8 }}>
-      現在: {theme} → 切り替え
-    </button>
-  );
-}
-
-function App() {
-  return (
-    <ThemeProvider>
-      <ThemeToggle />
-    </ThemeProvider>
-  );
-}`
+    code: "// contexts/ThemeContext.tsx\n// createContext → Provider → useTheme フック\n// App をラップして任意の子から切替可能に",
+    answer: "const ThemeContext = React.createContext(null);\n\nfunction ThemeProvider({ children }) {\n  const [theme, setTheme] = React.useState('light');\n  const toggle = React.useCallback(\n    () => setTheme(t => t === 'light' ? 'dark' : 'light'),\n    []\n  );\n  const value = React.useMemo(() => ({ theme, toggle }), [theme, toggle]);\n  return (\n    <ThemeContext.Provider value={value}>\n      {children}\n    </ThemeContext.Provider>\n  );\n}\n\nfunction useTheme() {\n  const ctx = React.useContext(ThemeContext);\n  if (!ctx) throw new Error('useTheme must be used inside ThemeProvider');\n  return ctx;\n}\n\nfunction ThemeToggle() {\n  const { theme, toggle } = useTheme();\n  return (\n    <button onClick={toggle}\n      style={{ background: theme === 'dark' ? '#1e1b4b' : '#eef2ff', color: theme === 'dark' ? '#fff' : '#1e1b4b', padding: '8px 16px', border: 'none', borderRadius: 8 }}>\n      現在: {theme} → 切り替え\n    </button>\n  );\n}\n\nfunction App() {\n  return (\n    <ThemeProvider>\n      <ThemeToggle />\n    </ThemeProvider>\n  );\n}"
   }, {
     diff: 2,
     q: "Contextの再レンダリング問題を確認し、useMemoで防いでください。\n・CounterContextとUserContextを別々に作成\n・カウンタが増えてもUserDisplayが再レンダリングされないことをconsole.logで確認",
-    code: `// Context を分割して不要な再レンダリングを防ぐ
-// console.log('UserDisplay rendered') で確認`,
-    answer: `const CounterContext = React.createContext(null);
-const UserContext = React.createContext(null);
-
-function CounterProvider({ children }) {
-  const [count, setCount] = React.useState(0);
-  // value を useMemo で安定化
-  const value = React.useMemo(() => ({ count, setCount }), [count]);
-  return <CounterContext.Provider value={value}>{children}</CounterContext.Provider>;
-}
-
-function UserProvider({ children }) {
-  const [user] = React.useState({ name: '太郎' });
-  const value = React.useMemo(() => ({ user }), [user]);
-  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
-}
-
-const UserDisplay = React.memo(function UserDisplay() {
-  const { user } = React.useContext(UserContext);
-  console.log('UserDisplay rendered'); // カウンタ変化では出ないはず
-  return <p>ユーザー: {user.name}</p>;
-});
-
-function Counter() {
-  const { count, setCount } = React.useContext(CounterContext);
-  return <button onClick={() => setCount(c => c + 1)}>Count: {count}</button>;
-}
-
-function App() {
-  return (
-    <UserProvider>
-      <CounterProvider>
-        <UserDisplay />
-        <Counter />
-      </CounterProvider>
-    </UserProvider>
-  );
-}`
+    code: "// Context を分割して不要な再レンダリングを防ぐ\n// console.log('UserDisplay rendered') で確認",
+    answer: "const CounterContext = React.createContext(null);\nconst UserContext = React.createContext(null);\n\nfunction CounterProvider({ children }) {\n  const [count, setCount] = React.useState(0);\n  // value を useMemo で安定化\n  const value = React.useMemo(() => ({ count, setCount }), [count]);\n  return <CounterContext.Provider value={value}>{children}</CounterContext.Provider>;\n}\n\nfunction UserProvider({ children }) {\n  const [user] = React.useState({ name: '太郎' });\n  const value = React.useMemo(() => ({ user }), [user]);\n  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;\n}\n\nconst UserDisplay = React.memo(function UserDisplay() {\n  const { user } = React.useContext(UserContext);\n  console.log('UserDisplay rendered'); // カウンタ変化では出ないはず\n  return <p>ユーザー: {user.name}</p>;\n});\n\nfunction Counter() {\n  const { count, setCount } = React.useContext(CounterContext);\n  return <button onClick={() => setCount(c => c + 1)}>Count: {count}</button>;\n}\n\nfunction App() {\n  return (\n    <UserProvider>\n      <CounterProvider>\n        <UserDisplay />\n        <Counter />\n      </CounterProvider>\n    </UserProvider>\n  );\n}"
   }],
   ch4: [{
     diff: 1,
     q: "Compound Components パターンを使って Tabs コンポーネントを実装してください。\n以下のように使えること:\n<Tabs defaultValue='a'>\n  <Tabs.List>\n    <Tabs.Trigger value='a'>タブA</Tabs.Trigger>\n  </Tabs.List>\n  <Tabs.Panel value='a'>内容A</Tabs.Panel>\n</Tabs>",
-    code: `// Tabs, Tabs.List, Tabs.Trigger, Tabs.Panel を実装
-// Context で activeTab を共有`,
-    answer: `const TabsContext = React.createContext(null);
-
-function Tabs({ defaultValue, children }) {
-  const [active, setActive] = React.useState(defaultValue);
-  const ctx = React.useMemo(() => ({ active, setActive }), [active]);
-  return (
-    <TabsContext.Provider value={ctx}>
-      <div>{children}</div>
-    </TabsContext.Provider>
-  );
-}
-
-Tabs.List = function TabsList({ children }) {
-  return <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e5e7eb', marginBottom: 12 }}>{children}</div>;
-};
-
-Tabs.Trigger = function TabsTrigger({ value, children }) {
-  const { active, setActive } = React.useContext(TabsContext);
-  return (
-    <button
-      onClick={() => setActive(value)}
-      style={{
-        padding: '8px 16px', border: 'none', borderRadius: '8px 8px 0 0',
-        background: active === value ? '#6366f1' : 'transparent',
-        color: active === value ? '#fff' : '#6b7280',
-        fontWeight: active === value ? 700 : 400, cursor: 'pointer'
-      }}>
-      {children}
-    </button>
-  );
-};
-
-Tabs.Panel = function TabsPanel({ value, children }) {
-  const { active } = React.useContext(TabsContext);
-  if (active !== value) return null;
-  return <div>{children}</div>;
-};
-
-// 使い方
-function App() {
-  return (
-    <Tabs defaultValue="a">
-      <Tabs.List>
-        <Tabs.Trigger value="a">概要</Tabs.Trigger>
-        <Tabs.Trigger value="b">詳細</Tabs.Trigger>
-      </Tabs.List>
-      <Tabs.Panel value="a">概要の内容</Tabs.Panel>
-      <Tabs.Panel value="b">詳細の内容</Tabs.Panel>
-    </Tabs>
-  );
-}`
+    code: "// Tabs, Tabs.List, Tabs.Trigger, Tabs.Panel を実装\n// Context で activeTab を共有",
+    answer: "const TabsContext = React.createContext(null);\n\nfunction Tabs({ defaultValue, children }) {\n  const [active, setActive] = React.useState(defaultValue);\n  const ctx = React.useMemo(() => ({ active, setActive }), [active]);\n  return (\n    <TabsContext.Provider value={ctx}>\n      <div>{children}</div>\n    </TabsContext.Provider>\n  );\n}\n\nTabs.List = function TabsList({ children }) {\n  return <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e5e7eb', marginBottom: 12 }}>{children}</div>;\n};\n\nTabs.Trigger = function TabsTrigger({ value, children }) {\n  const { active, setActive } = React.useContext(TabsContext);\n  return (\n    <button\n      onClick={() => setActive(value)}\n      style={{\n        padding: '8px 16px', border: 'none', borderRadius: '8px 8px 0 0',\n        background: active === value ? '#6366f1' : 'transparent',\n        color: active === value ? '#fff' : '#6b7280',\n        fontWeight: active === value ? 700 : 400, cursor: 'pointer'\n      }}>\n      {children}\n    </button>\n  );\n};\n\nTabs.Panel = function TabsPanel({ value, children }) {\n  const { active } = React.useContext(TabsContext);\n  if (active !== value) return null;\n  return <div>{children}</div>;\n};\n\n// 使い方\nfunction App() {\n  return (\n    <Tabs defaultValue=\"a\">\n      <Tabs.List>\n        <Tabs.Trigger value=\"a\">概要</Tabs.Trigger>\n        <Tabs.Trigger value=\"b\">詳細</Tabs.Trigger>\n      </Tabs.List>\n      <Tabs.Panel value=\"a\">概要の内容</Tabs.Panel>\n      <Tabs.Panel value=\"b\">詳細の内容</Tabs.Panel>\n    </Tabs>\n  );\n}"
   }, {
     diff: 2,
     q: "Render Props パターンを使って DataFetcher コンポーネントを作ってください。\n・url と children（関数）を props で受け取る\n・children({ data, loading, error }) を呼び出す\n・2つの異なるUIで同じ DataFetcher を再利用",
-    code: `// <DataFetcher url={...}>
-//   {({ data, loading, error }) => <div>...</div>}
-// </DataFetcher>`,
-    answer: `function DataFetcher({ url, children }) {
-  const [state, setState] = React.useState({ data: null, loading: true, error: null });
-
-  React.useEffect(() => {
-    fetch(url)
-      .then(r => r.json())
-      .then(data => setState({ data, loading: false, error: null }))
-      .catch(err => setState({ data: null, loading: false, error: err.message }));
-  }, [url]);
-
-  return children(state);
-}
-
-// 同じ DataFetcher を2種類のUIで再利用
-function App() {
-  return (
-    <div>
-      {/* カード表示 */}
-      <DataFetcher url="https://jsonplaceholder.typicode.com/users/1">
-        {({ data, loading, error }) => {
-          if (loading) return <p>読み込み中...</p>;
-          if (error) return <p style={{color:'red'}}>{error}</p>;
-          return <div style={{padding:12,border:'1px solid #e5e7eb',borderRadius:8}}>
-            <strong>{data.name}</strong><br/>{data.email}
-          </div>;
-        }}
-      </DataFetcher>
-
-      {/* テーブル表示 */}
-      <DataFetcher url="https://jsonplaceholder.typicode.com/users/2">
-        {({ data, loading }) =>
-          loading ? <span>...</span> : <p>→ {data?.username}</p>
-        }
-      </DataFetcher>
-    </div>
-  );
-}`
+    code: "// <DataFetcher url={...}>\n//   {({ data, loading, error }) => <div>...</div>}\n// </DataFetcher>",
+    answer: "function DataFetcher({ url, children }) {\n  const [state, setState] = React.useState({ data: null, loading: true, error: null });\n\n  React.useEffect(() => {\n    fetch(url)\n      .then(r => r.json())\n      .then(data => setState({ data, loading: false, error: null }))\n      .catch(err => setState({ data: null, loading: false, error: err.message }));\n  }, [url]);\n\n  return children(state);\n}\n\n// 同じ DataFetcher を2種類のUIで再利用\nfunction App() {\n  return (\n    <div>\n      {/* カード表示 */}\n      <DataFetcher url=\"https://jsonplaceholder.typicode.com/users/1\">\n        {({ data, loading, error }) => {\n          if (loading) return <p>読み込み中...</p>;\n          if (error) return <p style={{color:'red'}}>{error}</p>;\n          return <div style={{padding:12,border:'1px solid #e5e7eb',borderRadius:8}}>\n            <strong>{data.name}</strong><br/>{data.email}\n          </div>;\n        }}\n      </DataFetcher>\n\n      {/* テーブル表示 */}\n      <DataFetcher url=\"https://jsonplaceholder.typicode.com/users/2\">\n        {({ data, loading }) =>\n          loading ? <span>...</span> : <p>→ {data?.username}</p>\n        }\n      </DataFetcher>\n    </div>\n  );\n}"
   }],
   ch5: [{
     diff: 1,
     q: "TanStack Query (React Query) を使ってユーザー一覧を取得・表示してください。\n・useQuery でデータ取得\n・ローディング・エラー状態を表示\n・QueryClient と QueryClientProvider を設定",
-    code: `// npm install @tanstack/react-query
-// QueryClientProvider でアプリをラップ
-// useQuery({ queryKey: ['users'], queryFn: fetchUsers })`,
-    answer: `// npm install @tanstack/react-query が必要
-// ここでは概念コードを示す（UMD環境ではCDN追加が必要）
-
-// queryClient の設定
-// const queryClient = new QueryClient({
-//   defaultOptions: { queries: { staleTime: 1000 * 60 } }
-// });
-
-// フェッチ関数（純粋なasync関数）
-async function fetchUsers() {
-  const res = await fetch('https://jsonplaceholder.typicode.com/users');
-  if (!res.ok) throw new Error('fetch failed');
-  return res.json();
-}
-
-// コンポーネント
-function UserList() {
-  // useQuery フック
-  const { data: users, isLoading, error, refetch } = useQuery({
-    queryKey: ['users'],     // キャッシュキー
-    queryFn: fetchUsers,
-    staleTime: 1000 * 60,   // 1分間はキャッシュを使い再フェッチしない
-  });
-
-  if (isLoading) return <p>読み込み中...</p>;
-  if (error) return <p>エラー: {error.message} <button onClick={refetch}>再試行</button></p>;
-
-  return (
-    <ul>
-      {users.map(u => <li key={u.id}>{u.name} — {u.email}</li>)}
-    </ul>
-  );
-}
-
-// エントリポイント
-// root.render(
-//   <QueryClientProvider client={queryClient}>
-//     <UserList />
-//   </QueryClientProvider>
-// );`
+    code: "// npm install @tanstack/react-query\n// QueryClientProvider でアプリをラップ\n// useQuery({ queryKey: ['users'], queryFn: fetchUsers })",
+    answer: "// npm install @tanstack/react-query が必要\n// ここでは概念コードを示す（UMD環境ではCDN追加が必要）\n\n// queryClient の設定\n// const queryClient = new QueryClient({\n//   defaultOptions: { queries: { staleTime: 1000 * 60 } }\n// });\n\n// フェッチ関数（純粋なasync関数）\nasync function fetchUsers() {\n  const res = await fetch('https://jsonplaceholder.typicode.com/users');\n  if (!res.ok) throw new Error('fetch failed');\n  return res.json();\n}\n\n// コンポーネント\nfunction UserList() {\n  // useQuery フック\n  const { data: users, isLoading, error, refetch } = useQuery({\n    queryKey: ['users'],     // キャッシュキー\n    queryFn: fetchUsers,\n    staleTime: 1000 * 60,   // 1分間はキャッシュを使い再フェッチしない\n  });\n\n  if (isLoading) return <p>読み込み中...</p>;\n  if (error) return <p>エラー: {error.message} <button onClick={refetch}>再試行</button></p>;\n\n  return (\n    <ul>\n      {users.map(u => <li key={u.id}>{u.name} — {u.email}</li>)}\n    </ul>\n  );\n}\n\n// エントリポイント\n// root.render(\n//   <QueryClientProvider client={queryClient}>\n//     <UserList />\n//   </QueryClientProvider>\n// );"
   }, {
     diff: 2,
     q: "useMutation を使ってTodoの追加・楽観的更新を実装してください。\n・addTodo の mutation を作成\n・onMutate でUIを即時更新（楽観的更新）\n・onError でロールバック\n・onSettled で再フェッチ",
-    code: `// useMutation + onMutate で楽観的更新
-// queryClient.setQueryData でキャッシュを先に更新`,
-    answer: `// 楽観的更新パターン（React Query v5 スタイル）
-
-async function createTodo(text) {
-  const res = await fetch('https://jsonplaceholder.typicode.com/todos', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: text, completed: false, userId: 1 }),
-  });
-  return res.json();
-}
-
-function TodoForm() {
-  const queryClient = useQueryClient();
-  const [text, setText] = React.useState('');
-
-  const mutation = useMutation({
-    mutationFn: createTodo,
-    onMutate: async (newText) => {
-      // 進行中のフェッチをキャンセル
-      await queryClient.cancelQueries({ queryKey: ['todos'] });
-      // 現在のキャッシュを保存（ロールバック用）
-      const previous = queryClient.getQueryData(['todos']);
-      // キャッシュを楽観的に更新
-      queryClient.setQueryData(['todos'], old => [
-        ...(old ?? []),
-        { id: Date.now(), title: newText, completed: false }
-      ]);
-      return { previous }; // context として渡す
-    },
-    onError: (_err, _vars, context) => {
-      // エラー時はロールバック
-      queryClient.setQueryData(['todos'], context.previous);
-    },
-    onSettled: () => {
-      // 成功・失敗どちらでも再フェッチして整合性を担保
-      queryClient.invalidateQueries({ queryKey: ['todos'] });
-    },
-  });
-
-  return (
-    <form onSubmit={e => { e.preventDefault(); mutation.mutate(text); setText(''); }}>
-      <input value={text} onChange={e => setText(e.target.value)} />
-      <button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending ? '送信中...' : '追加'}
-      </button>
-    </form>
-  );
-}`
+    code: "// useMutation + onMutate で楽観的更新\n// queryClient.setQueryData でキャッシュを先に更新",
+    answer: "// 楽観的更新パターン（React Query v5 スタイル）\n\nasync function createTodo(text) {\n  const res = await fetch('https://jsonplaceholder.typicode.com/todos', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ title: text, completed: false, userId: 1 }),\n  });\n  return res.json();\n}\n\nfunction TodoForm() {\n  const queryClient = useQueryClient();\n  const [text, setText] = React.useState('');\n\n  const mutation = useMutation({\n    mutationFn: createTodo,\n    onMutate: async (newText) => {\n      // 進行中のフェッチをキャンセル\n      await queryClient.cancelQueries({ queryKey: ['todos'] });\n      // 現在のキャッシュを保存（ロールバック用）\n      const previous = queryClient.getQueryData(['todos']);\n      // キャッシュを楽観的に更新\n      queryClient.setQueryData(['todos'], old => [\n        ...(old ?? []),\n        { id: Date.now(), title: newText, completed: false }\n      ]);\n      return { previous }; // context として渡す\n    },\n    onError: (_err, _vars, context) => {\n      // エラー時はロールバック\n      queryClient.setQueryData(['todos'], context.previous);\n    },\n    onSettled: () => {\n      // 成功・失敗どちらでも再フェッチして整合性を担保\n      queryClient.invalidateQueries({ queryKey: ['todos'] });\n    },\n  });\n\n  return (\n    <form onSubmit={e => { e.preventDefault(); mutation.mutate(text); setText(''); }}>\n      <input value={text} onChange={e => setText(e.target.value)} />\n      <button type=\"submit\" disabled={mutation.isPending}>\n        {mutation.isPending ? '送信中...' : '追加'}\n      </button>\n    </form>\n  );\n}"
   }],
   ch6: [{
     diff: 1,
     q: "React Hook Form と Zod を組み合わせて登録フォームを作ってください。\n以下のバリデーションを実装:\n・name: 必須、2文字以上\n・email: 必須、メール形式\n・password: 必須、8文字以上",
-    code: `// npm install react-hook-form zod @hookform/resolvers
-// zodResolver を使ってスキーマを接続`,
-    answer: `// npm install react-hook-form zod @hookform/resolvers が必要
-// 概念コード（実際の環境では import が必要）
-
-// スキーマ定義
-const schema = z.object({
-  name: z.string().min(2, '2文字以上入力してください'),
-  email: z.string().email('メールアドレスの形式が正しくありません'),
-  password: z.string().min(8, '8文字以上入力してください'),
-});
-
-// type FormData = z.infer<typeof schema>;
-// → { name: string; email: string; password: string }
-
-function RegisterForm() {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting }
-  } = useForm({ resolver: zodResolver(schema) });
-
-  const onSubmit = async (data) => {
-    await new Promise(r => setTimeout(r, 1000)); // API呼び出しの模擬
-    console.log('送信データ:', data);
-  };
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <div>
-        <input {...register('name')} placeholder="名前" />
-        {errors.name && <p style={{color:'red'}}>{errors.name.message}</p>}
-      </div>
-      <div>
-        <input {...register('email')} placeholder="メール" />
-        {errors.email && <p style={{color:'red'}}>{errors.email.message}</p>}
-      </div>
-      <div>
-        <input type="password" {...register('password')} placeholder="パスワード" />
-        {errors.password && <p style={{color:'red'}}>{errors.password.message}</p>}
-      </div>
-      <button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? '送信中...' : '登録'}
-      </button>
-    </form>
-  );
-}`
+    code: "// npm install react-hook-form zod @hookform/resolvers\n// zodResolver を使ってスキーマを接続",
+    answer: "// npm install react-hook-form zod @hookform/resolvers が必要\n// 概念コード（実際の環境では import が必要）\n\n// スキーマ定義\nconst schema = z.object({\n  name: z.string().min(2, '2文字以上入力してください'),\n  email: z.string().email('メールアドレスの形式が正しくありません'),\n  password: z.string().min(8, '8文字以上入力してください'),\n});\n\n// type FormData = z.infer<typeof schema>;\n// → { name: string; email: string; password: string }\n\nfunction RegisterForm() {\n  const {\n    register,\n    handleSubmit,\n    formState: { errors, isSubmitting }\n  } = useForm({ resolver: zodResolver(schema) });\n\n  const onSubmit = async (data) => {\n    await new Promise(r => setTimeout(r, 1000)); // API呼び出しの模擬\n    console.log('送信データ:', data);\n  };\n\n  return (\n    <form onSubmit={handleSubmit(onSubmit)}>\n      <div>\n        <input {...register('name')} placeholder=\"名前\" />\n        {errors.name && <p style={{color:'red'}}>{errors.name.message}</p>}\n      </div>\n      <div>\n        <input {...register('email')} placeholder=\"メール\" />\n        {errors.email && <p style={{color:'red'}}>{errors.email.message}</p>}\n      </div>\n      <div>\n        <input type=\"password\" {...register('password')} placeholder=\"パスワード\" />\n        {errors.password && <p style={{color:'red'}}>{errors.password.message}</p>}\n      </div>\n      <button type=\"submit\" disabled={isSubmitting}>\n        {isSubmitting ? '送信中...' : '登録'}\n      </button>\n    </form>\n  );\n}"
   }, {
     diff: 2,
     q: "useFieldArray を使って動的フィールドを実装してください。\n・スキルを複数追加・削除できるフォーム\n・各スキルに name と level（1〜5）を持つ\n・最低1件のスキルが必要（バリデーション）",
-    code: `// useFieldArray で動的なフィールド配列を管理
-// fields.map でレンダリング、append/remove で操作`,
-    answer: `const skillSchema = z.object({
-  skills: z.array(z.object({
-    name: z.string().min(1, '必須'),
-    level: z.number().min(1).max(5),
-  })).min(1, '最低1つのスキルを入力してください'),
-});
-
-function SkillForm() {
-  const { register, control, handleSubmit, formState: { errors } } = useForm({
-    resolver: zodResolver(skillSchema),
-    defaultValues: { skills: [{ name: '', level: 3 }] }
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'skills',
-  });
-
-  return (
-    <form onSubmit={handleSubmit(data => console.log(data))}>
-      {fields.map((field, index) => (
-        <div key={field.id} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          <input
-            {...register(\`skills.\${index}.name\`)}
-            placeholder="スキル名"
-          />
-          <input
-            type="number" min={1} max={5}
-            {...register(\`skills.\${index}.level\`, { valueAsNumber: true })}
-          />
-          <button type="button" onClick={() => remove(index)}>削除</button>
-          {errors.skills?.[index]?.name && (
-            <span style={{color:'red'}}>{errors.skills[index].name.message}</span>
-          )}
-        </div>
-      ))}
-      {errors.skills?.root && <p style={{color:'red'}}>{errors.skills.root.message}</p>}
-      <button type="button" onClick={() => append({ name: '', level: 3 })}>
-        スキルを追加
-      </button>
-      <button type="submit">保存</button>
-    </form>
-  );
-}`
+    code: "// useFieldArray で動的なフィールド配列を管理\n// fields.map でレンダリング、append/remove で操作",
+    answer: "const skillSchema = z.object({\n  skills: z.array(z.object({\n    name: z.string().min(1, '必須'),\n    level: z.number().min(1).max(5),\n  })).min(1, '最低1つのスキルを入力してください'),\n});\n\nfunction SkillForm() {\n  const { register, control, handleSubmit, formState: { errors } } = useForm({\n    resolver: zodResolver(skillSchema),\n    defaultValues: { skills: [{ name: '', level: 3 }] }\n  });\n\n  const { fields, append, remove } = useFieldArray({\n    control,\n    name: 'skills',\n  });\n\n  return (\n    <form onSubmit={handleSubmit(data => console.log(data))}>\n      {fields.map((field, index) => (\n        <div key={field.id} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>\n          <input\n            {...register(`skills.\${index}.name`)}\n            placeholder=\"スキル名\"\n          />\n          <input\n            type=\"number\" min={1} max={5}\n            {...register(`skills.\${index}.level`, { valueAsNumber: true })}\n          />\n          <button type=\"button\" onClick={() => remove(index)}>削除</button>\n          {errors.skills?.[index]?.name && (\n            <span style={{color:'red'}}>{errors.skills[index].name.message}</span>\n          )}\n        </div>\n      ))}\n      {errors.skills?.root && <p style={{color:'red'}}>{errors.skills.root.message}</p>}\n      <button type=\"button\" onClick={() => append({ name: '', level: 3 })}>\n        スキルを追加\n      </button>\n      <button type=\"submit\">保存</button>\n    </form>\n  );\n}"
   }],
   ch7: [{
     diff: 1,
     q: "React Testing Library を使って以下のコンポーネントをテストしてください。\n・テキストが表示されること\n・ボタンクリックでカウントが増えること\n・getByRole / userEvent を使うこと",
-    code: `// Counter.test.tsx
-// render → screen.getByRole → userEvent.click → expect
-function Counter() {
-  const [n, setN] = React.useState(0);
-  return <div><p>Count: {n}</p><button onClick={() => setN(n+1)}>+1</button></div>;
-}`,
-    answer: `import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect } from 'vitest';
-
-function Counter() {
-  const [n, setN] = React.useState(0);
-  return (
-    <div>
-      <p role="status">Count: {n}</p>
-      <button onClick={() => setN(n + 1)}>+1</button>
-    </div>
-  );
-}
-
-describe('Counter', () => {
-  it('初期値0が表示される', () => {
-    render(<Counter />);
-    expect(screen.getByRole('status')).toHaveTextContent('Count: 0');
-  });
-
-  it('+1ボタンをクリックするとカウントが増える', async () => {
-    const user = userEvent.setup();
-    render(<Counter />);
-    const btn = screen.getByRole('button', { name: '+1' });
-    await user.click(btn);
-    await user.click(btn);
-    expect(screen.getByRole('status')).toHaveTextContent('Count: 2');
-  });
-});`
+    code: "// Counter.test.tsx\n// render → screen.getByRole → userEvent.click → expect\nfunction Counter() {\n  const [n, setN] = React.useState(0);\n  return <div><p>Count: {n}</p><button onClick={() => setN(n+1)}>+1</button></div>;\n}",
+    answer: "import { render, screen } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\nimport { describe, it, expect } from 'vitest';\n\nfunction Counter() {\n  const [n, setN] = React.useState(0);\n  return (\n    <div>\n      <p role=\"status\">Count: {n}</p>\n      <button onClick={() => setN(n + 1)}>+1</button>\n    </div>\n  );\n}\n\ndescribe('Counter', () => {\n  it('初期値0が表示される', () => {\n    render(<Counter />);\n    expect(screen.getByRole('status')).toHaveTextContent('Count: 0');\n  });\n\n  it('+1ボタンをクリックするとカウントが増える', async () => {\n    const user = userEvent.setup();\n    render(<Counter />);\n    const btn = screen.getByRole('button', { name: '+1' });\n    await user.click(btn);\n    await user.click(btn);\n    expect(screen.getByRole('status')).toHaveTextContent('Count: 2');\n  });\n});"
   }, {
     diff: 2,
     q: "MSWを使ってAPIをモックし、非同期コンポーネントをテストしてください。\n・GET /api/user をモック（{ name: 'テストユーザー' }を返す）\n・ローディング → データ表示の遷移を waitFor で検証",
-    code: `// msw の http.get でハンドラを定義
-// setupServer で起動、beforeAll/afterAll で管理`,
-    answer: `// npm install msw が必要
-import { render, screen, waitFor } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
-
-// MSWサーバの設定
-const server = setupServer(
-  http.get('/api/user', () => {
-    return HttpResponse.json({ name: 'テストユーザー' });
-  })
-);
-
-beforeAll(() => server.listen());
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
-
-// テスト対象コンポーネント
-function UserProfile() {
-  const [user, setUser] = React.useState(null);
-  React.useEffect(() => {
-    fetch('/api/user').then(r => r.json()).then(setUser);
-  }, []);
-  if (!user) return <p>読み込み中...</p>;
-  return <p role="heading">{user.name}</p>;
-}
-
-describe('UserProfile', () => {
-  it('APIレスポンスを表示する', async () => {
-    render(<UserProfile />);
-    // 最初はローディング
-    expect(screen.getByText('読み込み中...')).toBeInTheDocument();
-    // データが表示されるまで待機
-    await waitFor(() => {
-      expect(screen.getByRole('heading')).toHaveTextContent('テストユーザー');
-    });
-  });
-
-  it('APIエラー時にハンドラを上書きできる', async () => {
-    server.use(
-      http.get('/api/user', () => HttpResponse.error())
-    );
-    render(<UserProfile />);
-    // エラーハンドリングの確認（実装に合わせてアサート）
-    await waitFor(() => {
-      expect(screen.queryByText('読み込み中...')).not.toBeInTheDocument();
-    });
-  });
-});`
+    code: "// msw の http.get でハンドラを定義\n// setupServer で起動、beforeAll/afterAll で管理",
+    answer: "// npm install msw が必要\nimport { render, screen, waitFor } from '@testing-library/react';\nimport { http, HttpResponse } from 'msw';\nimport { setupServer } from 'msw/node';\n\n// MSWサーバの設定\nconst server = setupServer(\n  http.get('/api/user', () => {\n    return HttpResponse.json({ name: 'テストユーザー' });\n  })\n);\n\nbeforeAll(() => server.listen());\nafterEach(() => server.resetHandlers());\nafterAll(() => server.close());\n\n// テスト対象コンポーネント\nfunction UserProfile() {\n  const [user, setUser] = React.useState(null);\n  React.useEffect(() => {\n    fetch('/api/user').then(r => r.json()).then(setUser);\n  }, []);\n  if (!user) return <p>読み込み中...</p>;\n  return <p role=\"heading\">{user.name}</p>;\n}\n\ndescribe('UserProfile', () => {\n  it('APIレスポンスを表示する', async () => {\n    render(<UserProfile />);\n    // 最初はローディング\n    expect(screen.getByText('読み込み中...')).toBeInTheDocument();\n    // データが表示されるまで待機\n    await waitFor(() => {\n      expect(screen.getByRole('heading')).toHaveTextContent('テストユーザー');\n    });\n  });\n\n  it('APIエラー時にハンドラを上書きできる', async () => {\n    server.use(\n      http.get('/api/user', () => HttpResponse.error())\n    );\n    render(<UserProfile />);\n    // エラーハンドリングの確認（実装に合わせてアサート）\n    await waitFor(() => {\n      expect(screen.queryByText('読み込み中...')).not.toBeInTheDocument();\n    });\n  });\n});"
   }],
   ch8: [{
     diff: 1,
     q: "Next.js の App Router で Server Component と Client Component を使い分けてください。\n・ページコンポーネント（サーバ）でデータをfetch\n・検索ボックス（クライアント）でuseStateを使用\n・'use client' の位置を正しく記述",
-    code: `// app/page.tsx (Server Component)
-// app/components/SearchBox.tsx (Client Component)
-// それぞれの役割と 'use client' の位置を示す`,
-    answer: `// app/components/SearchBox.tsx
-'use client'; // ← この宣言でClient Componentになる
-
-import { useState } from 'react';
-
-export function SearchBox({ onSearch }) {
-  const [query, setQuery] = useState('');
-  return (
-    <input
-      value={query}
-      onChange={e => { setQuery(e.target.value); onSearch(e.target.value); }}
-      placeholder="検索..."
-    />
-  );
-}
-
-// app/page.tsx（Server Component — 'use client'不要）
-// async/await が直接使える
-async function getUsers() {
-  const res = await fetch('https://jsonplaceholder.typicode.com/users', {
-    next: { revalidate: 60 }, // 60秒ごとに再検証（ISR）
-  });
-  return res.json();
-}
-
-export default async function Page() {
-  const users = await getUsers(); // サーバ側でデータ取得
-
-  return (
-    <main>
-      <h1>ユーザー一覧</h1>
-      {/* Client Component はServer Component内で使用可能 */}
-      {/* <SearchBox onSearch={...} /> */}
-      <ul>
-        {users.map(u => <li key={u.id}>{u.name}</li>)}
-      </ul>
-    </main>
-  );
-}
-// ※ このファイルにはuseState等を書けない（サーバ専用）`
+    code: "// app/page.tsx (Server Component)\n// app/components/SearchBox.tsx (Client Component)\n// それぞれの役割と 'use client' の位置を示す",
+    answer: "// app/components/SearchBox.tsx\n'use client'; // ← この宣言でClient Componentになる\n\nimport { useState } from 'react';\n\nexport function SearchBox({ onSearch }) {\n  const [query, setQuery] = useState('');\n  return (\n    <input\n      value={query}\n      onChange={e => { setQuery(e.target.value); onSearch(e.target.value); }}\n      placeholder=\"検索...\"\n    />\n  );\n}\n\n// app/page.tsx（Server Component — 'use client'不要）\n// async/await が直接使える\nasync function getUsers() {\n  const res = await fetch('https://jsonplaceholder.typicode.com/users', {\n    next: { revalidate: 60 }, // 60秒ごとに再検証（ISR）\n  });\n  return res.json();\n}\n\nexport default async function Page() {\n  const users = await getUsers(); // サーバ側でデータ取得\n\n  return (\n    <main>\n      <h1>ユーザー一覧</h1>\n      {/* Client Component はServer Component内で使用可能 */}\n      {/* <SearchBox onSearch={...} /> */}\n      <ul>\n        {users.map(u => <li key={u.id}>{u.name}</li>)}\n      </ul>\n    </main>\n  );\n}\n// ※ このファイルにはuseState等を書けない（サーバ専用）"
   }, {
     diff: 2,
     q: "Server Actions を使ってフォーム送信を実装してください。\n・サーバ側でバリデーションと保存を行う\n・'use server' ディレクティブを正しく付与\n・useFormState でサーバのレスポンスをUIに反映",
-    code: `// app/actions/createPost.ts に 'use server'
-// app/components/PostForm.tsx で useFormState を使用`,
-    answer: `// app/actions/createPost.ts
-'use server'; // ← サーバ専用コード（ブラウザに送られない）
-
-export async function createPost(prevState, formData) {
-  const title = formData.get('title');
-
-  // サーバ側バリデーション
-  if (!title || title.toString().length < 2) {
-    return { error: 'タイトルは2文字以上必要です', success: false };
-  }
-
-  // DBへの保存（例）
-  // await db.post.create({ data: { title: title.toString() } });
-  console.log('サーバで保存:', title);
-
-  return { error: null, success: true, title: title.toString() };
-}
-
-// app/components/PostForm.tsx
-'use client';
-import { useFormState, useFormStatus } from 'react-dom';
-import { createPost } from '../actions/createPost';
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending}>
-      {pending ? '送信中...' : '投稿する'}
-    </button>
-  );
-}
-
-export function PostForm() {
-  const [state, formAction] = useFormState(createPost, {
-    error: null, success: false
-  });
-
-  return (
-    <form action={formAction}>
-      <input name="title" placeholder="タイトル" />
-      {state.error && <p style={{color:'red'}}>{state.error}</p>}
-      {state.success && <p style={{color:'green'}}>投稿しました: {state.title}</p>}
-      <SubmitButton />
-    </form>
-  );
-}`
+    code: "// app/actions/createPost.ts に 'use server'\n// app/components/PostForm.tsx で useFormState を使用",
+    answer: "// app/actions/createPost.ts\n'use server'; // ← サーバ専用コード（ブラウザに送られない）\n\nexport async function createPost(prevState, formData) {\n  const title = formData.get('title');\n\n  // サーバ側バリデーション\n  if (!title || title.toString().length < 2) {\n    return { error: 'タイトルは2文字以上必要です', success: false };\n  }\n\n  // DBへの保存（例）\n  // await db.post.create({ data: { title: title.toString() } });\n  console.log('サーバで保存:', title);\n\n  return { error: null, success: true, title: title.toString() };\n}\n\n// app/components/PostForm.tsx\n'use client';\nimport { useFormState, useFormStatus } from 'react-dom';\nimport { createPost } from '../actions/createPost';\n\nfunction SubmitButton() {\n  const { pending } = useFormStatus();\n  return (\n    <button type=\"submit\" disabled={pending}>\n      {pending ? '送信中...' : '投稿する'}\n    </button>\n  );\n}\n\nexport function PostForm() {\n  const [state, formAction] = useFormState(createPost, {\n    error: null, success: false\n  });\n\n  return (\n    <form action={formAction}>\n      <input name=\"title\" placeholder=\"タイトル\" />\n      {state.error && <p style={{color:'red'}}>{state.error}</p>}\n      {state.success && <p style={{color:'green'}}>投稿しました: {state.title}</p>}\n      <SubmitButton />\n    </form>\n  );\n}"
   }]
 };
 
@@ -869,38 +210,7 @@ const chapters = [{
   }, {
     title: "useReducer + useCallback の組み合わせ",
     body: "useReducer と useCallback を組み合わせるパターンは非常に強力です。dispatch 関数は React が保証する安定した参照を持つため、子コンポーネントに dispatch を直接渡せば useCallback でラップする必要がありません。\n\nつまり、「onDelete を useCallback でメモ化して子に渡す」代わりに「dispatch を直接子に渡す」設計にすると、コードがシンプルになります。子コンポーネントは dispatch({ type: 'DELETE', payload: id }) を呼ぶだけです。大規模なコンポーネントツリーでは、この設計が保守性を大きく向上させます。",
-    code: `// dispatch は安定した参照 → useCallback 不要
-function reducer(state, action) {
-  switch (action.type) {
-    case 'ADD':    return [...state, { id: Date.now(), text: action.payload, done: false }];
-    case 'DELETE': return state.filter(t => t.id !== action.payload);
-    case 'TOGGLE': return state.map(t =>
-      t.id === action.payload ? { ...t, done: !t.done } : t
-    );
-    default: return state;
-  }
-}
-
-function TodoItem({ todo, dispatch }) {
-  // dispatch は安定 → React.memo と相性◎
-  return (
-    <li>
-      <input type="checkbox" checked={todo.done}
-        onChange={() => dispatch({ type: 'TOGGLE', payload: todo.id })} />
-      {todo.text}
-      <button onClick={() => dispatch({ type: 'DELETE', payload: todo.id })}>削除</button>
-    </li>
-  );
-}
-
-function App() {
-  const [todos, dispatch] = React.useReducer(reducer, []);
-  return (
-    <ul>
-      {todos.map(t => <TodoItem key={t.id} todo={t} dispatch={dispatch} />)}
-    </ul>
-  );
-}`,
+    code: "// dispatch は安定した参照 → useCallback 不要\nfunction reducer(state, action) {\n  switch (action.type) {\n    case 'ADD':    return [...state, { id: Date.now(), text: action.payload, done: false }];\n    case 'DELETE': return state.filter(t => t.id !== action.payload);\n    case 'TOGGLE': return state.map(t =>\n      t.id === action.payload ? { ...t, done: !t.done } : t\n    );\n    default: return state;\n  }\n}\n\nfunction TodoItem({ todo, dispatch }) {\n  // dispatch は安定 → React.memo と相性◎\n  return (\n    <li>\n      <input type=\"checkbox\" checked={todo.done}\n        onChange={() => dispatch({ type: 'TOGGLE', payload: todo.id })} />\n      {todo.text}\n      <button onClick={() => dispatch({ type: 'DELETE', payload: todo.id })}>削除</button>\n    </li>\n  );\n}\n\nfunction App() {\n  const [todos, dispatch] = React.useReducer(reducer, []);\n  return (\n    <ul>\n      {todos.map(t => <TodoItem key={t.id} todo={t} dispatch={dispatch} />)}\n    </ul>\n  );\n}",
     afterCode: "ポイント: React.useReducer が返す dispatch は参照安定（レンダリングをまたいで同一オブジェクト）です。これは React の仕様として保証されているため、useCallback でラップしなくても子の React.memo が正常に動作します。"
   }]
 }, {
@@ -917,59 +227,12 @@ function App() {
   }, {
     title: "useLocalStorage の実装",
     body: "useLocalStorage は useState の拡張で、値が変わるたびに localStorage にも書き込むフックです。初期値の読み込みは useState の関数初期化形式（() => を渡す形）を使い、コストの高い localStorage の読み込みが初回レンダリング時にだけ実行されるようにします。\n\nエラーハンドリングが重要です。localStorage はプライベートブラウジングモードや容量制限超過で例外を投げることがあります。try-catch でラップし、失敗した場合は fallback の initialValue を使うように設計しましょう。",
-    code: `function useLocalStorage(key, initialValue) {
-  const [value, setValue] = React.useState(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      return item !== null ? JSON.parse(item) : initialValue;
-    } catch {
-      return initialValue;
-    }
-  });
-
-  const setStoredValue = React.useCallback((newValue) => {
-    setValue(newValue);
-    try {
-      window.localStorage.setItem(key, JSON.stringify(newValue));
-    } catch (e) {
-      console.error('localStorage write error:', e);
-    }
-  }, [key]);
-
-  return [value, setStoredValue];
-}`,
+    code: "function useLocalStorage(key, initialValue) {\n  const [value, setValue] = React.useState(() => {\n    try {\n      const item = window.localStorage.getItem(key);\n      return item !== null ? JSON.parse(item) : initialValue;\n    } catch {\n      return initialValue;\n    }\n  });\n\n  const setStoredValue = React.useCallback((newValue) => {\n    setValue(newValue);\n    try {\n      window.localStorage.setItem(key, JSON.stringify(newValue));\n    } catch (e) {\n      console.error('localStorage write error:', e);\n    }\n  }, [key]);\n\n  return [value, setStoredValue];\n}",
     afterCode: "ポイント: key が変わった場合（例えば userId に応じてキーを変える設計）、useEffect で localStorage.getItem を再読み込みするロジックが必要になります。シンプルな実装から始めて、必要になったら拡張するアプローチが実践的です。"
   }, {
     title: "useDebounce の実装",
     body: "デバウンスは「連続するイベントの最後の1回だけを処理する」テクニックです。検索ボックスへの入力でAPIを叩く場合、キーを押すたびにリクエストを送ると無駄なネットワーク通信が発生します。300ms 入力が止まってから初めてAPIを呼ぶのがデバウンスです。\n\nuseEffect のクリーンアップ関数を活用するのがポイントです。新しい値が来るたびに前の setTimeout をキャンセル（clearTimeout）し、新しいタイマーをセットします。このパターンは React でのデバウンス実装の定石です。",
-    code: `function useDebounce(value, delay = 300) {
-  const [debounced, setDebounced] = React.useState(value);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer); // 新しい値が来たらキャンセル
-  }, [value, delay]);
-
-  return debounced;
-}
-
-// 使い方: 検索フォーム
-function SearchBox({ onSearch }) {
-  const [query, setQuery] = React.useState('');
-  const debouncedQuery = useDebounce(query, 400);
-
-  React.useEffect(() => {
-    if (debouncedQuery) onSearch(debouncedQuery);
-  }, [debouncedQuery, onSearch]);
-
-  return (
-    <input
-      value={query}
-      onChange={e => setQuery(e.target.value)}
-      placeholder="検索（400ms後に実行）"
-    />
-  );
-}`,
+    code: "function useDebounce(value, delay = 300) {\n  const [debounced, setDebounced] = React.useState(value);\n\n  React.useEffect(() => {\n    const timer = setTimeout(() => setDebounced(value), delay);\n    return () => clearTimeout(timer); // 新しい値が来たらキャンセル\n  }, [value, delay]);\n\n  return debounced;\n}\n\n// 使い方: 検索フォーム\nfunction SearchBox({ onSearch }) {\n  const [query, setQuery] = React.useState('');\n  const debouncedQuery = useDebounce(query, 400);\n\n  React.useEffect(() => {\n    if (debouncedQuery) onSearch(debouncedQuery);\n  }, [debouncedQuery, onSearch]);\n\n  return (\n    <input\n      value={query}\n      onChange={e => setQuery(e.target.value)}\n      placeholder=\"検索（400ms後に実行）\"\n    />\n  );\n}",
     afterCode: "ポイント: useDebounce はジェネリクスで任意の型に対応できます（TypeScript の場合: function useDebounce<T>(value: T, delay = 300): T）。文字列だけでなく、数値・オブジェクトのデバウンスにも使えます。"
   }]
 }, {
@@ -981,33 +244,7 @@ function SearchBox({ onSearch }) {
   sections: [{
     title: "createContext / useContext の基本",
     body: "Context は「props のバケツリレーを使わずにデータを渡す仕組み」です。ログイン中のユーザー情報・テーマ設定・言語設定など、アプリ全体で参照するが頻繁に変わらないデータに適しています。\n\nPython の Flask の g オブジェクト（リクエストスコープの共有データ）に概念が近いですが、React の Context はコンポーネントツリーのスコープで動作します。createContext でコンテキストを作り、Provider で値を提供し、useContext で消費するという3ステップです。\n\nカスタムフックでラップするのがベストプラクティスです。useTheme() のような専用フックを作ることで、Context への直接依存がフック内に隠蔽され、Provider の変更やモックが容易になります。",
-    code: `const AuthContext = React.createContext(null);
-
-function AuthProvider({ children }) {
-  const [user, setUser] = React.useState(null);
-
-  const login = React.useCallback(async (email, password) => {
-    // API呼び出し（省略）
-    setUser({ id: 1, name: '太郎', email });
-  }, []);
-
-  const logout = React.useCallback(() => setUser(null), []);
-
-  // value を useMemo で安定化（再レンダリング防止）
-  const value = React.useMemo(
-    () => ({ user, login, logout }),
-    [user, login, logout]
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-// カスタムフックでラップ
-function useAuth() {
-  const ctx = React.useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
-  return ctx;
-}`,
+    code: "const AuthContext = React.createContext(null);\n\nfunction AuthProvider({ children }) {\n  const [user, setUser] = React.useState(null);\n\n  const login = React.useCallback(async (email, password) => {\n    // API呼び出し（省略）\n    setUser({ id: 1, name: '太郎', email });\n  }, []);\n\n  const logout = React.useCallback(() => setUser(null), []);\n\n  // value を useMemo で安定化（再レンダリング防止）\n  const value = React.useMemo(\n    () => ({ user, login, logout }),\n    [user, login, logout]\n  );\n\n  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;\n}\n\n// カスタムフックでラップ\nfunction useAuth() {\n  const ctx = React.useContext(AuthContext);\n  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');\n  return ctx;\n}",
     afterCode: "ポイント: useContext を直接コンポーネントに書くのではなく、useAuth のようなカスタムフックを一枚挟む設計が推奨されます。こうすることで、テスト時にモックを差し込みやすくなります。"
   }, {
     title: "Context の再レンダリング問題と対策",
@@ -1017,31 +254,7 @@ function useAuth() {
   }, {
     title: "Zustand で Context を置き換える",
     body: "Zustand は「バンドルサイズ約1KB・ボイラープレートほぼゼロ」のグローバル状態管理ライブラリです。Context と比べて優れている点は、セレクタによる細粒度の購読と、Provider コンポーネントが不要な点です。\n\ncreate 関数でストアを定義し、コンポーネントからカスタムフックとして呼び出すだけで使えます。Redux のような action type / reducer の分離は必要なく、setState に相当する set 関数を直接呼びます。小〜中規模のアプリで Context + useState の代替として最も導入コストが低い選択肢です。",
-    code: `// npm install zustand
-import { create } from 'zustand';
-
-const useAuthStore = create((set) => ({
-  user: null,
-  login: (userData) => set({ user: userData }),
-  logout: () => set({ user: null }),
-}));
-
-// コンポーネントでの使用（Provider 不要！）
-function Header() {
-  // セレクタで必要な値だけ購読 → user が変わった時だけ再レンダリング
-  const user = useAuthStore(s => s.user);
-  const logout = useAuthStore(s => s.logout);
-
-  return (
-    <header>
-      {user ? (
-        <><span>{user.name}</span><button onClick={logout}>ログアウト</button></>
-      ) : (
-        <span>未ログイン</span>
-      )}
-    </header>
-  );
-}`,
+    code: "// npm install zustand\nimport { create } from 'zustand';\n\nconst useAuthStore = create((set) => ({\n  user: null,\n  login: (userData) => set({ user: userData }),\n  logout: () => set({ user: null }),\n}));\n\n// コンポーネントでの使用（Provider 不要！）\nfunction Header() {\n  // セレクタで必要な値だけ購読 → user が変わった時だけ再レンダリング\n  const user = useAuthStore(s => s.user);\n  const logout = useAuthStore(s => s.logout);\n\n  return (\n    <header>\n      {user ? (\n        <><span>{user.name}</span><button onClick={logout}>ログアウト</button></>\n      ) : (\n        <span>未ログイン</span>\n      )}\n    </header>\n  );\n}",
     afterCode: "ポイント: useAuthStore(s => s.user) のようにセレクタを使うと、user が変わった時だけ再レンダリングされます。useAuthStore() と全体を取得するとストアのどの値が変わっても再レンダリングされるので注意。"
   }]
 }, {
@@ -1058,38 +271,7 @@ function Header() {
   }, {
     title: "HOC と Render Props",
     body: "HOC（Higher-Order Component）は「コンポーネントを受け取りコンポーネントを返す関数」です。Python のデコレータ（@login_required など）に非常に近い概念で、認証チェック・ローディング表示・ログ収集など横断的関心事を注入するのに使われていました。\n\nRender Props は「JSXを返す関数をpropsで渡す」パターンで、ロジックを共有しながらUIの描画を外部に委ねられます。ただし、HOC も Render Props も Hooks の登場以降は多くの場面でカスタムフックに置き換えられています。既存コードを読む際に理解できれば十分で、新規に書く場合はカスタムフックを検討しましょう。",
-    code: `// HOC の例: 認証ガード
-function withAuth(WrappedComponent) {
-  return function AuthGuard(props) {
-    const { user } = useAuth(); // 認証情報を取得
-    if (!user) return <p>ログインが必要です</p>;
-    return <WrappedComponent {...props} user={user} />;
-  };
-}
-
-// 使い方
-const ProtectedPage = withAuth(function DashboardPage({ user }) {
-  return <h1>ようこそ、{user.name}さん</h1>;
-});
-
-// Render Props の例: マウス位置追跡
-function MouseTracker({ children }) {
-  const [pos, setPos] = React.useState({ x: 0, y: 0 });
-  return (
-    <div onMouseMove={e => setPos({ x: e.clientX, y: e.clientY })}>
-      {children(pos)} {/* 関数として呼び出す */}
-    </div>
-  );
-}
-
-// 使い方: UIは呼び出し側が決める
-function App() {
-  return (
-    <MouseTracker>
-      {({ x, y }) => <p>マウス位置: {x}, {y}</p>}
-    </MouseTracker>
-  );
-}`,
+    code: "// HOC の例: 認証ガード\nfunction withAuth(WrappedComponent) {\n  return function AuthGuard(props) {\n    const { user } = useAuth(); // 認証情報を取得\n    if (!user) return <p>ログインが必要です</p>;\n    return <WrappedComponent {...props} user={user} />;\n  };\n}\n\n// 使い方\nconst ProtectedPage = withAuth(function DashboardPage({ user }) {\n  return <h1>ようこそ、{user.name}さん</h1>;\n});\n\n// Render Props の例: マウス位置追跡\nfunction MouseTracker({ children }) {\n  const [pos, setPos] = React.useState({ x: 0, y: 0 });\n  return (\n    <div onMouseMove={e => setPos({ x: e.clientX, y: e.clientY })}>\n      {children(pos)} {/* 関数として呼び出す */}\n    </div>\n  );\n}\n\n// 使い方: UIは呼び出し側が決める\nfunction App() {\n  return (\n    <MouseTracker>\n      {({ x, y }) => <p>マウス位置: {x}, {y}</p>}\n    </MouseTracker>\n  );\n}",
     afterCode: "ポイント: HOC の代替は「withXxx → useXxx」、Render Props の代替は「children関数 → カスタムフック」で書き換えられる場合がほとんどです。コードレビューやリファクタリングで遭遇した際にパターンを認識できるようにしておきましょう。"
   }]
 }, {
@@ -1106,82 +288,12 @@ function App() {
   }, {
     title: "useQuery の基本と設定",
     body: "useQuery は最もよく使うフックです。queryKey（キャッシュのキー）と queryFn（データを返す async 関数）を渡すと、isLoading・data・error・refetch などを返します。queryFn は純粋な async 関数として書け、fetch でも axios でも Prisma でも何でも使えます。\n\nQueryClient の設定はアプリ全体で共通のデフォルト値を定義できます。全クエリのデフォルト staleTime を設定したり、エラー時のリトライ回数を制御したりできます。React.StrictMode との組み合わせでは開発時に useEffect が2回実行されますが、TanStack Query は重複リクエストを自動で排除するため問題ありません。",
-    code: `// npm install @tanstack/react-query
-
-// main.tsx でのセットアップ
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60,     // 1分間はキャッシュを再利用
-      retry: 2,                  // エラー時2回まで自動リトライ
-      refetchOnWindowFocus: true, // ウィンドウフォーカスで再フェッチ
-    },
-  },
-});
-
-// フェッチ関数（純粋な async 関数として分離）
-const fetchUser = async (id) => {
-  const res = await fetch(\`/api/users/\${id}\`);
-  if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
-  return res.json();
-};
-
-// コンポーネントでの使用
-function UserProfile({ userId }) {
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['user', userId], // userId が変わると自動で再フェッチ
-    queryFn: () => fetchUser(userId),
-    enabled: !!userId,          // userId がある場合だけ実行
-  });
-
-  if (isLoading) return <p>読み込み中...</p>;
-  if (error) return <button onClick={refetch}>再読み込み</button>;
-  return <p>{data.name}</p>;
-}`,
+    code: "// npm install @tanstack/react-query\n\n// main.tsx でのセットアップ\nimport { QueryClient, QueryClientProvider } from '@tanstack/react-query';\n\nconst queryClient = new QueryClient({\n  defaultOptions: {\n    queries: {\n      staleTime: 1000 * 60,     // 1分間はキャッシュを再利用\n      retry: 2,                  // エラー時2回まで自動リトライ\n      refetchOnWindowFocus: true, // ウィンドウフォーカスで再フェッチ\n    },\n  },\n});\n\n// フェッチ関数（純粋な async 関数として分離）\nconst fetchUser = async (id) => {\n  const res = await fetch(`/api/users/\${id}`);\n  if (!res.ok) throw new Error(`HTTP \${res.status}`);\n  return res.json();\n};\n\n// コンポーネントでの使用\nfunction UserProfile({ userId }) {\n  const { data, isLoading, error, refetch } = useQuery({\n    queryKey: ['user', userId], // userId が変わると自動で再フェッチ\n    queryFn: () => fetchUser(userId),\n    enabled: !!userId,          // userId がある場合だけ実行\n  });\n\n  if (isLoading) return <p>読み込み中...</p>;\n  if (error) return <button onClick={refetch}>再読み込み</button>;\n  return <p>{data.name}</p>;\n}",
     afterCode: "ポイント: queryKey は配列で指定します。['user', userId] とすることで userId が変わると別のキャッシュエントリとして管理されます。['users'] は一覧、['user', 1] はID=1のユーザー、という階層的なキー設計が推奨されます。"
   }, {
     title: "useMutation と楽観的更新",
     body: "useMutation はデータの作成・更新・削除に使います。useQuery と異なり、自動では実行されず、mutation.mutate() を明示的に呼んだ時だけ実行されます。onSuccess・onError・onSettled のコールバックで結果に応じた処理を書けます。\n\n楽観的更新は「APIレスポンスを待たずにUIを先に更新する」技術です。ユーザーが削除ボタンを押した瞬間にリストから消え、もしAPIが失敗したら元に戻す。この UX が現代のアプリでは標準的になっています。onMutate でキャッシュを先に書き換え、onError でロールバック、onSettled で再フェッチ、という3段階のパターンを覚えましょう。",
-    code: `function deleteTodo(id) {
-  return fetch(\`/api/todos/\${id}\`, { method: 'DELETE' });
-}
-
-function TodoList() {
-  const queryClient = useQueryClient();
-  const { data: todos } = useQuery({ queryKey: ['todos'], queryFn: fetchTodos });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteTodo,
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ['todos'] });
-      const previous = queryClient.getQueryData(['todos']);
-      // 即時UIから削除（楽観的更新）
-      queryClient.setQueryData(['todos'], old => old.filter(t => t.id !== id));
-      return { previous };
-    },
-    onError: (_err, _id, context) => {
-      // 失敗したら元に戻す
-      queryClient.setQueryData(['todos'], context.previous);
-    },
-    onSettled: () => {
-      // 成功・失敗どちらでもサーバと同期
-      queryClient.invalidateQueries({ queryKey: ['todos'] });
-    },
-  });
-
-  return (
-    <ul>
-      {todos?.map(t => (
-        <li key={t.id}>
-          {t.text}
-          <button onClick={() => deleteMutation.mutate(t.id)}>削除</button>
-        </li>
-      ))}
-    </ul>
-  );
-}`,
+    code: "function deleteTodo(id) {\n  return fetch(`/api/todos/\${id}`, { method: 'DELETE' });\n}\n\nfunction TodoList() {\n  const queryClient = useQueryClient();\n  const { data: todos } = useQuery({ queryKey: ['todos'], queryFn: fetchTodos });\n\n  const deleteMutation = useMutation({\n    mutationFn: deleteTodo,\n    onMutate: async (id) => {\n      await queryClient.cancelQueries({ queryKey: ['todos'] });\n      const previous = queryClient.getQueryData(['todos']);\n      // 即時UIから削除（楽観的更新）\n      queryClient.setQueryData(['todos'], old => old.filter(t => t.id !== id));\n      return { previous };\n    },\n    onError: (_err, _id, context) => {\n      // 失敗したら元に戻す\n      queryClient.setQueryData(['todos'], context.previous);\n    },\n    onSettled: () => {\n      // 成功・失敗どちらでもサーバと同期\n      queryClient.invalidateQueries({ queryKey: ['todos'] });\n    },\n  });\n\n  return (\n    <ul>\n      {todos?.map(t => (\n        <li key={t.id}>\n          {t.text}\n          <button onClick={() => deleteMutation.mutate(t.id)}>削除</button>\n        </li>\n      ))}\n    </ul>\n  );\n}",
     afterCode: "ポイント: invalidateQueries はキャッシュを「古い（stale）」としてマークし、次のアクセス時に再フェッチを促します。DELETE に成功した後は必ず invalidateQueries を呼び、サーバとの整合性を担保する習慣をつけましょう。"
   }]
 }, {
@@ -1198,56 +310,7 @@ function TodoList() {
   }, {
     title: "React Hook Form + Zod の実装",
     body: "React Hook Form と Zod の接続には @hookform/resolvers パッケージの zodResolver を使います。useForm に resolver を渡すだけで、Zod スキーマがそのままバリデーションルールとして機能します。エラーメッセージも Zod で定義したメッセージがそのまま formState.errors に反映されます。\n\nregister 関数の戻り値をスプレッド構文で input に展開するのが基本パターンです。{...register('email')} とすることで name・onChange・onBlur・ref が自動で設定されます。TypeScript を使っている場合、register に渡せるフィールド名はスキーマの型から自動で絞り込まれます。",
-    code: `// npm install react-hook-form zod @hookform/resolvers
-// （概念コードのため import は省略）
-
-const loginSchema = z.object({
-  email: z.string().email('有効なメールアドレスを入力してください'),
-  password: z.string().min(8, 'パスワードは8文字以上です'),
-  rememberMe: z.boolean().optional(),
-});
-
-// type LoginForm = z.infer<typeof loginSchema>;
-
-function LoginForm({ onLogin }) {
-  const {
-    register,
-    handleSubmit,
-    setError,
-    formState: { errors, isSubmitting, isDirty }
-  } = useForm({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '', rememberMe: false }
-  });
-
-  const onSubmit = async (data) => {
-    try {
-      await onLogin(data);
-    } catch (e) {
-      // サーバエラーをフィールドに反映
-      setError('email', { message: 'メールアドレスまたはパスワードが正しくありません' });
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <input {...register('email')} type="email" placeholder="メール" />
-      {errors.email && <p>{errors.email.message}</p>}
-
-      <input {...register('password')} type="password" placeholder="パスワード" />
-      {errors.password && <p>{errors.password.message}</p>}
-
-      <label>
-        <input {...register('rememberMe')} type="checkbox" />
-        ログイン状態を保持
-      </label>
-
-      <button type="submit" disabled={isSubmitting || !isDirty}>
-        {isSubmitting ? 'ログイン中...' : 'ログイン'}
-      </button>
-    </form>
-  );
-}`,
+    code: "// npm install react-hook-form zod @hookform/resolvers\n// （概念コードのため import は省略）\n\nconst loginSchema = z.object({\n  email: z.string().email('有効なメールアドレスを入力してください'),\n  password: z.string().min(8, 'パスワードは8文字以上です'),\n  rememberMe: z.boolean().optional(),\n});\n\n// type LoginForm = z.infer<typeof loginSchema>;\n\nfunction LoginForm({ onLogin }) {\n  const {\n    register,\n    handleSubmit,\n    setError,\n    formState: { errors, isSubmitting, isDirty }\n  } = useForm({\n    resolver: zodResolver(loginSchema),\n    defaultValues: { email: '', password: '', rememberMe: false }\n  });\n\n  const onSubmit = async (data) => {\n    try {\n      await onLogin(data);\n    } catch (e) {\n      // サーバエラーをフィールドに反映\n      setError('email', { message: 'メールアドレスまたはパスワードが正しくありません' });\n    }\n  };\n\n  return (\n    <form onSubmit={handleSubmit(onSubmit)}>\n      <input {...register('email')} type=\"email\" placeholder=\"メール\" />\n      {errors.email && <p>{errors.email.message}</p>}\n\n      <input {...register('password')} type=\"password\" placeholder=\"パスワード\" />\n      {errors.password && <p>{errors.password.message}</p>}\n\n      <label>\n        <input {...register('rememberMe')} type=\"checkbox\" />\n        ログイン状態を保持\n      </label>\n\n      <button type=\"submit\" disabled={isSubmitting || !isDirty}>\n        {isSubmitting ? 'ログイン中...' : 'ログイン'}\n      </button>\n    </form>\n  );\n}",
     afterCode: "ポイント: setError を使うとサーバから返ってきたエラー（メール重複など）をフォームフィールドに紐づけて表示できます。クライアントバリデーションとサーババリデーションを統一的なUIで扱えるのが React Hook Form の強みです。"
   }]
 }, {
@@ -1259,79 +322,12 @@ function LoginForm({ onLogin }) {
   sections: [{
     title: "Testing Library の設計思想",
     body: "Testing Library の核心は「ユーザーが実際に操作するものをテストする」という哲学です。コンポーネントの内部実装（state の値、関数の呼び出し回数）ではなく、「画面に何が表示されているか」「ボタンを押したら何が変わるか」という振る舞いをテストします。\n\nクエリの優先順位が明確に定められており、getByRole（ARIA ロール）が最優先です。これはスクリーンリーダーがアクセスするのと同じ方法で要素を取得するため、テストを書くことがアクセシビリティの改善に直結します。getByTestId（data-testid）は最終手段で、他の方法で取得できない場合のみ使います。\n\nPython の pytest と比較すると、describe は test class、it は test function に対応します。beforeEach / afterEach は pytest の setup/teardown に相当します。",
-    code: `// セットアップ
-// npm install -D vitest @testing-library/react
-//   @testing-library/jest-dom @testing-library/user-event jsdom
-
-// vite.config.ts
-export default defineConfig({
-  plugins: [react()],
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-  },
-});
-
-// src/test/setup.ts
-import '@testing-library/jest-dom'; // toBeInTheDocument 等を追加
-
-// 基本的なテストパターン
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-
-describe('Button', () => {
-  it('クリックハンドラが呼ばれる', async () => {
-    const onClick = vi.fn();
-    const user = userEvent.setup();
-
-    render(<button onClick={onClick}>送信</button>);
-    await user.click(screen.getByRole('button', { name: '送信' }));
-
-    expect(onClick).toHaveBeenCalledTimes(1);
-  });
-});`,
+    code: "// セットアップ\n// npm install -D vitest @testing-library/react\n//   @testing-library/jest-dom @testing-library/user-event jsdom\n\n// vite.config.ts\nexport default defineConfig({\n  plugins: [react()],\n  test: {\n    globals: true,\n    environment: 'jsdom',\n    setupFiles: ['./src/test/setup.ts'],\n  },\n});\n\n// src/test/setup.ts\nimport '@testing-library/jest-dom'; // toBeInTheDocument 等を追加\n\n// 基本的なテストパターン\nimport { render, screen } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\n\ndescribe('Button', () => {\n  it('クリックハンドラが呼ばれる', async () => {\n    const onClick = vi.fn();\n    const user = userEvent.setup();\n\n    render(<button onClick={onClick}>送信</button>);\n    await user.click(screen.getByRole('button', { name: '送信' }));\n\n    expect(onClick).toHaveBeenCalledTimes(1);\n  });\n});",
     afterCode: "ポイント: userEvent.setup() を使うことで、実際のブラウザ操作（キーボードイベントの発火順序・フォーカス移動・ペースト操作）を正確にシミュレートできます。fireEvent より高精度で、フォームのテストに特に効果的です。"
   }, {
     title: "非同期テストと MSW",
     body: "APIを呼ぶコンポーネントのテストでは、実際のAPIを叩かずにモックで代替します。vi.fn() で fetch をモックする方法は手軽ですが、MSW（Mock Service Worker）を使うとネットワークレベルでリクエストをインターセプトでき、本番と同じ fetch コードがそのままテストで動きます。\n\nwaitFor は非同期で変化する UI 要素を検証するユーティリティです。APIレスポンスが返ってきてstateが更新され画面に反映されるまでの間、内部でリトライし続けます。findBy クエリ（findByText など）は waitFor + getBy の組み合わせのショートカットです。タイムアウトのデフォルトは1000msですが、遅いAPIのテストでは timeout オプションで延ばせます。",
-    code: `import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
-import { render, screen, waitFor } from '@testing-library/react';
-
-const server = setupServer(
-  http.get('/api/todos', () => {
-    return HttpResponse.json([
-      { id: 1, title: 'テストTodo', completed: false }
-    ]);
-  }),
-  http.post('/api/todos', async ({ request }) => {
-    const body = await request.json();
-    return HttpResponse.json({ id: 2, ...body }, { status: 201 });
-  })
-);
-
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers()); // テスト間でハンドラをリセット
-afterAll(() => server.close());
-
-describe('TodoList（APIあり）', () => {
-  it('取得したTodoを表示する', async () => {
-    render(<TodoList />);
-    // 非同期でデータが表示されるまで待機
-    await waitFor(() => {
-      expect(screen.getByText('テストTodo')).toBeInTheDocument();
-    });
-  });
-
-  it('404エラー時にエラーメッセージを表示', async () => {
-    server.use(
-      http.get('/api/todos', () => HttpResponse.json(null, { status: 404 }))
-    );
-    render(<TodoList />);
-    expect(await screen.findByText(/エラー/)).toBeInTheDocument();
-  });
-});`,
+    code: "import { http, HttpResponse } from 'msw';\nimport { setupServer } from 'msw/node';\nimport { render, screen, waitFor } from '@testing-library/react';\n\nconst server = setupServer(\n  http.get('/api/todos', () => {\n    return HttpResponse.json([\n      { id: 1, title: 'テストTodo', completed: false }\n    ]);\n  }),\n  http.post('/api/todos', async ({ request }) => {\n    const body = await request.json();\n    return HttpResponse.json({ id: 2, ...body }, { status: 201 });\n  })\n);\n\nbeforeAll(() => server.listen({ onUnhandledRequest: 'error' }));\nafterEach(() => server.resetHandlers()); // テスト間でハンドラをリセット\nafterAll(() => server.close());\n\ndescribe('TodoList（APIあり）', () => {\n  it('取得したTodoを表示する', async () => {\n    render(<TodoList />);\n    // 非同期でデータが表示されるまで待機\n    await waitFor(() => {\n      expect(screen.getByText('テストTodo')).toBeInTheDocument();\n    });\n  });\n\n  it('404エラー時にエラーメッセージを表示', async () => {\n    server.use(\n      http.get('/api/todos', () => HttpResponse.json(null, { status: 404 }))\n    );\n    render(<TodoList />);\n    expect(await screen.findByText(/エラー/)).toBeInTheDocument();\n  });\n});",
     afterCode: "ポイント: server.resetHandlers() を afterEach に入れることで、テスト内で上書きしたハンドラが次のテストに影響しません。onUnhandledRequest: 'error' を設定すると、モックしていないリクエストを即座に検知できます。"
   }]
 }, {
@@ -1348,96 +344,12 @@ describe('TodoList（APIあり）', () => {
   }, {
     title: "'use client' の境界設計",
     body: "'use client' はファイルの先頭に書くディレクティブで、そのファイルと依存する全てのモジュールをクライアントバンドルに含めます。つまり 'use client' を書いたコンポーネントの子コンポーネントは、明示的に分離しない限り全てClient Componentになります。\n\n設計の原則は「インタラクティブなUIだけをClient Componentにし、データ表示はServer Componentに残す」です。例えばページ全体をClient Componentにするのではなく、検索ボックスだけを切り出してClient Componentにし、検索結果表示はServer Componentとして残す、という粒度が理想的です。\n\n'use client' ファイルに props として渡せるのはシリアライズ可能な値（文字列・数値・配列・プレーンオブジェクト）のみです。関数やクラスインスタンスはそのまま渡せません（Server Actions は例外）。",
-    code: `// ❌ ページ全体をClient Componentにするのは避ける
-'use client'; // ← ここに書くとページ全体がクライアントに
-import { useState } from 'react';
-
-export default function Page() {
-  const [query, setQuery] = useState('');
-  // データフェッチも全部クライアントに...
-}
-
-// ✅ インタラクティブな部分だけを分離する
-
-// app/components/SearchBox.tsx
-'use client';
-import { useState } from 'react';
-
-export function SearchBox({ onSearch }) {
-  const [q, setQ] = useState('');
-  return (
-    <input
-      value={q}
-      onChange={e => { setQ(e.target.value); onSearch(e.target.value); }}
-    />
-  );
-}
-
-// app/page.tsx（Server Component）
-import { SearchBox } from './components/SearchBox';
-
-async function searchPosts(query) {
-  return fetch(\`/api/posts?q=\${query}\`).then(r => r.json());
-}
-
-export default async function Page({ searchParams }) {
-  const q = searchParams?.q ?? '';
-  const posts = await searchPosts(q); // サーバで直接フェッチ
-
-  return (
-    <div>
-      <SearchBox onSearch={/* URLパラメータ更新ロジック */() => {}} />
-      <ul>{posts.map(p => <li key={p.id}>{p.title}</li>)}</ul>
-    </div>
-  );
-}`,
+    code: "// ❌ ページ全体をClient Componentにするのは避ける\n'use client'; // ← ここに書くとページ全体がクライアントに\nimport { useState } from 'react';\n\nexport default function Page() {\n  const [query, setQuery] = useState('');\n  // データフェッチも全部クライアントに...\n}\n\n// ✅ インタラクティブな部分だけを分離する\n\n// app/components/SearchBox.tsx\n'use client';\nimport { useState } from 'react';\n\nexport function SearchBox({ onSearch }) {\n  const [q, setQ] = useState('');\n  return (\n    <input\n      value={q}\n      onChange={e => { setQ(e.target.value); onSearch(e.target.value); }}\n    />\n  );\n}\n\n// app/page.tsx（Server Component）\nimport { SearchBox } from './components/SearchBox';\n\nasync function searchPosts(query) {\n  return fetch(`/api/posts?q=\${query}`).then(r => r.json());\n}\n\nexport default async function Page({ searchParams }) {\n  const q = searchParams?.q ?? '';\n  const posts = await searchPosts(q); // サーバで直接フェッチ\n\n  return (\n    <div>\n      <SearchBox onSearch={/* URLパラメータ更新ロジック */() => {}} />\n      <ul>{posts.map(p => <li key={p.id}>{p.title}</li>)}</ul>\n    </div>\n  );\n}",
     afterCode: "ポイント: Next.js の App Router では searchParams を使ったURL駆動のフィルタリングがServer Componentと相性抜群です。検索ボックスでURLを更新→ページ全体がサーバで再レンダリング、というパターンはシンプルかつ強力です。"
   }, {
     title: "Server Actions",
     body: "Server Actions は 'use server' ディレクティブを付けた関数で、クライアントから呼び出せるサーバサイドの処理です。フォーム送信・ミューテーション処理をクライアントの JavaScript なしでサーバに委譲できます。\n\nフォームの action 属性に Server Action を直接渡せるのが最大の特徴です。JavaScript が読み込まれていない段階でもフォームが動作し（Progressive Enhancement）、JS 有効時は useFormState / useFormStatus でリッチなUXを追加できます。\n\nセキュリティの観点では、Server Actions は認証・認可のチェックをサーバ側で確実に実行できます。クライアントのバリデーションを通過しても、サーバ側で再バリデーションするのが鉄則です。Python の Django ビュー関数が常にサーバサイドで実行されるのと同様の安全性が確保されます。",
-    code: `// app/actions/posts.ts
-'use server'; // このファイルはサーバ専用
-
-import { revalidatePath } from 'next/cache';
-
-export async function createPost(prevState, formData) {
-  const title = formData.get('title')?.toString().trim();
-
-  // サーバサイドバリデーション（必須）
-  if (!title || title.length < 2) {
-    return { error: 'タイトルは2文字以上入力してください', post: null };
-  }
-
-  // DBへの保存（例: Prismaの場合）
-  // const post = await prisma.post.create({ data: { title } });
-
-  // キャッシュを無効化して一覧を再フェッチ
-  revalidatePath('/posts');
-
-  return { error: null, post: { id: Date.now(), title } };
-}
-
-// app/components/PostForm.tsx
-'use client';
-import { useFormState, useFormStatus } from 'react-dom';
-import { createPost } from '../actions/posts';
-
-function SubmitBtn() {
-  const { pending } = useFormStatus();
-  return <button type="submit" disabled={pending}>{pending ? '投稿中...' : '投稿'}</button>;
-}
-
-export function PostForm() {
-  const [state, action] = useFormState(createPost, { error: null, post: null });
-  return (
-    <form action={action}>
-      <input name="title" placeholder="タイトル" required />
-      {state.error && <p style={{color:'red'}}>{state.error}</p>}
-      {state.post && <p style={{color:'green'}}>投稿完了: {state.post.title}</p>}
-      <SubmitBtn />
-    </form>
-  );
-}`,
+    code: "// app/actions/posts.ts\n'use server'; // このファイルはサーバ専用\n\nimport { revalidatePath } from 'next/cache';\n\nexport async function createPost(prevState, formData) {\n  const title = formData.get('title')?.toString().trim();\n\n  // サーバサイドバリデーション（必須）\n  if (!title || title.length < 2) {\n    return { error: 'タイトルは2文字以上入力してください', post: null };\n  }\n\n  // DBへの保存（例: Prismaの場合）\n  // const post = await prisma.post.create({ data: { title } });\n\n  // キャッシュを無効化して一覧を再フェッチ\n  revalidatePath('/posts');\n\n  return { error: null, post: { id: Date.now(), title } };\n}\n\n// app/components/PostForm.tsx\n'use client';\nimport { useFormState, useFormStatus } from 'react-dom';\nimport { createPost } from '../actions/posts';\n\nfunction SubmitBtn() {\n  const { pending } = useFormStatus();\n  return <button type=\"submit\" disabled={pending}>{pending ? '投稿中...' : '投稿'}</button>;\n}\n\nexport function PostForm() {\n  const [state, action] = useFormState(createPost, { error: null, post: null });\n  return (\n    <form action={action}>\n      <input name=\"title\" placeholder=\"タイトル\" required />\n      {state.error && <p style={{color:'red'}}>{state.error}</p>}\n      {state.post && <p style={{color:'green'}}>投稿完了: {state.post.title}</p>}\n      <SubmitBtn />\n    </form>\n  );\n}",
     afterCode: "コース完了: useReducer によるパフォーマンス最適化・カスタムフック設計・Context とグローバル状態・コンポーネントパターン・React Query・フォームバリデーション・テスト・Server Components まで、実務で必要な React の中級スキルを一通り習得しました。次のステップとして Next.js の深掘り・TypeScript 上級・パフォーマンスチューニングへ進みましょう。"
   }]
 }];

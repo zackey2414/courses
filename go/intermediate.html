@@ -113,890 +113,64 @@ const T = {
 
 const EX = {
 ch1:[
-  {diff:1,q:"database/sqlとlib/pqを使ってPostgreSQLに接続し、pingで疎通確認するコードを書け。",code:`package main
-
-import (
-    "database/sql"
-    "fmt"
-    _ "github.com/lib/pq"
-)
-
-func main() {
-    dsn := "postgres://user:pass@localhost/mydb?sslmode=disable"
-    // ここに書く
-}`,answer:`package main
-
-import (
-    "database/sql"
-    "fmt"
-    _ "github.com/lib/pq"
-)
-
-func main() {
-    dsn := "postgres://user:pass@localhost/mydb?sslmode=disable"
-    db, err := sql.Open("postgres", dsn)
-    if err != nil { panic(err) }
-    defer db.Close()
-
-    if err := db.Ping(); err != nil {
-        panic(err)
-    }
-    fmt.Println("connected!")
-}`},
-  {diff:2,q:"pgxを使ってusersテーブルから全件取得しUser構造体にスキャンするコードを書け。",code:`package main
-
-import (
-    "context"
-    "fmt"
-    "github.com/jackc/pgx/v5/pgxpool"
-)
-
-type User struct{ ID int; Name string; Email string }
-
-func listUsers(pool *pgxpool.Pool) ([]User, error) {
-    // ここに書く
-}`,answer:`func listUsers(pool *pgxpool.Pool) ([]User, error) {
-    rows, err := pool.Query(context.Background(),
-        "SELECT id, name, email FROM users ORDER BY id")
-    if err != nil { return nil, err }
-    defer rows.Close()
-
-    var users []User
-    for rows.Next() {
-        var u User
-        if err := rows.Scan(&u.ID, &u.Name, &u.Email); err != nil { return nil, err }
-        users = append(users, u)
-    }
-    return users, rows.Err()
-}`},
-  {diff:3,q:"golang-migrateを使ってDBマイグレーションをGoコードから実行するコードを書け。",code:`// golang-migrate/migrate/v4
-import (
-    "github.com/golang-migrate/migrate/v4"
-    _ "github.com/golang-migrate/migrate/v4/database/postgres"
-    _ "github.com/golang-migrate/migrate/v4/source/file"
-)
-
-func runMigrations(dsn string) error {
-    // ここに書く
-}`,answer:`func runMigrations(dsn string) error {
-    m, err := migrate.New("file://migrations", dsn)
-    if err != nil { return err }
-    if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-        return err
-    }
-    return nil
-}`},
+  {diff:1,q:"database/sqlとlib/pqを使ってPostgreSQLに接続し、pingで疎通確認するコードを書け。",code:"package main\n\nimport (\n    \"database/sql\"\n    \"fmt\"\n    _ \"github.com/lib/pq\"\n)\n\nfunc main() {\n    dsn := \"postgres://user:pass@localhost/mydb?sslmode=disable\"\n    // ここに書く\n}",answer:"package main\n\nimport (\n    \"database/sql\"\n    \"fmt\"\n    _ \"github.com/lib/pq\"\n)\n\nfunc main() {\n    dsn := \"postgres://user:pass@localhost/mydb?sslmode=disable\"\n    db, err := sql.Open(\"postgres\", dsn)\n    if err != nil { panic(err) }\n    defer db.Close()\n\n    if err := db.Ping(); err != nil {\n        panic(err)\n    }\n    fmt.Println(\"connected!\")\n}"},
+  {diff:2,q:"pgxを使ってusersテーブルから全件取得しUser構造体にスキャンするコードを書け。",code:"package main\n\nimport (\n    \"context\"\n    \"fmt\"\n    \"github.com/jackc/pgx/v5/pgxpool\"\n)\n\ntype User struct{ ID int; Name string; Email string }\n\nfunc listUsers(pool *pgxpool.Pool) ([]User, error) {\n    // ここに書く\n}",answer:"func listUsers(pool *pgxpool.Pool) ([]User, error) {\n    rows, err := pool.Query(context.Background(),\n        \"SELECT id, name, email FROM users ORDER BY id\")\n    if err != nil { return nil, err }\n    defer rows.Close()\n\n    var users []User\n    for rows.Next() {\n        var u User\n        if err := rows.Scan(&u.ID, &u.Name, &u.Email); err != nil { return nil, err }\n        users = append(users, u)\n    }\n    return users, rows.Err()\n}"},
+  {diff:3,q:"golang-migrateを使ってDBマイグレーションをGoコードから実行するコードを書け。",code:"// golang-migrate/migrate/v4\nimport (\n    \"github.com/golang-migrate/migrate/v4\"\n    _ \"github.com/golang-migrate/migrate/v4/database/postgres\"\n    _ \"github.com/golang-migrate/migrate/v4/source/file\"\n)\n\nfunc runMigrations(dsn string) error {\n    // ここに書く\n}",answer:"func runMigrations(dsn string) error {\n    m, err := migrate.New(\"file://migrations\", dsn)\n    if err != nil { return err }\n    if err := m.Up(); err != nil && err != migrate.ErrNoChange {\n        return err\n    }\n    return nil\n}"},
 ],
 ch2:[
-  {diff:1,q:"go-chi/chiを使ってGET /users・POST /users・GET /users/{id}のルートを定義するコードを書け。",code:`package main
-
-import (
-    "net/http"
-    "github.com/go-chi/chi/v5"
-    "github.com/go-chi/chi/v5/middleware"
-)
-
-func main() {
-    r := chi.NewRouter()
-    r.Use(middleware.Logger)
-    r.Use(middleware.Recoverer)
-    // ルートを追加
-    http.ListenAndServe(":8080", r)
-}`,answer:`func main() {
-    r := chi.NewRouter()
-    r.Use(middleware.Logger, middleware.Recoverer)
-
-    r.Get("/users", listUsersHandler)
-    r.Post("/users", createUserHandler)
-    r.Get("/users/{id}", getUserHandler)
-
-    http.ListenAndServe(":8080", r)
-}
-
-func listUsersHandler(w http.ResponseWriter, r *http.Request)  {}
-func createUserHandler(w http.ResponseWriter, r *http.Request) {}
-func getUserHandler(w http.ResponseWriter, r *http.Request) {
-    id := chi.URLParam(r, "id")
-    _ = id
-}`},
-  {diff:2,q:"chi.URLParamでパスパラメータを取得し、不正なIDの場合は400を返すgetUserHandlerを完成させよ。",code:`func getUserHandler(w http.ResponseWriter, r *http.Request) {
-    idStr := chi.URLParam(r, "id")
-    // strconv.Atoi でintに変換、失敗したら400
-    // DBから取得してJSONで返す
-}`,answer:`func getUserHandler(w http.ResponseWriter, r *http.Request) {
-    idStr := chi.URLParam(r, "id")
-    id, err := strconv.Atoi(idStr)
-    if err != nil {
-        http.Error(w, "invalid id", http.StatusBadRequest)
-        return
-    }
-    // DBから取得（擬似コード）
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]int{"id": id})
-}`},
-  {diff:3,q:"JWTトークンを検証するミドルウェアをchi用に書け（golang-jwt/jwt使用）。Authorizationヘッダから取得すること。",code:`import (
-    "net/http"
-    "strings"
-    "github.com/golang-jwt/jwt/v5"
-)
-
-func authMiddleware(secret []byte) func(http.Handler) http.Handler {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            // Authorizationヘッダを解析してJWT検証
-        })
-    }
-}`,answer:`func authMiddleware(secret []byte) func(http.Handler) http.Handler {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            header := r.Header.Get("Authorization")
-            if !strings.HasPrefix(header, "Bearer ") {
-                http.Error(w, "unauthorized", http.StatusUnauthorized)
-                return
-            }
-            tokenStr := strings.TrimPrefix(header, "Bearer ")
-            _, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-                return secret, nil
-            })
-            if err != nil {
-                http.Error(w, "invalid token", http.StatusUnauthorized)
-                return
-            }
-            next.ServeHTTP(w, r)
-        })
-    }
-}`},
+  {diff:1,q:"go-chi/chiを使ってGET /users・POST /users・GET /users/{id}のルートを定義するコードを書け。",code:"package main\n\nimport (\n    \"net/http\"\n    \"github.com/go-chi/chi/v5\"\n    \"github.com/go-chi/chi/v5/middleware\"\n)\n\nfunc main() {\n    r := chi.NewRouter()\n    r.Use(middleware.Logger)\n    r.Use(middleware.Recoverer)\n    // ルートを追加\n    http.ListenAndServe(\":8080\", r)\n}",answer:"func main() {\n    r := chi.NewRouter()\n    r.Use(middleware.Logger, middleware.Recoverer)\n\n    r.Get(\"/users\", listUsersHandler)\n    r.Post(\"/users\", createUserHandler)\n    r.Get(\"/users/{id}\", getUserHandler)\n\n    http.ListenAndServe(\":8080\", r)\n}\n\nfunc listUsersHandler(w http.ResponseWriter, r *http.Request)  {}\nfunc createUserHandler(w http.ResponseWriter, r *http.Request) {}\nfunc getUserHandler(w http.ResponseWriter, r *http.Request) {\n    id := chi.URLParam(r, \"id\")\n    _ = id\n}"},
+  {diff:2,q:"chi.URLParamでパスパラメータを取得し、不正なIDの場合は400を返すgetUserHandlerを完成させよ。",code:"func getUserHandler(w http.ResponseWriter, r *http.Request) {\n    idStr := chi.URLParam(r, \"id\")\n    // strconv.Atoi でintに変換、失敗したら400\n    // DBから取得してJSONで返す\n}",answer:"func getUserHandler(w http.ResponseWriter, r *http.Request) {\n    idStr := chi.URLParam(r, \"id\")\n    id, err := strconv.Atoi(idStr)\n    if err != nil {\n        http.Error(w, \"invalid id\", http.StatusBadRequest)\n        return\n    }\n    // DBから取得（擬似コード）\n    w.Header().Set(\"Content-Type\", \"application/json\")\n    json.NewEncoder(w).Encode(map[string]int{\"id\": id})\n}"},
+  {diff:3,q:"JWTトークンを検証するミドルウェアをchi用に書け（golang-jwt/jwt使用）。Authorizationヘッダから取得すること。",code:"import (\n    \"net/http\"\n    \"strings\"\n    \"github.com/golang-jwt/jwt/v5\"\n)\n\nfunc authMiddleware(secret []byte) func(http.Handler) http.Handler {\n    return func(next http.Handler) http.Handler {\n        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n            // Authorizationヘッダを解析してJWT検証\n        })\n    }\n}",answer:"func authMiddleware(secret []byte) func(http.Handler) http.Handler {\n    return func(next http.Handler) http.Handler {\n        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n            header := r.Header.Get(\"Authorization\")\n            if !strings.HasPrefix(header, \"Bearer \") {\n                http.Error(w, \"unauthorized\", http.StatusUnauthorized)\n                return\n            }\n            tokenStr := strings.TrimPrefix(header, \"Bearer \")\n            _, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {\n                return secret, nil\n            })\n            if err != nil {\n                http.Error(w, \"invalid token\", http.StatusUnauthorized)\n                return\n            }\n            next.ServeHTTP(w, r)\n        })\n    }\n}"},
 ],
 ch3:[
-  {diff:1,q:"Protocol Buffersのmessage Userを定義するprotoファイルを書け（id, name, emailフィールド）。",code:`// user.proto
-syntax = "proto3";
-package user;
-
-// Userメッセージを定義`,answer:`syntax = "proto3";
-package user;
-option go_package = "./pb";
-
-message User {
-    int64  id    = 1;
-    string name  = 2;
-    string email = 3;
-}
-
-message GetUserRequest  { int64 id = 1; }
-message ListUsersResponse { repeated User users = 1; }`},
-  {diff:2,q:"gRPCサーバーの最小実装（UserService.GetUser）をGoで書け。",code:`// google.golang.org/grpc
-// 生成済みコードを使う
-package main
-
-import (
-    "context"
-    "net"
-    "google.golang.org/grpc"
-    pb "myapp/pb"
-)
-
-type server struct{ pb.UnimplementedUserServiceServer }
-
-func (s *server) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {
-    // ここに書く
-}
-
-func main() {
-    // gRPCサーバーを起動
-}`,answer:`type server struct{ pb.UnimplementedUserServiceServer }
-
-func (s *server) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {
-    return &pb.User{Id: req.Id, Name: "Alice", Email: "alice@example.com"}, nil
-}
-
-func main() {
-    lis, _ := net.Listen("tcp", ":50051")
-    s := grpc.NewServer()
-    pb.RegisterUserServiceServer(s, &server{})
-    s.Serve(lis)
-}`},
-  {diff:3,q:"gRPCクライアントを書いてGetUserを呼び出し、レスポンスを出力するコードを書け。",code:`package main
-
-import (
-    "context"
-    "fmt"
-    "google.golang.org/grpc"
-    "google.golang.org/grpc/credentials/insecure"
-    pb "myapp/pb"
-)
-
-func main() {
-    // ここに書く
-}`,answer:`func main() {
-    conn, err := grpc.Dial("localhost:50051",
-        grpc.WithTransportCredentials(insecure.NewCredentials()))
-    if err != nil { panic(err) }
-    defer conn.Close()
-
-    client := pb.NewUserServiceClient(conn)
-    resp, err := client.GetUser(context.Background(), &pb.GetUserRequest{Id: 1})
-    if err != nil { panic(err) }
-    fmt.Printf("User: %s (%s)\n", resp.Name, resp.Email)
-}`},
+  {diff:1,q:"Protocol Buffersのmessage Userを定義するprotoファイルを書け（id, name, emailフィールド）。",code:"// user.proto\nsyntax = \"proto3\";\npackage user;\n\n// Userメッセージを定義",answer:"syntax = \"proto3\";\npackage user;\noption go_package = \"./pb\";\n\nmessage User {\n    int64  id    = 1;\n    string name  = 2;\n    string email = 3;\n}\n\nmessage GetUserRequest  { int64 id = 1; }\nmessage ListUsersResponse { repeated User users = 1; }"},
+  {diff:2,q:"gRPCサーバーの最小実装（UserService.GetUser）をGoで書け。",code:"// google.golang.org/grpc\n// 生成済みコードを使う\npackage main\n\nimport (\n    \"context\"\n    \"net\"\n    \"google.golang.org/grpc\"\n    pb \"myapp/pb\"\n)\n\ntype server struct{ pb.UnimplementedUserServiceServer }\n\nfunc (s *server) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {\n    // ここに書く\n}\n\nfunc main() {\n    // gRPCサーバーを起動\n}",answer:"type server struct{ pb.UnimplementedUserServiceServer }\n\nfunc (s *server) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {\n    return &pb.User{Id: req.Id, Name: \"Alice\", Email: \"alice@example.com\"}, nil\n}\n\nfunc main() {\n    lis, _ := net.Listen(\"tcp\", \":50051\")\n    s := grpc.NewServer()\n    pb.RegisterUserServiceServer(s, &server{})\n    s.Serve(lis)\n}"},
+  {diff:3,q:"gRPCクライアントを書いてGetUserを呼び出し、レスポンスを出力するコードを書け。",code:"package main\n\nimport (\n    \"context\"\n    \"fmt\"\n    \"google.golang.org/grpc\"\n    \"google.golang.org/grpc/credentials/insecure\"\n    pb \"myapp/pb\"\n)\n\nfunc main() {\n    // ここに書く\n}",answer:"func main() {\n    conn, err := grpc.Dial(\"localhost:50051\",\n        grpc.WithTransportCredentials(insecure.NewCredentials()))\n    if err != nil { panic(err) }\n    defer conn.Close()\n\n    client := pb.NewUserServiceClient(conn)\n    resp, err := client.GetUser(context.Background(), &pb.GetUserRequest{Id: 1})\n    if err != nil { panic(err) }\n    fmt.Printf(\"User: %s (%s)\n\", resp.Name, resp.Email)\n}"},
 ],
 ch4:[
-  {diff:1,q:"prometheus/client_golangを使ってHTTPリクエストカウンターとレイテンシヒストグラムを定義し、/metricsエンドポイントを設定するコードを書け。",code:`package main
-
-import (
-    "net/http"
-    "github.com/prometheus/client_golang/prometheus"
-    "github.com/prometheus/client_golang/prometheus/promauto"
-    "github.com/prometheus/client_golang/prometheus/promhttp"
-)
-
-var (
-    reqTotal   prometheus.Counter
-    reqLatency prometheus.Histogram
-)
-
-func init() {
-    // ここに書く
-}`,answer:`var (
-    reqTotal = promauto.NewCounter(prometheus.CounterOpts{
-        Name: "http_requests_total",
-        Help: "Total HTTP requests",
-    })
-    reqLatency = promauto.NewHistogram(prometheus.HistogramOpts{
-        Name:    "http_request_duration_seconds",
-        Help:    "HTTP request latency",
-        Buckets: prometheus.DefBuckets,
-    })
-)
-
-func main() {
-    http.Handle("/metrics", promhttp.Handler())
-    http.ListenAndServe(":2112", nil)
-}`},
-  {diff:2,q:"OpenTelemetryのトレーシングを初期化し、HTTPハンドラにspanを追加するコードを書け。",code:`package main
-
-import (
-    "context"
-    "net/http"
-    "go.opentelemetry.io/otel"
-    "go.opentelemetry.io/otel/trace"
-)
-
-func handler(w http.ResponseWriter, r *http.Request) {
-    // spanを作成してtrace
-}`,answer:`func handler(w http.ResponseWriter, r *http.Request) {
-    tracer := otel.Tracer("my-service")
-    ctx, span := tracer.Start(r.Context(), "handler")
-    defer span.End()
-
-    result := doWork(ctx)
-    w.Write([]byte(result))
-}
-
-func doWork(ctx context.Context) string {
-    _, span := otel.Tracer("my-service").Start(ctx, "doWork")
-    defer span.End()
-    return "done"
-}`},
-  {diff:3,q:"pprof HTTPエンドポイントを追加し、CPUプロファイルを30秒取得するcurlコマンドも示せ。",code:`package main
-
-import (
-    "net/http"
-    _ "net/http/pprof" // インポートするだけで/debug/pprofが有効になる
-)
-
-func main() {
-    // pprofエンドポイント追加済みのサーバーを起動
-    // curlコマンドも書け
-}`,answer:`package main
-
-import (
-    "net/http"
-    _ "net/http/pprof"
-)
-
-func main() {
-    // メインサーバー
-    go http.ListenAndServe(":8080", nil)
-
-    // pprofサーバー（別ポートで公開）
-    http.ListenAndServe(":6060", nil)
-}
-
-// CPUプロファイル取得（30秒）:
-// curl -o cpu.prof "http://localhost:6060/debug/pprof/profile?seconds=30"
-// go tool pprof -http=:8090 cpu.prof`},
+  {diff:1,q:"prometheus/client_golangを使ってHTTPリクエストカウンターとレイテンシヒストグラムを定義し、/metricsエンドポイントを設定するコードを書け。",code:"package main\n\nimport (\n    \"net/http\"\n    \"github.com/prometheus/client_golang/prometheus\"\n    \"github.com/prometheus/client_golang/prometheus/promauto\"\n    \"github.com/prometheus/client_golang/prometheus/promhttp\"\n)\n\nvar (\n    reqTotal   prometheus.Counter\n    reqLatency prometheus.Histogram\n)\n\nfunc init() {\n    // ここに書く\n}",answer:"var (\n    reqTotal = promauto.NewCounter(prometheus.CounterOpts{\n        Name: \"http_requests_total\",\n        Help: \"Total HTTP requests\",\n    })\n    reqLatency = promauto.NewHistogram(prometheus.HistogramOpts{\n        Name:    \"http_request_duration_seconds\",\n        Help:    \"HTTP request latency\",\n        Buckets: prometheus.DefBuckets,\n    })\n)\n\nfunc main() {\n    http.Handle(\"/metrics\", promhttp.Handler())\n    http.ListenAndServe(\":2112\", nil)\n}"},
+  {diff:2,q:"OpenTelemetryのトレーシングを初期化し、HTTPハンドラにspanを追加するコードを書け。",code:"package main\n\nimport (\n    \"context\"\n    \"net/http\"\n    \"go.opentelemetry.io/otel\"\n    \"go.opentelemetry.io/otel/trace\"\n)\n\nfunc handler(w http.ResponseWriter, r *http.Request) {\n    // spanを作成してtrace\n}",answer:"func handler(w http.ResponseWriter, r *http.Request) {\n    tracer := otel.Tracer(\"my-service\")\n    ctx, span := tracer.Start(r.Context(), \"handler\")\n    defer span.End()\n\n    result := doWork(ctx)\n    w.Write([]byte(result))\n}\n\nfunc doWork(ctx context.Context) string {\n    _, span := otel.Tracer(\"my-service\").Start(ctx, \"doWork\")\n    defer span.End()\n    return \"done\"\n}"},
+  {diff:3,q:"pprof HTTPエンドポイントを追加し、CPUプロファイルを30秒取得するcurlコマンドも示せ。",code:"package main\n\nimport (\n    \"net/http\"\n    _ \"net/http/pprof\" // インポートするだけで/debug/pprofが有効になる\n)\n\nfunc main() {\n    // pprofエンドポイント追加済みのサーバーを起動\n    // curlコマンドも書け\n}",answer:"package main\n\nimport (\n    \"net/http\"\n    _ \"net/http/pprof\"\n)\n\nfunc main() {\n    // メインサーバー\n    go http.ListenAndServe(\":8080\", nil)\n\n    // pprofサーバー（別ポートで公開）\n    http.ListenAndServe(\":6060\", nil)\n}\n\n// CPUプロファイル取得（30秒）:\n// curl -o cpu.prof \"http://localhost:6060/debug/pprof/profile?seconds=30\"\n// go tool pprof -http=:8090 cpu.prof"},
 ],
 ch5:[
-  {diff:1,q:"go test -fuzzを使ってParseEmail関数のファジングテストを書け。",code:`package main
-
-import "testing"
-
-func ParseEmail(s string) (string, error) {
-    // 簡易実装
-    if len(s) == 0 { return "", fmt.Errorf("empty") }
-    return s, nil
-}
-
-func FuzzParseEmail(f *testing.F) {
-    // ここに書く
-}`,answer:`func FuzzParseEmail(f *testing.F) {
-    // シードコーパス
-    f.Add("user@example.com")
-    f.Add("invalid")
-    f.Add("")
-
-    f.Fuzz(func(t *testing.T, s string) {
-        // panicしないことだけ確認（エラーはOK）
-        _, _ = ParseEmail(s)
-    })
-}`},
-  {diff:2,q:"testcontainers-goを使ってPostgreSQLコンテナを起動し、統合テストを実行するコードを書け。",code:`package integration
-
-import (
-    "context"
-    "testing"
-    "github.com/testcontainers/testcontainers-go"
-    "github.com/testcontainers/testcontainers-go/modules/postgres"
-)
-
-func TestWithDB(t *testing.T) {
-    // PostgreSQLコンテナを起動してテスト
-}`,answer:`func TestWithDB(t *testing.T) {
-    ctx := context.Background()
-    pg, err := postgres.RunContainer(ctx,
-        testcontainers.WithImage("postgres:16"),
-        postgres.WithDatabase("testdb"),
-        postgres.WithUsername("user"),
-        postgres.WithPassword("pass"),
-        testcontainers.WithWaitStrategy(wait.ForListeningPort("5432/tcp")),
-    )
-    if err != nil { t.Fatal(err) }
-    defer pg.Terminate(ctx)
-
-    dsn, _ := pg.ConnectionString(ctx, "sslmode=disable")
-    // dsnを使ってDB操作のテスト
-    t.Logf("connected: %s", dsn)
-}`},
-  {diff:3,q:"goleak.VerifyTestMain を使ってgoroutineリークをテスト全体で検出するコードを書け。",code:`package main
-
-import (
-    "testing"
-    "go.uber.org/goleak"
-)
-
-func TestMain(m *testing.M) {
-    // golearでgoroutineリークを検出
-}`,answer:`package main
-
-import (
-    "testing"
-    "go.uber.org/goleak"
-)
-
-func TestMain(m *testing.M) {
-    goleak.VerifyTestMain(m)
-}`},
+  {diff:1,q:"go test -fuzzを使ってParseEmail関数のファジングテストを書け。",code:"package main\n\nimport \"testing\"\n\nfunc ParseEmail(s string) (string, error) {\n    // 簡易実装\n    if len(s) == 0 { return \"\", fmt.Errorf(\"empty\") }\n    return s, nil\n}\n\nfunc FuzzParseEmail(f *testing.F) {\n    // ここに書く\n}",answer:"func FuzzParseEmail(f *testing.F) {\n    // シードコーパス\n    f.Add(\"user@example.com\")\n    f.Add(\"invalid\")\n    f.Add(\"\")\n\n    f.Fuzz(func(t *testing.T, s string) {\n        // panicしないことだけ確認（エラーはOK）\n        _, _ = ParseEmail(s)\n    })\n}"},
+  {diff:2,q:"testcontainers-goを使ってPostgreSQLコンテナを起動し、統合テストを実行するコードを書け。",code:"package integration\n\nimport (\n    \"context\"\n    \"testing\"\n    \"github.com/testcontainers/testcontainers-go\"\n    \"github.com/testcontainers/testcontainers-go/modules/postgres\"\n)\n\nfunc TestWithDB(t *testing.T) {\n    // PostgreSQLコンテナを起動してテスト\n}",answer:"func TestWithDB(t *testing.T) {\n    ctx := context.Background()\n    pg, err := postgres.RunContainer(ctx,\n        testcontainers.WithImage(\"postgres:16\"),\n        postgres.WithDatabase(\"testdb\"),\n        postgres.WithUsername(\"user\"),\n        postgres.WithPassword(\"pass\"),\n        testcontainers.WithWaitStrategy(wait.ForListeningPort(\"5432/tcp\")),\n    )\n    if err != nil { t.Fatal(err) }\n    defer pg.Terminate(ctx)\n\n    dsn, _ := pg.ConnectionString(ctx, \"sslmode=disable\")\n    // dsnを使ってDB操作のテスト\n    t.Logf(\"connected: %s\", dsn)\n}"},
+  {diff:3,q:"goleak.VerifyTestMain を使ってgoroutineリークをテスト全体で検出するコードを書け。",code:"package main\n\nimport (\n    \"testing\"\n    \"go.uber.org/goleak\"\n)\n\nfunc TestMain(m *testing.M) {\n    // golearでgoroutineリークを検出\n}",answer:"package main\n\nimport (\n    \"testing\"\n    \"go.uber.org/goleak\"\n)\n\nfunc TestMain(m *testing.M) {\n    goleak.VerifyTestMain(m)\n}"},
 ],
 ch6:[
-  {diff:1,q:"Dockerfileのマルチステージビルドを使ってGoバイナリを最小Dockerイメージに入れるDockerfileを書け。",code:`# Dockerfile
-# マルチステージビルドでscratchイメージに入れる`,answer:`FROM golang:1.22-alpine AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o app .
-
-FROM scratch
-COPY --from=builder /app/app /app
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-USER 65534:65534
-ENTRYPOINT ["/app"]`},
-  {diff:2,q:"Kubernetes DeploymentのYAMLを書け。readinessProbe・resource limitsを含めること。",code:`# deployment.yaml`,answer:`apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: myapp
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: myapp
-  template:
-    metadata:
-      labels:
-        app: myapp
-    spec:
-      containers:
-      - name: myapp
-        image: myapp:latest
-        ports:
-        - containerPort: 8080
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "64Mi"
-          limits:
-            cpu: "500m"
-            memory: "256Mi"`},
-  {diff:3,q:"GracefulShutdownを実装し、SIGTERMを受け取ってから既存リクエストを5秒以内に完了するサーバーを書け。",code:`package main
-
-import (
-    "context"
-    "net/http"
-    "os"
-    "os/signal"
-    "syscall"
-    "time"
-)
-
-func main() {
-    // ここに書く
-}`,answer:`func main() {
-    srv := &http.Server{Addr: ":8080", Handler: http.DefaultServeMux}
-
-    go func() {
-        if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-            panic(err)
-        }
-    }()
-
-    sig := make(chan os.Signal, 1)
-    signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
-    <-sig
-
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
-    if err := srv.Shutdown(ctx); err != nil {
-        panic(err)
-    }
-}`},
+  {diff:1,q:"Dockerfileのマルチステージビルドを使ってGoバイナリを最小Dockerイメージに入れるDockerfileを書け。",code:"# Dockerfile\n# マルチステージビルドでscratchイメージに入れる",answer:"FROM golang:1.22-alpine AS builder\nWORKDIR /app\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 GOOS=linux go build -ldflags=\"-s -w\" -o app .\n\nFROM scratch\nCOPY --from=builder /app/app /app\nCOPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/\nUSER 65534:65534\nENTRYPOINT [\"/app\"]"},
+  {diff:2,q:"Kubernetes DeploymentのYAMLを書け。readinessProbe・resource limitsを含めること。",code:"# deployment.yaml",answer:"apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: myapp\n  template:\n    metadata:\n      labels:\n        app: myapp\n    spec:\n      containers:\n      - name: myapp\n        image: myapp:latest\n        ports:\n        - containerPort: 8080\n        readinessProbe:\n          httpGet:\n            path: /healthz\n            port: 8080\n          initialDelaySeconds: 5\n          periodSeconds: 10\n        resources:\n          requests:\n            cpu: \"100m\"\n            memory: \"64Mi\"\n          limits:\n            cpu: \"500m\"\n            memory: \"256Mi\""},
+  {diff:3,q:"GracefulShutdownを実装し、SIGTERMを受け取ってから既存リクエストを5秒以内に完了するサーバーを書け。",code:"package main\n\nimport (\n    \"context\"\n    \"net/http\"\n    \"os\"\n    \"os/signal\"\n    \"syscall\"\n    \"time\"\n)\n\nfunc main() {\n    // ここに書く\n}",answer:"func main() {\n    srv := &http.Server{Addr: \":8080\", Handler: http.DefaultServeMux}\n\n    go func() {\n        if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {\n            panic(err)\n        }\n    }()\n\n    sig := make(chan os.Signal, 1)\n    signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)\n    <-sig\n\n    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)\n    defer cancel()\n    if err := srv.Shutdown(ctx); err != nil {\n        panic(err)\n    }\n}"},
 ],
 ch7:[
-  {diff:1,q:"sync/errgroup を使って複数の非同期タスクを並列実行し、いずれかのエラーで全てをキャンセルするコードを書け。",code:`package main
-
-import (
-    "context"
-    "fmt"
-    "golang.org/x/sync/errgroup"
-)
-
-func main() {
-    g, ctx := errgroup.WithContext(context.Background())
-    // 3つのタスクを並列実行
-    if err := g.Wait(); err != nil {
-        fmt.Println("error:", err)
-    }
-}`,answer:`func main() {
-    g, ctx := errgroup.WithContext(context.Background())
-
-    for i := 0; i < 3; i++ {
-        i := i
-        g.Go(func() error {
-            select {
-            case <-ctx.Done():
-                return ctx.Err()
-            default:
-                fmt.Printf("task %d done\n", i)
-                return nil
-            }
-        })
-    }
-    if err := g.Wait(); err != nil {
-        fmt.Println("error:", err)
-    }
-}`},
-  {diff:2,q:"rate.Limiter（golang.org/x/time/rate）を使って毎秒10リクエストに制限するmiddlewareを書け。",code:`package main
-
-import (
-    "net/http"
-    "golang.org/x/time/rate"
-)
-
-func rateLimitMiddleware(rps float64) func(http.Handler) http.Handler {
-    limiter := rate.NewLimiter(rate.Limit(rps), int(rps))
-    return func(next http.Handler) http.Handler {
-        // ここに書く
-    }
-}`,answer:`func rateLimitMiddleware(rps float64) func(http.Handler) http.Handler {
-    limiter := rate.NewLimiter(rate.Limit(rps), int(rps))
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            if !limiter.Allow() {
-                http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
-                return
-            }
-            next.ServeHTTP(w, r)
-        })
-    }
-}`},
-  {diff:3,q:"NATSのpub/subを使って、publisherがメッセージを送り、subscriberが非同期に受け取るコードを書け。",code:`// nats-io/nats.go
-package main
-
-import (
-    "fmt"
-    "time"
-    "github.com/nats-io/nats.go"
-)
-
-func main() {
-    nc, _ := nats.Connect(nats.DefaultURL)
-    defer nc.Close()
-    // publish と subscribe
-}`,answer:`func main() {
-    nc, err := nats.Connect(nats.DefaultURL)
-    if err != nil { panic(err) }
-    defer nc.Close()
-
-    // subscribe
-    nc.Subscribe("tasks", func(m *nats.Msg) {
-        fmt.Printf("received: %s\n", string(m.Data))
-    })
-
-    // publish
-    nc.Publish("tasks", []byte("hello from publisher"))
-    time.Sleep(100 * time.Millisecond)
-}`},
+  {diff:1,q:"sync/errgroup を使って複数の非同期タスクを並列実行し、いずれかのエラーで全てをキャンセルするコードを書け。",code:"package main\n\nimport (\n    \"context\"\n    \"fmt\"\n    \"golang.org/x/sync/errgroup\"\n)\n\nfunc main() {\n    g, ctx := errgroup.WithContext(context.Background())\n    // 3つのタスクを並列実行\n    if err := g.Wait(); err != nil {\n        fmt.Println(\"error:\", err)\n    }\n}",answer:"func main() {\n    g, ctx := errgroup.WithContext(context.Background())\n\n    for i := 0; i < 3; i++ {\n        i := i\n        g.Go(func() error {\n            select {\n            case <-ctx.Done():\n                return ctx.Err()\n            default:\n                fmt.Printf(\"task %d done\n\", i)\n                return nil\n            }\n        })\n    }\n    if err := g.Wait(); err != nil {\n        fmt.Println(\"error:\", err)\n    }\n}"},
+  {diff:2,q:"rate.Limiter（golang.org/x/time/rate）を使って毎秒10リクエストに制限するmiddlewareを書け。",code:"package main\n\nimport (\n    \"net/http\"\n    \"golang.org/x/time/rate\"\n)\n\nfunc rateLimitMiddleware(rps float64) func(http.Handler) http.Handler {\n    limiter := rate.NewLimiter(rate.Limit(rps), int(rps))\n    return func(next http.Handler) http.Handler {\n        // ここに書く\n    }\n}",answer:"func rateLimitMiddleware(rps float64) func(http.Handler) http.Handler {\n    limiter := rate.NewLimiter(rate.Limit(rps), int(rps))\n    return func(next http.Handler) http.Handler {\n        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n            if !limiter.Allow() {\n                http.Error(w, \"rate limit exceeded\", http.StatusTooManyRequests)\n                return\n            }\n            next.ServeHTTP(w, r)\n        })\n    }\n}"},
+  {diff:3,q:"NATSのpub/subを使って、publisherがメッセージを送り、subscriberが非同期に受け取るコードを書け。",code:"// nats-io/nats.go\npackage main\n\nimport (\n    \"fmt\"\n    \"time\"\n    \"github.com/nats-io/nats.go\"\n)\n\nfunc main() {\n    nc, _ := nats.Connect(nats.DefaultURL)\n    defer nc.Close()\n    // publish と subscribe\n}",answer:"func main() {\n    nc, err := nats.Connect(nats.DefaultURL)\n    if err != nil { panic(err) }\n    defer nc.Close()\n\n    // subscribe\n    nc.Subscribe(\"tasks\", func(m *nats.Msg) {\n        fmt.Printf(\"received: %s\n\", string(m.Data))\n    })\n\n    // publish\n    nc.Publish(\"tasks\", []byte(\"hello from publisher\"))\n    time.Sleep(100 * time.Millisecond)\n}"},
 ],
 ch8:[
-  {diff:1,q:"go test -bench=. でベンチマークを実行し、-benchmemでメモリ割り当てを表示するコマンドを示せ。また簡単なベンチマーク関数も書け。",code:`// 文字列結合のベンチマーク
-func BenchmarkConcat(b *testing.B) {
-    // +演算子での結合
-}
-
-func BenchmarkBuilder(b *testing.B) {
-    // strings.Builderでの結合
-}`,answer:`func BenchmarkConcat(b *testing.B) {
-    for i := 0; i < b.N; i++ {
-        s := ""
-        for j := 0; j < 100; j++ { s += "a" }
-        _ = s
-    }
-}
-
-func BenchmarkBuilder(b *testing.B) {
-    for i := 0; i < b.N; i++ {
-        var sb strings.Builder
-        for j := 0; j < 100; j++ { sb.WriteString("a") }
-        _ = sb.String()
-    }
-}
-
-// 実行コマンド:
-// go test -bench=. -benchmem -count=5`},
-  {diff:2,q:"sync.Poolを使って[]byteバッファを再利用し、HTTPレスポンスのバッファリングのアロケーションを削減するコードを書け。",code:`package main
-
-import (
-    "bytes"
-    "net/http"
-    "sync"
-)
-
-var bufPool = sync.Pool{
-    New: func() any { return new(bytes.Buffer) },
-}
-
-func handler(w http.ResponseWriter, r *http.Request) {
-    // sync.Poolのバッファを使ってレスポンスを構築
-}`,answer:`func handler(w http.ResponseWriter, r *http.Request) {
-    buf := bufPool.Get().(*bytes.Buffer)
-    buf.Reset()
-    defer bufPool.Put(buf)
-
-    buf.WriteString("Hello from buffered handler!")
-    w.Write(buf.Bytes())
-}`},
-  {diff:3,q:"GOGC=off とGOMEMLIMITを設定して、GCを無効にしつつメモリ上限を設定するコードと環境変数設定を示せ。",code:`// GC制御の方法を示せ
-// 1. 環境変数
-// 2. Goコードからの設定`,answer:`// 環境変数（起動時）
-// GOGC=off GOMEMLIMIT=512MiB ./myapp
-
-// GoコードからGOGOGCを設定（runtime/debug）
-import (
-    "runtime"
-    "runtime/debug"
-)
-
-func configureGC() {
-    // GCを無効化（バッチ処理等で有用）
-    debug.SetGCPercent(-1)
-
-    // メモリ上限を512MBに設定（Go 1.19+）
-    debug.SetMemoryLimit(512 * 1024 * 1024)
-
-    // 明示的にGCを実行
-    runtime.GC()
-}`},
+  {diff:1,q:"go test -bench=. でベンチマークを実行し、-benchmemでメモリ割り当てを表示するコマンドを示せ。また簡単なベンチマーク関数も書け。",code:"// 文字列結合のベンチマーク\nfunc BenchmarkConcat(b *testing.B) {\n    // +演算子での結合\n}\n\nfunc BenchmarkBuilder(b *testing.B) {\n    // strings.Builderでの結合\n}",answer:"func BenchmarkConcat(b *testing.B) {\n    for i := 0; i < b.N; i++ {\n        s := \"\"\n        for j := 0; j < 100; j++ { s += \"a\" }\n        _ = s\n    }\n}\n\nfunc BenchmarkBuilder(b *testing.B) {\n    for i := 0; i < b.N; i++ {\n        var sb strings.Builder\n        for j := 0; j < 100; j++ { sb.WriteString(\"a\") }\n        _ = sb.String()\n    }\n}\n\n// 実行コマンド:\n// go test -bench=. -benchmem -count=5"},
+  {diff:2,q:"sync.Poolを使って[]byteバッファを再利用し、HTTPレスポンスのバッファリングのアロケーションを削減するコードを書け。",code:"package main\n\nimport (\n    \"bytes\"\n    \"net/http\"\n    \"sync\"\n)\n\nvar bufPool = sync.Pool{\n    New: func() any { return new(bytes.Buffer) },\n}\n\nfunc handler(w http.ResponseWriter, r *http.Request) {\n    // sync.Poolのバッファを使ってレスポンスを構築\n}",answer:"func handler(w http.ResponseWriter, r *http.Request) {\n    buf := bufPool.Get().(*bytes.Buffer)\n    buf.Reset()\n    defer bufPool.Put(buf)\n\n    buf.WriteString(\"Hello from buffered handler!\")\n    w.Write(buf.Bytes())\n}"},
+  {diff:3,q:"GOGC=off とGOMEMLIMITを設定して、GCを無効にしつつメモリ上限を設定するコードと環境変数設定を示せ。",code:"// GC制御の方法を示せ\n// 1. 環境変数\n// 2. Goコードからの設定",answer:"// 環境変数（起動時）\n// GOGC=off GOMEMLIMIT=512MiB ./myapp\n\n// GoコードからGOGOGCを設定（runtime/debug）\nimport (\n    \"runtime\"\n    \"runtime/debug\"\n)\n\nfunc configureGC() {\n    // GCを無効化（バッチ処理等で有用）\n    debug.SetGCPercent(-1)\n\n    // メモリ上限を512MBに設定（Go 1.19+）\n    debug.SetMemoryLimit(512 * 1024 * 1024)\n\n    // 明示的にGCを実行\n    runtime.GC()\n}"},
 ],
 ch9:[
-  {diff:1,q:"go generate と stringer を使ってColor型のString()メソッドを自動生成するコードを書け。",code:`//go:generate stringer -type=Color
-
-package main
-
-type Color int
-
-const (
-    Red Color = iota
-    Green
-    Blue
-)`,answer:`//go:generate stringer -type=Color
-
-package main
-
-type Color int
-
-const (
-    Red Color = iota
-    Green
-    Blue
-)
-
-// go generate を実行すると color_string.go が自動生成される
-// 生成されたファイルに String() が実装される
-// go install golang.org/x/tools/cmd/stringer@latest が必要`},
-  {diff:2,q:"wire（google/wire）を使ったDependency Injectionの基本構造を書け（Provider + Injector）。",code:`// google.golang.org/wire
-package main
-
-import "github.com/google/wire"
-
-type Config struct{ DSN string }
-type DB struct{ cfg *Config }
-type App struct{ db *DB }
-
-// Providerを定義して wire.Build でApp生成
-`,answer:`type Config struct{ DSN string }
-type DB struct{ cfg *Config }
-type App struct{ db *DB }
-
-// Provider
-func NewConfig() *Config { return &Config{DSN: "postgres://..."} }
-func NewDB(cfg *Config) *DB { return &DB{cfg: cfg} }
-func NewApp(db *DB) *App { return &App{db: db} }
-
-// wire_gen.go（wireが自動生成）:
-// func InitializeApp() *App {
-//     cfg := NewConfig()
-//     db := NewDB(cfg)
-//     return NewApp(db)
-// }
-
-var AppSet = wire.NewSet(NewConfig, NewDB, NewApp)`},
-  {diff:3,q:"reflect.TypeOfとreflect.ValueOfを使って、任意のstructのフィールド名と値をmapに変換するStructToMap関数を書け。",code:`package main
-
-import (
-    "fmt"
-    "reflect"
-)
-
-func StructToMap(s any) map[string]any {
-    // reflectを使う
-}`,answer:`func StructToMap(s any) map[string]any {
-    result := make(map[string]any)
-    v := reflect.ValueOf(s)
-    t := reflect.TypeOf(s)
-    if v.Kind() == reflect.Ptr {
-        v = v.Elem()
-        t = t.Elem()
-    }
-    for i := 0; i < v.NumField(); i++ {
-        result[t.Field(i).Name] = v.Field(i).Interface()
-    }
-    return result
-}`},
+  {diff:1,q:"go generate と stringer を使ってColor型のString()メソッドを自動生成するコードを書け。",code:"//go:generate stringer -type=Color\n\npackage main\n\ntype Color int\n\nconst (\n    Red Color = iota\n    Green\n    Blue\n)",answer:"//go:generate stringer -type=Color\n\npackage main\n\ntype Color int\n\nconst (\n    Red Color = iota\n    Green\n    Blue\n)\n\n// go generate を実行すると color_string.go が自動生成される\n// 生成されたファイルに String() が実装される\n// go install golang.org/x/tools/cmd/stringer@latest が必要"},
+  {diff:2,q:"wire（google/wire）を使ったDependency Injectionの基本構造を書け（Provider + Injector）。",code:"// google.golang.org/wire\npackage main\n\nimport \"github.com/google/wire\"\n\ntype Config struct{ DSN string }\ntype DB struct{ cfg *Config }\ntype App struct{ db *DB }\n\n// Providerを定義して wire.Build でApp生成\n",answer:"type Config struct{ DSN string }\ntype DB struct{ cfg *Config }\ntype App struct{ db *DB }\n\n// Provider\nfunc NewConfig() *Config { return &Config{DSN: \"postgres://...\"} }\nfunc NewDB(cfg *Config) *DB { return &DB{cfg: cfg} }\nfunc NewApp(db *DB) *App { return &App{db: db} }\n\n// wire_gen.go（wireが自動生成）:\n// func InitializeApp() *App {\n//     cfg := NewConfig()\n//     db := NewDB(cfg)\n//     return NewApp(db)\n// }\n\nvar AppSet = wire.NewSet(NewConfig, NewDB, NewApp)"},
+  {diff:3,q:"reflect.TypeOfとreflect.ValueOfを使って、任意のstructのフィールド名と値をmapに変換するStructToMap関数を書け。",code:"package main\n\nimport (\n    \"fmt\"\n    \"reflect\"\n)\n\nfunc StructToMap(s any) map[string]any {\n    // reflectを使う\n}",answer:"func StructToMap(s any) map[string]any {\n    result := make(map[string]any)\n    v := reflect.ValueOf(s)\n    t := reflect.TypeOf(s)\n    if v.Kind() == reflect.Ptr {\n        v = v.Elem()\n        t = t.Elem()\n    }\n    for i := 0; i < v.NumField(); i++ {\n        result[t.Field(i).Name] = v.Field(i).Interface()\n    }\n    return result\n}"},
 ],
 ch10:[
-  {diff:1,q:"Goのマイクロサービス構成でサービスAがサービスBをHTTP経由で呼び出す際、contextを正しく伝播させるコードを書け。",code:`func callServiceB(ctx context.Context, url string) error {
-    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-    // ここに書く
-}`,answer:`func callServiceB(ctx context.Context, url string) error {
-    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-    if err != nil { return err }
-
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil { return err }
-    defer resp.Body.Close()
-
-    if resp.StatusCode >= 400 {
-        return fmt.Errorf("service B error: %d", resp.StatusCode)
-    }
-    return nil
-}`},
-  {diff:2,q:"OpenTelemetryでHTTPリクエストのtrace contextをW3C Trace Context形式でプロパゲートするコードを書け。",code:`import (
-    "net/http"
-    "go.opentelemetry.io/otel/propagation"
-)
-
-// HTTPリクエストにtrace contextを注入
-func injectTraceContext(ctx context.Context, req *http.Request) {
-    // ここに書く
-}`,answer:`import (
-    "context"
-    "net/http"
-    "go.opentelemetry.io/otel"
-    "go.opentelemetry.io/otel/propagation"
-)
-
-func injectTraceContext(ctx context.Context, req *http.Request) {
-    prop := otel.GetTextMapPropagator()
-    prop.Inject(ctx, propagation.HeaderCarrier(req.Header))
-}
-
-func extractTraceContext(r *http.Request) context.Context {
-    prop := otel.GetTextMapPropagator()
-    return prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
-}`},
-  {diff:3,q:"k8s client-goを使ってPod一覧を取得するコードを書け（in-cluster設定を使うこと）。",code:`package main
-
-import (
-    "context"
-    "fmt"
-    "k8s.io/client-go/kubernetes"
-    "k8s.io/client-go/rest"
-)
-
-func main() {
-    // in-cluster設定でkubernetesクライアント作成
-}`,answer:`package main
-
-import (
-    "context"
-    "fmt"
-    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-    "k8s.io/client-go/kubernetes"
-    "k8s.io/client-go/rest"
-)
-
-func main() {
-    config, err := rest.InClusterConfig()
-    if err != nil { panic(err) }
-
-    clientset, err := kubernetes.NewForConfig(config)
-    if err != nil { panic(err) }
-
-    pods, err := clientset.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{})
-    if err != nil { panic(err) }
-
-    for _, pod := range pods.Items {
-        fmt.Printf("%s/%s\n", pod.Namespace, pod.Name)
-    }
-}`},
+  {diff:1,q:"Goのマイクロサービス構成でサービスAがサービスBをHTTP経由で呼び出す際、contextを正しく伝播させるコードを書け。",code:"func callServiceB(ctx context.Context, url string) error {\n    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)\n    // ここに書く\n}",answer:"func callServiceB(ctx context.Context, url string) error {\n    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)\n    if err != nil { return err }\n\n    resp, err := http.DefaultClient.Do(req)\n    if err != nil { return err }\n    defer resp.Body.Close()\n\n    if resp.StatusCode >= 400 {\n        return fmt.Errorf(\"service B error: %d\", resp.StatusCode)\n    }\n    return nil\n}"},
+  {diff:2,q:"OpenTelemetryでHTTPリクエストのtrace contextをW3C Trace Context形式でプロパゲートするコードを書け。",code:"import (\n    \"net/http\"\n    \"go.opentelemetry.io/otel/propagation\"\n)\n\n// HTTPリクエストにtrace contextを注入\nfunc injectTraceContext(ctx context.Context, req *http.Request) {\n    // ここに書く\n}",answer:"import (\n    \"context\"\n    \"net/http\"\n    \"go.opentelemetry.io/otel\"\n    \"go.opentelemetry.io/otel/propagation\"\n)\n\nfunc injectTraceContext(ctx context.Context, req *http.Request) {\n    prop := otel.GetTextMapPropagator()\n    prop.Inject(ctx, propagation.HeaderCarrier(req.Header))\n}\n\nfunc extractTraceContext(r *http.Request) context.Context {\n    prop := otel.GetTextMapPropagator()\n    return prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))\n}"},
+  {diff:3,q:"k8s client-goを使ってPod一覧を取得するコードを書け（in-cluster設定を使うこと）。",code:"package main\n\nimport (\n    \"context\"\n    \"fmt\"\n    \"k8s.io/client-go/kubernetes\"\n    \"k8s.io/client-go/rest\"\n)\n\nfunc main() {\n    // in-cluster設定でkubernetesクライアント作成\n}",answer:"package main\n\nimport (\n    \"context\"\n    \"fmt\"\n    metav1 \"k8s.io/apimachinery/pkg/apis/meta/v1\"\n    \"k8s.io/client-go/kubernetes\"\n    \"k8s.io/client-go/rest\"\n)\n\nfunc main() {\n    config, err := rest.InClusterConfig()\n    if err != nil { panic(err) }\n\n    clientset, err := kubernetes.NewForConfig(config)\n    if err != nil { panic(err) }\n\n    pods, err := clientset.CoreV1().Pods(\"\").List(context.Background(), metav1.ListOptions{})\n    if err != nil { panic(err) }\n\n    for _, pod := range pods.Items {\n        fmt.Printf(\"%s/%s\n\", pod.Namespace, pod.Name)\n    }\n}"},
 ],
 ch11:[
-  {diff:1,q:"golangci-lint の.golangci.yaml設定ファイルで、errcheck・govet・staticcheck・gofmtを有効にする設定を書け。",code:`# .golangci.yaml`,answer:`run:
-  timeout: 5m
-
-linters:
-  enable:
-    - errcheck
-    - govet
-    - staticcheck
-    - gofmt
-    - goimports
-    - gosec
-    - ineffassign
-    - unused
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true`},
-  {diff:2,q:"go mod graph と go mod why を使って依存関係を調査するコマンドを示せ。",code:`# 依存関係を調査するコマンドを書け`,answer:`# 依存グラフを表示
-go mod graph
-
-# 特定パッケージが必要な理由を表示
-go mod why github.com/some/package
-
-# 脆弱性チェック（Go 1.18+）
-govulncheck ./...
-
-# 不要な依存を削除
-go mod tidy
-
-# ビルドに含まれるパッケージを一覧
-go list -deps ./...`},
-  {diff:3,q:"Goプロジェクトのセキュリティチェックを行うgosecとgovulncheckのCIステップを含むGitHub Actions yamlを書け。",code:`# .github/workflows/security.yml`,answer:`name: Security
-
-on: [push, pull_request]
-
-jobs:
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: govulncheck
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
-
-      - name: gosec
-        uses: securego/gosec@master
-        with:
-          args: './...'`},
+  {diff:1,q:"golangci-lint の.golangci.yaml設定ファイルで、errcheck・govet・staticcheck・gofmtを有効にする設定を書け。",code:"# .golangci.yaml",answer:"run:\n  timeout: 5m\n\nlinters:\n  enable:\n    - errcheck\n    - govet\n    - staticcheck\n    - gofmt\n    - goimports\n    - gosec\n    - ineffassign\n    - unused\n\nlinters-settings:\n  errcheck:\n    check-type-assertions: true"},
+  {diff:2,q:"go mod graph と go mod why を使って依存関係を調査するコマンドを示せ。",code:"# 依存関係を調査するコマンドを書け",answer:"# 依存グラフを表示\ngo mod graph\n\n# 特定パッケージが必要な理由を表示\ngo mod why github.com/some/package\n\n# 脆弱性チェック（Go 1.18+）\ngovulncheck ./...\n\n# 不要な依存を削除\ngo mod tidy\n\n# ビルドに含まれるパッケージを一覧\ngo list -deps ./..."},
+  {diff:3,q:"Goプロジェクトのセキュリティチェックを行うgosecとgovulncheckのCIステップを含むGitHub Actions yamlを書け。",code:"# .github/workflows/security.yml",answer:"name: Security\n\non: [push, pull_request]\n\njobs:\n  security:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-go@v5\n        with:\n          go-version: '1.22'\n\n      - name: govulncheck\n        run: |\n          go install golang.org/x/vuln/cmd/govulncheck@latest\n          govulncheck ./...\n\n      - name: gosec\n        uses: securego/gosec@master\n        with:\n          args: './...'"},
 ],
 ch12:[
-  {diff:1,q:"Goのリフレクションを使ってJSON tagからフィールドマッピングを動的に行うシリアライザの概念コードを書け。",code:`func marshalWithTags(v any) (map[string]any, error) {
-    // reflectでstructのjsonタグを読む
-}`,answer:`func marshalWithTags(v any) (map[string]any, error) {
-    result := make(map[string]any)
-    val := reflect.ValueOf(v)
-    typ := reflect.TypeOf(v)
-    if val.Kind() == reflect.Ptr {
-        val = val.Elem()
-        typ = typ.Elem()
-    }
-    for i := 0; i < typ.NumField(); i++ {
-        field := typ.Field(i)
-        tag := field.Tag.Get("json")
-        name := strings.Split(tag, ",")[0]
-        if name == "" { name = field.Name }
-        if name == "-" { continue }
-        result[name] = val.Field(i).Interface()
-    }
-    return result, nil
-}`},
-  {diff:2,q:"Goのプラグインシステム（plugin.Open）を使ってsoファイルをロードしてSymbolを呼び出すコードを書け。",code:`package main
-
-import (
-    "fmt"
-    "plugin"
-)
-
-func main() {
-    // plugin.Openでsoをロード
-    // Lookupでシンボルを取得
-}`,answer:`func main() {
-    p, err := plugin.Open("./myplugin.so")
-    if err != nil { panic(err) }
-
-    sym, err := p.Lookup("Greet")
-    if err != nil { panic(err) }
-
-    greet, ok := sym.(func(string) string)
-    if !ok { panic("invalid symbol type") }
-
-    fmt.Println(greet("World"))
-}`},
-  {diff:3,q:"大規模Goプロジェクトのディレクトリ構造とパッケージ設計方針を示すコメント形式のアーキテクチャドキュメントを書け。",code:`// プロジェクトのアーキテクチャを説明するコメントを書け`,answer:`// myapp/ - マイクロサービスのモノレポ構造
-// ├── cmd/
-// │   ├── api/main.go         - REST APIサーバーのエントリポイント
-// │   └── worker/main.go      - バックグラウンドワーカーのエントリポイント
-// ├── internal/
-// │   ├── domain/             - ビジネスロジック（外部依存なし）
-// │   │   ├── user.go         - Userエンティティ・値オブジェクト
-// │   │   └── user_repo.go    - リポジトリインターフェース定義
-// │   ├── infra/              - インフラ実装
-// │   │   └── postgres/       - DB実装
-// │   ├── handler/            - HTTPハンドラ
-// │   └── service/            - アプリケーションサービス
-// ├── pkg/                    - 外部公開パッケージ
-// └── proto/                  - Protocol Buffers定義`},
+  {diff:1,q:"Goのリフレクションを使ってJSON tagからフィールドマッピングを動的に行うシリアライザの概念コードを書け。",code:"func marshalWithTags(v any) (map[string]any, error) {\n    // reflectでstructのjsonタグを読む\n}",answer:"func marshalWithTags(v any) (map[string]any, error) {\n    result := make(map[string]any)\n    val := reflect.ValueOf(v)\n    typ := reflect.TypeOf(v)\n    if val.Kind() == reflect.Ptr {\n        val = val.Elem()\n        typ = typ.Elem()\n    }\n    for i := 0; i < typ.NumField(); i++ {\n        field := typ.Field(i)\n        tag := field.Tag.Get(\"json\")\n        name := strings.Split(tag, \",\")[0]\n        if name == \"\" { name = field.Name }\n        if name == \"-\" { continue }\n        result[name] = val.Field(i).Interface()\n    }\n    return result, nil\n}"},
+  {diff:2,q:"Goのプラグインシステム（plugin.Open）を使ってsoファイルをロードしてSymbolを呼び出すコードを書け。",code:"package main\n\nimport (\n    \"fmt\"\n    \"plugin\"\n)\n\nfunc main() {\n    // plugin.Openでsoをロード\n    // Lookupでシンボルを取得\n}",answer:"func main() {\n    p, err := plugin.Open(\"./myplugin.so\")\n    if err != nil { panic(err) }\n\n    sym, err := p.Lookup(\"Greet\")\n    if err != nil { panic(err) }\n\n    greet, ok := sym.(func(string) string)\n    if !ok { panic(\"invalid symbol type\") }\n\n    fmt.Println(greet(\"World\"))\n}"},
+  {diff:3,q:"大規模Goプロジェクトのディレクトリ構造とパッケージ設計方針を示すコメント形式のアーキテクチャドキュメントを書け。",code:"// プロジェクトのアーキテクチャを説明するコメントを書け",answer:"// myapp/ - マイクロサービスのモノレポ構造\n// ├── cmd/\n// │   ├── api/main.go         - REST APIサーバーのエントリポイント\n// │   └── worker/main.go      - バックグラウンドワーカーのエントリポイント\n// ├── internal/\n// │   ├── domain/             - ビジネスロジック（外部依存なし）\n// │   │   ├── user.go         - Userエンティティ・値オブジェクト\n// │   │   └── user_repo.go    - リポジトリインターフェース定義\n// │   ├── infra/              - インフラ実装\n// │   │   └── postgres/       - DB実装\n// │   ├── handler/            - HTTPハンドラ\n// │   └── service/            - アプリケーションサービス\n// ├── pkg/                    - 外部公開パッケージ\n// └── proto/                  - Protocol Buffers定義"},
 ],
 };
 
@@ -1005,289 +179,107 @@ const chapters = [
 goal:"database/sqlとpgxを使ってPostgreSQLに接続し、CRUD操作・トランザクション・コネクションプールを実装できる。",
 sections:[
 {title:"GoとPostgreSQL",
-body:`database/sqlはGoのDBアクセスの標準インターフェースで、ドライバを差し替えてMySQL・PostgreSQL・SQLiteを統一的に扱えます。本番では多くのチームがpgx（高性能PostgreSQLドライバ）か、sqlx（database/sqlの薄いラッパー）を使います。PythonのpsycopgやSQLAlchemyのCoreに相当しますが、型安全なスキャンが特徴です。
-
-GORMのようなORMは学習コストを下げますが、複雑なクエリで限界を迎えます。SQLを直接書けるチームにはsqlxかpgxが推奨されます。golang-migrateでマイグレーションを管理し、スキーマをバージョン管理します。`,
+body:"database/sqlはGoのDBアクセスの標準インターフェースで、ドライバを差し替えてMySQL・PostgreSQL・SQLiteを統一的に扱えます。本番では多くのチームがpgx（高性能PostgreSQLドライバ）か、sqlx（database/sqlの薄いラッパー）を使います。PythonのpsycopgやSQLAlchemyのCoreに相当しますが、型安全なスキャンが特徴です。\n\nGORMのようなORMは学習コストを下げますが、複雑なクエリで限界を迎えます。SQLを直接書けるチームにはsqlxかpgxが推奨されます。golang-migrateでマイグレーションを管理し、スキーマをバージョン管理します。",
 table:T.sqlxVsGorm,
-code:`package main
-
-import (
-    "context"
-    "fmt"
-    "github.com/jackc/pgx/v5/pgxpool"
-)
-
-func main() {
-    dsn := "postgresql://user:pass@localhost/mydb?sslmode=disable"
-    pool, err := pgxpool.New(context.Background(), dsn)
-    if err != nil { panic(err) }
-    defer pool.Close()
-
-    if err := pool.Ping(context.Background()); err != nil {
-        panic(err)
-    }
-    fmt.Println("connected to PostgreSQL")
-}`,
-afterCode:`pgxpool.Newはコネクションプールを作成します。デフォルトでCPUコア数×4のコネクション数が設定されます。本番では最大コネクション数をDBのmax_connectionsに合わせて適切に設定してください。`,
+code:"package main\n\nimport (\n    \"context\"\n    \"fmt\"\n    \"github.com/jackc/pgx/v5/pgxpool\"\n)\n\nfunc main() {\n    dsn := \"postgresql://user:pass@localhost/mydb?sslmode=disable\"\n    pool, err := pgxpool.New(context.Background(), dsn)\n    if err != nil { panic(err) }\n    defer pool.Close()\n\n    if err := pool.Ping(context.Background()); err != nil {\n        panic(err)\n    }\n    fmt.Println(\"connected to PostgreSQL\")\n}",
+afterCode:"pgxpool.Newはコネクションプールを作成します。デフォルトでCPUコア数×4のコネクション数が設定されます。本番では最大コネクション数をDBのmax_connectionsに合わせて適切に設定してください。",
 table2: T.pgxFeatures},
 ]},
 {id:"ch2",num:2,title:"Webフレームワーク: go-chi・GORM",est:"70分",
 goal:"go-chi/chiでREST APIを構築し、ミドルウェアを設定できる。JWTによる認証を実装できる。",
 sections:[
 {title:"go-chiによるルーティング",
-body:`go-chi/chiはnet/httpを拡張したルーターで、パスパラメータ・ミドルウェア・サブルーターを標準的なhttp.Handlerインターフェースと完全に互換性を保ちながら提供します。Pythonのflask/FastAPIのルーティングと同じ感覚で書けます。
-
-ミドルウェアはhttp.Handler → http.Handlerの関数で、r.Use()でスタックに追加します。chi/middlewareパッケージには実用的なミドルウェアが揃っており、本番環境では少なくともLogger・Recoverer・RequestIDを使うことを推奨します。`,
+body:"go-chi/chiはnet/httpを拡張したルーターで、パスパラメータ・ミドルウェア・サブルーターを標準的なhttp.Handlerインターフェースと完全に互換性を保ちながら提供します。Pythonのflask/FastAPIのルーティングと同じ感覚で書けます。\n\nミドルウェアはhttp.Handler → http.Handlerの関数で、r.Use()でスタックに追加します。chi/middlewareパッケージには実用的なミドルウェアが揃っており、本番環境では少なくともLogger・Recoverer・RequestIDを使うことを推奨します。",
 table:T.chiMiddleware,
-code:`package main
-
-import (
-    "github.com/go-chi/chi/v5"
-    "github.com/go-chi/chi/v5/middleware"
-    "net/http"
-)
-
-func main() {
-    r := chi.NewRouter()
-
-    // グローバルミドルウェア
-    r.Use(middleware.RequestID)
-    r.Use(middleware.RealIP)
-    r.Use(middleware.Logger)
-    r.Use(middleware.Recoverer)
-    r.Use(middleware.Timeout(30 * time.Second))
-
-    // 認証不要ルート
-    r.Get("/healthz", healthzHandler)
-
-    // 認証必要ルート
-    r.Group(func(r chi.Router) {
-        r.Use(authMiddleware(jwtSecret))
-        r.Route("/api/v1", func(r chi.Router) {
-            r.Get("/users", listUsers)
-            r.Post("/users", createUser)
-            r.Route("/users/{id}", func(r chi.Router) {
-                r.Get("/", getUser)
-                r.Put("/", updateUser)
-                r.Delete("/", deleteUser)
-            })
-        })
-    })
-
-    http.ListenAndServe(":8080", r)
-}`,
-afterCode:`chi.Routeを入れ子にすることでURLプレフィックスをグループ化できます。r.Group()はプレフィックスなしのグループ化（ミドルウェア適用のみ）に使います。`},
+code:"package main\n\nimport (\n    \"github.com/go-chi/chi/v5\"\n    \"github.com/go-chi/chi/v5/middleware\"\n    \"net/http\"\n)\n\nfunc main() {\n    r := chi.NewRouter()\n\n    // グローバルミドルウェア\n    r.Use(middleware.RequestID)\n    r.Use(middleware.RealIP)\n    r.Use(middleware.Logger)\n    r.Use(middleware.Recoverer)\n    r.Use(middleware.Timeout(30 * time.Second))\n\n    // 認証不要ルート\n    r.Get(\"/healthz\", healthzHandler)\n\n    // 認証必要ルート\n    r.Group(func(r chi.Router) {\n        r.Use(authMiddleware(jwtSecret))\n        r.Route(\"/api/v1\", func(r chi.Router) {\n            r.Get(\"/users\", listUsers)\n            r.Post(\"/users\", createUser)\n            r.Route(\"/users/{id}\", func(r chi.Router) {\n                r.Get(\"/\", getUser)\n                r.Put(\"/\", updateUser)\n                r.Delete(\"/\", deleteUser)\n            })\n        })\n    })\n\n    http.ListenAndServe(\":8080\", r)\n}",
+afterCode:"chi.Routeを入れ子にすることでURLプレフィックスをグループ化できます。r.Group()はプレフィックスなしのグループ化（ミドルウェア適用のみ）に使います。"},
 ]},
 {id:"ch3",num:3,title:"gRPCとProtocol Buffers",est:"75min",
 goal:"protobufでAPIスキーマを定義し、gRPCサーバー・クライアントを実装できる。server-side streamingを説明できる。",
 sections:[
 {title:"gRPCとprotobuf",
-body:`gRPCはGoogleが開発したRPCフレームワークで、HTTP/2とProtocol Buffersを組み合わせてマイクロサービス間通信に使われます。JSONベースのRESTと比べてシリアライズが高速でスキーマが強制されるため、大規模マイクロサービス環境では主流です。
-
-protoc + protoc-gen-goでprotoファイルからGoコードを自動生成します。goファイルにインターフェースが生成されるため、そのインターフェースを実装するだけでサーバーが書けます。Pythonのgrpcioと設計は同じですが、Goの型システムとの相性が特に良いです。`,
+body:"gRPCはGoogleが開発したRPCフレームワークで、HTTP/2とProtocol Buffersを組み合わせてマイクロサービス間通信に使われます。JSONベースのRESTと比べてシリアライズが高速でスキーマが強制されるため、大規模マイクロサービス環境では主流です。\n\nprotoc + protoc-gen-goでprotoファイルからGoコードを自動生成します。goファイルにインターフェースが生成されるため、そのインターフェースを実装するだけでサーバーが書けます。Pythonのgrpcioと設計は同じですが、Goの型システムとの相性が特に良いです。",
 table:T.grpcVsRest,
-code:`// proto/user.proto
-syntax = "proto3";
-package user.v1;
-option go_package = "myapp/pb/user/v1";
-
-service UserService {
-    rpc GetUser(GetUserRequest) returns (User);
-    rpc ListUsers(ListUsersRequest) returns (stream User); // server-side streaming
-    rpc CreateUser(CreateUserRequest) returns (User);
-}
-
-message User {
-    int64  id    = 1;
-    string name  = 2;
-    string email = 3;
-}
-
-message GetUserRequest  { int64 id = 1; }
-message ListUsersRequest {}
-message CreateUserRequest { string name = 1; string email = 2; }
-
-// 生成コマンド:
-// protoc --go_out=. --go-grpc_out=. proto/user.proto`,
-afterCode:`buf.buildはprotocの代替として設定ファイルでprotoコンパイルを管理できます。buf lintでprotoのスタイルチェック・buf breakingでbreaking changeを検出できます。チームでのproto管理にはbufの導入を推奨します。`},
+code:"// proto/user.proto\nsyntax = \"proto3\";\npackage user.v1;\noption go_package = \"myapp/pb/user/v1\";\n\nservice UserService {\n    rpc GetUser(GetUserRequest) returns (User);\n    rpc ListUsers(ListUsersRequest) returns (stream User); // server-side streaming\n    rpc CreateUser(CreateUserRequest) returns (User);\n}\n\nmessage User {\n    int64  id    = 1;\n    string name  = 2;\n    string email = 3;\n}\n\nmessage GetUserRequest  { int64 id = 1; }\nmessage ListUsersRequest {}\nmessage CreateUserRequest { string name = 1; string email = 2; }\n\n// 生成コマンド:\n// protoc --go_out=. --go-grpc_out=. proto/user.proto",
+afterCode:"buf.buildはprotocの代替として設定ファイルでprotoコンパイルを管理できます。buf lintでprotoのスタイルチェック・buf breakingでbreaking changeを検出できます。チームでのproto管理にはbufの導入を推奨します。"},
 ]},
 {id:"ch4",num:4,title:"オブザーバビリティ: metrics・tracing・logging",est:"70分",
 goal:"Prometheusメトリクス・OpenTelemetryトレーシング・slog構造化ログを設定できる。pprofでプロファイリングできる。",
 sections:[
 {title:"オブザーバビリティの実装",
-body:`オブザーバビリティとは「システムの外から内部状態を理解できる能力」です。ログ・メトリクス・トレーシングの三本柱で構成されます。Goはこれら全てに対応した標準ライブラリとエコシステムを持ちます。
-
-Prometheusは最も普及したメトリクスシステムで、/metricsエンドポイントをGo側が公開し、Prometheusがスクレイプします。OpenTelemetryは観測データの標準規格で、JaegerやDatadog等のバックエンドに中立的にトレースを送れます。`,
+body:"オブザーバビリティとは「システムの外から内部状態を理解できる能力」です。ログ・メトリクス・トレーシングの三本柱で構成されます。Goはこれら全てに対応した標準ライブラリとエコシステムを持ちます。\n\nPrometheusは最も普及したメトリクスシステムで、/metricsエンドポイントをGo側が公開し、Prometheusがスクレイプします。OpenTelemetryは観測データの標準規格で、JaegerやDatadog等のバックエンドに中立的にトレースを送れます。",
 table:T.observability,
-afterTable:`pprof（net/http/pprof）をインポートするだけで/debug/pprofエンドポイントが追加されます。本番環境では別ポートかアクセス制限付きで公開します。goroutine・heap・CPUのプロファイルをgo tool pprofで分析できます。`},
+afterTable:"pprof（net/http/pprof）をインポートするだけで/debug/pprofエンドポイントが追加されます。本番環境では別ポートかアクセス制限付きで公開します。goroutine・heap・CPUのプロファイルをgo tool pprofで分析できます。"},
 ]},
 {id:"ch5",num:5,title:"高度なテスト技法",est:"65分",
 goal:"ファジングテスト・統合テスト（testcontainers）・goroutineリーク検出を実践できる。テストカバレッジを戦略的に設計できる。",
 sections:[
 {title:"高度なテスト戦略",
-body:`ファジングテスト（go test -fuzz）はランダム入力でコードを大量に試験し、クラッシュや予期しない動作を発見します。パーサー・デコーダー・バリデーション関数のテストに特に有効で、手動では思いつかない入力でバグを発見できます。
-
-testcontainers-goはDockerコンテナをGoのテストコードから起動するライブラリです。PostgreSQL・Redis・Kafkaのコンテナを起動して統合テストを実行することで、モックなしで本番に近い環境でテストできます。Pythonのpytest-dockerに相当します。`,
+body:"ファジングテスト（go test -fuzz）はランダム入力でコードを大量に試験し、クラッシュや予期しない動作を発見します。パーサー・デコーダー・バリデーション関数のテストに特に有効で、手動では思いつかない入力でバグを発見できます。\n\ntestcontainers-goはDockerコンテナをGoのテストコードから起動するライブラリです。PostgreSQL・Redis・Kafkaのコンテナを起動して統合テストを実行することで、モックなしで本番に近い環境でテストできます。Pythonのpytest-dockerに相当します。",
 table:T.testStrategies,
-afterTable:`goleak.VerifyTestMain(m)はテスト終了後のgoroutineリークを検出します。goroutineが漏れるとメモリを浪費し、長時間動作アプリでは問題になります。CIに組み込んでリーク検出を自動化することを推奨します。`},
+afterTable:"goleak.VerifyTestMain(m)はテスト終了後のgoroutineリークを検出します。goroutineが漏れるとメモリを浪費し、長時間動作アプリでは問題になります。CIに組み込んでリーク検出を自動化することを推奨します。"},
 ]},
 {id:"ch6",num:6,title:"Docker・Kubernetes・CI/CD",est:"70分",
 goal:"マルチステージDockerfileを書ける。Kubernetes Deployment・Service・ConfigMapを設定できる。GracefulShutdownを実装できる。",
 sections:[
 {title:"コンテナ化とオーケストレーション",
-body:`GoアプリのDockerイメージはマルチステージビルドを使うと最小化できます。Goのビルダーイメージでバイナリをコンパイルし、scratchやdistrolessの最小イメージにコピーするパターンで、数MB以下のイメージが作れます。Pythonイメージが通常200MB+になるのと対照的です。
-
-Kubernetes対応の必須要素はgraceful shutdown・ヘルスチェックエンドポイント・設定の環境変数化です。HTTP GETで/healthzを実装しreadinessProbeに登録することで、デプロイ中のダウンタイムを防げます。`,
+body:"GoアプリのDockerイメージはマルチステージビルドを使うと最小化できます。Goのビルダーイメージでバイナリをコンパイルし、scratchやdistrolessの最小イメージにコピーするパターンで、数MB以下のイメージが作れます。Pythonイメージが通常200MB+になるのと対照的です。\n\nKubernetes対応の必須要素はgraceful shutdown・ヘルスチェックエンドポイント・設定の環境変数化です。HTTP GETで/healthzを実装しreadinessProbeに登録することで、デプロイ中のダウンタイムを防げます。",
 table:T.dockerBest,
-afterTable:`distrolessイメージ（gcr.io/distroless/static）はshellもパッケージマネージャも含まないため攻撃面積が最小です。scratchはより小さいですがCA証明書もないためHTTPS通信に追加でCOPYが必要です。`},
+afterTable:"distrolessイメージ（gcr.io/distroless/static）はshellもパッケージマネージャも含まないため攻撃面積が最小です。scratchはより小さいですがCA証明書もないためHTTPS通信に追加でCOPYが必要です。"},
 {title:"Kubernetesへのデプロイ",
-body:`Kubernetes Deploymentはレプリカ数・イメージ・ヘルスチェック・リソース制限を宣言的に定義します。ローリングアップデートによりダウンタイムなしのデプロイが可能です。Serviceはpodへの安定したエンドポイントを提供し、LoadBalancerタイプで外部から接続できます。
-
-ConfigMapとSecretで設定を外部化することで、同じDockerイメージを開発・ステージング・本番で使えます。Secretはbase64エンコードされますが暗号化ではないため、本番ではKubernetes SecretsをVaultやAWS Secrets Managerと組み合わせます。`,
+body:"Kubernetes Deploymentはレプリカ数・イメージ・ヘルスチェック・リソース制限を宣言的に定義します。ローリングアップデートによりダウンタイムなしのデプロイが可能です。Serviceはpodへの安定したエンドポイントを提供し、LoadBalancerタイプで外部から接続できます。\n\nConfigMapとSecretで設定を外部化することで、同じDockerイメージを開発・ステージング・本番で使えます。Secretはbase64エンコードされますが暗号化ではないため、本番ではKubernetes SecretsをVaultやAWS Secrets Managerと組み合わせます。",
 table:T.k8sDeploy,
-code:`# kubectl コマンド早見表
-# kubectl apply -f deployment.yaml       : デプロイ
-# kubectl get pods                       : Pod一覧
-# kubectl logs -f pod/myapp-xxx          : ログ確認
-# kubectl exec -it pod/myapp-xxx -- sh  : シェル接続
-# kubectl port-forward svc/myapp 8080:80 : ローカルアクセス
-# kubectl rollout status deployment/myapp : ロールアウト確認
-# kubectl rollout undo deployment/myapp  : ロールバック`,
-afterCode:`Helmはkubernetesマニフェストのパッケージマネージャです。helm install myapp ./chartで複数のyamlをまとめてデプロイできます。本番Kubernetes環境ではHelmかKustomizeの使用を推奨します。`},
+code:"# kubectl コマンド早見表\n# kubectl apply -f deployment.yaml       : デプロイ\n# kubectl get pods                       : Pod一覧\n# kubectl logs -f pod/myapp-xxx          : ログ確認\n# kubectl exec -it pod/myapp-xxx -- sh  : シェル接続\n# kubectl port-forward svc/myapp 8080:80 : ローカルアクセス\n# kubectl rollout status deployment/myapp : ロールアウト確認\n# kubectl rollout undo deployment/myapp  : ロールバック",
+afterCode:"Helmはkubernetesマニフェストのパッケージマネージャです。helm install myapp ./chartで複数のyamlをまとめてデプロイできます。本番Kubernetes環境ではHelmかKustomizeの使用を推奨します。"},
 ]},
 {id:"ch7",num:7,title:"並行処理パターン: errgroup・rate limiter",est:"65分",
 goal:"errgroup・rate.Limiter・NATSを使った高度な並行処理を実装できる。並行バグ（deadlock・data race）を検出できる。",
 sections:[
 {title:"並行処理の高度なパターン",
-body:`golang.org/x/sync/errgroupは複数のgoroutineを並列実行し、いずれかが失敗した場合に全てをキャンセルするパターンをシンプルに実装します。contextと組み合わせることでタイムアウト・キャンセルも自動的に伝播します。PythonのasyncioのgatherとTaskGroupの組み合わせに相当します。
-
-golang.org/x/time/rateのrate.Limiterはトークンバケットアルゴリズムによるレート制限を実装します。API呼び出しの速度制限・スロットリング実装に使えます。Wait()は指定レートを超えた場合にスリープして自動調整します。`,
+body:"golang.org/x/sync/errgroupは複数のgoroutineを並列実行し、いずれかが失敗した場合に全てをキャンセルするパターンをシンプルに実装します。contextと組み合わせることでタイムアウト・キャンセルも自動的に伝播します。PythonのasyncioのgatherとTaskGroupの組み合わせに相当します。\n\ngolang.org/x/time/rateのrate.Limiterはトークンバケットアルゴリズムによるレート制限を実装します。API呼び出しの速度制限・スロットリング実装に使えます。Wait()は指定レートを超えた場合にスリープして自動調整します。",
 table:T.channelPatterns,
-afterTable:`go test -race はデータ競合を検出する最重要ツールです。CIでは必ずgo test -race ./...を実行してください。deadlockはchannel操作・Mutex取得の順序を常に同一にすることで防げます。`},
+afterTable:"go test -race はデータ競合を検出する最重要ツールです。CIでは必ずgo test -race ./...を実行してください。deadlockはchannel操作・Mutex取得の順序を常に同一にすることで防げます。"},
 ]},
 {id:"ch8",num:8,title:"パフォーマンスチューニング",est:"65分",
 goal:"pprofとbenchmarkで性能ボトルネックを特定できる。sync.Pool・バッファ再利用・GC制御で性能を改善できる。",
 sections:[
 {title:"Goのパフォーマンスの計測と改善",
-body:`Goは既に高速ですが、不必要なメモリ割り当てとGC圧力が性能の主な障壁です。sync.Poolでオブジェクトを再利用し、strings.Builderでバッファを積み上げ、スライスのcapacityを事前確保することが効果的です。
-
-benchmarkとpprof（特にheapプロファイル・allocsプロファイル）でホットスポットを特定してから最適化するのが鉄則です。推測による最適化は時間の無駄です。go test -bench=. -benchmem -cpuprofileでCPUプロファイルを取り、go tool pprofで分析します。`,
+body:"Goは既に高速ですが、不必要なメモリ割り当てとGC圧力が性能の主な障壁です。sync.Poolでオブジェクトを再利用し、strings.Builderでバッファを積み上げ、スライスのcapacityを事前確保することが効果的です。\n\nbenchmarkとpprof（特にheapプロファイル・allocsプロファイル）でホットスポットを特定してから最適化するのが鉄則です。推測による最適化は時間の無駄です。go test -bench=. -benchmem -cpuprofileでCPUプロファイルを取り、go tool pprofで分析します。",
 table:T.perfTopics,
-code:`// プロファイル駆動の最適化例
-// Before: 毎回allocate
-func bad() string {
-    result := ""
-    for i := 0; i < 100; i++ {
-        result += fmt.Sprintf("item %d\n", i)
-    }
-    return result
-}
-
-// After: Builderで1回のalloc
-func good() string {
-    var sb strings.Builder
-    sb.Grow(1000) // 事前にキャパシティを確保
-    for i := 0; i < 100; i++ {
-        fmt.Fprintf(&sb, "item %d\n", i)
-    }
-    return sb.String()
-}`,
-afterCode:`go test -bench=Good -benchmem で改善効果を数値で確認できます。B/op（1操作のバイト数）とallocs/op（1操作のアロケーション数）が減少すれば成功です。`},
+code:"// プロファイル駆動の最適化例\n// Before: 毎回allocate\nfunc bad() string {\n    result := \"\"\n    for i := 0; i < 100; i++ {\n        result += fmt.Sprintf(\"item %d\n\", i)\n    }\n    return result\n}\n\n// After: Builderで1回のalloc\nfunc good() string {\n    var sb strings.Builder\n    sb.Grow(1000) // 事前にキャパシティを確保\n    for i := 0; i < 100; i++ {\n        fmt.Fprintf(&sb, \"item %d\n\", i)\n    }\n    return sb.String()\n}",
+afterCode:"go test -bench=Good -benchmem で改善効果を数値で確認できます。B/op（1操作のバイト数）とallocs/op（1操作のアロケーション数）が減少すれば成功です。"},
 ]},
 {id:"ch9",num:9,title:"コード生成とリフレクション",est:"65分",
 goal:"go generate・stringer・wire等のコード生成ツールを使える。reflectで動的な型操作を実装できる。",
 sections:[
 {title:"コード生成の活用",
-body:`Goはマクロや動的な言語機能の代わりに、コード生成（go generate）を多用します。stringer・moq・wire・swaggergenなどのツールがgo:generateコメントから呼び出されてコードを自動生成します。Pythonのデコレータが実行時に変換を行うのに対し、Goはコンパイル前に変換して型安全を保ちます。
-
-wireはGoogleが開発するDI（依存性注入）ツールで、ProviderとInjectorの定義からwire_gen.goを自動生成します。コンパイル時にDIグラフが解決されるためランタイムエラーがなく、PythonのFastAPIのDependency Injectionより型安全です。`,
-code:`// go generateとwireの組み合わせ
-//go:generate wire
-
-//go:build wireinject
-
-package main
-
-import "github.com/google/wire"
-
-func InitializeApp() *App {
-    wire.Build(
-        NewConfig,
-        NewDB,
-        NewRepository,
-        NewService,
-        NewApp,
-    )
-    return nil // wireが実際のコードを生成
-}`,
-afterTable:`reflectは強力ですが遅く、型安全でもないため多用は避けます。JSONのマーシャリング・ORMのスキャニング等、フレームワーク内部でのみ使うのが理想です。コード生成で解決できる場合はそちらを優先してください。`},
+body:"Goはマクロや動的な言語機能の代わりに、コード生成（go generate）を多用します。stringer・moq・wire・swaggergenなどのツールがgo:generateコメントから呼び出されてコードを自動生成します。Pythonのデコレータが実行時に変換を行うのに対し、Goはコンパイル前に変換して型安全を保ちます。\n\nwireはGoogleが開発するDI（依存性注入）ツールで、ProviderとInjectorの定義からwire_gen.goを自動生成します。コンパイル時にDIグラフが解決されるためランタイムエラーがなく、PythonのFastAPIのDependency Injectionより型安全です。",
+code:"// go generateとwireの組み合わせ\n//go:generate wire\n\n//go:build wireinject\n\npackage main\n\nimport \"github.com/google/wire\"\n\nfunc InitializeApp() *App {\n    wire.Build(\n        NewConfig,\n        NewDB,\n        NewRepository,\n        NewService,\n        NewApp,\n    )\n    return nil // wireが実際のコードを生成\n}",
+afterTable:"reflectは強力ですが遅く、型安全でもないため多用は避けます。JSONのマーシャリング・ORMのスキャニング等、フレームワーク内部でのみ使うのが理想です。コード生成で解決できる場合はそちらを優先してください。"},
 ]},
 {id:"ch10",num:10,title:"マイクロサービス設計",est:"70分",
 goal:"マイクロサービスの基本コンポーネント（サービスディスカバリ・メッセージキュー・分散トレーシング）を説明できる。contextの伝播を正しく実装できる。",
 sections:[
 {title:"マイクロサービスアーキテクチャ",
-body:`マイクロサービスは大きなモノリスを独立してデプロイ可能な小さなサービスに分割するアーキテクチャです。Goはコンパイルが速く・バイナリが小さく・並行処理が得意なため、マイクロサービスに非常に向いています。KubernetesのコントロールプレーンがGoで書かれているのはその証左です。
-
-サービス間通信には同期（gRPC・REST）と非同期（NATS・Kafka）があります。非同期メッセージングはサービス間の結合を緩くし、バックプレッシャーや耐障害性を向上させます。contextを全ての関数に伝播させることでリクエストのキャンセル・タイムアウトがサービス全体に伝わります。`,
+body:"マイクロサービスは大きなモノリスを独立してデプロイ可能な小さなサービスに分割するアーキテクチャです。Goはコンパイルが速く・バイナリが小さく・並行処理が得意なため、マイクロサービスに非常に向いています。KubernetesのコントロールプレーンがGoで書かれているのはその証左です。\n\nサービス間通信には同期（gRPC・REST）と非同期（NATS・Kafka）があります。非同期メッセージングはサービス間の結合を緩くし、バックプレッシャーや耐障害性を向上させます。contextを全ての関数に伝播させることでリクエストのキャンセル・タイムアウトがサービス全体に伝わります。",
 table:T.microservices,
-afterTable:`サービスメッシュ（Istio・Linkerd）を使うとアプリコードの変更なしにmTLS・トレーシング・サーキットブレーカーが実現できます。ただし複雑性とオーバーヘッドが増すため、サービス数が少ない段階では導入を急がないことを推奨します。`},
+afterTable:"サービスメッシュ（Istio・Linkerd）を使うとアプリコードの変更なしにmTLS・トレーシング・サーキットブレーカーが実現できます。ただし複雑性とオーバーヘッドが増すため、サービス数が少ない段階では導入を急がないことを推奨します。"},
 ]},
 {id:"ch11",num:11,title:"ツールチェーンとエコシステム",est:"60分",
 goal:"golangci-lint・govulncheck・go mod管理を使ってコード品質を管理できる。Goの主要エコシステムツールを説明できる。",
 sections:[
 {title:"Goのツールチェーン",
-body:`Goはツールチェーンが充実しており、コード品質・セキュリティ・依存管理を一貫して管理できます。golangci-lintは多数のlinterを集約して高速実行するツールで、CIに組み込むことで一貫したコードスタイルを維持できます。PythonのflakE8・mypy・banditを一つのツールで統合したようなものです。
-
-govulncheckはGoモジュールの依存関係に既知の脆弱性がないかをチェックします。go.sumに登録された依存のバイナリ解析を行い、実際にコードから呼ばれている脆弱な関数のみを報告するため誤検知が少ないです。`,
-code:`# Goツールチェーン早見表
-go fmt ./...         # コードフォーマット
-go vet ./...         # 静的解析（基本）
-golangci-lint run    # 多数のlinterを一括実行
-govulncheck ./...    # 脆弱性チェック
-go test -race ./...  # テスト + データ競合検出
-go test -cover ./... # カバレッジ計測
-go mod tidy          # 依存整理
-go mod verify        # チェックサム検証
-go build ./...       # 全パッケージをビルド確認
-go doc -http=:6060   # ドキュメントサーバー`,
-afterCode:`golangci-lintの設定は.golangci.yaml（またはtoml/json）で管理します。CIではgolangci-lint run --timeout=5mとタイムアウトを指定してください。定期的にgolangci-lintのバージョンを更新して新しいlinterを取り込みましょう。`},
+body:"Goはツールチェーンが充実しており、コード品質・セキュリティ・依存管理を一貫して管理できます。golangci-lintは多数のlinterを集約して高速実行するツールで、CIに組み込むことで一貫したコードスタイルを維持できます。PythonのflakE8・mypy・banditを一つのツールで統合したようなものです。\n\ngovulncheckはGoモジュールの依存関係に既知の脆弱性がないかをチェックします。go.sumに登録された依存のバイナリ解析を行い、実際にコードから呼ばれている脆弱な関数のみを報告するため誤検知が少ないです。",
+code:"# Goツールチェーン早見表\ngo fmt ./...         # コードフォーマット\ngo vet ./...         # 静的解析（基本）\ngolangci-lint run    # 多数のlinterを一括実行\ngovulncheck ./...    # 脆弱性チェック\ngo test -race ./...  # テスト + データ競合検出\ngo test -cover ./... # カバレッジ計測\ngo mod tidy          # 依存整理\ngo mod verify        # チェックサム検証\ngo build ./...       # 全パッケージをビルド確認\ngo doc -http=:6060   # ドキュメントサーバー",
+afterCode:"golangci-lintの設定は.golangci.yaml（またはtoml/json）で管理します。CIではgolangci-lint run --timeout=5mとタイムアウトを指定してください。定期的にgolangci-lintのバージョンを更新して新しいlinterを取り込みましょう。"},
 ]},
 {id:"ch12",num:12,title:"実務設計パターンとアーキテクチャ",est:"65分",
 goal:"Goの実務的な設計パターン（リポジトリパターン・クリーンアーキテクチャ）を説明できる。大規模プロジェクトのパッケージ設計ができる。",
 sections:[
 {title:"Goのアーキテクチャパターン",
-body:`大規模Goプロジェクトではリポジトリパターン（Repository Pattern）が広く使われます。Domain（ビジネスロジック）・Repository（データアクセスインターフェース）・Infra（実装）を分離することで、テスト時にモックに差し替えやすくなります。Pythonのsqlalchemy sessionを依存注入するパターンに近いです。
-
-クリーンアーキテクチャはDomain → Usecase → Interface → Infrastructureの依存方向を内側に一方向に保つ設計原則です。Goのinterfaceを使えばこの設計が自然に実現できます。パッケージ設計はcmd（エントリポイント）・internal（非公開）・domain・infra等を責務で分割するのが実務的です。`,
-code:`// リポジトリパターンの例
-package domain
-
-// インターフェース定義（Domainレイヤ）
-type UserRepository interface {
-    FindByID(ctx context.Context, id int64) (*User, error)
-    Save(ctx context.Context, user *User) error
-    Delete(ctx context.Context, id int64) error
-}
-
-// ---
-
-package infra
-
-// PostgreSQL実装（Infraレイヤ）
-type pgUserRepository struct{ pool *pgxpool.Pool }
-
-func NewPgUserRepository(pool *pgxpool.Pool) domain.UserRepository {
-    return &pgUserRepository{pool: pool}
-}
-
-func (r *pgUserRepository) FindByID(ctx context.Context, id int64) (*domain.User, error) {
-    var u domain.User
-    err := r.pool.QueryRow(ctx, "SELECT id, name, email FROM users WHERE id=$1", id).
-        Scan(&u.ID, &u.Name, &u.Email)
-    if err != nil { return nil, err }
-    return &u, nil
-}`,
-afterCode:`テスト時はpgUserRepositoryの代わりにモック実装を注入することで、DBなしで高速なユニットテストが書けます。testifyのmockやmoqで自動生成されたモックを使うのが実務的です。上級コースではプロダクションレベルのGoサービスの全体設計を学びます。`},
+body:"大規模Goプロジェクトではリポジトリパターン（Repository Pattern）が広く使われます。Domain（ビジネスロジック）・Repository（データアクセスインターフェース）・Infra（実装）を分離することで、テスト時にモックに差し替えやすくなります。Pythonのsqlalchemy sessionを依存注入するパターンに近いです。\n\nクリーンアーキテクチャはDomain → Usecase → Interface → Infrastructureの依存方向を内側に一方向に保つ設計原則です。Goのinterfaceを使えばこの設計が自然に実現できます。パッケージ設計はcmd（エントリポイント）・internal（非公開）・domain・infra等を責務で分割するのが実務的です。",
+code:"// リポジトリパターンの例\npackage domain\n\n// インターフェース定義（Domainレイヤ）\ntype UserRepository interface {\n    FindByID(ctx context.Context, id int64) (*User, error)\n    Save(ctx context.Context, user *User) error\n    Delete(ctx context.Context, id int64) error\n}\n\n// ---\n\npackage infra\n\n// PostgreSQL実装（Infraレイヤ）\ntype pgUserRepository struct{ pool *pgxpool.Pool }\n\nfunc NewPgUserRepository(pool *pgxpool.Pool) domain.UserRepository {\n    return &pgUserRepository{pool: pool}\n}\n\nfunc (r *pgUserRepository) FindByID(ctx context.Context, id int64) (*domain.User, error) {\n    var u domain.User\n    err := r.pool.QueryRow(ctx, \"SELECT id, name, email FROM users WHERE id=$1\", id).\n        Scan(&u.ID, &u.Name, &u.Email)\n    if err != nil { return nil, err }\n    return &u, nil\n}",
+afterCode:"テスト時はpgUserRepositoryの代わりにモック実装を注入することで、DBなしで高速なユニットテストが書けます。testifyのmockやmoqで自動生成されたモックを使うのが実務的です。上級コースではプロダクションレベルのGoサービスの全体設計を学びます。"},
 ]},
 ];
 

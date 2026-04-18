@@ -87,1274 +87,162 @@ const EX = {
   ch1: [{
     diff: 1,
     q: "FastAPIアプリケーションを作成し、ルートパス `/` にアクセスすると `{\"message\": \"Hello, FastAPI!\"}` を返すエンドポイントを書いてください。\n\nポイント: FastAPIインスタンスの作成とデコレータの基本。",
-    code: `# app/main.py を作成してください
-# uvicorn app.main:app --reload で起動確認`,
-    answer: `from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello, FastAPI!"}`
+    code: "# app/main.py を作成してください\n# uvicorn app.main:app --reload で起動確認",
+    answer: "from fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"Hello, FastAPI!\"}"
   }, {
     diff: 2,
     q: "以下のプロジェクト構成を作成し、`app/routers/health.py` に `/health` エンドポイントを定義して `app/main.py` からマウントしてください。\nステータスコード200で `{\"status\": \"ok\"}` を返すこと。\n\nポイント: APIRouter の分離とinclude_router。",
-    code: `# app/
-# ├── main.py
-# └── routers/
-#     └── health.py`,
-    answer: `# app/routers/health.py
-from fastapi import APIRouter
-
-router = APIRouter(tags=["health"])
-
-@router.get("/health")
-def health_check():
-    return {"status": "ok"}
-
-# app/main.py
-from fastapi import FastAPI
-from app.routers.health import router as health_router
-
-app = FastAPI(title="Todo API")
-app.include_router(health_router)`
+    code: "# app/\n# ├── main.py\n# └── routers/\n#     └── health.py",
+    answer: "# app/routers/health.py\nfrom fastapi import APIRouter\n\nrouter = APIRouter(tags=[\"health\"])\n\n@router.get(\"/health\")\ndef health_check():\n    return {\"status\": \"ok\"}\n\n# app/main.py\nfrom fastapi import FastAPI\nfrom app.routers.health import router as health_router\n\napp = FastAPI(title=\"Todo API\")\napp.include_router(health_router)"
   }, {
     diff: 2,
     q: "pydantic-settings を使って、以下の設定を環境変数から読み込む Settings クラスを作成してください。\n・APP_NAME: str（デフォルト \"Todo API\"）\n・DEBUG: bool（デフォルト False）\n・DATABASE_URL: str（デフォルトなし・必須）\n\nポイント: BaseSettings と model_config の使い方。",
-    code: `# app/core/config.py
-# .env ファイルから読み込めるようにすること`,
-    answer: `# app/core/config.py
-from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    APP_NAME: str = "Todo API"
-    DEBUG: bool = False
-    DATABASE_URL: str
-
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-    }
-
-settings = Settings()
-
-# .env ファイル例:
-# DATABASE_URL=sqlite+aiosqlite:///./todo.db
-# DEBUG=true`
+    code: "# app/core/config.py\n# .env ファイルから読み込めるようにすること",
+    answer: "# app/core/config.py\nfrom pydantic_settings import BaseSettings\n\nclass Settings(BaseSettings):\n    APP_NAME: str = \"Todo API\"\n    DEBUG: bool = False\n    DATABASE_URL: str\n\n    model_config = {\n        \"env_file\": \".env\",\n        \"env_file_encoding\": \"utf-8\",\n    }\n\nsettings = Settings()\n\n# .env ファイル例:\n# DATABASE_URL=sqlite+aiosqlite:///./todo.db\n# DEBUG=true"
   }],
   ch2: [{
     diff: 1,
     q: "Pydanticモデルで TodoCreate スキーマを定義してください。\n・title: str（1文字以上100文字以下）\n・description: str | None（デフォルトNone）\n・is_done: bool（デフォルトFalse）\n\nポイント: Field によるバリデーション。",
-    code: `# app/schemas/todo.py
-from pydantic import BaseModel, Field`,
-    answer: `from pydantic import BaseModel, Field
-
-class TodoCreate(BaseModel):
-    title: str = Field(
-        min_length=1,
-        max_length=100,
-        examples=["Buy milk"]
-    )
-    description: str | None = Field(
-        default=None,
-        max_length=500,
-        examples=["Remember to buy organic milk"]
-    )
-    is_done: bool = Field(default=False)`
+    code: "# app/schemas/todo.py\nfrom pydantic import BaseModel, Field",
+    answer: "from pydantic import BaseModel, Field\n\nclass TodoCreate(BaseModel):\n    title: str = Field(\n        min_length=1,\n        max_length=100,\n        examples=[\"Buy milk\"]\n    )\n    description: str | None = Field(\n        default=None,\n        max_length=500,\n        examples=[\"Remember to buy organic milk\"]\n    )\n    is_done: bool = Field(default=False)"
   }, {
     diff: 2,
     q: "インメモリの辞書をストレージとして、Todo の CRUD エンドポイント4つを全て実装してください。\n・POST /todos → 作成\n・GET /todos → 一覧取得\n・GET /todos/{todo_id} → 個別取得\n・DELETE /todos/{todo_id} → 削除\n存在しないIDは404を返すこと。\n\nポイント: HTTPメソッドの使い分けとステータスコード。",
-    code: `# インメモリで動くCRUD APIを書いてください
-from fastapi import FastAPI, HTTPException
-# ...`,
-    answer: `from fastapi import FastAPI, HTTPException, status
-from pydantic import BaseModel, Field
-
-app = FastAPI()
-
-class TodoCreate(BaseModel):
-    title: str = Field(min_length=1, max_length=100)
-    description: str | None = None
-    is_done: bool = False
-
-class TodoResponse(TodoCreate):
-    id: int
-
-todos: dict[int, dict] = {}
-counter = 0
-
-@app.post("/todos", response_model=TodoResponse,
-          status_code=status.HTTP_201_CREATED)
-def create_todo(body: TodoCreate):
-    global counter
-    counter += 1
-    todo = {"id": counter, **body.model_dump()}
-    todos[counter] = todo
-    return todo
-
-@app.get("/todos", response_model=list[TodoResponse])
-def list_todos():
-    return list(todos.values())
-
-@app.get("/todos/{todo_id}", response_model=TodoResponse)
-def get_todo(todo_id: int):
-    if todo_id not in todos:
-        raise HTTPException(status_code=404, detail="Todo not found")
-    return todos[todo_id]
-
-@app.delete("/todos/{todo_id}",
-            status_code=status.HTTP_204_NO_CONTENT)
-def delete_todo(todo_id: int):
-    if todo_id not in todos:
-        raise HTTPException(status_code=404, detail="Todo not found")
-    del todos[todo_id]`
+    code: "# インメモリで動くCRUD APIを書いてください\nfrom fastapi import FastAPI, HTTPException\n# ...",
+    answer: "from fastapi import FastAPI, HTTPException, status\nfrom pydantic import BaseModel, Field\n\napp = FastAPI()\n\nclass TodoCreate(BaseModel):\n    title: str = Field(min_length=1, max_length=100)\n    description: str | None = None\n    is_done: bool = False\n\nclass TodoResponse(TodoCreate):\n    id: int\n\ntodos: dict[int, dict] = {}\ncounter = 0\n\n@app.post(\"/todos\", response_model=TodoResponse,\n          status_code=status.HTTP_201_CREATED)\ndef create_todo(body: TodoCreate):\n    global counter\n    counter += 1\n    todo = {\"id\": counter, **body.model_dump()}\n    todos[counter] = todo\n    return todo\n\n@app.get(\"/todos\", response_model=list[TodoResponse])\ndef list_todos():\n    return list(todos.values())\n\n@app.get(\"/todos/{todo_id}\", response_model=TodoResponse)\ndef get_todo(todo_id: int):\n    if todo_id not in todos:\n        raise HTTPException(status_code=404, detail=\"Todo not found\")\n    return todos[todo_id]\n\n@app.delete(\"/todos/{todo_id}\",\n            status_code=status.HTTP_204_NO_CONTENT)\ndef delete_todo(todo_id: int):\n    if todo_id not in todos:\n        raise HTTPException(status_code=404, detail=\"Todo not found\")\n    del todos[todo_id]"
   }, {
     diff: 3,
     q: "PUT /todos/{todo_id} と PATCH /todos/{todo_id} の両方を実装してください。\n・PUT: 全フィールドを置き換え\n・PATCH: 送られたフィールドだけ更新（model_dump(exclude_unset=True) を使う）\n\nポイント: PUT と PATCH の意味的な違い、exclude_unset の活用。",
-    code: `# PUT と PATCH の違いを実装で示してください
-# PATCHには TodoUpdate スキーマ（全フィールドOptional）を使う`,
-    answer: `from pydantic import BaseModel, Field
-from typing import Optional
-
-class TodoCreate(BaseModel):
-    title: str = Field(min_length=1, max_length=100)
-    description: str | None = None
-    is_done: bool = False
-
-class TodoUpdate(BaseModel):
-    title: Optional[str] = Field(
-        default=None, min_length=1, max_length=100
-    )
-    description: Optional[str] = None
-    is_done: Optional[bool] = None
-
-# PUT: 全体置換
-@app.put("/todos/{todo_id}", response_model=TodoResponse)
-def replace_todo(todo_id: int, body: TodoCreate):
-    if todo_id not in todos:
-        raise HTTPException(status_code=404,
-                            detail="Todo not found")
-    todos[todo_id] = {"id": todo_id, **body.model_dump()}
-    return todos[todo_id]
-
-# PATCH: 部分更新
-@app.patch("/todos/{todo_id}", response_model=TodoResponse)
-def update_todo(todo_id: int, body: TodoUpdate):
-    if todo_id not in todos:
-        raise HTTPException(status_code=404,
-                            detail="Todo not found")
-    stored = todos[todo_id]
-    update_data = body.model_dump(exclude_unset=True)
-    stored.update(update_data)
-    return stored`
+    code: "# PUT と PATCH の違いを実装で示してください\n# PATCHには TodoUpdate スキーマ（全フィールドOptional）を使う",
+    answer: "from pydantic import BaseModel, Field\nfrom typing import Optional\n\nclass TodoCreate(BaseModel):\n    title: str = Field(min_length=1, max_length=100)\n    description: str | None = None\n    is_done: bool = False\n\nclass TodoUpdate(BaseModel):\n    title: Optional[str] = Field(\n        default=None, min_length=1, max_length=100\n    )\n    description: Optional[str] = None\n    is_done: Optional[bool] = None\n\n# PUT: 全体置換\n@app.put(\"/todos/{todo_id}\", response_model=TodoResponse)\ndef replace_todo(todo_id: int, body: TodoCreate):\n    if todo_id not in todos:\n        raise HTTPException(status_code=404,\n                            detail=\"Todo not found\")\n    todos[todo_id] = {\"id\": todo_id, **body.model_dump()}\n    return todos[todo_id]\n\n# PATCH: 部分更新\n@app.patch(\"/todos/{todo_id}\", response_model=TodoResponse)\ndef update_todo(todo_id: int, body: TodoUpdate):\n    if todo_id not in todos:\n        raise HTTPException(status_code=404,\n                            detail=\"Todo not found\")\n    stored = todos[todo_id]\n    update_data = body.model_dump(exclude_unset=True)\n    stored.update(update_data)\n    return stored"
   }],
   ch3: [{
     diff: 1,
     q: "SQLAlchemy 2.0 スタイルで Todo テーブルのモデルを定義してください。\n・id: 主キー（自動採番）\n・title: 文字列（NOT NULL）\n・description: テキスト（NULL可）\n・is_done: 真偽値（デフォルトFalse）\n・created_at: 作成日時（自動設定）\n・updated_at: 更新日時（自動更新）\n\nポイント: Mapped, mapped_column, DeclarativeBase の使い方。",
-    code: `# app/models/todo.py
-# SQLAlchemy 2.0 の型注釈スタイルで書くこと`,
-    answer: `from datetime import datetime
-from sqlalchemy import String, Text, func
-from sqlalchemy.orm import (
-    DeclarativeBase, Mapped, mapped_column
-)
-
-class Base(DeclarativeBase):
-    pass
-
-class Todo(Base):
-    __tablename__ = "todos"
-
-    id: Mapped[int] = mapped_column(
-        primary_key=True, autoincrement=True
-    )
-    title: Mapped[str] = mapped_column(String(100))
-    description: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )
-    is_done: Mapped[bool] = mapped_column(default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(),
-        onupdate=func.now()
-    )`
+    code: "# app/models/todo.py\n# SQLAlchemy 2.0 の型注釈スタイルで書くこと",
+    answer: "from datetime import datetime\nfrom sqlalchemy import String, Text, func\nfrom sqlalchemy.orm import (\n    DeclarativeBase, Mapped, mapped_column\n)\n\nclass Base(DeclarativeBase):\n    pass\n\nclass Todo(Base):\n    __tablename__ = \"todos\"\n\n    id: Mapped[int] = mapped_column(\n        primary_key=True, autoincrement=True\n    )\n    title: Mapped[str] = mapped_column(String(100))\n    description: Mapped[str | None] = mapped_column(\n        Text, nullable=True\n    )\n    is_done: Mapped[bool] = mapped_column(default=False)\n    created_at: Mapped[datetime] = mapped_column(\n        server_default=func.now()\n    )\n    updated_at: Mapped[datetime] = mapped_column(\n        server_default=func.now(),\n        onupdate=func.now()\n    )"
   }, {
     diff: 2,
     q: "非同期セッションファクトリを作成し、FastAPIの Depends で注入できる get_db 関数を書いてください。\naiosqlite を使った SQLite の非同期接続とする。\n\nポイント: async_sessionmaker, AsyncSession, yield による依存性注入。",
-    code: `# app/db/session.py
-# 非同期エンジンとセッション管理を実装`,
-    answer: `from sqlalchemy.ext.asyncio import (
-    create_async_engine,
-    async_sessionmaker,
-    AsyncSession,
-)
-from typing import AsyncGenerator
-
-DATABASE_URL = "sqlite+aiosqlite:///./todo.db"
-
-engine = create_async_engine(
-    DATABASE_URL, echo=True
-)
-
-async_session = async_sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise`
+    code: "# app/db/session.py\n# 非同期エンジンとセッション管理を実装",
+    answer: "from sqlalchemy.ext.asyncio import (\n    create_async_engine,\n    async_sessionmaker,\n    AsyncSession,\n)\nfrom typing import AsyncGenerator\n\nDATABASE_URL = \"sqlite+aiosqlite:///./todo.db\"\n\nengine = create_async_engine(\n    DATABASE_URL, echo=True\n)\n\nasync_session = async_sessionmaker(\n    engine, class_=AsyncSession, expire_on_commit=False\n)\n\nasync def get_db() -> AsyncGenerator[AsyncSession, None]:\n    async with async_session() as session:\n        try:\n            yield session\n            await session.commit()\n        except Exception:\n            await session.rollback()\n            raise"
   }, {
     diff: 3,
     q: "Alembic を設定し、Todo モデルの初回マイグレーションを生成・適用する手順を書いてください。\nenv.py の target_metadata の設定も含めること。\n\nポイント: Alembic の非同期対応設定と autogenerate。",
-    code: `# alembic.ini と env.py の設定を示し、
-# マイグレーション生成・適用コマンドも書くこと`,
-    answer: `# 1. 初期化
-# alembic init -t async alembic
-
-# 2. alembic.ini の sqlalchemy.url を設定
-# sqlalchemy.url = sqlite+aiosqlite:///./todo.db
-
-# 3. alembic/env.py を編集
-# --- env.py の該当部分 ---
-from app.models.todo import Base
-target_metadata = Base.metadata
-
-# run_async_migrations の中で:
-# connectable = async_engine_from_config(
-#     config.get_section(config.config_ini_section, {}),
-#     prefix="sqlalchemy.",
-#     poolclass=pool.NullPool,
-# )
-
-# 4. マイグレーション生成
-# alembic revision --autogenerate -m "create todos table"
-
-# 5. 適用
-# alembic upgrade head
-
-# 6. 確認
-# alembic current
-# → head にいることを確認`
+    code: "# alembic.ini と env.py の設定を示し、\n# マイグレーション生成・適用コマンドも書くこと",
+    answer: "# 1. 初期化\n# alembic init -t async alembic\n\n# 2. alembic.ini の sqlalchemy.url を設定\n# sqlalchemy.url = sqlite+aiosqlite:///./todo.db\n\n# 3. alembic/env.py を編集\n# --- env.py の該当部分 ---\nfrom app.models.todo import Base\ntarget_metadata = Base.metadata\n\n# run_async_migrations の中で:\n# connectable = async_engine_from_config(\n#     config.get_section(config.config_ini_section, {}),\n#     prefix=\"sqlalchemy.\",\n#     poolclass=pool.NullPool,\n# )\n\n# 4. マイグレーション生成\n# alembic revision --autogenerate -m \"create todos table\"\n\n# 5. 適用\n# alembic upgrade head\n\n# 6. 確認\n# alembic current\n# → head にいることを確認"
   }],
   ch4: [{
     diff: 2,
     q: "TodoRepository クラスを作成してください。\n以下のメソッドを持つこと:\n・create(data: TodoCreate) -> Todo\n・get_by_id(todo_id: int) -> Todo | None\n・list_all() -> list[Todo]\n・update(todo_id: int, data: TodoUpdate) -> Todo | None\n・delete(todo_id: int) -> bool\n\nポイント: AsyncSession を受け取り、SQLAlchemy 2.0 の select 文を使う。",
-    code: `# app/repositories/todo.py
-# リポジトリパターンでデータアクセスを抽象化`,
-    answer: `from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.todo import Todo
-from app.schemas.todo import TodoCreate, TodoUpdate
-
-class TodoRepository:
-    def __init__(self, session: AsyncSession):
-        self.session = session
-
-    async def create(self, data: TodoCreate) -> Todo:
-        todo = Todo(**data.model_dump())
-        self.session.add(todo)
-        await self.session.flush()
-        await self.session.refresh(todo)
-        return todo
-
-    async def get_by_id(self, todo_id: int) -> Todo | None:
-        stmt = select(Todo).where(Todo.id == todo_id)
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
-
-    async def list_all(self) -> list[Todo]:
-        stmt = select(Todo).order_by(Todo.created_at.desc())
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
-
-    async def update(
-        self, todo_id: int, data: TodoUpdate
-    ) -> Todo | None:
-        todo = await self.get_by_id(todo_id)
-        if todo is None:
-            return None
-        for key, val in data.model_dump(
-            exclude_unset=True
-        ).items():
-            setattr(todo, key, val)
-        await self.session.flush()
-        await self.session.refresh(todo)
-        return todo
-
-    async def delete(self, todo_id: int) -> bool:
-        todo = await self.get_by_id(todo_id)
-        if todo is None:
-            return False
-        await self.session.delete(todo)
-        await self.session.flush()
-        return True`
+    code: "# app/repositories/todo.py\n# リポジトリパターンでデータアクセスを抽象化",
+    answer: "from sqlalchemy import select\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom app.models.todo import Todo\nfrom app.schemas.todo import TodoCreate, TodoUpdate\n\nclass TodoRepository:\n    def __init__(self, session: AsyncSession):\n        self.session = session\n\n    async def create(self, data: TodoCreate) -> Todo:\n        todo = Todo(**data.model_dump())\n        self.session.add(todo)\n        await self.session.flush()\n        await self.session.refresh(todo)\n        return todo\n\n    async def get_by_id(self, todo_id: int) -> Todo | None:\n        stmt = select(Todo).where(Todo.id == todo_id)\n        result = await self.session.execute(stmt)\n        return result.scalar_one_or_none()\n\n    async def list_all(self) -> list[Todo]:\n        stmt = select(Todo).order_by(Todo.created_at.desc())\n        result = await self.session.execute(stmt)\n        return list(result.scalars().all())\n\n    async def update(\n        self, todo_id: int, data: TodoUpdate\n    ) -> Todo | None:\n        todo = await self.get_by_id(todo_id)\n        if todo is None:\n            return None\n        for key, val in data.model_dump(\n            exclude_unset=True\n        ).items():\n            setattr(todo, key, val)\n        await self.session.flush()\n        await self.session.refresh(todo)\n        return todo\n\n    async def delete(self, todo_id: int) -> bool:\n        todo = await self.get_by_id(todo_id)\n        if todo is None:\n            return False\n        await self.session.delete(todo)\n        await self.session.flush()\n        return True"
   }, {
     diff: 2,
     q: "TodoService クラスを作成し、ビジネスロジック（存在チェックと404送出）をルーターから分離してください。\nFastAPIのDependsでリポジトリとサービスを注入する関数も書くこと。\n\nポイント: サービス層によるビジネスロジックの集約、Depends チェーン。",
-    code: `# app/services/todo.py
-# app/dependencies.py`,
-    answer: `# app/services/todo.py
-from fastapi import HTTPException, status
-from app.repositories.todo import TodoRepository
-from app.schemas.todo import TodoCreate, TodoUpdate
-from app.models.todo import Todo
-
-class TodoService:
-    def __init__(self, repo: TodoRepository):
-        self.repo = repo
-
-    async def create(self, data: TodoCreate) -> Todo:
-        return await self.repo.create(data)
-
-    async def get_or_404(self, todo_id: int) -> Todo:
-        todo = await self.repo.get_by_id(todo_id)
-        if todo is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Todo {todo_id} not found"
-            )
-        return todo
-
-    async def list_all(self) -> list[Todo]:
-        return await self.repo.list_all()
-
-    async def update(
-        self, todo_id: int, data: TodoUpdate
-    ) -> Todo:
-        todo = await self.repo.update(todo_id, data)
-        if todo is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Todo {todo_id} not found"
-            )
-        return todo
-
-    async def delete(self, todo_id: int) -> None:
-        deleted = await self.repo.delete(todo_id)
-        if not deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Todo {todo_id} not found"
-            )
-
-# app/dependencies.py
-from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
-from app.repositories.todo import TodoRepository
-from app.services.todo import TodoService
-
-def get_todo_repo(
-    db: AsyncSession = Depends(get_db)
-) -> TodoRepository:
-    return TodoRepository(db)
-
-def get_todo_service(
-    repo: TodoRepository = Depends(get_todo_repo)
-) -> TodoService:
-    return TodoService(repo)`
+    code: "# app/services/todo.py\n# app/dependencies.py",
+    answer: "# app/services/todo.py\nfrom fastapi import HTTPException, status\nfrom app.repositories.todo import TodoRepository\nfrom app.schemas.todo import TodoCreate, TodoUpdate\nfrom app.models.todo import Todo\n\nclass TodoService:\n    def __init__(self, repo: TodoRepository):\n        self.repo = repo\n\n    async def create(self, data: TodoCreate) -> Todo:\n        return await self.repo.create(data)\n\n    async def get_or_404(self, todo_id: int) -> Todo:\n        todo = await self.repo.get_by_id(todo_id)\n        if todo is None:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=f\"Todo {todo_id} not found\"\n            )\n        return todo\n\n    async def list_all(self) -> list[Todo]:\n        return await self.repo.list_all()\n\n    async def update(\n        self, todo_id: int, data: TodoUpdate\n    ) -> Todo:\n        todo = await self.repo.update(todo_id, data)\n        if todo is None:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=f\"Todo {todo_id} not found\"\n            )\n        return todo\n\n    async def delete(self, todo_id: int) -> None:\n        deleted = await self.repo.delete(todo_id)\n        if not deleted:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=f\"Todo {todo_id} not found\"\n            )\n\n# app/dependencies.py\nfrom fastapi import Depends\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom app.db.session import get_db\nfrom app.repositories.todo import TodoRepository\nfrom app.services.todo import TodoService\n\ndef get_todo_repo(\n    db: AsyncSession = Depends(get_db)\n) -> TodoRepository:\n    return TodoRepository(db)\n\ndef get_todo_service(\n    repo: TodoRepository = Depends(get_todo_repo)\n) -> TodoService:\n    return TodoService(repo)"
   }, {
     diff: 3,
     q: "リファクタリング後の todo ルーターを完成させてください。\n全5エンドポイント（POST/GET一覧/GET個別/PATCH/DELETE）で TodoService を Depends 経由で使うこと。\n\nポイント: ルーターの薄さ（ビジネスロジックはサービスに委譲）。",
-    code: `# app/routers/todos.py
-# サービス層を使った薄いルーターを書く`,
-    answer: `from fastapi import APIRouter, Depends, status
-from app.schemas.todo import (
-    TodoCreate, TodoUpdate, TodoResponse
-)
-from app.services.todo import TodoService
-from app.dependencies import get_todo_service
-
-router = APIRouter(prefix="/todos", tags=["todos"])
-
-@router.post(
-    "", response_model=TodoResponse,
-    status_code=status.HTTP_201_CREATED
-)
-async def create_todo(
-    body: TodoCreate,
-    service: TodoService = Depends(get_todo_service)
-):
-    return await service.create(body)
-
-@router.get("", response_model=list[TodoResponse])
-async def list_todos(
-    service: TodoService = Depends(get_todo_service)
-):
-    return await service.list_all()
-
-@router.get("/{todo_id}", response_model=TodoResponse)
-async def get_todo(
-    todo_id: int,
-    service: TodoService = Depends(get_todo_service)
-):
-    return await service.get_or_404(todo_id)
-
-@router.patch("/{todo_id}", response_model=TodoResponse)
-async def update_todo(
-    todo_id: int,
-    body: TodoUpdate,
-    service: TodoService = Depends(get_todo_service)
-):
-    return await service.update(todo_id, body)
-
-@router.delete(
-    "/{todo_id}",
-    status_code=status.HTTP_204_NO_CONTENT
-)
-async def delete_todo(
-    todo_id: int,
-    service: TodoService = Depends(get_todo_service)
-):
-    await service.delete(todo_id)`
+    code: "# app/routers/todos.py\n# サービス層を使った薄いルーターを書く",
+    answer: "from fastapi import APIRouter, Depends, status\nfrom app.schemas.todo import (\n    TodoCreate, TodoUpdate, TodoResponse\n)\nfrom app.services.todo import TodoService\nfrom app.dependencies import get_todo_service\n\nrouter = APIRouter(prefix=\"/todos\", tags=[\"todos\"])\n\n@router.post(\n    \"\", response_model=TodoResponse,\n    status_code=status.HTTP_201_CREATED\n)\nasync def create_todo(\n    body: TodoCreate,\n    service: TodoService = Depends(get_todo_service)\n):\n    return await service.create(body)\n\n@router.get(\"\", response_model=list[TodoResponse])\nasync def list_todos(\n    service: TodoService = Depends(get_todo_service)\n):\n    return await service.list_all()\n\n@router.get(\"/{todo_id}\", response_model=TodoResponse)\nasync def get_todo(\n    todo_id: int,\n    service: TodoService = Depends(get_todo_service)\n):\n    return await service.get_or_404(todo_id)\n\n@router.patch(\"/{todo_id}\", response_model=TodoResponse)\nasync def update_todo(\n    todo_id: int,\n    body: TodoUpdate,\n    service: TodoService = Depends(get_todo_service)\n):\n    return await service.update(todo_id, body)\n\n@router.delete(\n    \"/{todo_id}\",\n    status_code=status.HTTP_204_NO_CONTENT\n)\nasync def delete_todo(\n    todo_id: int,\n    service: TodoService = Depends(get_todo_service)\n):\n    await service.delete(todo_id)"
   }],
   ch5: [{
     diff: 2,
     q: "User モデルと UserCreate / UserResponse スキーマを定義してください。\n・email: ユニーク制約\n・hashed_password: DBに保存（レスポンスには含めない）\n・is_active: デフォルトTrue\n\nポイント: パスワードをレスポンスから除外する設計。",
-    code: `# app/models/user.py
-# app/schemas/user.py`,
-    answer: `# app/models/user.py
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-from app.models.todo import Base
-
-class User(Base):
-    __tablename__ = "users"
-
-    id: Mapped[int] = mapped_column(
-        primary_key=True, autoincrement=True
-    )
-    email: Mapped[str] = mapped_column(
-        String(255), unique=True, index=True
-    )
-    hashed_password: Mapped[str] = mapped_column(
-        String(255)
-    )
-    is_active: Mapped[bool] = mapped_column(default=True)
-
-# app/schemas/user.py
-from pydantic import BaseModel, EmailStr, Field
-
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
-
-class UserResponse(BaseModel):
-    id: int
-    email: str
-    is_active: bool
-
-    model_config = {"from_attributes": True}`
+    code: "# app/models/user.py\n# app/schemas/user.py",
+    answer: "# app/models/user.py\nfrom sqlalchemy import String\nfrom sqlalchemy.orm import Mapped, mapped_column\nfrom app.models.todo import Base\n\nclass User(Base):\n    __tablename__ = \"users\"\n\n    id: Mapped[int] = mapped_column(\n        primary_key=True, autoincrement=True\n    )\n    email: Mapped[str] = mapped_column(\n        String(255), unique=True, index=True\n    )\n    hashed_password: Mapped[str] = mapped_column(\n        String(255)\n    )\n    is_active: Mapped[bool] = mapped_column(default=True)\n\n# app/schemas/user.py\nfrom pydantic import BaseModel, EmailStr, Field\n\nclass UserCreate(BaseModel):\n    email: EmailStr\n    password: str = Field(min_length=8, max_length=128)\n\nclass UserResponse(BaseModel):\n    id: int\n    email: str\n    is_active: bool\n\n    model_config = {\"from_attributes\": True}"
   }, {
     diff: 3,
     q: "JWT トークンの生成と検証を行うモジュールを作成してください。\n・create_access_token(data: dict) -> str\n・decode_access_token(token: str) -> dict\n・有効期限は30分\n・SECRET_KEY は Settings から取得\n\nポイント: python-jose の使い方、有効期限の設定。",
-    code: `# app/core/security.py
-# JWTの生成・検証関数を実装`,
-    answer: `# app/core/security.py
-from datetime import datetime, timedelta, timezone
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from app.core.config import settings
-
-pwd_context = CryptContext(
-    schemes=["bcrypt"], deprecated="auto"
-)
-
-SECRET_KEY = settings.SECRET_KEY
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-def verify_password(
-    plain: str, hashed: str
-) -> bool:
-    return pwd_context.verify(plain, hashed)
-
-def create_access_token(
-    data: dict,
-    expires_delta: timedelta | None = None
-) -> str:
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (
-        expires_delta
-        or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    to_encode.update({"exp": expire})
-    return jwt.encode(
-        to_encode, SECRET_KEY, algorithm=ALGORITHM
-    )
-
-def decode_access_token(token: str) -> dict:
-    try:
-        payload = jwt.decode(
-            token, SECRET_KEY, algorithms=[ALGORITHM]
-        )
-        return payload
-    except JWTError:
-        return {}`
+    code: "# app/core/security.py\n# JWTの生成・検証関数を実装",
+    answer: "# app/core/security.py\nfrom datetime import datetime, timedelta, timezone\nfrom jose import JWTError, jwt\nfrom passlib.context import CryptContext\nfrom app.core.config import settings\n\npwd_context = CryptContext(\n    schemes=[\"bcrypt\"], deprecated=\"auto\"\n)\n\nSECRET_KEY = settings.SECRET_KEY\nALGORITHM = \"HS256\"\nACCESS_TOKEN_EXPIRE_MINUTES = 30\n\ndef hash_password(password: str) -> str:\n    return pwd_context.hash(password)\n\ndef verify_password(\n    plain: str, hashed: str\n) -> bool:\n    return pwd_context.verify(plain, hashed)\n\ndef create_access_token(\n    data: dict,\n    expires_delta: timedelta | None = None\n) -> str:\n    to_encode = data.copy()\n    expire = datetime.now(timezone.utc) + (\n        expires_delta\n        or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)\n    )\n    to_encode.update({\"exp\": expire})\n    return jwt.encode(\n        to_encode, SECRET_KEY, algorithm=ALGORITHM\n    )\n\ndef decode_access_token(token: str) -> dict:\n    try:\n        payload = jwt.decode(\n            token, SECRET_KEY, algorithms=[ALGORITHM]\n        )\n        return payload\n    except JWTError:\n        return {}"
   }, {
     diff: 3,
     q: "get_current_user 依存関数を実装してください。\n・Authorization ヘッダーから Bearer トークンを取り出す\n・トークンを検証して User を返す\n・無効なトークンなら 401 を返す\n\nポイント: OAuth2PasswordBearer と Depends の組み合わせ。",
-    code: `# app/dependencies.py に追加
-# OAuth2PasswordBearer を使う`,
-    answer: `from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
-from app.core.security import decode_access_token
-from app.models.user import User
-from sqlalchemy import select
-
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/auth/login"
-)
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db)
-) -> User:
-    payload = decode_access_token(token)
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    stmt = select(User).where(
-        User.id == int(user_id)
-    )
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
-    return user`
+    code: "# app/dependencies.py に追加\n# OAuth2PasswordBearer を使う",
+    answer: "from fastapi import Depends, HTTPException, status\nfrom fastapi.security import OAuth2PasswordBearer\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom app.db.session import get_db\nfrom app.core.security import decode_access_token\nfrom app.models.user import User\nfrom sqlalchemy import select\n\noauth2_scheme = OAuth2PasswordBearer(\n    tokenUrl=\"/auth/login\"\n)\n\nasync def get_current_user(\n    token: str = Depends(oauth2_scheme),\n    db: AsyncSession = Depends(get_db)\n) -> User:\n    payload = decode_access_token(token)\n    user_id = payload.get(\"sub\")\n    if user_id is None:\n        raise HTTPException(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            detail=\"Invalid token\",\n            headers={\"WWW-Authenticate\": \"Bearer\"},\n        )\n    stmt = select(User).where(\n        User.id == int(user_id)\n    )\n    result = await db.execute(stmt)\n    user = result.scalar_one_or_none()\n    if user is None:\n        raise HTTPException(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            detail=\"User not found\"\n        )\n    return user"
   }],
   ch6: [{
     diff: 1,
     q: "skip と limit のクエリパラメータを受け取る Todo 一覧 API を書いてください。\n・skip: デフォルト0、0以上\n・limit: デフォルト20、1以上100以下\n\nポイント: Query によるバリデーション。",
-    code: `# GET /todos?skip=0&limit=20
-from fastapi import Query`,
-    answer: `from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
-from app.models.todo import Todo
-
-router = APIRouter(prefix="/todos", tags=["todos"])
-
-@router.get("")
-async def list_todos(
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
-):
-    stmt = (
-        select(Todo)
-        .offset(skip)
-        .limit(limit)
-        .order_by(Todo.created_at.desc())
-    )
-    result = await db.execute(stmt)
-    return list(result.scalars().all())`
+    code: "# GET /todos?skip=0&limit=20\nfrom fastapi import Query",
+    answer: "from fastapi import APIRouter, Depends, Query\nfrom sqlalchemy import select\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom app.db.session import get_db\nfrom app.models.todo import Todo\n\nrouter = APIRouter(prefix=\"/todos\", tags=[\"todos\"])\n\n@router.get(\"\")\nasync def list_todos(\n    skip: int = Query(default=0, ge=0),\n    limit: int = Query(default=20, ge=1, le=100),\n    db: AsyncSession = Depends(get_db),\n):\n    stmt = (\n        select(Todo)\n        .offset(skip)\n        .limit(limit)\n        .order_by(Todo.created_at.desc())\n    )\n    result = await db.execute(stmt)\n    return list(result.scalars().all())"
   }, {
     diff: 2,
     q: "キーワード検索（title と description の部分一致）と is_done フィルタを追加してください。\n・q: 検索キーワード（Optional）\n・is_done: 完了状態フィルタ（Optional）\n\nポイント: 動的なwhere句の組み立て。",
-    code: `# GET /todos?q=milk&is_done=false&skip=0&limit=20`,
-    answer: `from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, or_
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
-from app.models.todo import Todo
-
-router = APIRouter(prefix="/todos", tags=["todos"])
-
-@router.get("")
-async def list_todos(
-    q: str | None = Query(default=None),
-    is_done: bool | None = Query(default=None),
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
-):
-    stmt = select(Todo)
-
-    if q is not None:
-        pattern = f"%{q}%"
-        stmt = stmt.where(
-            or_(
-                Todo.title.ilike(pattern),
-                Todo.description.ilike(pattern),
-            )
-        )
-
-    if is_done is not None:
-        stmt = stmt.where(Todo.is_done == is_done)
-
-    stmt = (
-        stmt
-        .offset(skip)
-        .limit(limit)
-        .order_by(Todo.created_at.desc())
-    )
-    result = await db.execute(stmt)
-    return list(result.scalars().all())`
+    code: "# GET /todos?q=milk&is_done=false&skip=0&limit=20",
+    answer: "from fastapi import APIRouter, Depends, Query\nfrom sqlalchemy import select, or_\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom app.db.session import get_db\nfrom app.models.todo import Todo\n\nrouter = APIRouter(prefix=\"/todos\", tags=[\"todos\"])\n\n@router.get(\"\")\nasync def list_todos(\n    q: str | None = Query(default=None),\n    is_done: bool | None = Query(default=None),\n    skip: int = Query(default=0, ge=0),\n    limit: int = Query(default=20, ge=1, le=100),\n    db: AsyncSession = Depends(get_db),\n):\n    stmt = select(Todo)\n\n    if q is not None:\n        pattern = f\"%{q}%\"\n        stmt = stmt.where(\n            or_(\n                Todo.title.ilike(pattern),\n                Todo.description.ilike(pattern),\n            )\n        )\n\n    if is_done is not None:\n        stmt = stmt.where(Todo.is_done == is_done)\n\n    stmt = (\n        stmt\n        .offset(skip)\n        .limit(limit)\n        .order_by(Todo.created_at.desc())\n    )\n    result = await db.execute(stmt)\n    return list(result.scalars().all())"
   }, {
     diff: 3,
     q: "ソート機能を追加し、レスポンスにページネーション情報（total, skip, limit, has_next）を含めてください。\nレスポンスモデルも定義すること。\n\nポイント: 総件数の取得と PaginatedResponse モデル。",
-    code: `# GET /todos?sort_by=created_at&order=desc
-# レスポンス: { items: [...], total: 50, ... }`,
-    answer: `from enum import Enum
-from pydantic import BaseModel
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func, asc, desc
-from sqlalchemy.ext.asyncio import AsyncSession
-
-class SortOrder(str, Enum):
-    asc = "asc"
-    desc = "desc"
-
-class PaginatedResponse(BaseModel):
-    items: list[TodoResponse]
-    total: int
-    skip: int
-    limit: int
-    has_next: bool
-
-    model_config = {"from_attributes": True}
-
-@router.get("", response_model=PaginatedResponse)
-async def list_todos(
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=100),
-    sort_by: str = Query(default="created_at"),
-    order: SortOrder = Query(default=SortOrder.desc),
-    db: AsyncSession = Depends(get_db),
-):
-    # 総件数
-    count_stmt = select(func.count(Todo.id))
-    total = (await db.execute(count_stmt)).scalar()
-
-    # ソート
-    col = getattr(Todo, sort_by, Todo.created_at)
-    order_func = desc if order == SortOrder.desc else asc
-
-    stmt = (
-        select(Todo)
-        .order_by(order_func(col))
-        .offset(skip)
-        .limit(limit)
-    )
-    result = await db.execute(stmt)
-    items = list(result.scalars().all())
-
-    return PaginatedResponse(
-        items=items,
-        total=total,
-        skip=skip,
-        limit=limit,
-        has_next=(skip + limit) < total,
-    )`
+    code: "# GET /todos?sort_by=created_at&order=desc\n# レスポンス: { items: [...], total: 50, ... }",
+    answer: "from enum import Enum\nfrom pydantic import BaseModel\nfrom fastapi import APIRouter, Depends, Query\nfrom sqlalchemy import select, func, asc, desc\nfrom sqlalchemy.ext.asyncio import AsyncSession\n\nclass SortOrder(str, Enum):\n    asc = \"asc\"\n    desc = \"desc\"\n\nclass PaginatedResponse(BaseModel):\n    items: list[TodoResponse]\n    total: int\n    skip: int\n    limit: int\n    has_next: bool\n\n    model_config = {\"from_attributes\": True}\n\n@router.get(\"\", response_model=PaginatedResponse)\nasync def list_todos(\n    skip: int = Query(default=0, ge=0),\n    limit: int = Query(default=20, ge=1, le=100),\n    sort_by: str = Query(default=\"created_at\"),\n    order: SortOrder = Query(default=SortOrder.desc),\n    db: AsyncSession = Depends(get_db),\n):\n    # 総件数\n    count_stmt = select(func.count(Todo.id))\n    total = (await db.execute(count_stmt)).scalar()\n\n    # ソート\n    col = getattr(Todo, sort_by, Todo.created_at)\n    order_func = desc if order == SortOrder.desc else asc\n\n    stmt = (\n        select(Todo)\n        .order_by(order_func(col))\n        .offset(skip)\n        .limit(limit)\n    )\n    result = await db.execute(stmt)\n    items = list(result.scalars().all())\n\n    return PaginatedResponse(\n        items=items,\n        total=total,\n        skip=skip,\n        limit=limit,\n        has_next=(skip + limit) < total,\n    )"
   }],
   ch7: [{
     diff: 1,
     q: "カスタム例外クラス TodoNotFoundError を定義し、FastAPI の exception_handler で 404 レスポンスに変換してください。\n\nポイント: app.exception_handler デコレータの使い方。",
-    code: `# app/exceptions.py と app/main.py
-# HTTPException を使わずにカスタム例外を処理`,
-    answer: `# app/exceptions.py
-class TodoNotFoundError(Exception):
-    def __init__(self, todo_id: int):
-        self.todo_id = todo_id
-        super().__init__(
-            f"Todo {todo_id} not found"
-        )
-
-# app/main.py
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from app.exceptions import TodoNotFoundError
-
-app = FastAPI()
-
-@app.exception_handler(TodoNotFoundError)
-async def todo_not_found_handler(
-    request: Request, exc: TodoNotFoundError
-):
-    return JSONResponse(
-        status_code=404,
-        content={
-            "error": "not_found",
-            "detail": str(exc),
-            "todo_id": exc.todo_id,
-        },
-    )`
+    code: "# app/exceptions.py と app/main.py\n# HTTPException を使わずにカスタム例外を処理",
+    answer: "# app/exceptions.py\nclass TodoNotFoundError(Exception):\n    def __init__(self, todo_id: int):\n        self.todo_id = todo_id\n        super().__init__(\n            f\"Todo {todo_id} not found\"\n        )\n\n# app/main.py\nfrom fastapi import FastAPI, Request\nfrom fastapi.responses import JSONResponse\nfrom app.exceptions import TodoNotFoundError\n\napp = FastAPI()\n\n@app.exception_handler(TodoNotFoundError)\nasync def todo_not_found_handler(\n    request: Request, exc: TodoNotFoundError\n):\n    return JSONResponse(\n        status_code=404,\n        content={\n            \"error\": \"not_found\",\n            \"detail\": str(exc),\n            \"todo_id\": exc.todo_id,\n        },\n    )"
   }, {
     diff: 2,
     q: "structlog を設定し、リクエストごとに request_id・メソッド・パス・処理時間をログ出力するミドルウェアを作成してください。\n\nポイント: structlog の設定、ミドルウェアでの計測、コンテキスト変数。",
-    code: `# app/core/logging.py
-# app/middleware/logging.py`,
-    answer: `# app/core/logging.py
-import structlog
-
-def setup_logging():
-    structlog.configure(
-        processors=[
-            structlog.contextvars.merge_contextvars,
-            structlog.processors.add_log_level,
-            structlog.processors.TimeStamper(
-                fmt="iso"
-            ),
-            structlog.dev.ConsoleRenderer(),
-        ],
-        logger_factory=structlog.PrintLoggerFactory(),
-    )
-
-# app/middleware/logging.py
-import time
-import uuid
-from starlette.middleware.base import (
-    BaseHTTPMiddleware
-)
-from starlette.requests import Request
-import structlog
-
-logger = structlog.get_logger()
-
-class LoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        request_id = str(uuid.uuid4())[:8]
-        structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(
-            request_id=request_id
-        )
-
-        start = time.perf_counter()
-        response = await call_next(request)
-        elapsed = time.perf_counter() - start
-
-        await logger.ainfo(
-            "request",
-            method=request.method,
-            path=str(request.url.path),
-            status=response.status_code,
-            duration_ms=round(elapsed * 1000, 2),
-        )
-        response.headers["X-Request-ID"] = request_id
-        return response
-
-# app/main.py での登録:
-# from app.core.logging import setup_logging
-# from app.middleware.logging import LoggingMiddleware
-# setup_logging()
-# app.add_middleware(LoggingMiddleware)`
+    code: "# app/core/logging.py\n# app/middleware/logging.py",
+    answer: "# app/core/logging.py\nimport structlog\n\ndef setup_logging():\n    structlog.configure(\n        processors=[\n            structlog.contextvars.merge_contextvars,\n            structlog.processors.add_log_level,\n            structlog.processors.TimeStamper(\n                fmt=\"iso\"\n            ),\n            structlog.dev.ConsoleRenderer(),\n        ],\n        logger_factory=structlog.PrintLoggerFactory(),\n    )\n\n# app/middleware/logging.py\nimport time\nimport uuid\nfrom starlette.middleware.base import (\n    BaseHTTPMiddleware\n)\nfrom starlette.requests import Request\nimport structlog\n\nlogger = structlog.get_logger()\n\nclass LoggingMiddleware(BaseHTTPMiddleware):\n    async def dispatch(self, request: Request, call_next):\n        request_id = str(uuid.uuid4())[:8]\n        structlog.contextvars.clear_contextvars()\n        structlog.contextvars.bind_contextvars(\n            request_id=request_id\n        )\n\n        start = time.perf_counter()\n        response = await call_next(request)\n        elapsed = time.perf_counter() - start\n\n        await logger.ainfo(\n            \"request\",\n            method=request.method,\n            path=str(request.url.path),\n            status=response.status_code,\n            duration_ms=round(elapsed * 1000, 2),\n        )\n        response.headers[\"X-Request-ID\"] = request_id\n        return response\n\n# app/main.py での登録:\n# from app.core.logging import setup_logging\n# from app.middleware.logging import LoggingMiddleware\n# setup_logging()\n# app.add_middleware(LoggingMiddleware)"
   }, {
     diff: 3,
     q: "バリデーションエラー（RequestValidationError）のレスポンス形式をカスタマイズし、フィールドごとのエラーメッセージを分かりやすい JSON で返してください。\n内部サーバーエラー（500）もキャッチして構造化ログに出力すること。\n\nポイント: RequestValidationError ハンドラ、500エラーのログ出力。",
-    code: `# エラーレスポンスの統一フォーマットを設計`,
-    answer: `from fastapi import FastAPI, Request, status
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-import structlog
-import traceback
-
-app = FastAPI()
-logger = structlog.get_logger()
-
-@app.exception_handler(RequestValidationError)
-async def validation_handler(
-    request: Request, exc: RequestValidationError
-):
-    errors = []
-    for err in exc.errors():
-        field = " -> ".join(str(x) for x in err["loc"])
-        errors.append({
-            "field": field,
-            "message": err["msg"],
-            "type": err["type"],
-        })
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={
-            "error": "validation_error",
-            "detail": errors,
-        },
-    )
-
-@app.exception_handler(Exception)
-async def internal_error_handler(
-    request: Request, exc: Exception
-):
-    await logger.aerror(
-        "unhandled_exception",
-        exc_type=type(exc).__name__,
-        exc_msg=str(exc),
-        traceback=traceback.format_exc(),
-        path=str(request.url.path),
-    )
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "error": "internal_server_error",
-            "detail": "An unexpected error occurred",
-        },
-    )`
+    code: "# エラーレスポンスの統一フォーマットを設計",
+    answer: "from fastapi import FastAPI, Request, status\nfrom fastapi.exceptions import RequestValidationError\nfrom fastapi.responses import JSONResponse\nimport structlog\nimport traceback\n\napp = FastAPI()\nlogger = structlog.get_logger()\n\n@app.exception_handler(RequestValidationError)\nasync def validation_handler(\n    request: Request, exc: RequestValidationError\n):\n    errors = []\n    for err in exc.errors():\n        field = \" -> \".join(str(x) for x in err[\"loc\"])\n        errors.append({\n            \"field\": field,\n            \"message\": err[\"msg\"],\n            \"type\": err[\"type\"],\n        })\n    return JSONResponse(\n        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,\n        content={\n            \"error\": \"validation_error\",\n            \"detail\": errors,\n        },\n    )\n\n@app.exception_handler(Exception)\nasync def internal_error_handler(\n    request: Request, exc: Exception\n):\n    await logger.aerror(\n        \"unhandled_exception\",\n        exc_type=type(exc).__name__,\n        exc_msg=str(exc),\n        traceback=traceback.format_exc(),\n        path=str(request.url.path),\n    )\n    return JSONResponse(\n        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n        content={\n            \"error\": \"internal_server_error\",\n            \"detail\": \"An unexpected error occurred\",\n        },\n    )"
   }],
   ch8: [{
     diff: 1,
     q: "pytest + httpx で GET /health が 200 を返すことをテストしてください。\nASGI の TestClient ではなく httpx.AsyncClient を使うこと。\n\nポイント: @pytest.mark.anyio, httpx.AsyncClient の基本。",
-    code: `# tests/test_health.py`,
-    answer: `# tests/test_health.py
-import pytest
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-
-@pytest.mark.anyio
-async def test_health_check():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test"
-    ) as client:
-        response = await client.get("/health")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
-
-# pyproject.toml / conftest.py:
-# [tool.pytest.ini_options]
-# anyio_backend = "asyncio"`
+    code: "# tests/test_health.py",
+    answer: "# tests/test_health.py\nimport pytest\nfrom httpx import AsyncClient, ASGITransport\nfrom app.main import app\n\n@pytest.mark.anyio\nasync def test_health_check():\n    transport = ASGITransport(app=app)\n    async with AsyncClient(\n        transport=transport,\n        base_url=\"http://test\"\n    ) as client:\n        response = await client.get(\"/health\")\n    assert response.status_code == 200\n    assert response.json() == {\"status\": \"ok\"}\n\n# pyproject.toml / conftest.py:\n# [tool.pytest.ini_options]\n# anyio_backend = \"asyncio\""
   }, {
     diff: 2,
     q: "テスト用のデータベースセッションを設定し、Todo の作成・取得 API をテストしてください。\nテストごとにDBをクリーンにする fixture を書くこと。\n\nポイント: app.dependency_overrides、テスト用DB、fixture のスコープ。",
-    code: `# tests/conftest.py
-# tests/test_todos.py`,
-    answer: `# tests/conftest.py
-import pytest
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import (
-    create_async_engine,
-    async_sessionmaker,
-    AsyncSession,
-)
-from app.models.todo import Base
-from app.db.session import get_db
-from app.main import app
-
-TEST_DB_URL = "sqlite+aiosqlite:///./test.db"
-engine = create_async_engine(TEST_DB_URL)
-TestSession = async_sessionmaker(
-    engine, class_=AsyncSession,
-    expire_on_commit=False
-)
-
-@pytest.fixture
-async def db_session():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with TestSession() as session:
-        yield session
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-@pytest.fixture
-async def client(db_session):
-    async def override_get_db():
-        yield db_session
-    app.dependency_overrides[get_db] = override_get_db
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test"
-    ) as c:
-        yield c
-    app.dependency_overrides.clear()
-
-# tests/test_todos.py
-import pytest
-
-@pytest.mark.anyio
-async def test_create_todo(client):
-    resp = await client.post(
-        "/todos",
-        json={"title": "Test Todo"}
-    )
-    assert resp.status_code == 201
-    data = resp.json()
-    assert data["title"] == "Test Todo"
-    assert data["is_done"] is False
-    assert "id" in data
-
-@pytest.mark.anyio
-async def test_get_todo(client):
-    create = await client.post(
-        "/todos",
-        json={"title": "Another Todo"}
-    )
-    todo_id = create.json()["id"]
-    resp = await client.get(f"/todos/{todo_id}")
-    assert resp.status_code == 200
-    assert resp.json()["title"] == "Another Todo"`
+    code: "# tests/conftest.py\n# tests/test_todos.py",
+    answer: "# tests/conftest.py\nimport pytest\nfrom httpx import AsyncClient, ASGITransport\nfrom sqlalchemy.ext.asyncio import (\n    create_async_engine,\n    async_sessionmaker,\n    AsyncSession,\n)\nfrom app.models.todo import Base\nfrom app.db.session import get_db\nfrom app.main import app\n\nTEST_DB_URL = \"sqlite+aiosqlite:///./test.db\"\nengine = create_async_engine(TEST_DB_URL)\nTestSession = async_sessionmaker(\n    engine, class_=AsyncSession,\n    expire_on_commit=False\n)\n\n@pytest.fixture\nasync def db_session():\n    async with engine.begin() as conn:\n        await conn.run_sync(Base.metadata.create_all)\n    async with TestSession() as session:\n        yield session\n    async with engine.begin() as conn:\n        await conn.run_sync(Base.metadata.drop_all)\n\n@pytest.fixture\nasync def client(db_session):\n    async def override_get_db():\n        yield db_session\n    app.dependency_overrides[get_db] = override_get_db\n    transport = ASGITransport(app=app)\n    async with AsyncClient(\n        transport=transport,\n        base_url=\"http://test\"\n    ) as c:\n        yield c\n    app.dependency_overrides.clear()\n\n# tests/test_todos.py\nimport pytest\n\n@pytest.mark.anyio\nasync def test_create_todo(client):\n    resp = await client.post(\n        \"/todos\",\n        json={\"title\": \"Test Todo\"}\n    )\n    assert resp.status_code == 201\n    data = resp.json()\n    assert data[\"title\"] == \"Test Todo\"\n    assert data[\"is_done\"] is False\n    assert \"id\" in data\n\n@pytest.mark.anyio\nasync def test_get_todo(client):\n    create = await client.post(\n        \"/todos\",\n        json={\"title\": \"Another Todo\"}\n    )\n    todo_id = create.json()[\"id\"]\n    resp = await client.get(f\"/todos/{todo_id}\")\n    assert resp.status_code == 200\n    assert resp.json()[\"title\"] == \"Another Todo\""
   }, {
     diff: 3,
     q: "factory_boy を使って Todo のファクトリを作り、ページネーションのテストを書いてください。\n50件のTodoを生成し、limit=10 で取得して正しいページネーション情報が返ることを確認。\n\nポイント: factory_boy + SQLAlchemy の非同期統合、大量データのテスト。",
-    code: `# tests/factories.py
-# tests/test_pagination.py`,
-    answer: `# tests/factories.py
-import factory
-from app.models.todo import Todo
-
-class TodoFactory(factory.Factory):
-    class Meta:
-        model = Todo
-
-    title = factory.Sequence(
-        lambda n: f"Todo Item {n}"
-    )
-    description = factory.Faker(
-        "sentence", locale="ja_JP"
-    )
-    is_done = False
-
-# tests/test_pagination.py
-import pytest
-from tests.factories import TodoFactory
-
-@pytest.mark.anyio
-async def test_pagination(client, db_session):
-    # 50件のTodoを作成
-    for i in range(50):
-        todo = TodoFactory.build()
-        db_session.add(Todo(
-            title=todo.title,
-            description=todo.description,
-            is_done=todo.is_done,
-        ))
-    await db_session.commit()
-
-    # 最初のページ
-    resp = await client.get(
-        "/todos?skip=0&limit=10"
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert len(data["items"]) == 10
-    assert data["total"] == 50
-    assert data["has_next"] is True
-
-    # 最後のページ
-    resp = await client.get(
-        "/todos?skip=40&limit=10"
-    )
-    data = resp.json()
-    assert len(data["items"]) == 10
-    assert data["has_next"] is False
-
-    # 範囲外
-    resp = await client.get(
-        "/todos?skip=50&limit=10"
-    )
-    data = resp.json()
-    assert len(data["items"]) == 0
-    assert data["has_next"] is False`
+    code: "# tests/factories.py\n# tests/test_pagination.py",
+    answer: "# tests/factories.py\nimport factory\nfrom app.models.todo import Todo\n\nclass TodoFactory(factory.Factory):\n    class Meta:\n        model = Todo\n\n    title = factory.Sequence(\n        lambda n: f\"Todo Item {n}\"\n    )\n    description = factory.Faker(\n        \"sentence\", locale=\"ja_JP\"\n    )\n    is_done = False\n\n# tests/test_pagination.py\nimport pytest\nfrom tests.factories import TodoFactory\n\n@pytest.mark.anyio\nasync def test_pagination(client, db_session):\n    # 50件のTodoを作成\n    for i in range(50):\n        todo = TodoFactory.build()\n        db_session.add(Todo(\n            title=todo.title,\n            description=todo.description,\n            is_done=todo.is_done,\n        ))\n    await db_session.commit()\n\n    # 最初のページ\n    resp = await client.get(\n        \"/todos?skip=0&limit=10\"\n    )\n    assert resp.status_code == 200\n    data = resp.json()\n    assert len(data[\"items\"]) == 10\n    assert data[\"total\"] == 50\n    assert data[\"has_next\"] is True\n\n    # 最後のページ\n    resp = await client.get(\n        \"/todos?skip=40&limit=10\"\n    )\n    data = resp.json()\n    assert len(data[\"items\"]) == 10\n    assert data[\"has_next\"] is False\n\n    # 範囲外\n    resp = await client.get(\n        \"/todos?skip=50&limit=10\"\n    )\n    data = resp.json()\n    assert len(data[\"items\"]) == 0\n    assert data[\"has_next\"] is False"
   }],
   ch9: [{
     diff: 1,
     q: "FastAPIアプリ用のマルチステージ Dockerfile を書いてください。\n・ベースイメージ: python:3.12-slim\n・依存関係のインストールとアプリのコピーを分ける\n・非rootユーザで実行\n\nポイント: レイヤーキャッシュの活用、セキュリティ。",
-    code: `# Dockerfile`,
-    answer: `# Dockerfile
-FROM python:3.12-slim AS builder
-
-WORKDIR /build
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir --prefix=/install .
-
-FROM python:3.12-slim
-
-# 非rootユーザ作成
-RUN groupadd -r appuser && \\
-    useradd -r -g appuser appuser
-
-WORKDIR /app
-COPY --from=builder /install /usr/local
-COPY ./app ./app
-COPY ./alembic ./alembic
-COPY ./alembic.ini ./
-
-# 非rootユーザに切り替え
-USER appuser
-
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", \\
-     "--host", "0.0.0.0", "--port", "8000"]`
+    code: "# Dockerfile",
+    answer: "# Dockerfile\nFROM python:3.12-slim AS builder\n\nWORKDIR /build\nCOPY pyproject.toml ./\nRUN pip install --no-cache-dir --prefix=/install .\n\nFROM python:3.12-slim\n\n# 非rootユーザ作成\nRUN groupadd -r appuser && \\\n    useradd -r -g appuser appuser\n\nWORKDIR /app\nCOPY --from=builder /install /usr/local\nCOPY ./app ./app\nCOPY ./alembic ./alembic\nCOPY ./alembic.ini ./\n\n# 非rootユーザに切り替え\nUSER appuser\n\nEXPOSE 8000\nCMD [\"uvicorn\", \"app.main:app\", \\\n     \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]"
   }, {
     diff: 2,
     q: "docker-compose.yml を書いて、アプリ・PostgreSQL・Redis の3サービスを定義してください。\n・アプリはDBの起動を待つ（depends_on + healthcheck）\n・環境変数は .env ファイルから読む\n\nポイント: サービス間の依存関係、ヘルスチェック。",
-    code: `# docker-compose.yml`,
-    answer: `# docker-compose.yml
-services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: todo
-      POSTGRES_PASSWORD: todo_pass
-      POSTGRES_DB: todo_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL",
-        "pg_isready -U todo -d todo_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  app:
-    build: .
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: >-
-        postgresql+asyncpg://todo:todo_pass@db:5432/todo_db
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    command: >
-      sh -c "alembic upgrade head &&
-      uvicorn app.main:app
-      --host 0.0.0.0 --port 8000"
-
-volumes:
-  pgdata:`
+    code: "# docker-compose.yml",
+    answer: "# docker-compose.yml\nservices:\n  db:\n    image: postgres:16-alpine\n    environment:\n      POSTGRES_USER: todo\n      POSTGRES_PASSWORD: todo_pass\n      POSTGRES_DB: todo_db\n    ports:\n      - \"5432:5432\"\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n    healthcheck:\n      test: [\"CMD-SHELL\",\n        \"pg_isready -U todo -d todo_db\"]\n      interval: 5s\n      timeout: 5s\n      retries: 5\n\n  redis:\n    image: redis:7-alpine\n    ports:\n      - \"6379:6379\"\n    healthcheck:\n      test: [\"CMD\", \"redis-cli\", \"ping\"]\n      interval: 5s\n      timeout: 3s\n      retries: 5\n\n  app:\n    build: .\n    ports:\n      - \"8000:8000\"\n    env_file:\n      - .env\n    environment:\n      DATABASE_URL: >-\n        postgresql+asyncpg://todo:todo_pass@db:5432/todo_db\n    depends_on:\n      db:\n        condition: service_healthy\n      redis:\n        condition: service_healthy\n    command: >\n      sh -c \"alembic upgrade head &&\n      uvicorn app.main:app\n      --host 0.0.0.0 --port 8000\"\n\nvolumes:\n  pgdata:"
   }, {
     diff: 3,
     q: "GitHub Actions の CI ワークフローを書いてください。\n・Python 3.12 でテストを実行\n・PostgreSQL サービスコンテナを使用\n・lint (ruff) → test (pytest) → build (docker) の3ステップ\n\nポイント: サービスコンテナ、ステップ間の依存。",
-    code: `# .github/workflows/ci.yml`,
-    answer: `# .github/workflows/ci.yml
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test_pass
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      DATABASE_URL: >-
-        postgresql+asyncpg://test:test_pass@localhost:5432/test_db
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
-
-      - name: Lint
-        run: ruff check .
-
-      - name: Test
-        run: pytest -v --tb=short
-
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build Docker image
-        run: docker build -t todo-app .`
+    code: "# .github/workflows/ci.yml",
+    answer: "# .github/workflows/ci.yml\nname: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n    branches: [main]\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    services:\n      postgres:\n        image: postgres:16-alpine\n        env:\n          POSTGRES_USER: test\n          POSTGRES_PASSWORD: test_pass\n          POSTGRES_DB: test_db\n        ports:\n          - 5432:5432\n        options: >-\n          --health-cmd \"pg_isready -U test\"\n          --health-interval 5s\n          --health-timeout 5s\n          --health-retries 5\n\n    env:\n      DATABASE_URL: >-\n        postgresql+asyncpg://test:test_pass@localhost:5432/test_db\n\n    steps:\n      - uses: actions/checkout@v4\n\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n          cache: \"pip\"\n\n      - name: Install dependencies\n        run: pip install -e \".[dev]\"\n\n      - name: Lint\n        run: ruff check .\n\n      - name: Test\n        run: pytest -v --tb=short\n\n  build:\n    needs: test\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - name: Build Docker image\n        run: docker build -t todo-app ."
   }],
   ch10: [{
     diff: 2,
     q: "Gunicorn + Uvicorn worker の本番起動設定を書いてください。\n・gunicorn.conf.py で worker 数を CPU コア数に基づいて設定\n・タイムアウト、アクセスログも設定\n\nポイント: worker 数の最適化、プロセス管理。",
-    code: `# gunicorn.conf.py
-# Dockerfile の CMD も更新`,
-    answer: `# gunicorn.conf.py
-import multiprocessing
-
-# Worker設定
-workers = multiprocessing.cpu_count() * 2 + 1
-worker_class = "uvicorn.workers.UvicornWorker"
-worker_connections = 1000
-
-# バインド
-bind = "0.0.0.0:8000"
-
-# タイムアウト
-timeout = 120
-graceful_timeout = 30
-keepalive = 5
-
-# ログ
-accesslog = "-"
-errorlog = "-"
-loglevel = "info"
-
-# プロセス名
-proc_name = "todo-api"
-
-# Dockerfile CMD:
-# CMD ["gunicorn", "app.main:app",
-#      "-c", "gunicorn.conf.py"]`
+    code: "# gunicorn.conf.py\n# Dockerfile の CMD も更新",
+    answer: "# gunicorn.conf.py\nimport multiprocessing\n\n# Worker設定\nworkers = multiprocessing.cpu_count() * 2 + 1\nworker_class = \"uvicorn.workers.UvicornWorker\"\nworker_connections = 1000\n\n# バインド\nbind = \"0.0.0.0:8000\"\n\n# タイムアウト\ntimeout = 120\ngraceful_timeout = 30\nkeepalive = 5\n\n# ログ\naccesslog = \"-\"\nerrorlog = \"-\"\nloglevel = \"info\"\n\n# プロセス名\nproc_name = \"todo-api\"\n\n# Dockerfile CMD:\n# CMD [\"gunicorn\", \"app.main:app\",\n#      \"-c\", \"gunicorn.conf.py\"]"
   }, {
     diff: 2,
     q: "/health エンドポイントを拡張し、DB接続・アプリバージョン・起動時間を返すようにしてください。\nDB接続確認が失敗した場合は 503 を返すこと。\n\nポイント: ヘルスチェックの実践パターン、依存サービスの確認。",
-    code: `# app/routers/health.py
-# 詳細なヘルスチェック`,
-    answer: `# app/routers/health.py
-import time
-from fastapi import APIRouter, Depends, status
-from fastapi.responses import JSONResponse
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
-
-router = APIRouter(tags=["health"])
-APP_VERSION = "1.0.0"
-START_TIME = time.time()
-
-@router.get("/health")
-async def health_check(
-    db: AsyncSession = Depends(get_db),
-):
-    health = {
-        "status": "ok",
-        "version": APP_VERSION,
-        "uptime_seconds": round(
-            time.time() - START_TIME, 1
-        ),
-        "checks": {},
-    }
-
-    # DB接続チェック
-    try:
-        await db.execute(text("SELECT 1"))
-        health["checks"]["database"] = "ok"
-    except Exception as e:
-        health["status"] = "degraded"
-        health["checks"]["database"] = str(e)
-        return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content=health,
-        )
-
-    return health`
+    code: "# app/routers/health.py\n# 詳細なヘルスチェック",
+    answer: "# app/routers/health.py\nimport time\nfrom fastapi import APIRouter, Depends, status\nfrom fastapi.responses import JSONResponse\nfrom sqlalchemy import text\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom app.db.session import get_db\n\nrouter = APIRouter(tags=[\"health\"])\nAPP_VERSION = \"1.0.0\"\nSTART_TIME = time.time()\n\n@router.get(\"/health\")\nasync def health_check(\n    db: AsyncSession = Depends(get_db),\n):\n    health = {\n        \"status\": \"ok\",\n        \"version\": APP_VERSION,\n        \"uptime_seconds\": round(\n            time.time() - START_TIME, 1\n        ),\n        \"checks\": {},\n    }\n\n    # DB接続チェック\n    try:\n        await db.execute(text(\"SELECT 1\"))\n        health[\"checks\"][\"database\"] = \"ok\"\n    except Exception as e:\n        health[\"status\"] = \"degraded\"\n        health[\"checks\"][\"database\"] = str(e)\n        return JSONResponse(\n            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,\n            content=health,\n        )\n\n    return health"
   }, {
     diff: 3,
     q: "Prometheus メトリクスを収集するミドルウェアを作成してください。\n・リクエスト数（メソッド・パス・ステータスコード別）\n・レスポンスタイム（ヒストグラム）\n・/metrics エンドポイントで公開\n\nポイント: prometheus_client の使い方、ミドルウェアでの計測。",
-    code: `# app/middleware/metrics.py
-# app/routers/metrics.py`,
-    answer: `# app/middleware/metrics.py
-import time
-from starlette.middleware.base import (
-    BaseHTTPMiddleware
-)
-from starlette.requests import Request
-from prometheus_client import (
-    Counter, Histogram
-)
-
-REQUEST_COUNT = Counter(
-    "http_requests_total",
-    "Total HTTP requests",
-    ["method", "path", "status"],
-)
-REQUEST_DURATION = Histogram(
-    "http_request_duration_seconds",
-    "HTTP request duration in seconds",
-    ["method", "path"],
-    buckets=[0.01, 0.05, 0.1, 0.25, 0.5,
-             1.0, 2.5, 5.0],
-)
-
-class MetricsMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request,
-                       call_next):
-        if request.url.path == "/metrics":
-            return await call_next(request)
-
-        start = time.perf_counter()
-        response = await call_next(request)
-        duration = time.perf_counter() - start
-
-        REQUEST_COUNT.labels(
-            method=request.method,
-            path=request.url.path,
-            status=response.status_code,
-        ).inc()
-        REQUEST_DURATION.labels(
-            method=request.method,
-            path=request.url.path,
-        ).observe(duration)
-
-        return response
-
-# app/routers/metrics.py
-from fastapi import APIRouter
-from fastapi.responses import Response
-from prometheus_client import generate_latest
-
-router = APIRouter()
-
-@router.get("/metrics")
-def metrics():
-    return Response(
-        content=generate_latest(),
-        media_type="text/plain",
-    )
-
-# app/main.py での登録:
-# from app.middleware.metrics import MetricsMiddleware
-# from app.routers.metrics import router as metrics_router
-# app.add_middleware(MetricsMiddleware)
-# app.include_router(metrics_router)`
+    code: "# app/middleware/metrics.py\n# app/routers/metrics.py",
+    answer: "# app/middleware/metrics.py\nimport time\nfrom starlette.middleware.base import (\n    BaseHTTPMiddleware\n)\nfrom starlette.requests import Request\nfrom prometheus_client import (\n    Counter, Histogram\n)\n\nREQUEST_COUNT = Counter(\n    \"http_requests_total\",\n    \"Total HTTP requests\",\n    [\"method\", \"path\", \"status\"],\n)\nREQUEST_DURATION = Histogram(\n    \"http_request_duration_seconds\",\n    \"HTTP request duration in seconds\",\n    [\"method\", \"path\"],\n    buckets=[0.01, 0.05, 0.1, 0.25, 0.5,\n             1.0, 2.5, 5.0],\n)\n\nclass MetricsMiddleware(BaseHTTPMiddleware):\n    async def dispatch(self, request: Request,\n                       call_next):\n        if request.url.path == \"/metrics\":\n            return await call_next(request)\n\n        start = time.perf_counter()\n        response = await call_next(request)\n        duration = time.perf_counter() - start\n\n        REQUEST_COUNT.labels(\n            method=request.method,\n            path=request.url.path,\n            status=response.status_code,\n        ).inc()\n        REQUEST_DURATION.labels(\n            method=request.method,\n            path=request.url.path,\n        ).observe(duration)\n\n        return response\n\n# app/routers/metrics.py\nfrom fastapi import APIRouter\nfrom fastapi.responses import Response\nfrom prometheus_client import generate_latest\n\nrouter = APIRouter()\n\n@router.get(\"/metrics\")\ndef metrics():\n    return Response(\n        content=generate_latest(),\n        media_type=\"text/plain\",\n    )\n\n# app/main.py での登録:\n# from app.middleware.metrics import MetricsMiddleware\n# from app.routers.metrics import router as metrics_router\n# app.add_middleware(MetricsMiddleware)\n# app.include_router(metrics_router)"
   }]
 };
 
@@ -1368,18 +256,7 @@ const chapters = [{
   sections: [{
     title: "FastAPI とは何か",
     body: "FastAPI は、Python 3.8 以降で使える高性能な Web API フレームワークです。Starlette（非同期 Web フレームワーク）と Pydantic（データバリデーション）の上に構築されており、型ヒントを活用して自動的に OpenAPI ドキュメントを生成してくれます。\n\nFlask や Django REST Framework を使ったことがある方なら、FastAPI の最大の特長は「型ヒントがそのままバリデーション・ドキュメント・補完に使われる」点だと実感するでしょう。コードの型注釈が API 仕様書を兼ねるため、実装とドキュメントの乖離が起きにくい設計になっています。\n\nまた、async/await をネイティブにサポートしているため、I/O バウンドな処理（DB アクセス、外部 API 呼び出し）で高いスループットを発揮します。ただし同期関数も普通に書けるので、非同期に慣れていなくても段階的に移行できます。",
-    code: `# 最小構成の FastAPI アプリ
-from fastapi import FastAPI
-
-app = FastAPI(
-    title="Todo API",
-    description="Todo管理のREST API",
-    version="1.0.0",
-)
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello, FastAPI!"}`,
+    code: "# 最小構成の FastAPI アプリ\nfrom fastapi import FastAPI\n\napp = FastAPI(\n    title=\"Todo API\",\n    description=\"Todo管理のREST API\",\n    version=\"1.0.0\",\n)\n\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"Hello, FastAPI!\"}",
     afterCode: "ポイント: FastAPI() に渡した title や description は、自動生成される /docs（Swagger UI）に反映されます。ブラウザで http://localhost:8000/docs を開けば、API の対話的なドキュメントがすぐに確認できます。"
   }, {
     title: "プロジェクトレイアウト",
@@ -1389,75 +266,17 @@ def read_root():
   }, {
     title: "APIRouter によるルーター分離",
     body: "FastAPI の APIRouter は、Flask の Blueprint に相当する仕組みです。関連するエンドポイントをひとまとめにして別ファイルに定義し、main.py から include_router() でマウントします。\n\nルーターを分離する最大のメリットは「ファイルを開いた瞬間に、そのファイルがどの機能を担当しているかが分かる」ことです。todos.py を開けば Todo 関連の API だけが並んでおり、auth.py を開けば認証関連だけが見えます。機能追加時も既存コードに触らず新しいルーターファイルを足すだけで済むため、変更の影響範囲が限定されます。\n\nprefix と tags を活用することで、URL 設計と OpenAPI ドキュメントの構造化が同時に実現できます。prefix=\"/todos\" を指定すれば、ルーター内の全エンドポイントに自動的に /todos プレフィックスが付きます。",
-    code: `# app/routers/todos.py
-from fastapi import APIRouter
-
-router = APIRouter(
-    prefix="/todos",
-    tags=["todos"],  # OpenAPI ドキュメントでのグループ名
-)
-
-@router.get("")
-def list_todos():
-    return [{"id": 1, "title": "Sample"}]
-
-@router.post("")
-def create_todo():
-    return {"id": 2, "title": "New"}
-
-# app/main.py
-from fastapi import FastAPI
-from app.routers.todos import router as todos_router
-
-app = FastAPI(title="Todo API")
-app.include_router(todos_router)  # マウント`,
+    code: "# app/routers/todos.py\nfrom fastapi import APIRouter\n\nrouter = APIRouter(\n    prefix=\"/todos\",\n    tags=[\"todos\"],  # OpenAPI ドキュメントでのグループ名\n)\n\n@router.get(\"\")\ndef list_todos():\n    return [{\"id\": 1, \"title\": \"Sample\"}]\n\n@router.post(\"\")\ndef create_todo():\n    return {\"id\": 2, \"title\": \"New\"}\n\n# app/main.py\nfrom fastapi import FastAPI\nfrom app.routers.todos import router as todos_router\n\napp = FastAPI(title=\"Todo API\")\napp.include_router(todos_router)  # マウント",
     afterCode: "ポイント: include_router() は何度でも呼べるので、機能ごとにルーターを増やしていけます。大規模プロジェクトでは routers/ ディレクトリに 10 以上のファイルが並ぶことも珍しくありません。"
   }, {
     title: "Uvicorn の起動とオプション",
     body: "Uvicorn は Python の ASGI（Asynchronous Server Gateway Interface）サーバーで、FastAPI アプリを実行する標準的な方法です。WSGI サーバー（Gunicorn 単体、uWSGI など）と違い、非同期処理をネイティブに扱えるのが特長です。\n\n開発時は --reload オプションを付けると、ファイル変更時に自動的にサーバーが再起動します。本番では使わないオプションですが、開発効率が大幅に上がるので常に付けておきましょう。\n\napp.main:app という書き方は「app パッケージの main モジュールにある app オブジェクト」を意味します。ドットとコロンの使い分けに注意してください（パッケージ/モジュールはドット、モジュール内のオブジェクトはコロンで区切ります）。",
-    code: `# 開発サーバー起動
-uvicorn app.main:app --reload --port 8000
-
-# ホスト指定（外部からアクセス可能に）
-uvicorn app.main:app --reload --host 0.0.0.0
-
-# ログレベル変更
-uvicorn app.main:app --reload --log-level debug
-
-# プログラムから起動する場合
-import uvicorn
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-    )`,
+    code: "# 開発サーバー起動\nuvicorn app.main:app --reload --port 8000\n\n# ホスト指定（外部からアクセス可能に）\nuvicorn app.main:app --reload --host 0.0.0.0\n\n# ログレベル変更\nuvicorn app.main:app --reload --log-level debug\n\n# プログラムから起動する場合\nimport uvicorn\n\nif __name__ == \"__main__\":\n    uvicorn.run(\n        \"app.main:app\",\n        host=\"0.0.0.0\",\n        port=8000,\n        reload=True,\n    )",
     afterCode: "ミニ演習: uvicorn app.main:app --reload で起動し、ブラウザで http://localhost:8000/docs を開いてみましょう。Swagger UI が表示され、API を対話的に試せることを確認してください。"
   }, {
     title: "pydantic-settings による設定管理",
     body: "アプリケーションの設定（データベース URL、シークレットキー、デバッグフラグなど）をハードコードするのは、セキュリティ上も運用上も問題があります。pydantic-settings を使うと、環境変数や .env ファイルから型安全に設定を読み込めます。\n\n「型安全に」というのがポイントで、例えば DEBUG=true という文字列が自動的に bool 型の True に変換されます。DATABASE_URL が未設定のまま起動しようとするとバリデーションエラーが出るので、「本番で設定漏れに気づく」という最悪のシナリオを防げます。\n\nThe Twelve-Factor App という設計指針では「設定は環境変数に格納する」ことが推奨されています。pydantic-settings はこの原則に沿った実装を最小限のコードで実現してくれます。",
-    code: `# app/core/config.py
-from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    APP_NAME: str = "Todo API"
-    DEBUG: bool = False
-    DATABASE_URL: str  # 必須（デフォルトなし）
-    SECRET_KEY: str = "change-me-in-production"
-
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-    }
-
-# シングルトンとしてインポート
-settings = Settings()
-
-# 使用例
-# from app.core.config import settings
-# print(settings.APP_NAME)`,
+    code: "# app/core/config.py\nfrom pydantic_settings import BaseSettings\n\nclass Settings(BaseSettings):\n    APP_NAME: str = \"Todo API\"\n    DEBUG: bool = False\n    DATABASE_URL: str  # 必須（デフォルトなし）\n    SECRET_KEY: str = \"change-me-in-production\"\n\n    model_config = {\n        \"env_file\": \".env\",\n        \"env_file_encoding\": \"utf-8\",\n    }\n\n# シングルトンとしてインポート\nsettings = Settings()\n\n# 使用例\n# from app.core.config import settings\n# print(settings.APP_NAME)",
     afterCode: "注意: .env ファイルは .gitignore に追加してリポジトリにコミットしないでください。代わりに .env.example をコミットして、必要な環境変数の一覧を共有するのが定石です。"
   }]
 }, {
@@ -1475,97 +294,23 @@ settings = Settings()
     title: "ステータスコードの使い分け",
     body: "HTTP ステータスコードは、API の応答状態をクライアントに伝える重要な情報です。FastAPI では status モジュールから定数を使うことで、コード中にマジックナンバーを散りばめるのを避けられます。\n\n正しいステータスコードを返すことは、API の品質を示す最もわかりやすい指標の一つです。POST で 200 を返したり、DELETE で 200 を返したりしても動きはしますが、クライアント側の処理が煩雑になり、API の利用者（多くの場合フロントエンドエンジニア）を混乱させます。\n\n特に 201（Created）と 204（No Content）は忘れがちなので意識しましょう。201 はレスポンスボディに作成されたリソースを返し、204 はボディなしで成功を伝えます。",
     table: T.statusCodes,
-    code: `from fastapi import status
-
-# 作成時は 201
-@router.post("/todos",
-    status_code=status.HTTP_201_CREATED)
-def create_todo(body: TodoCreate):
-    ...
-
-# 削除時は 204（ボディなし）
-@router.delete("/todos/{todo_id}",
-    status_code=status.HTTP_204_NO_CONTENT)
-def delete_todo(todo_id: int):
-    ...`,
+    code: "from fastapi import status\n\n# 作成時は 201\n@router.post(\"/todos\",\n    status_code=status.HTTP_201_CREATED)\ndef create_todo(body: TodoCreate):\n    ...\n\n# 削除時は 204（ボディなし）\n@router.delete(\"/todos/{todo_id}\",\n    status_code=status.HTTP_204_NO_CONTENT)\ndef delete_todo(todo_id: int):\n    ...",
     afterCode: "ポイント: status_code はデコレータの引数で指定します。これにより OpenAPI ドキュメントにも正しいステータスコードが反映されます。"
   }, {
     title: "Pydantic モデルによるバリデーション",
     body: "FastAPI の最大の強みの一つが、Pydantic モデルによる自動バリデーションです。関数の引数に Pydantic モデルを型注釈として書くだけで、リクエストボディの検証・変換・エラーレスポンスが全て自動化されます。\n\nPython の dataclass と似ていますが、Pydantic は入力データのバリデーション（型変換、制約チェック）に特化しています。例えば str 型のフィールドに数値が送られてきた場合、Pydantic は自動的に文字列に変換してくれます（strict モードでなければ）。Field() を使えば、最小文字数、最大値、正規表現パターンなど、きめ細かいバリデーションルールを宣言的に書けます。\n\nリクエスト用とレスポンス用でモデルを分ける（TodoCreate と TodoResponse）のが定石です。作成時には id は不要ですが、レスポンスには id を含めたいからです。この「入出力でモデルを分ける」パターンは DTO（Data Transfer Object）と呼ばれ、API 設計の基本です。",
     table: T.pydanticFields,
-    code: `from pydantic import BaseModel, Field
-
-# リクエスト用（作成）
-class TodoCreate(BaseModel):
-    title: str = Field(
-        min_length=1, max_length=100,
-        examples=["Buy milk"]
-    )
-    description: str | None = Field(
-        default=None, max_length=500
-    )
-    is_done: bool = Field(default=False)
-
-# レスポンス用
-class TodoResponse(TodoCreate):
-    id: int
-    model_config = {"from_attributes": True}
-
-# 更新用（全フィールド Optional）
-class TodoUpdate(BaseModel):
-    title: str | None = Field(
-        default=None, min_length=1, max_length=100
-    )
-    description: str | None = None
-    is_done: bool | None = None`,
+    code: "from pydantic import BaseModel, Field\n\n# リクエスト用（作成）\nclass TodoCreate(BaseModel):\n    title: str = Field(\n        min_length=1, max_length=100,\n        examples=[\"Buy milk\"]\n    )\n    description: str | None = Field(\n        default=None, max_length=500\n    )\n    is_done: bool = Field(default=False)\n\n# レスポンス用\nclass TodoResponse(TodoCreate):\n    id: int\n    model_config = {\"from_attributes\": True}\n\n# 更新用（全フィールド Optional）\nclass TodoUpdate(BaseModel):\n    title: str | None = Field(\n        default=None, min_length=1, max_length=100\n    )\n    description: str | None = None\n    is_done: bool | None = None",
     afterCode: "ポイント: model_config = {\"from_attributes\": True} を設定すると、SQLAlchemy モデルのインスタンスから直接 Pydantic モデルに変換できるようになります。後の章で DB 連携する際に必要になります。"
   }, {
     title: "パスパラメータとクエリパラメータ",
     body: "FastAPI はパスパラメータ（/todos/{todo_id}）とクエリパラメータ（/todos?skip=0&limit=10）の両方を型ヒントから自動的に解析します。パスパラメータは URL の一部として必須、クエリパラメータはデフォルト値を持てるオプショナルなものです。\n\nパスパラメータに todo_id: int と型注釈を付ければ、文字列が送られてきた場合に自動的にバリデーションエラー（422）を返してくれます。自前で int() 変換や try-except を書く必要がないのは、Flask と比べて大きなメリットです。\n\nクエリパラメータは関数の引数にデフォルト値を持たせるだけで定義できます。Query() を使えばバリデーション（最小値、最大値など）も付けられます。",
-    code: `# パスパラメータ: URL の一部
-@router.get("/todos/{todo_id}")
-def get_todo(todo_id: int):  # 自動的に int に変換
-    ...
-
-# クエリパラメータ: ?key=value
-@router.get("/todos")
-def list_todos(
-    skip: int = 0,      # デフォルト値あり
-    limit: int = 10,     # デフォルト値あり
-    done: bool | None = None,  # Optional
-):
-    ...
-
-# 両方の組み合わせ
-@router.get("/users/{user_id}/todos")
-def get_user_todos(
-    user_id: int,        # パスパラメータ
-    skip: int = 0,       # クエリパラメータ
-):
-    ...`,
+    code: "# パスパラメータ: URL の一部\n@router.get(\"/todos/{todo_id}\")\ndef get_todo(todo_id: int):  # 自動的に int に変換\n    ...\n\n# クエリパラメータ: ?key=value\n@router.get(\"/todos\")\ndef list_todos(\n    skip: int = 0,      # デフォルト値あり\n    limit: int = 10,     # デフォルト値あり\n    done: bool | None = None,  # Optional\n):\n    ...\n\n# 両方の組み合わせ\n@router.get(\"/users/{user_id}/todos\")\ndef get_user_todos(\n    user_id: int,        # パスパラメータ\n    skip: int = 0,       # クエリパラメータ\n):\n    ...",
     afterCode: "ミニ演習: /todos/{todo_id} に文字列「abc」を渡してみてください。FastAPI が自動的に 422 エラーを返し、エラーメッセージにどのパラメータが不正だったかが含まれることを確認しましょう。"
   }, {
     title: "HTTPException によるエラーレスポンス",
     body: "存在しないリソースへのアクセスや権限のない操作に対して、適切なエラーレスポンスを返す必要があります。FastAPI では HTTPException を raise することで、任意のステータスコードとエラーメッセージを返せます。\n\nPython の例外機構を使って制御フローを扱えるため、Flask のように abort() 関数を呼ぶよりも自然な書き方ができます。例外はどこからでも raise できるので、ネストした関数やサービス層からもエラーを返せます。\n\n後の章ではカスタム例外クラスと exception_handler を使ったより洗練されたエラーハンドリングを学びますが、まずは HTTPException で基本パターンを身に付けましょう。",
-    code: `from fastapi import HTTPException, status
-
-@router.get("/todos/{todo_id}")
-def get_todo(todo_id: int):
-    if todo_id not in todos:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Todo not found"
-        )
-    return todos[todo_id]
-
-# detail には dict も渡せる
-raise HTTPException(
-    status_code=400,
-    detail={
-        "error": "invalid_request",
-        "message": "Title is required"
-    }
-)`,
+    code: "from fastapi import HTTPException, status\n\n@router.get(\"/todos/{todo_id}\")\ndef get_todo(todo_id: int):\n    if todo_id not in todos:\n        raise HTTPException(\n            status_code=status.HTTP_404_NOT_FOUND,\n            detail=\"Todo not found\"\n        )\n    return todos[todo_id]\n\n# detail には dict も渡せる\nraise HTTPException(\n    status_code=400,\n    detail={\n        \"error\": \"invalid_request\",\n        \"message\": \"Title is required\"\n    }\n)",
     afterCode: "ポイント: headers 引数でレスポンスヘッダーも追加できます。認証エラー時の WWW-Authenticate ヘッダーなど、RFC で定められたヘッダーを返す場面で使います。"
   }]
 }, {
@@ -1578,124 +323,23 @@ raise HTTPException(
     title: "SQLAlchemy 2.0 の新スタイル",
     body: "SQLAlchemy 2.0 は ORM の書き方が大きく変わりました。従来の Column(Integer, primary_key=True) という書き方から、Python の型注釈を活用した Mapped[int] = mapped_column(primary_key=True) というスタイルに移行しています。\n\nこの変更の背景には「型チェッカー（mypy, pyright）との親和性を高めたい」という動機があります。従来のスタイルでは user.name が str なのか何なのか、型チェッカーには判断できませんでした。新スタイルでは Mapped[str] と書くことで、IDE の補完も型チェックも正しく動作します。\n\n古い記事やチュートリアルでは 1.x スタイルで書かれていることが多いので注意してください。2026 年時点で新規プロジェクトを始めるなら、必ず 2.0 スタイルを使いましょう。",
     table: T.sqlalchemyTypes,
-    code: `from datetime import datetime
-from sqlalchemy import String, Text, func
-from sqlalchemy.orm import (
-    DeclarativeBase, Mapped, mapped_column
-)
-
-# ベースクラス（2.0スタイル）
-class Base(DeclarativeBase):
-    pass
-
-class Todo(Base):
-    __tablename__ = "todos"
-
-    id: Mapped[int] = mapped_column(
-        primary_key=True, autoincrement=True
-    )
-    title: Mapped[str] = mapped_column(String(100))
-    description: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )
-    is_done: Mapped[bool] = mapped_column(default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(),
-        onupdate=func.now()
-    )`,
+    code: "from datetime import datetime\nfrom sqlalchemy import String, Text, func\nfrom sqlalchemy.orm import (\n    DeclarativeBase, Mapped, mapped_column\n)\n\n# ベースクラス（2.0スタイル）\nclass Base(DeclarativeBase):\n    pass\n\nclass Todo(Base):\n    __tablename__ = \"todos\"\n\n    id: Mapped[int] = mapped_column(\n        primary_key=True, autoincrement=True\n    )\n    title: Mapped[str] = mapped_column(String(100))\n    description: Mapped[str | None] = mapped_column(\n        Text, nullable=True\n    )\n    is_done: Mapped[bool] = mapped_column(default=False)\n    created_at: Mapped[datetime] = mapped_column(\n        server_default=func.now()\n    )\n    updated_at: Mapped[datetime] = mapped_column(\n        server_default=func.now(),\n        onupdate=func.now()\n    )",
     afterCode: "ポイント: Mapped[str | None] と書くと nullable=True が自動的に推論されます。型注釈がそのまま DB スキーマに反映されるので、コードとスキーマの一貫性が保たれます。"
   }, {
     title: "非同期エンジンとセッション管理",
     body: "FastAPI は非同期フレームワークなので、SQLAlchemy も非同期で使うのが自然です。create_async_engine で非同期エンジンを作り、async_sessionmaker でセッションファクトリを構成します。\n\nセッション管理で最も重要なのは「リクエストごとにセッションを作り、処理が終わったら確実に閉じる」ことです。Python のジェネレータ（yield）を使った依存関数でこれを実現します。yield の前でセッションを返し、yield の後で後処理（コミットまたはロールバック）を行います。\n\nこの get_db パターンは FastAPI の事実上の標準で、ほぼ全ての FastAPI + SQLAlchemy プロジェクトで同じ形が採用されています。try-except-finally でエラー時のロールバックを確実に行うのがポイントです。",
-    code: `# app/db/session.py
-from sqlalchemy.ext.asyncio import (
-    create_async_engine,
-    async_sessionmaker,
-    AsyncSession,
-)
-from typing import AsyncGenerator
-from app.core.config import settings
-
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,  # SQL文をログ出力
-    pool_size=5,          # 接続プールサイズ
-    max_overflow=10,      # 最大超過接続数
-)
-
-async_session = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,  # commit後も属性アクセス可
-)
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise`,
+    code: "# app/db/session.py\nfrom sqlalchemy.ext.asyncio import (\n    create_async_engine,\n    async_sessionmaker,\n    AsyncSession,\n)\nfrom typing import AsyncGenerator\nfrom app.core.config import settings\n\nengine = create_async_engine(\n    settings.DATABASE_URL,\n    echo=settings.DEBUG,  # SQL文をログ出力\n    pool_size=5,          # 接続プールサイズ\n    max_overflow=10,      # 最大超過接続数\n)\n\nasync_session = async_sessionmaker(\n    engine,\n    class_=AsyncSession,\n    expire_on_commit=False,  # commit後も属性アクセス可\n)\n\nasync def get_db() -> AsyncGenerator[AsyncSession, None]:\n    async with async_session() as session:\n        try:\n            yield session\n            await session.commit()\n        except Exception:\n            await session.rollback()\n            raise",
     afterCode: "注意: expire_on_commit=False は重要です。これを設定しないと、commit() 後にモデルの属性にアクセスした瞬間に新しい SELECT が発行され、非同期コンテキストでエラーになることがあります。"
   }, {
     title: "SQLAlchemy 2.0 のクエリ構文",
     body: "SQLAlchemy 2.0 では、従来の session.query(User).filter(...) スタイルから select(User).where(...) スタイルに変わりました。SQL 文を Python のオブジェクトとして組み立てる「ステートメント構築」のアプローチです。\n\n新しい select() スタイルは SQL の SELECT 文に近い見た目をしていて、SQL に慣れている人には直感的です。また、ステートメントオブジェクトは実行前にいくらでも条件を追加できるので、動的なクエリ構築（検索条件の有無で WHERE 句を変える等）にも適しています。\n\n結果の取り出し方も変わっています。scalar_one_or_none() は「1 件 or None」、scalars().all() は「複数件のリスト」というのが基本の使い分けです。",
-    code: `from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.todo import Todo
-
-# 全件取得
-stmt = select(Todo).order_by(Todo.created_at.desc())
-result = await session.execute(stmt)
-todos = result.scalars().all()
-
-# 1件取得
-stmt = select(Todo).where(Todo.id == todo_id)
-result = await session.execute(stmt)
-todo = result.scalar_one_or_none()  # None or Todo
-
-# 条件付き取得
-stmt = (
-    select(Todo)
-    .where(Todo.is_done == False)
-    .order_by(Todo.created_at.desc())
-    .offset(0)
-    .limit(20)
-)
-
-# 作成
-todo = Todo(title="New", description="...")
-session.add(todo)
-await session.flush()       # DBに反映（IDが付く）
-await session.refresh(todo) # 最新の値を再読込`,
+    code: "from sqlalchemy import select\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom app.models.todo import Todo\n\n# 全件取得\nstmt = select(Todo).order_by(Todo.created_at.desc())\nresult = await session.execute(stmt)\ntodos = result.scalars().all()\n\n# 1件取得\nstmt = select(Todo).where(Todo.id == todo_id)\nresult = await session.execute(stmt)\ntodo = result.scalar_one_or_none()  # None or Todo\n\n# 条件付き取得\nstmt = (\n    select(Todo)\n    .where(Todo.is_done == False)\n    .order_by(Todo.created_at.desc())\n    .offset(0)\n    .limit(20)\n)\n\n# 作成\ntodo = Todo(title=\"New\", description=\"...\")\nsession.add(todo)\nawait session.flush()       # DBに反映（IDが付く）\nawait session.refresh(todo) # 最新の値を再読込",
     afterCode: "ポイント: flush() は SQL を発行するがトランザクションはコミットしません。commit() はトランザクションを確定させます。get_db の中で commit/rollback を管理しているので、個々の関数では flush() だけで十分です。"
   }, {
     title: "Alembic によるマイグレーション管理",
     body: "データベースのスキーマ変更（テーブル追加、カラム変更など）を安全に管理するのが Alembic の役割です。Django の makemigrations / migrate に相当する機能ですが、SQLAlchemy のモデルを直接解析して差分を検出する autogenerate が便利です。\n\nalembic revision --autogenerate を実行すると、現在の DB スキーマと SQLAlchemy モデルの差分を検出し、マイグレーションスクリプトを自動生成します。生成されたスクリプトは必ず目視で確認してください。autogenerate は完璧ではなく、カラム名の変更をドロップ＋追加と誤認するケースがあります。\n\nマイグレーションファイルはバージョン管理（Git）にコミットします。これにより、チームメンバー全員が同じスキーマ変更を再現でき、本番環境へのデプロイ時にも自動的にマイグレーションが適用されます。",
     table: T.alembicCommands,
-    code: `# 初期化（非同期テンプレートを使用）
-alembic init -t async alembic
-
-# alembic/env.py の設定（抜粋）
-from app.models.todo import Base
-target_metadata = Base.metadata
-
-# マイグレーション生成
-alembic revision --autogenerate -m "create todos table"
-
-# 適用
-alembic upgrade head
-
-# ロールバック（1つ前に戻す）
-alembic downgrade -1
-
-# 状態確認
-alembic current
-alembic history`,
+    code: "# 初期化（非同期テンプレートを使用）\nalembic init -t async alembic\n\n# alembic/env.py の設定（抜粋）\nfrom app.models.todo import Base\ntarget_metadata = Base.metadata\n\n# マイグレーション生成\nalembic revision --autogenerate -m \"create todos table\"\n\n# 適用\nalembic upgrade head\n\n# ロールバック（1つ前に戻す）\nalembic downgrade -1\n\n# 状態確認\nalembic current\nalembic history",
     afterCode: "ミニ演習: Todo モデルに priority: Mapped[int] = mapped_column(default=0) を追加して、alembic revision --autogenerate で差分が検出されることを確認してみましょう。生成されたマイグレーションファイルの中身（upgrade/downgrade 関数）を読んで、何が行われるか理解してください。"
   }]
 }, {
@@ -1712,127 +356,22 @@ alembic history`,
   }, {
     title: "リポジトリパターン",
     body: "リポジトリは「データアクセスの窓口」です。SQLAlchemy のセッションを受け取り、CRUD 操作を提供します。ルーターやサービス層は「どんな SQL が発行されているか」を知る必要がなく、リポジトリの公開メソッド（create, get_by_id, list_all, update, delete）だけを使います。\n\nこの抽象化の最大のメリットは「DB の実装を差し替えられる」ことです。テスト時にはインメモリのフェイクリポジトリを使い、本番では PostgreSQL のリポジトリを使う、という切り替えが可能になります。また、将来的に SQLAlchemy から別の ORM に移行する場合も、影響はリポジトリ層だけに留まります。\n\nリポジトリは HTTPException を raise しません。「見つからなかった」は None を返すだけで、404 を返す判断はサービス層の責務です。この境界を守ることで、リポジトリを HTTP 以外のコンテキスト（CLI ツール、バッチ処理など）でも再利用できます。",
-    code: `# app/repositories/todo.py
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.todo import Todo
-from app.schemas.todo import TodoCreate, TodoUpdate
-
-class TodoRepository:
-    def __init__(self, session: AsyncSession):
-        self.session = session
-
-    async def create(self, data: TodoCreate) -> Todo:
-        todo = Todo(**data.model_dump())
-        self.session.add(todo)
-        await self.session.flush()
-        await self.session.refresh(todo)
-        return todo
-
-    async def get_by_id(
-        self, todo_id: int
-    ) -> Todo | None:
-        stmt = select(Todo).where(Todo.id == todo_id)
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
-
-    async def delete(self, todo_id: int) -> bool:
-        todo = await self.get_by_id(todo_id)
-        if todo is None:
-            return False
-        await self.session.delete(todo)
-        await self.session.flush()
-        return True`,
+    code: "# app/repositories/todo.py\nfrom sqlalchemy import select\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom app.models.todo import Todo\nfrom app.schemas.todo import TodoCreate, TodoUpdate\n\nclass TodoRepository:\n    def __init__(self, session: AsyncSession):\n        self.session = session\n\n    async def create(self, data: TodoCreate) -> Todo:\n        todo = Todo(**data.model_dump())\n        self.session.add(todo)\n        await self.session.flush()\n        await self.session.refresh(todo)\n        return todo\n\n    async def get_by_id(\n        self, todo_id: int\n    ) -> Todo | None:\n        stmt = select(Todo).where(Todo.id == todo_id)\n        result = await self.session.execute(stmt)\n        return result.scalar_one_or_none()\n\n    async def delete(self, todo_id: int) -> bool:\n        todo = await self.get_by_id(todo_id)\n        if todo is None:\n            return False\n        await self.session.delete(todo)\n        await self.session.flush()\n        return True",
     afterCode: "ポイント: リポジトリは SQLAlchemy 固有のコードだけを含みます。HTTPException やステータスコードはリポジトリに書かないでください。"
   }, {
     title: "サービス層",
     body: "サービス層はビジネスロジックを集約する場所です。「この Todo は存在するか？」「このユーザはこの Todo を操作する権限があるか？」といった判断をここで行います。\n\nサービス層が HTTPException を raise するのは許容されます（FastAPI のコンテキストで使う前提だから）。ただし、より厳密にしたい場合はカスタム例外を raise し、ルーター層で HTTPException に変換するアプローチもあります。これは第 7 章で詳しく扱います。\n\nサービス層を設けることで、複数のルーターから同じロジックを再利用できるようになります。例えば「Todo の存在確認 → 404 送出」のロジックは、GET / PATCH / DELETE の全てで必要ですが、サービスの get_or_404 メソッド 1 箇所に集約できます。",
-    code: `# app/services/todo.py
-from fastapi import HTTPException, status
-from app.repositories.todo import TodoRepository
-from app.schemas.todo import TodoCreate, TodoUpdate
-
-class TodoService:
-    def __init__(self, repo: TodoRepository):
-        self.repo = repo
-
-    async def create(self, data: TodoCreate):
-        return await self.repo.create(data)
-
-    async def get_or_404(self, todo_id: int):
-        todo = await self.repo.get_by_id(todo_id)
-        if todo is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Todo {todo_id} not found"
-            )
-        return todo
-
-    async def delete(self, todo_id: int):
-        deleted = await self.repo.delete(todo_id)
-        if not deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Todo {todo_id} not found"
-            )`,
+    code: "# app/services/todo.py\nfrom fastapi import HTTPException, status\nfrom app.repositories.todo import TodoRepository\nfrom app.schemas.todo import TodoCreate, TodoUpdate\n\nclass TodoService:\n    def __init__(self, repo: TodoRepository):\n        self.repo = repo\n\n    async def create(self, data: TodoCreate):\n        return await self.repo.create(data)\n\n    async def get_or_404(self, todo_id: int):\n        todo = await self.repo.get_by_id(todo_id)\n        if todo is None:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=f\"Todo {todo_id} not found\"\n            )\n        return todo\n\n    async def delete(self, todo_id: int):\n        deleted = await self.repo.delete(todo_id)\n        if not deleted:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=f\"Todo {todo_id} not found\"\n            )",
     afterCode: "ポイント: サービスはリポジトリに依存し、ルーターはサービスに依存します。依存の方向は常に「外側 → 内側」で、内側が外側を知ることはありません。"
   }, {
     title: "FastAPI の Depends による依存性注入",
     body: "FastAPI の Depends() は依存性注入（DI）の仕組みです。関数やクラスのインスタンスを、呼び出し時に自動的に組み立てて渡してくれます。\n\nDI のメリットは「組み立て方を変えればテスト用の実装に差し替えられる」ことです。app.dependency_overrides を使えば、テスト時に get_db を「テスト用 DB セッションを返す関数」に差し替えるだけで、プロダクションコードを一切変更せずにテストできます。\n\nDepends のチェーン（get_db → get_todo_repo → get_todo_service）を構築することで、各層の組み立てを FastAPI に任せられます。ルーター関数は「TodoService を受け取る」という宣言だけで済み、セッションやリポジトリの生成コードを書く必要がありません。",
-    code: `# app/dependencies.py
-from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
-from app.repositories.todo import TodoRepository
-from app.services.todo import TodoService
-
-def get_todo_repo(
-    db: AsyncSession = Depends(get_db)
-) -> TodoRepository:
-    return TodoRepository(db)
-
-def get_todo_service(
-    repo: TodoRepository = Depends(get_todo_repo)
-) -> TodoService:
-    return TodoService(repo)
-
-# ルーターでの使用
-@router.get("/{todo_id}")
-async def get_todo(
-    todo_id: int,
-    service: TodoService = Depends(get_todo_service)
-):
-    return await service.get_or_404(todo_id)`,
+    code: "# app/dependencies.py\nfrom fastapi import Depends\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom app.db.session import get_db\nfrom app.repositories.todo import TodoRepository\nfrom app.services.todo import TodoService\n\ndef get_todo_repo(\n    db: AsyncSession = Depends(get_db)\n) -> TodoRepository:\n    return TodoRepository(db)\n\ndef get_todo_service(\n    repo: TodoRepository = Depends(get_todo_repo)\n) -> TodoService:\n    return TodoService(repo)\n\n# ルーターでの使用\n@router.get(\"/{todo_id}\")\nasync def get_todo(\n    todo_id: int,\n    service: TodoService = Depends(get_todo_service)\n):\n    return await service.get_or_404(todo_id)",
     afterCode: "ミニ演習: Depends チェーンの流れを紙に書いてみましょう。リクエスト → get_todo_service → get_todo_repo → get_db → AsyncSession。各関数が何を受け取り、何を返すか、矢印で繋いでみてください。"
   }, {
     title: "リファクタリング後のルーター",
     body: "サービス層とリポジトリ層を導入すると、ルーターは驚くほどシンプルになります。各エンドポイントは「リクエストを受け取る → サービスに委譲する → 結果を返す」という 3 ステップだけになり、ビジネスロジックもデータアクセスも含みません。\n\nこの「薄いルーター」パターンは、コードレビューの効率を大幅に上げます。ルーターを見れば API のインターフェース（URL, メソッド, 入出力の型）が分かり、サービスを見ればビジネスルールが分かり、リポジトリを見れば DB アクセスの詳細が分かる、という役割分担が明確になるからです。\n\n大規模プロジェクトでは、この分離がチーム開発を円滑にします。フロントエンドエンジニアはルーターだけ読めば API の仕様が分かり、バックエンドエンジニアはサービス層のビジネスロジックに集中できます。",
-    code: `# app/routers/todos.py（リファクタリング後）
-from fastapi import APIRouter, Depends, status
-from app.schemas.todo import (
-    TodoCreate, TodoUpdate, TodoResponse
-)
-from app.services.todo import TodoService
-from app.dependencies import get_todo_service
-
-router = APIRouter(prefix="/todos", tags=["todos"])
-
-@router.post(
-    "", response_model=TodoResponse,
-    status_code=status.HTTP_201_CREATED
-)
-async def create_todo(
-    body: TodoCreate,
-    svc: TodoService = Depends(get_todo_service)
-):
-    return await svc.create(body)
-
-@router.get("/{todo_id}", response_model=TodoResponse)
-async def get_todo(
-    todo_id: int,
-    svc: TodoService = Depends(get_todo_service)
-):
-    return await svc.get_or_404(todo_id)`,
+    code: "# app/routers/todos.py（リファクタリング後）\nfrom fastapi import APIRouter, Depends, status\nfrom app.schemas.todo import (\n    TodoCreate, TodoUpdate, TodoResponse\n)\nfrom app.services.todo import TodoService\nfrom app.dependencies import get_todo_service\n\nrouter = APIRouter(prefix=\"/todos\", tags=[\"todos\"])\n\n@router.post(\n    \"\", response_model=TodoResponse,\n    status_code=status.HTTP_201_CREATED\n)\nasync def create_todo(\n    body: TodoCreate,\n    svc: TodoService = Depends(get_todo_service)\n):\n    return await svc.create(body)\n\n@router.get(\"/{todo_id}\", response_model=TodoResponse)\nasync def get_todo(\n    todo_id: int,\n    svc: TodoService = Depends(get_todo_service)\n):\n    return await svc.get_or_404(todo_id)",
     afterCode: "ポイント: ルーターの各関数は 2〜3 行で完結しています。これが「薄いルーター」の理想形です。ロジックの変更はサービス層で、クエリの変更はリポジトリ層で行い、ルーターは触る必要がありません。"
   }]
 }, {
@@ -1845,161 +384,23 @@ async def get_todo(
     title: "パスワードのハッシュ化",
     body: "ユーザのパスワードをデータベースに平文で保存するのは、セキュリティ上の最悪の選択です。DB が流出した時点で全ユーザのパスワードが露出し、他のサービスでも同じパスワードを使い回しているユーザは連鎖的に被害を受けます。\n\nパスワードは必ずハッシュ化（一方向の変換）してから保存します。ハッシュ化とは、元のデータから固定長の値を生成する不可逆な処理で、ハッシュ値から元のパスワードを復元することはできません。ログイン時は「入力されたパスワードをハッシュ化し、DB のハッシュ値と比較する」ことで認証を行います。\n\nbcrypt はハッシュ化アルゴリズムの中で最も広く使われている方式の一つです。ソルト（ランダムな付加値）を自動的に生成してハッシュに含めるため、同じパスワードでもハッシュ値が毎回異なります。これによりレインボーテーブル攻撃（事前計算された辞書による逆引き）を防げます。",
     table: T.passwordHashComparison,
-    code: `# app/core/security.py
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(
-    schemes=["bcrypt"], deprecated="auto"
-)
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-def verify_password(
-    plain: str, hashed: str
-) -> bool:
-    return pwd_context.verify(plain, hashed)
-
-# 使用例
-hashed = hash_password("my_password")
-# → "$2b$12$..." (60文字のハッシュ)
-verify_password("my_password", hashed)  # True
-verify_password("wrong", hashed)        # False`,
+    code: "# app/core/security.py\nfrom passlib.context import CryptContext\n\npwd_context = CryptContext(\n    schemes=[\"bcrypt\"], deprecated=\"auto\"\n)\n\ndef hash_password(password: str) -> str:\n    return pwd_context.hash(password)\n\ndef verify_password(\n    plain: str, hashed: str\n) -> bool:\n    return pwd_context.verify(plain, hashed)\n\n# 使用例\nhashed = hash_password(\"my_password\")\n# → \"$2b$12$...\" (60文字のハッシュ)\nverify_password(\"my_password\", hashed)  # True\nverify_password(\"wrong\", hashed)        # False",
     afterCode: "ポイント: passlib の CryptContext は deprecated=\"auto\" を設定すると、将来的により安全なアルゴリズムが追加された際に自動的に移行してくれます。"
   }, {
     title: "JWT（JSON Web Token）の仕組み",
     body: "JWT はサーバーがクライアントに発行する「認証済みの証明書」のようなものです。ユーザがログインに成功すると、サーバーはユーザ ID や有効期限などの情報をトークンに含めて署名付きで発行します。クライアントはこのトークンを以降のリクエストの Authorization ヘッダーに付けて送ることで、リクエストごとに DB へのパスワード照合を行わずに認証できます。\n\nJWT は 3 つの部分（Header.Payload.Signature）をドットで繋いだ文字列です。Payload にはユーザ情報や有効期限が含まれ、Signature はサーバーだけが知る SECRET_KEY で生成されます。トークンの内容を改ざんすると署名の検証に失敗するため、安全性が保たれます。\n\nセッション方式（サーバー側に状態を保持する）と比べて、JWT はサーバーが状態を持たない（ステートレス）ため、複数サーバーへのスケールアウトが容易です。ただし「発行済みトークンの無効化が難しい」というデメリットもあり、有効期限を短く設定したりリフレッシュトークンを併用したりする設計が必要です。",
     table: T.jwtFields,
-    code: `# app/core/security.py
-from datetime import datetime, timedelta, timezone
-from jose import jwt, JWTError
-
-SECRET_KEY = "your-secret-key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-def create_access_token(
-    data: dict,
-    expires_delta: timedelta | None = None
-) -> str:
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (
-        expires_delta
-        or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    to_encode.update({"exp": expire})
-    return jwt.encode(
-        to_encode, SECRET_KEY, algorithm=ALGORITHM
-    )
-
-def decode_access_token(token: str) -> dict:
-    try:
-        return jwt.decode(
-            token, SECRET_KEY, algorithms=[ALGORITHM]
-        )
-    except JWTError:
-        return {}
-
-# 使用例
-token = create_access_token({"sub": "42"})
-payload = decode_access_token(token)
-# → {"sub": "42", "exp": 1713100800}`,
+    code: "# app/core/security.py\nfrom datetime import datetime, timedelta, timezone\nfrom jose import jwt, JWTError\n\nSECRET_KEY = \"your-secret-key\"\nALGORITHM = \"HS256\"\nACCESS_TOKEN_EXPIRE_MINUTES = 30\n\ndef create_access_token(\n    data: dict,\n    expires_delta: timedelta | None = None\n) -> str:\n    to_encode = data.copy()\n    expire = datetime.now(timezone.utc) + (\n        expires_delta\n        or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)\n    )\n    to_encode.update({\"exp\": expire})\n    return jwt.encode(\n        to_encode, SECRET_KEY, algorithm=ALGORITHM\n    )\n\ndef decode_access_token(token: str) -> dict:\n    try:\n        return jwt.decode(\n            token, SECRET_KEY, algorithms=[ALGORITHM]\n        )\n    except JWTError:\n        return {}\n\n# 使用例\ntoken = create_access_token({\"sub\": \"42\"})\npayload = decode_access_token(token)\n# → {\"sub\": \"42\", \"exp\": 1713100800}",
     afterCode: "注意: SECRET_KEY は環境変数で管理し、コードにハードコードしないでください。openssl rand -hex 32 で十分な長さのランダムキーを生成できます。"
   }, {
     title: "ユーザ登録・ログイン API",
     body: "ユーザ登録では email の重複チェックとパスワードのハッシュ化を行い、ログインでは email でユーザを検索してパスワードを検証し、JWT トークンを返します。\n\nログインのエンドポイントでは OAuth2PasswordRequestForm を使うのが FastAPI の慣例です。この Form は username と password を受け取る仕様で、OAuth2 の標準に準拠しています。Swagger UI の「Authorize」ボタンからも直接ログインを試せるようになります。\n\nレスポンスでは access_token と token_type を返します。token_type は常に \"bearer\" で、これは Authorization ヘッダーの形式（Bearer <token>）を示しています。",
-    code: `# app/routers/auth.py
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from app.db.session import get_db
-from app.models.user import User
-from app.schemas.user import UserCreate, UserResponse
-from app.core.security import (
-    hash_password, verify_password,
-    create_access_token
-)
-
-router = APIRouter(prefix="/auth", tags=["auth"])
-
-@router.post("/register", response_model=UserResponse,
-             status_code=201)
-async def register(
-    body: UserCreate,
-    db: AsyncSession = Depends(get_db)
-):
-    # 重複チェック
-    stmt = select(User).where(User.email == body.email)
-    existing = (await db.execute(stmt)).scalar_one_or_none()
-    if existing:
-        raise HTTPException(400, "Email already registered")
-    user = User(
-        email=body.email,
-        hashed_password=hash_password(body.password)
-    )
-    db.add(user)
-    await db.flush()
-    await db.refresh(user)
-    return user
-
-@router.post("/login")
-async def login(
-    form: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_db)
-):
-    stmt = select(User).where(
-        User.email == form.username
-    )
-    user = (await db.execute(stmt)).scalar_one_or_none()
-    if not user or not verify_password(
-        form.password, user.hashed_password
-    ):
-        raise HTTPException(401, "Invalid credentials")
-    token = create_access_token(
-        {"sub": str(user.id)}
-    )
-    return {
-        "access_token": token,
-        "token_type": "bearer"
-    }`,
+    code: "# app/routers/auth.py\nfrom fastapi import APIRouter, Depends, HTTPException\nfrom fastapi.security import OAuth2PasswordRequestForm\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom sqlalchemy import select\nfrom app.db.session import get_db\nfrom app.models.user import User\nfrom app.schemas.user import UserCreate, UserResponse\nfrom app.core.security import (\n    hash_password, verify_password,\n    create_access_token\n)\n\nrouter = APIRouter(prefix=\"/auth\", tags=[\"auth\"])\n\n@router.post(\"/register\", response_model=UserResponse,\n             status_code=201)\nasync def register(\n    body: UserCreate,\n    db: AsyncSession = Depends(get_db)\n):\n    # 重複チェック\n    stmt = select(User).where(User.email == body.email)\n    existing = (await db.execute(stmt)).scalar_one_or_none()\n    if existing:\n        raise HTTPException(400, \"Email already registered\")\n    user = User(\n        email=body.email,\n        hashed_password=hash_password(body.password)\n    )\n    db.add(user)\n    await db.flush()\n    await db.refresh(user)\n    return user\n\n@router.post(\"/login\")\nasync def login(\n    form: OAuth2PasswordRequestForm = Depends(),\n    db: AsyncSession = Depends(get_db)\n):\n    stmt = select(User).where(\n        User.email == form.username\n    )\n    user = (await db.execute(stmt)).scalar_one_or_none()\n    if not user or not verify_password(\n        form.password, user.hashed_password\n    ):\n        raise HTTPException(401, \"Invalid credentials\")\n    token = create_access_token(\n        {\"sub\": str(user.id)}\n    )\n    return {\n        \"access_token\": token,\n        \"token_type\": \"bearer\"\n    }",
     afterCode: "ポイント: ログイン失敗時に「メールアドレスが存在しない」のか「パスワードが間違っている」のかを区別するエラーメッセージを返さないでください。攻撃者にメールアドレスの存在を特定される情報を与えてしまいます。"
   }, {
     title: "認証済みユーザの取得（get_current_user）",
     body: "OAuth2PasswordBearer は FastAPI が提供するセキュリティスキームで、Authorization ヘッダーから Bearer トークンを自動的に抽出します。これを Depends と組み合わせると、認証が必要なエンドポイントに簡潔に制限を加えられます。\n\nget_current_user 関数はトークンの検証とユーザの取得を行う依存関数です。トークンが無効な場合や、トークンに含まれるユーザ ID がデータベースに存在しない場合は 401 エラーを返します。\n\nこの関数を Depends で注入するだけで、エンドポイントが「認証必須」になります。Swagger UI にも鍵アイコンが表示され、トークンを入力するフォームが自動的に追加されます。",
-    code: `# app/dependencies.py
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from app.core.security import decode_access_token
-
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/auth/login"
-)
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db)
-) -> User:
-    payload = decode_access_token(token)
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
-    # DBからユーザ取得
-    user = await db.get(User, int(user_id))
-    if user is None:
-        raise HTTPException(401, "User not found")
-    return user
-
-# エンドポイントでの使用
-@router.get("/me")
-async def get_me(
-    user: User = Depends(get_current_user)
-):
-    return user`,
+    code: "# app/dependencies.py\nfrom fastapi import Depends, HTTPException, status\nfrom fastapi.security import OAuth2PasswordBearer\nfrom app.core.security import decode_access_token\n\noauth2_scheme = OAuth2PasswordBearer(\n    tokenUrl=\"/auth/login\"\n)\n\nasync def get_current_user(\n    token: str = Depends(oauth2_scheme),\n    db: AsyncSession = Depends(get_db)\n) -> User:\n    payload = decode_access_token(token)\n    user_id = payload.get(\"sub\")\n    if user_id is None:\n        raise HTTPException(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            detail=\"Invalid token\",\n            headers={\"WWW-Authenticate\": \"Bearer\"}\n        )\n    # DBからユーザ取得\n    user = await db.get(User, int(user_id))\n    if user is None:\n        raise HTTPException(401, \"User not found\")\n    return user\n\n# エンドポイントでの使用\n@router.get(\"/me\")\nasync def get_me(\n    user: User = Depends(get_current_user)\n):\n    return user",
     afterCode: "ミニ演習: Todo モデルに user_id カラムを追加し、Todo の作成時に認証済みユーザの ID を自動設定するように改修してみましょう。他のユーザの Todo には GET でもアクセスできないように認可チェックを入れてください。"
   }]
 }, {
@@ -2016,108 +417,17 @@ async def get_me(
   }, {
     title: "基本のページネーション実装",
     body: "offset/limit 方式のページネーションは、SQL の OFFSET と LIMIT をそのまま使います。SQLAlchemy の .offset() と .limit() メソッドで実現でき、実装はシンプルです。\n\n注意点として、offset が大きくなると DB のパフォーマンスが劣化します（OFFSET 10000 は最初の 10000 件をスキップするために読み込む必要がある）。大量データを扱う場合はカーソルベースのページネーション（WHERE id > last_id）を検討しますが、初級段階では offset/limit で十分です。\n\nQuery() の ge（greater than or equal）や le（less than or equal）でバリデーションを付けておけば、不正なパラメータを早期に弾けます。",
-    code: `from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-
-@router.get("")
-async def list_todos(
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
-):
-    # 総件数
-    count_stmt = select(func.count(Todo.id))
-    total = (await db.execute(count_stmt)).scalar()
-
-    # データ取得
-    stmt = (
-        select(Todo)
-        .offset(skip)
-        .limit(limit)
-        .order_by(Todo.created_at.desc())
-    )
-    result = await db.execute(stmt)
-    items = list(result.scalars().all())
-
-    return {
-        "items": items,
-        "total": total,
-        "skip": skip,
-        "limit": limit,
-        "has_next": (skip + limit) < total,
-    }`,
+    code: "from fastapi import APIRouter, Depends, Query\nfrom sqlalchemy import select, func\nfrom sqlalchemy.ext.asyncio import AsyncSession\n\n@router.get(\"\")\nasync def list_todos(\n    skip: int = Query(default=0, ge=0),\n    limit: int = Query(default=20, ge=1, le=100),\n    db: AsyncSession = Depends(get_db),\n):\n    # 総件数\n    count_stmt = select(func.count(Todo.id))\n    total = (await db.execute(count_stmt)).scalar()\n\n    # データ取得\n    stmt = (\n        select(Todo)\n        .offset(skip)\n        .limit(limit)\n        .order_by(Todo.created_at.desc())\n    )\n    result = await db.execute(stmt)\n    items = list(result.scalars().all())\n\n    return {\n        \"items\": items,\n        \"total\": total,\n        \"skip\": skip,\n        \"limit\": limit,\n        \"has_next\": (skip + limit) < total,\n    }",
     afterCode: "ポイント: 総件数の取得（COUNT クエリ）は別途実行します。SQLAlchemy の func.count() はデータベース側で集計するため、Python 側で len() するよりも効率的です。"
   }, {
     title: "キーワード検索とフィルタ",
     body: "検索とフィルタは API の使い勝手を大きく左右する機能です。キーワード検索は LIKE 句（部分一致）で実装するのが一般的で、SQLAlchemy では .ilike() メソッド（大文字小文字を区別しない LIKE）を使います。\n\nフィルタは「条件に合うデータだけを返す」機能で、is_done=true で完了済みの Todo だけを取得する、といった使い方をします。フィルタパラメータは Optional にして、指定されなければ条件を付けない、というのが基本パターンです。\n\n動的にクエリを組み立てるときは、最初に select(Todo) のベースクエリを作り、条件がある場合だけ .where() を追加していく方法が読みやすくなります。",
-    code: `from sqlalchemy import or_
-
-@router.get("")
-async def list_todos(
-    q: str | None = Query(default=None,
-        description="キーワード検索"),
-    is_done: bool | None = Query(default=None,
-        description="完了状態フィルタ"),
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
-):
-    stmt = select(Todo)
-
-    # キーワード検索
-    if q is not None:
-        pattern = f"%{q}%"
-        stmt = stmt.where(
-            or_(
-                Todo.title.ilike(pattern),
-                Todo.description.ilike(pattern),
-            )
-        )
-
-    # フィルタ
-    if is_done is not None:
-        stmt = stmt.where(Todo.is_done == is_done)
-
-    stmt = stmt.offset(skip).limit(limit)
-    result = await db.execute(stmt)
-    return list(result.scalars().all())`,
+    code: "from sqlalchemy import or_\n\n@router.get(\"\")\nasync def list_todos(\n    q: str | None = Query(default=None,\n        description=\"キーワード検索\"),\n    is_done: bool | None = Query(default=None,\n        description=\"完了状態フィルタ\"),\n    skip: int = Query(default=0, ge=0),\n    limit: int = Query(default=20, ge=1, le=100),\n    db: AsyncSession = Depends(get_db),\n):\n    stmt = select(Todo)\n\n    # キーワード検索\n    if q is not None:\n        pattern = f\"%{q}%\"\n        stmt = stmt.where(\n            or_(\n                Todo.title.ilike(pattern),\n                Todo.description.ilike(pattern),\n            )\n        )\n\n    # フィルタ\n    if is_done is not None:\n        stmt = stmt.where(Todo.is_done == is_done)\n\n    stmt = stmt.offset(skip).limit(limit)\n    result = await db.execute(stmt)\n    return list(result.scalars().all())",
     afterCode: "注意: ilike の pattern に直接ユーザ入力を渡していますが、SQLAlchemy はパラメータバインディングを使うため SQL インジェクションのリスクはありません。ただし % や _ はワイルドカード文字なので、必要に応じてエスケープしてください。"
   }, {
     title: "ソートとレスポンスモデル",
     body: "ソート機能では、クライアントが「どのフィールドで」「昇順/降順のどちらで」並べるかを指定できるようにします。sort_by パラメータでフィールド名を、order パラメータで asc/desc を受け取ります。\n\n注意すべきは、sort_by に任意の文字列を受け入れてしまうと、存在しないカラム名を指定された場合にエラーになることです。許可するフィールドをホワイトリストで管理するか、Enum で選択肢を制限するのが安全です。\n\nレスポンスモデルを Pydantic で定義することで、API のレスポンス形式がドキュメントにも反映され、フロントエンド開発者にとっても明確な仕様になります。",
-    code: `from enum import Enum
-from pydantic import BaseModel
-
-class SortOrder(str, Enum):
-    asc = "asc"
-    desc = "desc"
-
-class PaginatedResponse(BaseModel):
-    items: list[TodoResponse]
-    total: int
-    skip: int
-    limit: int
-    has_next: bool
-
-@router.get("", response_model=PaginatedResponse)
-async def list_todos(
-    sort_by: str = Query(default="created_at"),
-    order: SortOrder = Query(default=SortOrder.desc),
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
-):
-    # ソートフィールドの検証
-    allowed = {"created_at", "title", "is_done"}
-    if sort_by not in allowed:
-        sort_by = "created_at"
-
-    col = getattr(Todo, sort_by)
-    order_func = desc if order == SortOrder.desc else asc
-
-    stmt = select(Todo).order_by(order_func(col))
-    # ... offset, limit, count は省略`,
+    code: "from enum import Enum\nfrom pydantic import BaseModel\n\nclass SortOrder(str, Enum):\n    asc = \"asc\"\n    desc = \"desc\"\n\nclass PaginatedResponse(BaseModel):\n    items: list[TodoResponse]\n    total: int\n    skip: int\n    limit: int\n    has_next: bool\n\n@router.get(\"\", response_model=PaginatedResponse)\nasync def list_todos(\n    sort_by: str = Query(default=\"created_at\"),\n    order: SortOrder = Query(default=SortOrder.desc),\n    skip: int = Query(default=0, ge=0),\n    limit: int = Query(default=20, ge=1, le=100),\n    db: AsyncSession = Depends(get_db),\n):\n    # ソートフィールドの検証\n    allowed = {\"created_at\", \"title\", \"is_done\"}\n    if sort_by not in allowed:\n        sort_by = \"created_at\"\n\n    col = getattr(Todo, sort_by)\n    order_func = desc if order == SortOrder.desc else asc\n\n    stmt = select(Todo).order_by(order_func(col))\n    # ... offset, limit, count は省略",
     afterCode: "ミニ演習: フロントエンドの視点で、この API をどう呼び出すか考えてみましょう。GET /todos?q=milk&is_done=false&sort_by=created_at&order=desc&skip=0&limit=10 のように、全パラメータを組み合わせて使えることを確認してください。"
   }]
 }, {
@@ -2129,159 +439,23 @@ async def list_todos(
   sections: [{
     title: "カスタム例外と exception_handler",
     body: "HTTPException を直接 raise するのは手軽ですが、サービス層やリポジトリ層で HTTP の概念（ステータスコード）を扱うのは設計上の問題があります。サービス層は「ビジネスロジック」に集中すべきで、「HTTP 404 を返す」という判断は本来 HTTP 層の責務です。\n\nカスタム例外クラスを使うアプローチでは、サービス層は TodoNotFoundError という業務例外を raise し、FastAPI の exception_handler がそれを 404 レスポンスに変換します。これにより、サービス層のコードから HTTP の知識が排除され、CLI ツールやバッチ処理でも同じサービスを使えるようになります。\n\nexception_handler はデコレータで登録します。例外クラスごとに異なるハンドラを登録でき、レスポンスの形式（JSON のキー名やステータスコード）を一元管理できます。",
-    code: `# app/exceptions.py
-class AppError(Exception):
-    """アプリケーション共通の基底例外"""
-    pass
-
-class NotFoundError(AppError):
-    def __init__(self, resource: str, id: int):
-        self.resource = resource
-        self.id = id
-        super().__init__(
-            f"{resource} {id} not found"
-        )
-
-class AlreadyExistsError(AppError):
-    def __init__(self, resource: str, field: str):
-        self.resource = resource
-        self.field = field
-
-# app/main.py
-@app.exception_handler(NotFoundError)
-async def not_found_handler(request, exc):
-    return JSONResponse(
-        status_code=404,
-        content={
-            "error": "not_found",
-            "resource": exc.resource,
-            "id": exc.id,
-            "detail": str(exc),
-        }
-    )
-
-@app.exception_handler(AlreadyExistsError)
-async def already_exists_handler(request, exc):
-    return JSONResponse(
-        status_code=409,
-        content={
-            "error": "already_exists",
-            "resource": exc.resource,
-            "field": exc.field,
-        }
-    )`,
+    code: "# app/exceptions.py\nclass AppError(Exception):\n    \"\"\"アプリケーション共通の基底例外\"\"\"\n    pass\n\nclass NotFoundError(AppError):\n    def __init__(self, resource: str, id: int):\n        self.resource = resource\n        self.id = id\n        super().__init__(\n            f\"{resource} {id} not found\"\n        )\n\nclass AlreadyExistsError(AppError):\n    def __init__(self, resource: str, field: str):\n        self.resource = resource\n        self.field = field\n\n# app/main.py\n@app.exception_handler(NotFoundError)\nasync def not_found_handler(request, exc):\n    return JSONResponse(\n        status_code=404,\n        content={\n            \"error\": \"not_found\",\n            \"resource\": exc.resource,\n            \"id\": exc.id,\n            \"detail\": str(exc),\n        }\n    )\n\n@app.exception_handler(AlreadyExistsError)\nasync def already_exists_handler(request, exc):\n    return JSONResponse(\n        status_code=409,\n        content={\n            \"error\": \"already_exists\",\n            \"resource\": exc.resource,\n            \"field\": exc.field,\n        }\n    )",
     afterCode: "ポイント: 基底クラス AppError を作っておくと、exception_handler(AppError) で全てのカスタム例外を一括キャッチすることも可能です。"
   }, {
     title: "バリデーションエラーのカスタマイズ",
     body: "FastAPI がデフォルトで返すバリデーションエラー（422 Unprocessable Entity）のレスポンスは、Pydantic の内部構造がそのまま露出しており、フロントエンド開発者にとっては読みにくいことがあります。\n\nRequestValidationError の exception_handler を登録することで、エラーレスポンスの形式をカスタマイズできます。フィールド名、エラーメッセージ、エラー種別を整理した JSON を返すことで、フロントエンドのエラー表示が格段にやりやすくなります。\n\n内部サーバーエラー（500）もキャッチして、ユーザには安全なメッセージだけを返し、詳細はサーバーのログに記録する、という設計も重要です。",
-    code: `from fastapi.exceptions import RequestValidationError
-
-@app.exception_handler(RequestValidationError)
-async def validation_handler(request, exc):
-    errors = []
-    for err in exc.errors():
-        field = " -> ".join(
-            str(x) for x in err["loc"]
-        )
-        errors.append({
-            "field": field,
-            "message": err["msg"],
-            "type": err["type"],
-        })
-    return JSONResponse(
-        status_code=422,
-        content={
-            "error": "validation_error",
-            "detail": errors,
-        }
-    )
-
-# 500 エラーのキャッチ
-@app.exception_handler(Exception)
-async def internal_error_handler(request, exc):
-    logger.error("unhandled", exc_info=exc)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "internal_server_error",
-            "detail": "An unexpected error occurred"
-        }
-    )`,
+    code: "from fastapi.exceptions import RequestValidationError\n\n@app.exception_handler(RequestValidationError)\nasync def validation_handler(request, exc):\n    errors = []\n    for err in exc.errors():\n        field = \" -> \".join(\n            str(x) for x in err[\"loc\"]\n        )\n        errors.append({\n            \"field\": field,\n            \"message\": err[\"msg\"],\n            \"type\": err[\"type\"],\n        })\n    return JSONResponse(\n        status_code=422,\n        content={\n            \"error\": \"validation_error\",\n            \"detail\": errors,\n        }\n    )\n\n# 500 エラーのキャッチ\n@app.exception_handler(Exception)\nasync def internal_error_handler(request, exc):\n    logger.error(\"unhandled\", exc_info=exc)\n    return JSONResponse(\n        status_code=500,\n        content={\n            \"error\": \"internal_server_error\",\n            \"detail\": \"An unexpected error occurred\"\n        }\n    )",
     afterCode: "注意: Exception をキャッチする handler は必ず最後に登録してください。また、本番環境では内部のエラー詳細（スタックトレース等）をレスポンスに含めないでください。"
   }, {
     title: "structlog による構造化ログ",
     body: "Python 標準の logging モジュールは文字列ベースのログ出力ですが、本番環境ではログを JSON 形式で出力して集約サービス（CloudWatch, ELK Stack, Datadog）に送る構成が一般的です。structlog は構造化ログをシンプルに実現するライブラリです。\n\nstructlog のメリットは、ログにコンテキスト情報（request_id, user_id など）を付与できることです。contextvars を使うと、リクエストの入り口で request_id をセットすれば、そのリクエスト内のすべてのログに自動的に request_id が付きます。障害調査時に「この request_id のログを全部抽出する」といった絞り込みが可能になります。\n\n開発環境ではカラフルなコンソール出力、本番環境では JSON 出力と、環境に応じてフォーマッタを切り替えるのが定石です。",
     table: T.logLevels,
-    code: `# app/core/logging.py
-import structlog
-
-def setup_logging(json_logs: bool = False):
-    processors = [
-        structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-    ]
-    if json_logs:
-        processors.append(
-            structlog.processors.JSONRenderer()
-        )
-    else:
-        processors.append(
-            structlog.dev.ConsoleRenderer()
-        )
-    structlog.configure(
-        processors=processors,
-        logger_factory=structlog.PrintLoggerFactory(),
-    )
-
-# 使用例
-import structlog
-logger = structlog.get_logger()
-
-await logger.ainfo(
-    "todo_created",
-    todo_id=42,
-    user_id=1,
-    title="Buy milk"
-)
-# → 2026-04-14T10:00:00 [info] todo_created
-#    todo_id=42 user_id=1 title="Buy milk"`,
+    code: "# app/core/logging.py\nimport structlog\n\ndef setup_logging(json_logs: bool = False):\n    processors = [\n        structlog.contextvars.merge_contextvars,\n        structlog.processors.add_log_level,\n        structlog.processors.TimeStamper(fmt=\"iso\"),\n    ]\n    if json_logs:\n        processors.append(\n            structlog.processors.JSONRenderer()\n        )\n    else:\n        processors.append(\n            structlog.dev.ConsoleRenderer()\n        )\n    structlog.configure(\n        processors=processors,\n        logger_factory=structlog.PrintLoggerFactory(),\n    )\n\n# 使用例\nimport structlog\nlogger = structlog.get_logger()\n\nawait logger.ainfo(\n    \"todo_created\",\n    todo_id=42,\n    user_id=1,\n    title=\"Buy milk\"\n)\n# → 2026-04-14T10:00:00 [info] todo_created\n#    todo_id=42 user_id=1 title=\"Buy milk\"",
     afterCode: "ポイント: structlog は Python 標準の logging と統合して使うこともできます。既存のライブラリが logging を使っている場合も、structlog の processors を通じて構造化できます。"
   }, {
     title: "ロギングミドルウェア",
     body: "リクエストごとにログを自動出力するミドルウェアを作ることで、アクセスログの記録漏れを防ぎます。Starlette の BaseHTTPMiddleware を継承して dispatch メソッドを実装するのが基本パターンです。\n\nミドルウェアではリクエスト開始時に request_id を生成し、contextvars に設定します。これにより、そのリクエスト内で出力される全てのログに request_id が含まれるようになります。処理完了時には所要時間も記録し、パフォーマンスの監視に役立てます。\n\nレスポンスヘッダーに X-Request-ID を含めることで、フロントエンドからも問い合わせ時にリクエストを特定できるようになります。",
-    code: `# app/middleware/logging.py
-import time, uuid
-from starlette.middleware.base import BaseHTTPMiddleware
-import structlog
-
-logger = structlog.get_logger()
-
-class LoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        request_id = str(uuid.uuid4())[:8]
-        structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(
-            request_id=request_id
-        )
-
-        start = time.perf_counter()
-        response = await call_next(request)
-        elapsed = time.perf_counter() - start
-
-        await logger.ainfo(
-            "request",
-            method=request.method,
-            path=str(request.url.path),
-            status=response.status_code,
-            duration_ms=round(elapsed * 1000, 2),
-        )
-        response.headers["X-Request-ID"] = request_id
-        return response
-
-# app/main.py での登録
-from app.middleware.logging import LoggingMiddleware
-app.add_middleware(LoggingMiddleware)`,
+    code: "# app/middleware/logging.py\nimport time, uuid\nfrom starlette.middleware.base import BaseHTTPMiddleware\nimport structlog\n\nlogger = structlog.get_logger()\n\nclass LoggingMiddleware(BaseHTTPMiddleware):\n    async def dispatch(self, request, call_next):\n        request_id = str(uuid.uuid4())[:8]\n        structlog.contextvars.clear_contextvars()\n        structlog.contextvars.bind_contextvars(\n            request_id=request_id\n        )\n\n        start = time.perf_counter()\n        response = await call_next(request)\n        elapsed = time.perf_counter() - start\n\n        await logger.ainfo(\n            \"request\",\n            method=request.method,\n            path=str(request.url.path),\n            status=response.status_code,\n            duration_ms=round(elapsed * 1000, 2),\n        )\n        response.headers[\"X-Request-ID\"] = request_id\n        return response\n\n# app/main.py での登録\nfrom app.middleware.logging import LoggingMiddleware\napp.add_middleware(LoggingMiddleware)",
     afterCode: "ミニ演習: ミドルウェアを追加した状態で API を数回呼び出し、ログに request_id と処理時間が出力されることを確認してみましょう。"
   }]
 }, {
@@ -2294,155 +468,22 @@ app.add_middleware(LoggingMiddleware)`,
     title: "テストの基本構成",
     body: "FastAPI のテストでは httpx.AsyncClient を ASGI トランスポートで使うのが現在の推奨方法です。以前は requests ベースの TestClient が主流でしたが、非同期エンドポイントのテストには httpx の方が自然に書けます。\n\npytest-anyio（または pytest-asyncio）を使えば、テスト関数を async def で書いてそのまま await できます。テストの非同期化により、実際のアプリケーションと同じ非同期コンテキストでテストが実行されるため、より信頼性の高いテストになります。\n\nテストファイルは tests/ ディレクトリに配置し、ファイル名は test_ プレフィックスを付けます。conftest.py に共通の fixture を置くことで、テストコードの重複を最小限にできます。",
     table: T.testTypes,
-    code: `# tests/test_health.py
-import pytest
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-
-@pytest.mark.anyio
-async def test_health():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test"
-    ) as client:
-        resp = await client.get("/health")
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
-
-# pyproject.toml
-# [tool.pytest.ini_options]
-# anyio_backend = "asyncio"`,
+    code: "# tests/test_health.py\nimport pytest\nfrom httpx import AsyncClient, ASGITransport\nfrom app.main import app\n\n@pytest.mark.anyio\nasync def test_health():\n    transport = ASGITransport(app=app)\n    async with AsyncClient(\n        transport=transport,\n        base_url=\"http://test\"\n    ) as client:\n        resp = await client.get(\"/health\")\n    assert resp.status_code == 200\n    assert resp.json()[\"status\"] == \"ok\"\n\n# pyproject.toml\n# [tool.pytest.ini_options]\n# anyio_backend = \"asyncio\"",
     afterCode: "ポイント: base_url は実際にはどこにもリクエストを送りません。ASGI トランスポートを通じてアプリケーションに直接送信されるため、サーバーを起動する必要がありません。"
   }, {
     title: "テスト用データベースの設定",
     body: "テストでは本番のデータベースを使わず、テスト専用の DB を使います。SQLite のインメモリ DB やテスト専用の PostgreSQL DB を用意し、テストごとにテーブルを作り直すのが基本パターンです。\n\nFastAPI の dependency_overrides を使えば、get_db 関数をテスト用の実装に差し替えることができます。これが依存性注入の威力で、プロダクションコードを一切変更せずにテスト環境を構築できます。\n\nfixture のスコープ設計も重要です。DB テーブルの作成はテストセッション単位、データのクリーンアップはテスト関数単位、というのが一般的なパターンです。",
-    code: `# tests/conftest.py
-import pytest
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import (
-    create_async_engine, async_sessionmaker, AsyncSession
-)
-from app.models.todo import Base
-from app.db.session import get_db
-from app.main import app
-
-TEST_DB = "sqlite+aiosqlite:///./test.db"
-engine = create_async_engine(TEST_DB)
-TestSession = async_sessionmaker(
-    engine, class_=AsyncSession,
-    expire_on_commit=False
-)
-
-@pytest.fixture
-async def db_session():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with TestSession() as session:
-        yield session
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-@pytest.fixture
-async def client(db_session):
-    async def override():
-        yield db_session
-    app.dependency_overrides[get_db] = override
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as c:
-        yield c
-    app.dependency_overrides.clear()`,
+    code: "# tests/conftest.py\nimport pytest\nfrom httpx import AsyncClient, ASGITransport\nfrom sqlalchemy.ext.asyncio import (\n    create_async_engine, async_sessionmaker, AsyncSession\n)\nfrom app.models.todo import Base\nfrom app.db.session import get_db\nfrom app.main import app\n\nTEST_DB = \"sqlite+aiosqlite:///./test.db\"\nengine = create_async_engine(TEST_DB)\nTestSession = async_sessionmaker(\n    engine, class_=AsyncSession,\n    expire_on_commit=False\n)\n\n@pytest.fixture\nasync def db_session():\n    async with engine.begin() as conn:\n        await conn.run_sync(Base.metadata.create_all)\n    async with TestSession() as session:\n        yield session\n    async with engine.begin() as conn:\n        await conn.run_sync(Base.metadata.drop_all)\n\n@pytest.fixture\nasync def client(db_session):\n    async def override():\n        yield db_session\n    app.dependency_overrides[get_db] = override\n    transport = ASGITransport(app=app)\n    async with AsyncClient(\n        transport=transport, base_url=\"http://test\"\n    ) as c:\n        yield c\n    app.dependency_overrides.clear()",
     afterCode: "注意: dependency_overrides.clear() を忘れると、テスト間で設定が漏れて予期しない挙動を引き起こします。fixture の teardown（yield の後）で必ずクリアしてください。"
   }, {
     title: "CRUD テストの書き方",
     body: "API テストでは「正常系」と「異常系」の両方をカバーすることが重要です。正常系は期待通りの入力で期待通りの出力が返ることを確認し、異常系は不正な入力や存在しないリソースへのアクセスで適切なエラーが返ることを確認します。\n\nテストの命名は test_[操作]_[条件] のパターンが読みやすくなります。例えば test_create_todo_success, test_create_todo_empty_title, test_get_todo_not_found のように書くと、テスト結果を見たときにどのケースが失敗したか即座に分かります。\n\nテストデータの準備は、テスト関数内で API を呼んで作成する方法（統合テスト的）と、DB に直接挿入する方法（単体テスト的）の 2 つがあります。API テストでは前者が推奨されます。",
-    code: `# tests/test_todos.py
-import pytest
-
-@pytest.mark.anyio
-async def test_create_todo_success(client):
-    resp = await client.post(
-        "/todos",
-        json={"title": "Buy milk"}
-    )
-    assert resp.status_code == 201
-    data = resp.json()
-    assert data["title"] == "Buy milk"
-    assert data["is_done"] is False
-    assert "id" in data
-
-@pytest.mark.anyio
-async def test_create_todo_empty_title(client):
-    resp = await client.post(
-        "/todos",
-        json={"title": ""}
-    )
-    assert resp.status_code == 422
-
-@pytest.mark.anyio
-async def test_get_todo_not_found(client):
-    resp = await client.get("/todos/99999")
-    assert resp.status_code == 404
-
-@pytest.mark.anyio
-async def test_update_todo(client):
-    # 作成
-    create = await client.post(
-        "/todos", json={"title": "Original"}
-    )
-    todo_id = create.json()["id"]
-    # 更新
-    resp = await client.patch(
-        f"/todos/{todo_id}",
-        json={"title": "Updated"}
-    )
-    assert resp.status_code == 200
-    assert resp.json()["title"] == "Updated"
-
-@pytest.mark.anyio
-async def test_delete_todo(client):
-    create = await client.post(
-        "/todos", json={"title": "To delete"}
-    )
-    todo_id = create.json()["id"]
-    resp = await client.delete(f"/todos/{todo_id}")
-    assert resp.status_code == 204
-    # 削除後に取得→404
-    get = await client.get(f"/todos/{todo_id}")
-    assert get.status_code == 404`,
+    code: "# tests/test_todos.py\nimport pytest\n\n@pytest.mark.anyio\nasync def test_create_todo_success(client):\n    resp = await client.post(\n        \"/todos\",\n        json={\"title\": \"Buy milk\"}\n    )\n    assert resp.status_code == 201\n    data = resp.json()\n    assert data[\"title\"] == \"Buy milk\"\n    assert data[\"is_done\"] is False\n    assert \"id\" in data\n\n@pytest.mark.anyio\nasync def test_create_todo_empty_title(client):\n    resp = await client.post(\n        \"/todos\",\n        json={\"title\": \"\"}\n    )\n    assert resp.status_code == 422\n\n@pytest.mark.anyio\nasync def test_get_todo_not_found(client):\n    resp = await client.get(\"/todos/99999\")\n    assert resp.status_code == 404\n\n@pytest.mark.anyio\nasync def test_update_todo(client):\n    # 作成\n    create = await client.post(\n        \"/todos\", json={\"title\": \"Original\"}\n    )\n    todo_id = create.json()[\"id\"]\n    # 更新\n    resp = await client.patch(\n        f\"/todos/{todo_id}\",\n        json={\"title\": \"Updated\"}\n    )\n    assert resp.status_code == 200\n    assert resp.json()[\"title\"] == \"Updated\"\n\n@pytest.mark.anyio\nasync def test_delete_todo(client):\n    create = await client.post(\n        \"/todos\", json={\"title\": \"To delete\"}\n    )\n    todo_id = create.json()[\"id\"]\n    resp = await client.delete(f\"/todos/{todo_id}\")\n    assert resp.status_code == 204\n    # 削除後に取得→404\n    get = await client.get(f\"/todos/{todo_id}\")\n    assert get.status_code == 404",
     afterCode: "ポイント: テストは独立して実行できるようにしてください。test_delete_todo が test_create_todo に依存する（作成されたデータを前提とする）ような設計は避けましょう。各テストは自分でデータを準備し、自分で検証するのが原則です。"
   }, {
     title: "factory_boy によるテストデータ生成",
     body: "テストデータの作成を手動で行うと、テストコードが冗長になり、モデルの変更時に全てのテストを修正する必要が出てきます。factory_boy はテストデータのファクトリを定義するライブラリで、最小限のコードで多様なテストデータを生成できます。\n\nFactory クラスでモデルのデフォルト値を定義しておけば、テスト関数では「違いのある属性だけ」をオーバーライドすれば済みます。例えば TodoFactory.build(is_done=True) で「完了済みの Todo」を簡潔に作れます。\n\nSequence を使えば連番のデータ（Todo Item 1, Todo Item 2, ...）を、Faker を使えばランダムなデータを生成できます。大量データを使ったページネーションテストや負荷テストで特に威力を発揮します。",
-    code: `# tests/factories.py
-import factory
-from app.models.todo import Todo
-
-class TodoFactory(factory.Factory):
-    class Meta:
-        model = Todo
-
-    title = factory.Sequence(
-        lambda n: f"Todo Item {n}"
-    )
-    description = factory.Faker(
-        "sentence", locale="ja_JP"
-    )
-    is_done = False
-
-# テストでの使用
-def test_example():
-    # 1件作成
-    todo = TodoFactory.build()
-    # → Todo(title="Todo Item 0", ...)
-
-    # 属性をオーバーライド
-    done = TodoFactory.build(is_done=True)
-
-    # バッチ作成
-    todos = TodoFactory.build_batch(50)`,
+    code: "# tests/factories.py\nimport factory\nfrom app.models.todo import Todo\n\nclass TodoFactory(factory.Factory):\n    class Meta:\n        model = Todo\n\n    title = factory.Sequence(\n        lambda n: f\"Todo Item {n}\"\n    )\n    description = factory.Faker(\n        \"sentence\", locale=\"ja_JP\"\n    )\n    is_done = False\n\n# テストでの使用\ndef test_example():\n    # 1件作成\n    todo = TodoFactory.build()\n    # → Todo(title=\"Todo Item 0\", ...)\n\n    # 属性をオーバーライド\n    done = TodoFactory.build(is_done=True)\n\n    # バッチ作成\n    todos = TodoFactory.build_batch(50)",
     afterCode: "ポイント: build() はインスタンスを生成するだけで DB には保存しません。DB に保存するには create() を使いますが、非同期 SQLAlchemy との統合には追加の設定が必要です。"
   }]
 }, {
@@ -2455,141 +496,17 @@ def test_example():
     title: "Dockerfile の設計",
     body: "Docker でアプリケーションをコンテナ化することで、「自分のマシンでは動くのに本番では動かない」という問題を解消できます。環境（OS、Python バージョン、ライブラリ）がコンテナ内に固定されるため、開発・テスト・本番で同じ環境を再現できます。\n\nマルチステージビルドを使うと、ビルド時に必要なツール（コンパイラ等）を最終イメージに含めずに済み、イメージサイズを削減できます。python:3.12-slim をベースにすることで、フルイメージ（約 1GB）と比べて 200MB 程度に抑えられます。\n\nセキュリティの観点から、コンテナ内ではroot ユーザで実行しないのが鉄則です。非 root ユーザを作成して USER ディレクティブで切り替えます。",
     table: T.dockerCommands,
-    code: `# Dockerfile
-FROM python:3.12-slim AS builder
-
-WORKDIR /build
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir --prefix=/install .
-
-FROM python:3.12-slim
-
-# 非rootユーザ
-RUN groupadd -r appuser && \\
-    useradd -r -g appuser appuser
-
-WORKDIR /app
-COPY --from=builder /install /usr/local
-COPY ./app ./app
-COPY ./alembic ./alembic
-COPY ./alembic.ini ./
-
-USER appuser
-EXPOSE 8000
-
-CMD ["uvicorn", "app.main:app", \\
-     "--host", "0.0.0.0", "--port", "8000"]
-
-# .dockerignore
-__pycache__
-*.pyc
-.git
-.env
-tests/
-*.md`,
+    code: "# Dockerfile\nFROM python:3.12-slim AS builder\n\nWORKDIR /build\nCOPY pyproject.toml ./\nRUN pip install --no-cache-dir --prefix=/install .\n\nFROM python:3.12-slim\n\n# 非rootユーザ\nRUN groupadd -r appuser && \\\n    useradd -r -g appuser appuser\n\nWORKDIR /app\nCOPY --from=builder /install /usr/local\nCOPY ./app ./app\nCOPY ./alembic ./alembic\nCOPY ./alembic.ini ./\n\nUSER appuser\nEXPOSE 8000\n\nCMD [\"uvicorn\", \"app.main:app\", \\\n     \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n\n# .dockerignore\n__pycache__\n*.pyc\n.git\n.env\ntests/\n*.md",
     afterCode: "ポイント: COPY pyproject.toml を先に行い、pip install を実行した後にアプリケーションコードをコピーしています。これにより、依存関係が変わらない限りキャッシュが効き、ビルド時間が大幅に短縮されます。"
   }, {
     title: "docker-compose による複数サービス管理",
     body: "実際のアプリケーションは FastAPI 単体では動かず、データベース（PostgreSQL）やキャッシュ（Redis）などの外部サービスに依存します。docker-compose を使うと、これらのサービスを一つの YAML ファイルで定義し、コマンド一つで全て起動できます。\n\ndepends_on でサービス間の起動順序を制御できますが、「起動した」だけでは接続可能とは限りません。healthcheck を設定して「DB が接続可能になるまで待つ」ことが重要です。condition: service_healthy を指定すると、ヘルスチェックが通るまでアプリの起動を遅延させます。\n\n開発環境では volumes でソースコードをマウントし、--reload と組み合わせることで、ホスト側のファイル変更が即座にコンテナ内に反映される開発体験を実現できます。",
-    code: `# docker-compose.yml
-services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: todo
-      POSTGRES_PASSWORD: todo_pass
-      POSTGRES_DB: todo_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL",
-        "pg_isready -U todo -d todo_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  app:
-    build: .
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: >-
-        postgresql+asyncpg://todo:todo_pass@db:5432/todo_db
-    depends_on:
-      db:
-        condition: service_healthy
-    command: >
-      sh -c "alembic upgrade head &&
-      uvicorn app.main:app
-      --host 0.0.0.0 --port 8000 --reload"
-    volumes:
-      - ./app:/app/app  # 開発用ホットリロード
-
-volumes:
-  pgdata:`,
+    code: "# docker-compose.yml\nservices:\n  db:\n    image: postgres:16-alpine\n    environment:\n      POSTGRES_USER: todo\n      POSTGRES_PASSWORD: todo_pass\n      POSTGRES_DB: todo_db\n    ports:\n      - \"5432:5432\"\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n    healthcheck:\n      test: [\"CMD-SHELL\",\n        \"pg_isready -U todo -d todo_db\"]\n      interval: 5s\n      timeout: 5s\n      retries: 5\n\n  app:\n    build: .\n    ports:\n      - \"8000:8000\"\n    env_file:\n      - .env\n    environment:\n      DATABASE_URL: >-\n        postgresql+asyncpg://todo:todo_pass@db:5432/todo_db\n    depends_on:\n      db:\n        condition: service_healthy\n    command: >\n      sh -c \"alembic upgrade head &&\n      uvicorn app.main:app\n      --host 0.0.0.0 --port 8000 --reload\"\n    volumes:\n      - ./app:/app/app  # 開発用ホットリロード\n\nvolumes:\n  pgdata:",
     afterCode: "ミニ演習: docker compose up -d で起動し、docker compose logs -f app でログを確認しながら API を呼び出してみましょう。docker compose exec app bash でコンテナ内に入って、環境変数が正しく設定されていることも確認してください。"
   }, {
     title: "GitHub Actions による CI パイプライン",
     body: "CI（継続的インテグレーション）は、コードの変更がプッシュされるたびに自動的にテストを実行し、問題を早期に検出する仕組みです。GitHub Actions はリポジトリ内にワークフローファイルを置くだけで CI を構築できます。\n\n典型的な CI パイプラインは lint（コード品質チェック）→ test（テスト実行）→ build（ビルド確認）の 3 ステップで構成されます。lint で明らかな問題を弾いてからテストを実行することで、テストの実行時間を節約できます。\n\nPostgreSQL をテストに使う場合は、GitHub Actions のサービスコンテナ機能が便利です。services セクションに定義するだけで、テスト実行前に PostgreSQL コンテナが起動し、テスト後に自動で破棄されます。",
-    code: `# .github/workflows/ci.yml
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install ruff
-      - run: ruff check .
-
-  test:
-    needs: lint
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test_pass
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: >-
-        postgresql+asyncpg://test:test_pass@localhost:5432/test_db
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -e ".[dev]"
-      - run: pytest -v --tb=short
-
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -t todo-app .`,
+    code: "# .github/workflows/ci.yml\nname: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n    branches: [main]\n\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n      - run: pip install ruff\n      - run: ruff check .\n\n  test:\n    needs: lint\n    runs-on: ubuntu-latest\n    services:\n      postgres:\n        image: postgres:16-alpine\n        env:\n          POSTGRES_USER: test\n          POSTGRES_PASSWORD: test_pass\n          POSTGRES_DB: test_db\n        ports:\n          - 5432:5432\n        options: >-\n          --health-cmd \"pg_isready -U test\"\n          --health-interval 5s\n          --health-timeout 5s\n          --health-retries 5\n    env:\n      DATABASE_URL: >-\n        postgresql+asyncpg://test:test_pass@localhost:5432/test_db\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n          cache: pip\n      - run: pip install -e \".[dev]\"\n      - run: pytest -v --tb=short\n\n  build:\n    needs: test\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: docker build -t todo-app .",
     afterCode: "ポイント: needs キーワードでジョブ間の依存関係を定義できます。lint → test → build の順に実行され、前のジョブが失敗したら後続は実行されません。"
   }]
 }, {
@@ -2601,111 +518,18 @@ jobs:
   sections: [{
     title: "Gunicorn + Uvicorn worker",
     body: "開発時は uvicorn を直接実行しますが、本番環境ではプロセスマネージャとして Gunicorn を使い、その worker として Uvicorn を動かすのが推奨構成です。Gunicorn がプロセスの生死を監視し、クラッシュした worker を自動的に再起動してくれます。\n\nworker 数は CPU コア数に基づいて設定します。I/O バウンドなアプリケーションでは (CPU コア数 * 2) + 1 が一般的な指針です。ただし、メモリ使用量とのトレードオフがあるため、実際のワークロードで計測して調整することが重要です。\n\nGunicorn の設定は gunicorn.conf.py に書くことで、コマンドライン引数を長々と並べる必要がなくなります。タイムアウト、ログ設定、プロセス名なども一元管理できます。",
-    code: `# gunicorn.conf.py
-import multiprocessing
-
-workers = multiprocessing.cpu_count() * 2 + 1
-worker_class = "uvicorn.workers.UvicornWorker"
-bind = "0.0.0.0:8000"
-timeout = 120
-graceful_timeout = 30
-keepalive = 5
-accesslog = "-"
-errorlog = "-"
-loglevel = "info"
-
-# 起動コマンド
-# gunicorn app.main:app -c gunicorn.conf.py
-
-# Dockerfile CMD
-# CMD ["gunicorn", "app.main:app",
-#      "-c", "gunicorn.conf.py"]`,
+    code: "# gunicorn.conf.py\nimport multiprocessing\n\nworkers = multiprocessing.cpu_count() * 2 + 1\nworker_class = \"uvicorn.workers.UvicornWorker\"\nbind = \"0.0.0.0:8000\"\ntimeout = 120\ngraceful_timeout = 30\nkeepalive = 5\naccesslog = \"-\"\nerrorlog = \"-\"\nloglevel = \"info\"\n\n# 起動コマンド\n# gunicorn app.main:app -c gunicorn.conf.py\n\n# Dockerfile CMD\n# CMD [\"gunicorn\", \"app.main:app\",\n#      \"-c\", \"gunicorn.conf.py\"]",
     afterCode: "ポイント: graceful_timeout は worker がシャットダウンする際に、処理中のリクエストを完了するまで待つ時間です。長いリクエスト（ファイルアップロード等）がある場合は大きめに設定してください。"
   }, {
     title: "ヘルスチェックエンドポイント",
     body: "ヘルスチェックは、アプリケーションが正常に動作しているかを外部から確認するためのエンドポイントです。ロードバランサー（ALB, nginx）やコンテナオーケストレータ（Kubernetes, ECS）は、ヘルスチェックの結果に基づいて、異常なインスタンスへのトラフィックを停止したり、コンテナを再起動したりします。\n\n単純に 200 を返すだけのヘルスチェックでは、アプリケーションプロセスは生きているが DB に接続できない、というケースを検出できません。DB 接続確認を含む「ディープヘルスチェック」を実装することで、依存サービスの障害も早期に検出できます。\n\nレスポンスにはアプリのバージョンや起動時間も含めておくと、デプロイが正しく行われたかの確認や、障害時のトリアージに役立ちます。",
     table: T.deployChecklist,
-    code: `# app/routers/health.py
-import time
-from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
-
-router = APIRouter(tags=["health"])
-APP_VERSION = "1.0.0"
-START_TIME = time.time()
-
-@router.get("/health")
-async def health_check(
-    db: AsyncSession = Depends(get_db)
-):
-    health = {
-        "status": "ok",
-        "version": APP_VERSION,
-        "uptime_seconds": round(
-            time.time() - START_TIME, 1
-        ),
-        "checks": {},
-    }
-    try:
-        await db.execute(text("SELECT 1"))
-        health["checks"]["database"] = "ok"
-    except Exception as e:
-        health["status"] = "degraded"
-        health["checks"]["database"] = str(e)
-        return JSONResponse(
-            status_code=503, content=health
-        )
-    return health`,
+    code: "# app/routers/health.py\nimport time\nfrom fastapi import APIRouter, Depends\nfrom fastapi.responses import JSONResponse\nfrom sqlalchemy import text\nfrom sqlalchemy.ext.asyncio import AsyncSession\nfrom app.db.session import get_db\n\nrouter = APIRouter(tags=[\"health\"])\nAPP_VERSION = \"1.0.0\"\nSTART_TIME = time.time()\n\n@router.get(\"/health\")\nasync def health_check(\n    db: AsyncSession = Depends(get_db)\n):\n    health = {\n        \"status\": \"ok\",\n        \"version\": APP_VERSION,\n        \"uptime_seconds\": round(\n            time.time() - START_TIME, 1\n        ),\n        \"checks\": {},\n    }\n    try:\n        await db.execute(text(\"SELECT 1\"))\n        health[\"checks\"][\"database\"] = \"ok\"\n    except Exception as e:\n        health[\"status\"] = \"degraded\"\n        health[\"checks\"][\"database\"] = str(e)\n        return JSONResponse(\n            status_code=503, content=health\n        )\n    return health",
     afterCode: "ポイント: ヘルスチェックは認証なしでアクセスできるようにしてください。ロードバランサーやオーケストレータがトークンを持つことは通常ありません。"
   }, {
     title: "Prometheus メトリクス",
     body: "監視（モニタリング）は本番運用の生命線です。Prometheus はメトリクス収集のデファクトスタンダードで、アプリケーションが /metrics エンドポイントで数値を公開し、Prometheus サーバーが定期的に収集（スクレイプ）する Pull 型のアーキテクチャです。\n\nWeb アプリケーションで最低限収集すべきメトリクスは、リクエスト数（Counter）、レスポンスタイム（Histogram）、エラー率（Counter のラベルで分類）の 3 つです。これらをメソッド・パス・ステータスコード別に集計することで、「POST /todos が急に遅くなった」「500 エラーが増えている」といった異常を即座に検出できます。\n\n収集したメトリクスは Grafana でダッシュボード化するのが一般的です。レスポンスタイムの 95 パーセンタイル（p95）やエラー率のアラートを設定しておけば、障害の初動対応が格段に速くなります。",
-    code: `# app/middleware/metrics.py
-import time
-from prometheus_client import Counter, Histogram
-
-REQUEST_COUNT = Counter(
-    "http_requests_total",
-    "Total HTTP requests",
-    ["method", "path", "status"]
-)
-REQUEST_DURATION = Histogram(
-    "http_request_duration_seconds",
-    "Request duration in seconds",
-    ["method", "path"],
-    buckets=[0.01, 0.05, 0.1, 0.25,
-             0.5, 1.0, 2.5, 5.0]
-)
-
-class MetricsMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        if request.url.path == "/metrics":
-            return await call_next(request)
-        start = time.perf_counter()
-        response = await call_next(request)
-        duration = time.perf_counter() - start
-        REQUEST_COUNT.labels(
-            method=request.method,
-            path=request.url.path,
-            status=response.status_code,
-        ).inc()
-        REQUEST_DURATION.labels(
-            method=request.method,
-            path=request.url.path,
-        ).observe(duration)
-        return response
-
-# /metrics エンドポイント
-from prometheus_client import generate_latest
-@router.get("/metrics")
-def metrics():
-    return Response(
-        content=generate_latest(),
-        media_type="text/plain"
-    )`,
+    code: "# app/middleware/metrics.py\nimport time\nfrom prometheus_client import Counter, Histogram\n\nREQUEST_COUNT = Counter(\n    \"http_requests_total\",\n    \"Total HTTP requests\",\n    [\"method\", \"path\", \"status\"]\n)\nREQUEST_DURATION = Histogram(\n    \"http_request_duration_seconds\",\n    \"Request duration in seconds\",\n    [\"method\", \"path\"],\n    buckets=[0.01, 0.05, 0.1, 0.25,\n             0.5, 1.0, 2.5, 5.0]\n)\n\nclass MetricsMiddleware(BaseHTTPMiddleware):\n    async def dispatch(self, request, call_next):\n        if request.url.path == \"/metrics\":\n            return await call_next(request)\n        start = time.perf_counter()\n        response = await call_next(request)\n        duration = time.perf_counter() - start\n        REQUEST_COUNT.labels(\n            method=request.method,\n            path=request.url.path,\n            status=response.status_code,\n        ).inc()\n        REQUEST_DURATION.labels(\n            method=request.method,\n            path=request.url.path,\n        ).observe(duration)\n        return response\n\n# /metrics エンドポイント\nfrom prometheus_client import generate_latest\n@router.get(\"/metrics\")\ndef metrics():\n    return Response(\n        content=generate_latest(),\n        media_type=\"text/plain\"\n    )",
     afterCode: "ポイント: /metrics 自体のリクエストをメトリクスに含めないように除外しています。含めると Prometheus のスクレイプ間隔でメトリクスが膨らみ、ノイズになります。"
   }, {
     title: "コース総括",

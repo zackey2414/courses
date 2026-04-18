@@ -204,1657 +204,282 @@ const EX = {
     {
       diff: 1,
       q: "alias を使ってコンパイル時にフィボナッチ数列の第10項を計算する関数 fib を書いてください。\nコンパイル時に結果が確定することを alias で確認。",
-      code: `# alias result = fib(10)
-# print(result)  # → 55`,
-      answer: `def fib(n: Int) -> Int:
-    if n <= 1:
-        return n
-    return fib(n - 1) + fib(n - 2)
-
-def main():
-    alias result = fib(10)
-    print(result)  # 55 — コンパイル時に計算済み`
+      code: "# alias result = fib(10)\n# print(result)  # → 55",
+      answer: "def fib(n: Int) -> Int:\n    if n <= 1:\n        return n\n    return fib(n - 1) + fib(n - 2)\n\ndef main():\n    alias result = fib(10)\n    print(result)  # 55 — コンパイル時に計算済み"
     },
     {
       diff: 2,
       q: "comptime if を使って、DType パラメータが浮動小数点型かどうかで異なる初期値を返すジェネリック関数 default_value を書いてください。\n浮動小数点 → 0.0相当、整数 → 0相当の SIMD[T,1] を返す。",
-      code: `# default_value[DType.float32]() → 0.0
-# default_value[DType.int32]()   → 0`,
-      answer: `def default_value[T: DType]() -> SIMD[T, 1]:
-    comptime if T.is_floating_point():
-        return SIMD[T, 1](0.0)
-    else:
-        return SIMD[T, 1](0)
-
-def main():
-    print(default_value[DType.float32]())
-    print(default_value[DType.int32]())`
+      code: "# default_value[DType.float32]() → 0.0\n# default_value[DType.int32]()   → 0",
+      answer: "def default_value[T: DType]() -> SIMD[T, 1]:\n    comptime if T.is_floating_point():\n        return SIMD[T, 1](0.0)\n    else:\n        return SIMD[T, 1](0)\n\ndef main():\n    print(default_value[DType.float32]())\n    print(default_value[DType.int32]())"
     },
     {
       diff: 2,
       q: "comptime for を使ってタプル内の全要素を表示する汎用関数 print_all を書いてください。\n異なる型が混在するタプルでも動作すること。",
-      code: `# print_all((42, "hello", 3.14, True))
-# → 各要素が1行ずつ表示`,
-      answer: `def print_all[*Ts: Writable](*args: *Ts):
-    comptime for i in range(len(args)):
-        print(args[i])
-
-def main():
-    print_all(42, "hello", 3.14, True)`
+      code: "# print_all((42, \"hello\", 3.14, True))\n# → 各要素が1行ずつ表示",
+      answer: "def print_all[*Ts: Writable](*args: *Ts):\n    comptime for i in range(len(args)):\n        print(args[i])\n\ndef main():\n    print_all(42, \"hello\", 3.14, True)"
     },
     {
       diff: 3,
       q: "comptime メンバーを使って、コンパイル時に要素数を保持するFixedArray的なstruct StaticVec を定義してください。\ncomptime メンバー N を持ち、N に基づいてゼロ初期化する __init__ を実装。",
-      code: `# var v = StaticVec[4, DType.float64]()
-# comptime で要素数が確定`,
-      answer: `struct StaticVec[N: Int, T: DType]:
-    var data: SIMD[T, N]
-
-    def __init__(out self):
-        self.data = SIMD[T, N](0)
-
-    def __getitem__(self, idx: Int) -> SIMD[T, 1]:
-        return self.data[idx]
-
-    def set(mut self, idx: Int, val: SIMD[T, 1]):
-        self.data[idx] = val
-
-    def sum(self) -> SIMD[T, 1]:
-        return self.data.reduce_add()
-
-def main():
-    var v = StaticVec[4, DType.float64]()
-    v.set(0, 1.0)
-    v.set(1, 2.0)
-    v.set(2, 3.0)
-    v.set(3, 4.0)
-    print("合計:", v.sum())`
+      code: "# var v = StaticVec[4, DType.float64]()\n# comptime で要素数が確定",
+      answer: "struct StaticVec[N: Int, T: DType]:\n    var data: SIMD[T, N]\n\n    def __init__(out self):\n        self.data = SIMD[T, N](0)\n\n    def __getitem__(self, idx: Int) -> SIMD[T, 1]:\n        return self.data[idx]\n\n    def set(mut self, idx: Int, val: SIMD[T, 1]):\n        self.data[idx] = val\n\n    def sum(self) -> SIMD[T, 1]:\n        return self.data.reduce_add()\n\ndef main():\n    var v = StaticVec[4, DType.float64]()\n    v.set(0, 1.0)\n    v.set(1, 2.0)\n    v.set(2, 3.0)\n    v.set(3, 4.0)\n    print(\"合計:\", v.sum())"
     }
   ],
   ch2: [
     {
       diff: 1,
       q: "infer-only パラメータ（//）を使って、任意の SIMD ベクトルの要素数を返す関数 vec_len を書いてください。\n呼び出し側でパラメータを明示指定しなくても動くこと。",
-      code: `# var v = SIMD[DType.float32, 8](1.0)
-# print(vec_len(v))  # → 8`,
-      answer: `def vec_len[//, T: DType, N: Int](v: SIMD[T, N]) -> Int:
-    return N
-
-def main():
-    var v4 = SIMD[DType.float32, 4](1.0)
-    var v8 = SIMD[DType.int64, 8](0)
-    print(vec_len(v4))  # 4
-    print(vec_len(v8))  # 8`
+      code: "# var v = SIMD[DType.float32, 8](1.0)\n# print(vec_len(v))  # → 8",
+      answer: "def vec_len[//, T: DType, N: Int](v: SIMD[T, N]) -> Int:\n    return N\n\ndef main():\n    var v4 = SIMD[DType.float32, 4](1.0)\n    var v8 = SIMD[DType.int64, 8](0)\n    print(vec_len(v4))  # 4\n    print(vec_len(v8))  # 8"
     },
     {
       diff: 2,
       q: "可変長パラメータを使って、任意個の DType を受け取り、それぞれのビット幅を表示する関数 print_bitwidths を書いてください。",
-      code: `# print_bitwidths[DType.float32, DType.int64, DType.uint8]()
-# → 32, 64, 8`,
-      answer: `def print_bitwidths[*Ts: DType]():
-    comptime for i in range(len(Ts)):
-        alias T = Ts[i]
-        print(T, ":", T.bitwidth(), "bits")
-
-def main():
-    print_bitwidths[DType.float32, DType.int64, DType.uint8]()`
+      code: "# print_bitwidths[DType.float32, DType.int64, DType.uint8]()\n# → 32, 64, 8",
+      answer: "def print_bitwidths[*Ts: DType]():\n    comptime for i in range(len(Ts)):\n        alias T = Ts[i]\n        print(T, \":\", T.bitwidth(), \"bits\")\n\ndef main():\n    print_bitwidths[DType.float32, DType.int64, DType.uint8]()"
     },
     {
       diff: 2,
       q: "自動パラメータ化を使って、任意の SIMD ベクトルを2倍にする関数 double_vec を書いてください。\nパラメータ宣言を省略し、引数の型だけで動くようにすること。",
-      code: `# var v = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)
-# print(double_vec(v))  # → [2.0, 4.0, 6.0, 8.0]`,
-      answer: `def double_vec(v: SIMD) -> __type_of(v):
-    return v * 2
-
-def main():
-    var v = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)
-    print(double_vec(v))
-    var w = SIMD[DType.int64, 2](10, 20)
-    print(double_vec(w))`
+      code: "# var v = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)\n# print(double_vec(v))  # → [2.0, 4.0, 6.0, 8.0]",
+      answer: "def double_vec(v: SIMD) -> __type_of(v):\n    return v * 2\n\ndef main():\n    var v = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)\n    print(double_vec(v))\n    var w = SIMD[DType.int64, 2](10, 20)\n    print(double_vec(w))"
     },
     {
       diff: 3,
       q: "依存型パターンを使って、2つのSIMDベクトルのドット積を計算する関数 dot を書いてください。\n同じDType・同じ幅のベクトルのみ受け付けること。\nreduce_add() を使用。",
-      code: `# var a = SIMD[DType.float32, 4](1,2,3,4)
-# var b = SIMD[DType.float32, 4](5,6,7,8)
-# dot(a, b) → 70.0`,
-      answer: `def dot[T: DType, N: Int](a: SIMD[T, N], b: SIMD[T, N]) -> SIMD[T, 1]:
-    return (a * b).reduce_add()
-
-def main():
-    var a = SIMD[DType.float32, 4](1, 2, 3, 4)
-    var b = SIMD[DType.float32, 4](5, 6, 7, 8)
-    print("dot:", dot(a, b))  # 70.0
-
-    var x = SIMD[DType.float64, 8](1, 0, 1, 0, 1, 0, 1, 0)
-    var y = SIMD[DType.float64, 8](2, 2, 2, 2, 2, 2, 2, 2)
-    print("dot:", dot(x, y))  # 8.0`
+      code: "# var a = SIMD[DType.float32, 4](1,2,3,4)\n# var b = SIMD[DType.float32, 4](5,6,7,8)\n# dot(a, b) → 70.0",
+      answer: "def dot[T: DType, N: Int](a: SIMD[T, N], b: SIMD[T, N]) -> SIMD[T, 1]:\n    return (a * b).reduce_add()\n\ndef main():\n    var a = SIMD[DType.float32, 4](1, 2, 3, 4)\n    var b = SIMD[DType.float32, 4](5, 6, 7, 8)\n    print(\"dot:\", dot(a, b))  # 70.0\n\n    var x = SIMD[DType.float64, 8](1, 0, 1, 0, 1, 0, 1, 0)\n    var y = SIMD[DType.float64, 8](2, 2, 2, 2, 2, 2, 2, 2)\n    print(\"dot:\", dot(x, y))  # 8.0"
     }
   ],
   ch3: [
     {
       diff: 1,
       q: "UnsafePointer を使って Int 型の値を3つ分のメモリを確保し、初期化・読み取り・解放を行ってください。\nalloc → init_pointee_move → 読み取り → destroy_pointee → free の流れ。",
-      code: `# メモリ確保 → 初期化 → 表示 → 解放`,
-      answer: `def main():
-    var ptr = UnsafePointer[Int].alloc(3)
-    for i in range(3):
-        (ptr + i).init_pointee_move(i * 10)
-    for i in range(3):
-        print("ptr[" + String(i) + "]:", (ptr + i)[])
-    for i in range(3):
-        (ptr + i).destroy_pointee()
-    ptr.free()`
+      code: "# メモリ確保 → 初期化 → 表示 → 解放",
+      answer: "def main():\n    var ptr = UnsafePointer[Int].alloc(3)\n    for i in range(3):\n        (ptr + i).init_pointee_move(i * 10)\n    for i in range(3):\n        print(\"ptr[\" + String(i) + \"]:\", (ptr + i)[])\n    for i in range(3):\n        (ptr + i).destroy_pointee()\n    ptr.free()"
     },
     {
       diff: 2,
       q: "@align(64) を使ってキャッシュライン境界に配置される struct CacheAligned を定義してください。\nSIMD[DType.float64, 8] のフィールドを持ち、合計を返すメソッドを実装。",
-      code: `# @align(64)
-# struct CacheAligned: ...`,
-      answer: `@align(64)
-struct CacheAligned:
-    var data: SIMD[DType.float64, 8]
-
-    def __init__(out self):
-        self.data = SIMD[DType.float64, 8](0)
-
-    def __init__(out self, val: SIMD[DType.float64, 8]):
-        self.data = val
-
-    def sum(self) -> Float64:
-        return self.data.reduce_add()
-
-def main():
-    var block = CacheAligned(
-        SIMD[DType.float64, 8](1, 2, 3, 4, 5, 6, 7, 8)
-    )
-    print("合計:", block.sum())  # 36.0`
+      code: "# @align(64)\n# struct CacheAligned: ...",
+      answer: "@align(64)\nstruct CacheAligned:\n    var data: SIMD[DType.float64, 8]\n\n    def __init__(out self):\n        self.data = SIMD[DType.float64, 8](0)\n\n    def __init__(out self, val: SIMD[DType.float64, 8]):\n        self.data = val\n\n    def sum(self) -> Float64:\n        return self.data.reduce_add()\n\ndef main():\n    var block = CacheAligned(\n        SIMD[DType.float64, 8](1, 2, 3, 4, 5, 6, 7, 8)\n    )\n    print(\"合計:\", block.sum())  # 36.0"
     },
     {
       diff: 3,
       q: "UnsafePointer で動的配列（簡易 DynArray[Int]）を実装してください。\npush（末尾追加）、get（読み取り）、len、__del__（解放）を持つこと。\n容量が足りなくなったら2倍に拡張する。",
-      code: `# var arr = DynArray()
-# arr.push(10); arr.push(20); arr.push(30)
-# print(arr.get(1))  # → 20`,
-      answer: `struct DynArray:
-    var ptr: UnsafePointer[Int]
-    var size: Int
-    var cap: Int
-
-    def __init__(out self):
-        self.cap = 4
-        self.size = 0
-        self.ptr = UnsafePointer[Int].alloc(self.cap)
-
-    def push(mut self, val: Int):
-        if self.size == self.cap:
-            var new_cap = self.cap * 2
-            var new_ptr = UnsafePointer[Int].alloc(new_cap)
-            for i in range(self.size):
-                (new_ptr + i).init_pointee_move((self.ptr + i).take_pointee())
-            self.ptr.free()
-            self.ptr = new_ptr
-            self.cap = new_cap
-        (self.ptr + self.size).init_pointee_move(val)
-        self.size += 1
-
-    def get(self, idx: Int) -> Int:
-        return (self.ptr + idx)[]
-
-    def len(self) -> Int:
-        return self.size
-
-    def __del__(owned self):
-        for i in range(self.size):
-            (self.ptr + i).destroy_pointee()
-        self.ptr.free()
-
-def main():
-    var arr = DynArray()
-    for i in range(10):
-        arr.push(i * 100)
-    print("len:", arr.len())
-    print("arr[3]:", arr.get(3))
-    print("arr[9]:", arr.get(9))`
+      code: "# var arr = DynArray()\n# arr.push(10); arr.push(20); arr.push(30)\n# print(arr.get(1))  # → 20",
+      answer: "struct DynArray:\n    var ptr: UnsafePointer[Int]\n    var size: Int\n    var cap: Int\n\n    def __init__(out self):\n        self.cap = 4\n        self.size = 0\n        self.ptr = UnsafePointer[Int].alloc(self.cap)\n\n    def push(mut self, val: Int):\n        if self.size == self.cap:\n            var new_cap = self.cap * 2\n            var new_ptr = UnsafePointer[Int].alloc(new_cap)\n            for i in range(self.size):\n                (new_ptr + i).init_pointee_move((self.ptr + i).take_pointee())\n            self.ptr.free()\n            self.ptr = new_ptr\n            self.cap = new_cap\n        (self.ptr + self.size).init_pointee_move(val)\n        self.size += 1\n\n    def get(self, idx: Int) -> Int:\n        return (self.ptr + idx)[]\n\n    def len(self) -> Int:\n        return self.size\n\n    def __del__(owned self):\n        for i in range(self.size):\n            (self.ptr + i).destroy_pointee()\n        self.ptr.free()\n\ndef main():\n    var arr = DynArray()\n    for i in range(10):\n        arr.push(i * 100)\n    print(\"len:\", arr.len())\n    print(\"arr[3]:\", arr.get(3))\n    print(\"arr[9]:\", arr.get(9))"
     }
   ],
   ch4: [
     {
       diff: 1,
       q: "SIMD[DType.float32, 8] のベクトルを作成し、reduce_add / reduce_max / reduce_min を表示してください。",
-      code: `# var v = SIMD[DType.float32, 8](...)
-# 合計・最大・最小を表示`,
-      answer: `def main():
-    var v = SIMD[DType.float32, 8](3, 1, 4, 1, 5, 9, 2, 6)
-    print("合計:", v.reduce_add())
-    print("最大:", v.reduce_max())
-    print("最小:", v.reduce_min())`
+      code: "# var v = SIMD[DType.float32, 8](...)\n# 合計・最大・最小を表示",
+      answer: "def main():\n    var v = SIMD[DType.float32, 8](3, 1, 4, 1, 5, 9, 2, 6)\n    print(\"合計:\", v.reduce_add())\n    print(\"最大:\", v.reduce_max())\n    print(\"最小:\", v.reduce_min())"
     },
     {
       diff: 2,
       q: "SIMD の select を使って、ベクトルの負の値を0にクランプする関数 relu を書いてください。\nSIMD[DType.float32, N] を受け取り、max(0, x) を返す。",
-      code: `# relu(SIMD[-1, 2, -3, 4]) → [0, 2, 0, 4]`,
-      answer: `def relu[N: Int](v: SIMD[DType.float32, N]) -> SIMD[DType.float32, N]:
-    var zeros = SIMD[DType.float32, N](0)
-    var mask = v > zeros
-    return mask.select(v, zeros)
-
-def main():
-    var v = SIMD[DType.float32, 8](-1, 2, -3, 4, -5, 6, -7, 8)
-    print("入力:", v)
-    print("ReLU:", relu(v))`
+      code: "# relu(SIMD[-1, 2, -3, 4]) → [0, 2, 0, 4]",
+      answer: "def relu[N: Int](v: SIMD[DType.float32, N]) -> SIMD[DType.float32, N]:\n    var zeros = SIMD[DType.float32, N](0)\n    var mask = v > zeros\n    return mask.select(v, zeros)\n\ndef main():\n    var v = SIMD[DType.float32, 8](-1, 2, -3, 4, -5, 6, -7, 8)\n    print(\"入力:\", v)\n    print(\"ReLU:\", relu(v))"
     },
     {
       diff: 2,
       q: "cast を使って DType.float32 のベクトルを DType.int32 に変換し、元の値と変換後を比較表示してください。精度の違いを確認。",
-      code: `# float → int キャスト`,
-      answer: `def main():
-    var fv = SIMD[DType.float32, 4](1.7, 2.3, -3.9, 4.1)
-    var iv = fv.cast[DType.int32]()
-    print("float32:", fv)
-    print("int32:  ", iv)
-
-    var back = iv.cast[DType.float32]()
-    print("戻し:  ", back)
-    print("差分:  ", fv - back)`
+      code: "# float → int キャスト",
+      answer: "def main():\n    var fv = SIMD[DType.float32, 4](1.7, 2.3, -3.9, 4.1)\n    var iv = fv.cast[DType.int32]()\n    print(\"float32:\", fv)\n    print(\"int32:  \", iv)\n\n    var back = iv.cast[DType.float32]()\n    print(\"戻し:  \", back)\n    print(\"差分:  \", fv - back)"
     },
     {
       diff: 3,
       q: "SIMDを使ったベクトル化配列処理: Float32 の配列（UnsafePointer）に対し、SIMD幅8で一括処理する関数 simd_sum を書いてください。\n配列長がSIMD幅の倍数でない場合のテール処理も含めること。",
-      code: `# simd_sum(ptr, 100) → 配列の合計値`,
-      answer: `alias simd_width = 8
-
-def simd_sum(ptr: UnsafePointer[Float32], length: Int) -> Float32:
-    var vec_sum = SIMD[DType.float32, simd_width](0)
-    var i = 0
-
-    # SIMD幅ごとに一括処理
-    while i + simd_width <= length:
-        var chunk = (ptr + i).load[width=simd_width]()
-        vec_sum += chunk
-        i += simd_width
-
-    # テール処理（残り要素）
-    var tail_sum: Float32 = 0
-    while i < length:
-        tail_sum += (ptr + i)[]
-        i += 1
-
-    return vec_sum.reduce_add() + tail_sum
-
-def main():
-    alias N = 100
-    var ptr = UnsafePointer[Float32].alloc(N)
-    for i in range(N):
-        (ptr + i).init_pointee_move(Float32(i + 1))
-
-    var total = simd_sum(ptr, N)
-    print("合計:", total)  # 5050.0
-
-    for i in range(N):
-        (ptr + i).destroy_pointee()
-    ptr.free()`
+      code: "# simd_sum(ptr, 100) → 配列の合計値",
+      answer: "alias simd_width = 8\n\ndef simd_sum(ptr: UnsafePointer[Float32], length: Int) -> Float32:\n    var vec_sum = SIMD[DType.float32, simd_width](0)\n    var i = 0\n\n    # SIMD幅ごとに一括処理\n    while i + simd_width <= length:\n        var chunk = (ptr + i).load[width=simd_width]()\n        vec_sum += chunk\n        i += simd_width\n\n    # テール処理（残り要素）\n    var tail_sum: Float32 = 0\n    while i < length:\n        tail_sum += (ptr + i)[]\n        i += 1\n\n    return vec_sum.reduce_add() + tail_sum\n\ndef main():\n    alias N = 100\n    var ptr = UnsafePointer[Float32].alloc(N)\n    for i in range(N):\n        (ptr + i).init_pointee_move(Float32(i + 1))\n\n    var total = simd_sum(ptr, N)\n    print(\"合計:\", total)  # 5050.0\n\n    for i in range(N):\n        (ptr + i).destroy_pointee()\n    ptr.free()"
     }
   ],
   ch5: [
     {
       diff: 1,
       q: "DeviceContext を作成し、HostBuffer と DeviceBuffer の間でデータを転送する基本パターンを書いてください。\nFloat32 の配列 [1,2,3,4] をGPUに送り、戻すだけ。",
-      code: `# CPU → GPU → CPU の転送`,
-      answer: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-def main():
-    var ctx = DeviceContext()
-    var host = HostBuffer[DType.float32](4)
-    for i in range(4):
-        host[i] = Float32(i + 1)
-
-    # CPU → GPU
-    var dev = ctx.enqueue_create_buffer[DType.float32](4)
-    ctx.enqueue_copy(dev, host)
-
-    # GPU → CPU
-    var result = HostBuffer[DType.float32](4)
-    ctx.enqueue_copy(result, dev)
-    ctx.synchronize()
-
-    for i in range(4):
-        print("result[" + String(i) + "]:", result[i])`
+      code: "# CPU → GPU → CPU の転送",
+      answer: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\ndef main():\n    var ctx = DeviceContext()\n    var host = HostBuffer[DType.float32](4)\n    for i in range(4):\n        host[i] = Float32(i + 1)\n\n    # CPU → GPU\n    var dev = ctx.enqueue_create_buffer[DType.float32](4)\n    ctx.enqueue_copy(dev, host)\n\n    # GPU → CPU\n    var result = HostBuffer[DType.float32](4)\n    ctx.enqueue_copy(result, dev)\n    ctx.synchronize()\n\n    for i in range(4):\n        print(\"result[\" + String(i) + \"]:\", result[i])"
     },
     {
       diff: 2,
       q: "各要素を2倍にする簡単なGPUカーネルを書いてください。\nblock_idx, thread_idx, block_dim からグローバルインデックスを計算すること。",
-      code: `# カーネル: 各要素を2倍
-# 入力 [1,2,3,4,5,6,7,8] → [2,4,6,8,10,12,14,16]`,
-      answer: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-def double_kernel(data: DeviceBuffer[DType.float32]):
-    var idx = block_idx.x * block_dim.x + thread_idx.x
-    if idx < len(data):
-        data[idx] = data[idx] * 2
-
-def main():
-    alias N = 8
-    var ctx = DeviceContext()
-
-    var host = HostBuffer[DType.float32](N)
-    for i in range(N):
-        host[i] = Float32(i + 1)
-
-    var dev = ctx.enqueue_create_buffer[DType.float32](N)
-    ctx.enqueue_copy(dev, host)
-
-    # カーネル起動: 1ブロック x 8スレッド
-    ctx.enqueue_function[double_kernel](dev, grid_dim=1, block_dim=N)
-
-    var result = HostBuffer[DType.float32](N)
-    ctx.enqueue_copy(result, dev)
-    ctx.synchronize()
-
-    for i in range(N):
-        print(result[i])`
+      code: "# カーネル: 各要素を2倍\n# 入力 [1,2,3,4,5,6,7,8] → [2,4,6,8,10,12,14,16]",
+      answer: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\ndef double_kernel(data: DeviceBuffer[DType.float32]):\n    var idx = block_idx.x * block_dim.x + thread_idx.x\n    if idx < len(data):\n        data[idx] = data[idx] * 2\n\ndef main():\n    alias N = 8\n    var ctx = DeviceContext()\n\n    var host = HostBuffer[DType.float32](N)\n    for i in range(N):\n        host[i] = Float32(i + 1)\n\n    var dev = ctx.enqueue_create_buffer[DType.float32](N)\n    ctx.enqueue_copy(dev, host)\n\n    # カーネル起動: 1ブロック x 8スレッド\n    ctx.enqueue_function[double_kernel](dev, grid_dim=1, block_dim=N)\n\n    var result = HostBuffer[DType.float32](N)\n    ctx.enqueue_copy(result, dev)\n    ctx.synchronize()\n\n    for i in range(N):\n        print(result[i])"
     },
     {
       diff: 3,
       q: "グリッドとブロックの設計: 要素数1024のベクトルに対し、ブロックサイズ256でカーネルを起動してください。\nグリッドサイズの計算（切り上げ除算）も含めること。\n各要素に自身のグローバルインデックスを書き込む。",
-      code: `# N=1024, block_dim=256 → grid_dim=4
-# data[i] = i`,
-      answer: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-def index_kernel(data: DeviceBuffer[DType.int32], n: Int):
-    var idx = block_idx.x * block_dim.x + thread_idx.x
-    if idx < n:
-        data[idx] = Int32(idx)
-
-def main():
-    alias N = 1024
-    alias BLOCK = 256
-    alias GRID = (N + BLOCK - 1) // BLOCK  # 切り上げ除算 → 4
-
-    var ctx = DeviceContext()
-    var dev = ctx.enqueue_create_buffer[DType.int32](N)
-
-    ctx.enqueue_function[index_kernel](dev, N, grid_dim=GRID, block_dim=BLOCK)
-
-    var result = HostBuffer[DType.int32](N)
-    ctx.enqueue_copy(result, dev)
-    ctx.synchronize()
-
-    # 先頭と末尾を確認
-    for i in range(5):
-        print("result[" + String(i) + "]:", result[i])
-    print("...")
-    for i in range(N - 3, N):
-        print("result[" + String(i) + "]:", result[i])`
+      code: "# N=1024, block_dim=256 → grid_dim=4\n# data[i] = i",
+      answer: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\ndef index_kernel(data: DeviceBuffer[DType.int32], n: Int):\n    var idx = block_idx.x * block_dim.x + thread_idx.x\n    if idx < n:\n        data[idx] = Int32(idx)\n\ndef main():\n    alias N = 1024\n    alias BLOCK = 256\n    alias GRID = (N + BLOCK - 1) // BLOCK  # 切り上げ除算 → 4\n\n    var ctx = DeviceContext()\n    var dev = ctx.enqueue_create_buffer[DType.int32](N)\n\n    ctx.enqueue_function[index_kernel](dev, N, grid_dim=GRID, block_dim=BLOCK)\n\n    var result = HostBuffer[DType.int32](N)\n    ctx.enqueue_copy(result, dev)\n    ctx.synchronize()\n\n    # 先頭と末尾を確認\n    for i in range(5):\n        print(\"result[\" + String(i) + \"]:\", result[i])\n    print(\"...\")\n    for i in range(N - 3, N):\n        print(\"result[\" + String(i) + \"]:\", result[i])"
     }
   ],
   ch6: [
     {
       diff: 2,
       q: "GPU上で並列リダクション（合計）を実装してください。\n共有メモリを使い、ブロック内でツリーリダクションを行う。",
-      code: `# 入力: [1,2,3,...,1024] → 合計: 524800`,
-      answer: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-def reduce_kernel(
-    input: DeviceBuffer[DType.float32],
-    output: DeviceBuffer[DType.float32],
-    n: Int
-):
-    var tid = thread_idx.x
-    var bid = block_idx.x
-    var idx = bid * block_dim.x + tid
-
-    # 共有メモリにロード
-    var shared = stack_allocation[256, DType.float32]()
-    if idx < n:
-        shared[tid] = input[idx]
-    else:
-        shared[tid] = 0
-
-    barrier()
-
-    # ツリーリダクション
-    var stride = block_dim.x // 2
-    while stride > 0:
-        if tid < stride:
-            shared[tid] = shared[tid] + shared[tid + stride]
-        barrier()
-        stride = stride // 2
-
-    # ブロック代表がグローバルに書き出し
-    if tid == 0:
-        output[bid] = shared[0]
-
-def main():
-    alias N = 1024
-    alias BLOCK = 256
-    alias GRID = (N + BLOCK - 1) // BLOCK
-
-    var ctx = DeviceContext()
-    var host = HostBuffer[DType.float32](N)
-    for i in range(N):
-        host[i] = Float32(i + 1)
-
-    var dev_in = ctx.enqueue_create_buffer[DType.float32](N)
-    ctx.enqueue_copy(dev_in, host)
-
-    var dev_out = ctx.enqueue_create_buffer[DType.float32](GRID)
-    ctx.enqueue_function[reduce_kernel](
-        dev_in, dev_out, N, grid_dim=GRID, block_dim=BLOCK
-    )
-
-    var partial = HostBuffer[DType.float32](GRID)
-    ctx.enqueue_copy(partial, dev_out)
-    ctx.synchronize()
-
-    var total: Float32 = 0
-    for i in range(GRID):
-        total += partial[i]
-    print("合計:", total)`
+      code: "# 入力: [1,2,3,...,1024] → 合計: 524800",
+      answer: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\ndef reduce_kernel(\n    input: DeviceBuffer[DType.float32],\n    output: DeviceBuffer[DType.float32],\n    n: Int\n):\n    var tid = thread_idx.x\n    var bid = block_idx.x\n    var idx = bid * block_dim.x + tid\n\n    # 共有メモリにロード\n    var shared = stack_allocation[256, DType.float32]()\n    if idx < n:\n        shared[tid] = input[idx]\n    else:\n        shared[tid] = 0\n\n    barrier()\n\n    # ツリーリダクション\n    var stride = block_dim.x // 2\n    while stride > 0:\n        if tid < stride:\n            shared[tid] = shared[tid] + shared[tid + stride]\n        barrier()\n        stride = stride // 2\n\n    # ブロック代表がグローバルに書き出し\n    if tid == 0:\n        output[bid] = shared[0]\n\ndef main():\n    alias N = 1024\n    alias BLOCK = 256\n    alias GRID = (N + BLOCK - 1) // BLOCK\n\n    var ctx = DeviceContext()\n    var host = HostBuffer[DType.float32](N)\n    for i in range(N):\n        host[i] = Float32(i + 1)\n\n    var dev_in = ctx.enqueue_create_buffer[DType.float32](N)\n    ctx.enqueue_copy(dev_in, host)\n\n    var dev_out = ctx.enqueue_create_buffer[DType.float32](GRID)\n    ctx.enqueue_function[reduce_kernel](\n        dev_in, dev_out, N, grid_dim=GRID, block_dim=BLOCK\n    )\n\n    var partial = HostBuffer[DType.float32](GRID)\n    ctx.enqueue_copy(partial, dev_out)\n    ctx.synchronize()\n\n    var total: Float32 = 0\n    for i in range(GRID):\n        total += partial[i]\n    print(\"合計:\", total)"
     },
     {
       diff: 2,
       q: "GPU上でベクトルの要素ごとの加算（vector add）を実装してください。\n2つの入力バッファの和を出力バッファに書き込むカーネル。",
-      code: `# a = [1,2,...,N], b = [N,...,2,1]
-# c[i] = a[i] + b[i]`,
-      answer: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-def vec_add_kernel(
-    a: DeviceBuffer[DType.float32],
-    b: DeviceBuffer[DType.float32],
-    c: DeviceBuffer[DType.float32],
-    n: Int
-):
-    var idx = block_idx.x * block_dim.x + thread_idx.x
-    if idx < n:
-        c[idx] = a[idx] + b[idx]
-
-def main():
-    alias N = 512
-    alias BLOCK = 128
-    alias GRID = (N + BLOCK - 1) // BLOCK
-
-    var ctx = DeviceContext()
-    var h_a = HostBuffer[DType.float32](N)
-    var h_b = HostBuffer[DType.float32](N)
-    for i in range(N):
-        h_a[i] = Float32(i + 1)
-        h_b[i] = Float32(N - i)
-
-    var d_a = ctx.enqueue_create_buffer[DType.float32](N)
-    var d_b = ctx.enqueue_create_buffer[DType.float32](N)
-    var d_c = ctx.enqueue_create_buffer[DType.float32](N)
-    ctx.enqueue_copy(d_a, h_a)
-    ctx.enqueue_copy(d_b, h_b)
-
-    ctx.enqueue_function[vec_add_kernel](
-        d_a, d_b, d_c, N, grid_dim=GRID, block_dim=BLOCK
-    )
-
-    var result = HostBuffer[DType.float32](N)
-    ctx.enqueue_copy(result, d_c)
-    ctx.synchronize()
-
-    # 全要素が N+1 になるはず
-    print("result[0]:", result[0])
-    print("result[255]:", result[255])
-    print("result[511]:", result[511])`
+      code: "# a = [1,2,...,N], b = [N,...,2,1]\n# c[i] = a[i] + b[i]",
+      answer: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\ndef vec_add_kernel(\n    a: DeviceBuffer[DType.float32],\n    b: DeviceBuffer[DType.float32],\n    c: DeviceBuffer[DType.float32],\n    n: Int\n):\n    var idx = block_idx.x * block_dim.x + thread_idx.x\n    if idx < n:\n        c[idx] = a[idx] + b[idx]\n\ndef main():\n    alias N = 512\n    alias BLOCK = 128\n    alias GRID = (N + BLOCK - 1) // BLOCK\n\n    var ctx = DeviceContext()\n    var h_a = HostBuffer[DType.float32](N)\n    var h_b = HostBuffer[DType.float32](N)\n    for i in range(N):\n        h_a[i] = Float32(i + 1)\n        h_b[i] = Float32(N - i)\n\n    var d_a = ctx.enqueue_create_buffer[DType.float32](N)\n    var d_b = ctx.enqueue_create_buffer[DType.float32](N)\n    var d_c = ctx.enqueue_create_buffer[DType.float32](N)\n    ctx.enqueue_copy(d_a, h_a)\n    ctx.enqueue_copy(d_b, h_b)\n\n    ctx.enqueue_function[vec_add_kernel](\n        d_a, d_b, d_c, N, grid_dim=GRID, block_dim=BLOCK\n    )\n\n    var result = HostBuffer[DType.float32](N)\n    ctx.enqueue_copy(result, d_c)\n    ctx.synchronize()\n\n    # 全要素が N+1 になるはず\n    print(\"result[0]:\", result[0])\n    print(\"result[255]:\", result[255])\n    print(\"result[511]:\", result[511])"
     },
     {
       diff: 3,
       q: "GPU上で行列乗算（NxN）のカーネルを実装してください。\n各スレッドが結果行列の1要素を計算する素朴な実装で構いません。\n2次元グリッド/ブロック構成を使用。",
-      code: `# C[i][j] = Σ A[i][k] * B[k][j]`,
-      answer: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-def matmul_kernel(
-    A: DeviceBuffer[DType.float32],
-    B: DeviceBuffer[DType.float32],
-    C: DeviceBuffer[DType.float32],
-    N: Int
-):
-    var row = block_idx.y * block_dim.y + thread_idx.y
-    var col = block_idx.x * block_dim.x + thread_idx.x
-
-    if row < N and col < N:
-        var sum: Float32 = 0
-        for k in range(N):
-            sum += A[row * N + k] * B[k * N + col]
-        C[row * N + col] = sum
-
-def main():
-    alias N = 16
-    alias BLOCK = 8
-    alias GRID = (N + BLOCK - 1) // BLOCK
-
-    var ctx = DeviceContext()
-
-    var h_a = HostBuffer[DType.float32](N * N)
-    var h_b = HostBuffer[DType.float32](N * N)
-    # 単位行列 A, 全要素2 の B
-    for i in range(N):
-        for j in range(N):
-            h_a[i * N + j] = Float32(1) if i == j else Float32(0)
-            h_b[i * N + j] = Float32(2)
-
-    var d_a = ctx.enqueue_create_buffer[DType.float32](N * N)
-    var d_b = ctx.enqueue_create_buffer[DType.float32](N * N)
-    var d_c = ctx.enqueue_create_buffer[DType.float32](N * N)
-    ctx.enqueue_copy(d_a, h_a)
-    ctx.enqueue_copy(d_b, h_b)
-
-    # 2次元ブロック/グリッド
-    ctx.enqueue_function[matmul_kernel](
-        d_a, d_b, d_c, N,
-        grid_dim=(GRID, GRID), block_dim=(BLOCK, BLOCK)
-    )
-
-    var result = HostBuffer[DType.float32](N * N)
-    ctx.enqueue_copy(result, d_c)
-    ctx.synchronize()
-
-    # I * B = B なので全要素 2
-    print("C[0,0]:", result[0])
-    print("C[7,7]:", result[7 * N + 7])
-    print("C[15,15]:", result[15 * N + 15])`
+      code: "# C[i][j] = Σ A[i][k] * B[k][j]",
+      answer: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\ndef matmul_kernel(\n    A: DeviceBuffer[DType.float32],\n    B: DeviceBuffer[DType.float32],\n    C: DeviceBuffer[DType.float32],\n    N: Int\n):\n    var row = block_idx.y * block_dim.y + thread_idx.y\n    var col = block_idx.x * block_dim.x + thread_idx.x\n\n    if row < N and col < N:\n        var sum: Float32 = 0\n        for k in range(N):\n            sum += A[row * N + k] * B[k * N + col]\n        C[row * N + col] = sum\n\ndef main():\n    alias N = 16\n    alias BLOCK = 8\n    alias GRID = (N + BLOCK - 1) // BLOCK\n\n    var ctx = DeviceContext()\n\n    var h_a = HostBuffer[DType.float32](N * N)\n    var h_b = HostBuffer[DType.float32](N * N)\n    # 単位行列 A, 全要素2 の B\n    for i in range(N):\n        for j in range(N):\n            h_a[i * N + j] = Float32(1) if i == j else Float32(0)\n            h_b[i * N + j] = Float32(2)\n\n    var d_a = ctx.enqueue_create_buffer[DType.float32](N * N)\n    var d_b = ctx.enqueue_create_buffer[DType.float32](N * N)\n    var d_c = ctx.enqueue_create_buffer[DType.float32](N * N)\n    ctx.enqueue_copy(d_a, h_a)\n    ctx.enqueue_copy(d_b, h_b)\n\n    # 2次元ブロック/グリッド\n    ctx.enqueue_function[matmul_kernel](\n        d_a, d_b, d_c, N,\n        grid_dim=(GRID, GRID), block_dim=(BLOCK, BLOCK)\n    )\n\n    var result = HostBuffer[DType.float32](N * N)\n    ctx.enqueue_copy(result, d_c)\n    ctx.synchronize()\n\n    # I * B = B なので全要素 2\n    print(\"C[0,0]:\", result[0])\n    print(\"C[7,7]:\", result[7 * N + 7])\n    print(\"C[15,15]:\", result[15 * N + 15])"
     },
     {
       diff: 3,
       q: "メモリ転送を最小化する設計: GPU上で複数回のカーネル起動をチェインし、中間結果をGPU上に保持するパイプラインを書いてください。\nステップ1: 全要素を+10、ステップ2: 全要素を*2。CPU-GPU転送は最初と最後だけ。",
-      code: `# CPU→GPU → kernel1(+10) → kernel2(*2) → GPU→CPU`,
-      answer: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-def add_kernel(data: DeviceBuffer[DType.float32], val: Float32, n: Int):
-    var idx = block_idx.x * block_dim.x + thread_idx.x
-    if idx < n:
-        data[idx] = data[idx] + val
-
-def mul_kernel(data: DeviceBuffer[DType.float32], val: Float32, n: Int):
-    var idx = block_idx.x * block_dim.x + thread_idx.x
-    if idx < n:
-        data[idx] = data[idx] * val
-
-def main():
-    alias N = 256
-    alias BLOCK = 64
-    alias GRID = N // BLOCK
-
-    var ctx = DeviceContext()
-    var host = HostBuffer[DType.float32](N)
-    for i in range(N):
-        host[i] = Float32(i)
-
-    var dev = ctx.enqueue_create_buffer[DType.float32](N)
-    ctx.enqueue_copy(dev, host)  # 転送1回目
-
-    # カーネルチェイン（GPU上のみ）
-    ctx.enqueue_function[add_kernel](dev, Float32(10), N, grid_dim=GRID, block_dim=BLOCK)
-    ctx.enqueue_function[mul_kernel](dev, Float32(2), N, grid_dim=GRID, block_dim=BLOCK)
-
-    ctx.enqueue_copy(host, dev)  # 転送2回目
-    ctx.synchronize()
-
-    # (0+10)*2=20, (1+10)*2=22, ...
-    for i in range(5):
-        print("result[" + String(i) + "]:", host[i])`
+      code: "# CPU→GPU → kernel1(+10) → kernel2(*2) → GPU→CPU",
+      answer: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\ndef add_kernel(data: DeviceBuffer[DType.float32], val: Float32, n: Int):\n    var idx = block_idx.x * block_dim.x + thread_idx.x\n    if idx < n:\n        data[idx] = data[idx] + val\n\ndef mul_kernel(data: DeviceBuffer[DType.float32], val: Float32, n: Int):\n    var idx = block_idx.x * block_dim.x + thread_idx.x\n    if idx < n:\n        data[idx] = data[idx] * val\n\ndef main():\n    alias N = 256\n    alias BLOCK = 64\n    alias GRID = N // BLOCK\n\n    var ctx = DeviceContext()\n    var host = HostBuffer[DType.float32](N)\n    for i in range(N):\n        host[i] = Float32(i)\n\n    var dev = ctx.enqueue_create_buffer[DType.float32](N)\n    ctx.enqueue_copy(dev, host)  # 転送1回目\n\n    # カーネルチェイン（GPU上のみ）\n    ctx.enqueue_function[add_kernel](dev, Float32(10), N, grid_dim=GRID, block_dim=BLOCK)\n    ctx.enqueue_function[mul_kernel](dev, Float32(2), N, grid_dim=GRID, block_dim=BLOCK)\n\n    ctx.enqueue_copy(host, dev)  # 転送2回目\n    ctx.synchronize()\n\n    # (0+10)*2=20, (1+10)*2=22, ...\n    for i in range(5):\n        print(\"result[\" + String(i) + \"]:\", host[i])"
     }
   ],
   ch7: [
     {
       diff: 1,
       q: "@export と @deprecated を使った公開関数を書いてください。\n新しい関数 compute_v2 と、非推奨の compute を定義。",
-      code: `# @deprecated → 使用時に警告
-# @export → C ABI互換で公開`,
-      answer: `@deprecated("compute_v2() を使ってください")
-def compute(x: Int) -> Int:
-    return x * 2
-
-@export
-def compute_v2(x: Int) -> Int:
-    return x * x + x
-
-def main():
-    print(compute_v2(5))   # 30
-    # print(compute(5))    # コンパイル警告が出る`
+      code: "# @deprecated → 使用時に警告\n# @export → C ABI互換で公開",
+      answer: "@deprecated(\"compute_v2() を使ってください\")\ndef compute(x: Int) -> Int:\n    return x * 2\n\n@export\ndef compute_v2(x: Int) -> Int:\n    return x * x + x\n\ndef main():\n    print(compute_v2(5))   # 30\n    # print(compute(5))    # コンパイル警告が出る"
     },
     {
       diff: 2,
       q: "@fieldwise_init を使って、設定structを定義してください。\nデフォルト値・バリデーション付きのファクトリメソッド（@staticmethod）も提供。\n後方互換性のため旧名のファクトリは @deprecated にする。",
-      code: `# Config構造体 + ファクトリメソッド`,
-      answer: `@fieldwise_init
-struct Config:
-    var width: Int
-    var height: Int
-    var depth: Int
-
-    @staticmethod
-    def default() -> Config:
-        return Config(width=1920, height=1080, depth=32)
-
-    @staticmethod
-    def create(w: Int, h: Int) -> Config:
-        return Config(width=w, height=h, depth=24)
-
-    @staticmethod
-    @deprecated("create() を使ってください")
-    def make(w: Int, h: Int) -> Config:
-        return Config.create(w, h)
-
-    def describe(self) -> String:
-        return String(self.width) + "x" + String(self.height) + "@" + String(self.depth)
-
-def main():
-    var c1 = Config.default()
-    print(c1.describe())
-    var c2 = Config.create(3840, 2160)
-    print(c2.describe())`
+      code: "# Config構造体 + ファクトリメソッド",
+      answer: "@fieldwise_init\nstruct Config:\n    var width: Int\n    var height: Int\n    var depth: Int\n\n    @staticmethod\n    def default() -> Config:\n        return Config(width=1920, height=1080, depth=32)\n\n    @staticmethod\n    def create(w: Int, h: Int) -> Config:\n        return Config(width=w, height=h, depth=24)\n\n    @staticmethod\n    @deprecated(\"create() を使ってください\")\n    def make(w: Int, h: Int) -> Config:\n        return Config.create(w, h)\n\n    def describe(self) -> String:\n        return String(self.width) + \"x\" + String(self.height) + \"@\" + String(self.depth)\n\ndef main():\n    var c1 = Config.default()\n    print(c1.describe())\n    var c2 = Config.create(3840, 2160)\n    print(c2.describe())"
     },
     {
       diff: 3,
       q: "公開APIの設計: Numeric ライブラリのファサードを設計してください。\n内部実装は非公開、公開APIは @export 関数群のみ。\nバージョン定数、初期化関数、計算関数を含むこと。",
-      code: `# 公開API設計パターン`,
-      answer: `alias VERSION = "1.0.0"
-alias VERSION_MAJOR = 1
-alias VERSION_MINOR = 0
-
-# --- 内部実装（非公開想定）---
-struct _InternalAccum:
-    var total: Float64
-    var count: Int
-
-    def __init__(out self):
-        self.total = 0.0
-        self.count = 0
-
-    def add(mut self, v: Float64):
-        self.total += v
-        self.count += 1
-
-    def mean(self) -> Float64:
-        if self.count == 0:
-            return 0.0
-        return self.total / Float64(self.count)
-
-# --- 公開API ---
-@export
-def numeric_version() -> Int:
-    return VERSION_MAJOR * 1000 + VERSION_MINOR
-
-@export
-def numeric_mean(data: UnsafePointer[Float64], n: Int) -> Float64:
-    var acc = _InternalAccum()
-    for i in range(n):
-        acc.add((data + i)[])
-    return acc.mean()
-
-def main():
-    print("Version:", VERSION)
-    var ptr = UnsafePointer[Float64].alloc(4)
-    for i in range(4):
-        (ptr + i).init_pointee_move(Float64(i + 1) * 10.0)
-    print("Mean:", numeric_mean(ptr, 4))  # 25.0
-    for i in range(4):
-        (ptr + i).destroy_pointee()
-    ptr.free()`
+      code: "# 公開API設計パターン",
+      answer: "alias VERSION = \"1.0.0\"\nalias VERSION_MAJOR = 1\nalias VERSION_MINOR = 0\n\n# --- 内部実装（非公開想定）---\nstruct _InternalAccum:\n    var total: Float64\n    var count: Int\n\n    def __init__(out self):\n        self.total = 0.0\n        self.count = 0\n\n    def add(mut self, v: Float64):\n        self.total += v\n        self.count += 1\n\n    def mean(self) -> Float64:\n        if self.count == 0:\n            return 0.0\n        return self.total / Float64(self.count)\n\n# --- 公開API ---\n@export\ndef numeric_version() -> Int:\n    return VERSION_MAJOR * 1000 + VERSION_MINOR\n\n@export\ndef numeric_mean(data: UnsafePointer[Float64], n: Int) -> Float64:\n    var acc = _InternalAccum()\n    for i in range(n):\n        acc.add((data + i)[])\n    return acc.mean()\n\ndef main():\n    print(\"Version:\", VERSION)\n    var ptr = UnsafePointer[Float64].alloc(4)\n    for i in range(4):\n        (ptr + i).init_pointee_move(Float64(i + 1) * 10.0)\n    print(\"Mean:\", numeric_mean(ptr, 4))  # 25.0\n    for i in range(4):\n        (ptr + i).destroy_pointee()\n    ptr.free()"
     }
   ],
   ch8: [
     {
       diff: 2,
       q: "UnsafePointer を使って、ジェネリックなリングバッファ RingBuffer[T] を実装してください。\npush / pop / is_empty / is_full を持つこと。",
-      code: `# var rb = RingBuffer[Int, 4]()
-# rb.push(1); rb.push(2); rb.push(3)
-# rb.pop() → 1`,
-      answer: `struct RingBuffer[T: Movable & Copyable, N: Int]:
-    var buf: UnsafePointer[T]
-    var head: Int
-    var tail: Int
-    var count: Int
-
-    def __init__(out self):
-        self.buf = UnsafePointer[T].alloc(N)
-        self.head = 0
-        self.tail = 0
-        self.count = 0
-
-    def is_empty(self) -> Bool:
-        return self.count == 0
-
-    def is_full(self) -> Bool:
-        return self.count == N
-
-    def push(mut self, val: T):
-        if self.is_full():
-            return  # 満杯時は無視
-        (self.buf + self.tail).init_pointee_copy(val)
-        self.tail = (self.tail + 1) % N
-        self.count += 1
-
-    def pop(mut self) -> T:
-        var val = (self.buf + self.head).take_pointee()
-        self.head = (self.head + 1) % N
-        self.count -= 1
-        return val
-
-    def __del__(owned self):
-        for i in range(self.count):
-            var idx = (self.head + i) % N
-            (self.buf + idx).destroy_pointee()
-        self.buf.free()
-
-def main():
-    var rb = RingBuffer[Int, 4]()
-    rb.push(10)
-    rb.push(20)
-    rb.push(30)
-    print("pop:", rb.pop())  # 10
-    print("pop:", rb.pop())  # 20
-    rb.push(40)
-    rb.push(50)
-    print("pop:", rb.pop())  # 30`
+      code: "# var rb = RingBuffer[Int, 4]()\n# rb.push(1); rb.push(2); rb.push(3)\n# rb.pop() → 1",
+      answer: "struct RingBuffer[T: Movable & Copyable, N: Int]:\n    var buf: UnsafePointer[T]\n    var head: Int\n    var tail: Int\n    var count: Int\n\n    def __init__(out self):\n        self.buf = UnsafePointer[T].alloc(N)\n        self.head = 0\n        self.tail = 0\n        self.count = 0\n\n    def is_empty(self) -> Bool:\n        return self.count == 0\n\n    def is_full(self) -> Bool:\n        return self.count == N\n\n    def push(mut self, val: T):\n        if self.is_full():\n            return  # 満杯時は無視\n        (self.buf + self.tail).init_pointee_copy(val)\n        self.tail = (self.tail + 1) % N\n        self.count += 1\n\n    def pop(mut self) -> T:\n        var val = (self.buf + self.head).take_pointee()\n        self.head = (self.head + 1) % N\n        self.count -= 1\n        return val\n\n    def __del__(owned self):\n        for i in range(self.count):\n            var idx = (self.head + i) % N\n            (self.buf + idx).destroy_pointee()\n        self.buf.free()\n\ndef main():\n    var rb = RingBuffer[Int, 4]()\n    rb.push(10)\n    rb.push(20)\n    rb.push(30)\n    print(\"pop:\", rb.pop())  # 10\n    print(\"pop:\", rb.pop())  # 20\n    rb.push(40)\n    rb.push(50)\n    print(\"pop:\", rb.pop())  # 30"
     },
     {
       diff: 2,
       q: "イテレータプロトコル（__iter__, __next__, __has_next__）を実装した Range風のカウンタ struct CountUp を作ってください。\nfor ループで使えること。",
-      code: `# for val in CountUp(0, 5):
-#     print(val)  # 0, 1, 2, 3, 4`,
-      answer: `struct CountUp:
-    var current: Int
-    var end: Int
-
-    def __init__(out self, start: Int, end: Int):
-        self.current = start
-        self.end = end
-
-    def __iter__(self) -> Self:
-        return self
-
-    def __next__(mut self) -> Int:
-        var val = self.current
-        self.current += 1
-        return val
-
-    def __has_next__(self) -> Bool:
-        return self.current < self.end
-
-    def __len__(self) -> Int:
-        if self.end > self.current:
-            return self.end - self.current
-        return 0
-
-def main():
-    for val in CountUp(0, 5):
-        print(val)
-    print("---")
-    for val in CountUp(10, 15):
-        print(val)`
+      code: "# for val in CountUp(0, 5):\n#     print(val)  # 0, 1, 2, 3, 4",
+      answer: "struct CountUp:\n    var current: Int\n    var end: Int\n\n    def __init__(out self, start: Int, end: Int):\n        self.current = start\n        self.end = end\n\n    def __iter__(self) -> Self:\n        return self\n\n    def __next__(mut self) -> Int:\n        var val = self.current\n        self.current += 1\n        return val\n\n    def __has_next__(self) -> Bool:\n        return self.current < self.end\n\n    def __len__(self) -> Int:\n        if self.end > self.current:\n            return self.end - self.current\n        return 0\n\ndef main():\n    for val in CountUp(0, 5):\n        print(val)\n    print(\"---\")\n    for val in CountUp(10, 15):\n        print(val)"
     },
     {
       diff: 3,
       q: "UnsafePointer を使って HashMap[K, V]（オープンアドレス法）の簡易版を実装してください。\nput / get / contains を最低限持つこと。キーは Int で可。",
-      code: `# var m = SimpleMap[128]()
-# m.put(42, 100)
-# print(m.get(42))  # 100`,
-      answer: `struct Entry:
-    var key: Int
-    var value: Int
-    var occupied: Bool
-
-    def __init__(out self):
-        self.key = 0
-        self.value = 0
-        self.occupied = False
-
-    def __init__(out self, key: Int, value: Int):
-        self.key = key
-        self.value = value
-        self.occupied = True
-
-struct SimpleMap[CAP: Int]:
-    var data: UnsafePointer[Entry]
-
-    def __init__(out self):
-        self.data = UnsafePointer[Entry].alloc(CAP)
-        for i in range(CAP):
-            (self.data + i).init_pointee_move(Entry())
-
-    def _hash(self, key: Int) -> Int:
-        var h = key % CAP
-        if h < 0:
-            h += CAP
-        return h
-
-    def put(mut self, key: Int, value: Int):
-        var idx = self._hash(key)
-        for _ in range(CAP):
-            var entry = (self.data + idx)[]
-            if not entry.occupied or entry.key == key:
-                (self.data + idx).destroy_pointee()
-                (self.data + idx).init_pointee_move(Entry(key, value))
-                return
-            idx = (idx + 1) % CAP
-
-    def get(self, key: Int) -> Int:
-        var idx = self._hash(key)
-        for _ in range(CAP):
-            var entry = (self.data + idx)[]
-            if not entry.occupied:
-                return -1  # not found
-            if entry.key == key:
-                return entry.value
-            idx = (idx + 1) % CAP
-        return -1
-
-    def contains(self, key: Int) -> Bool:
-        var idx = self._hash(key)
-        for _ in range(CAP):
-            var entry = (self.data + idx)[]
-            if not entry.occupied:
-                return False
-            if entry.key == key:
-                return True
-            idx = (idx + 1) % CAP
-        return False
-
-    def __del__(owned self):
-        for i in range(CAP):
-            (self.data + i).destroy_pointee()
-        self.data.free()
-
-def main():
-    var m = SimpleMap[128]()
-    m.put(42, 100)
-    m.put(7, 200)
-    m.put(170, 300)  # 170 % 128 = 42 → 衝突
-    print("42:", m.get(42))
-    print("7:", m.get(7))
-    print("170:", m.get(170))
-    print("contains 7:", m.contains(7))
-    print("contains 99:", m.contains(99))`
+      code: "# var m = SimpleMap[128]()\n# m.put(42, 100)\n# print(m.get(42))  # 100",
+      answer: "struct Entry:\n    var key: Int\n    var value: Int\n    var occupied: Bool\n\n    def __init__(out self):\n        self.key = 0\n        self.value = 0\n        self.occupied = False\n\n    def __init__(out self, key: Int, value: Int):\n        self.key = key\n        self.value = value\n        self.occupied = True\n\nstruct SimpleMap[CAP: Int]:\n    var data: UnsafePointer[Entry]\n\n    def __init__(out self):\n        self.data = UnsafePointer[Entry].alloc(CAP)\n        for i in range(CAP):\n            (self.data + i).init_pointee_move(Entry())\n\n    def _hash(self, key: Int) -> Int:\n        var h = key % CAP\n        if h < 0:\n            h += CAP\n        return h\n\n    def put(mut self, key: Int, value: Int):\n        var idx = self._hash(key)\n        for _ in range(CAP):\n            var entry = (self.data + idx)[]\n            if not entry.occupied or entry.key == key:\n                (self.data + idx).destroy_pointee()\n                (self.data + idx).init_pointee_move(Entry(key, value))\n                return\n            idx = (idx + 1) % CAP\n\n    def get(self, key: Int) -> Int:\n        var idx = self._hash(key)\n        for _ in range(CAP):\n            var entry = (self.data + idx)[]\n            if not entry.occupied:\n                return -1  # not found\n            if entry.key == key:\n                return entry.value\n            idx = (idx + 1) % CAP\n        return -1\n\n    def contains(self, key: Int) -> Bool:\n        var idx = self._hash(key)\n        for _ in range(CAP):\n            var entry = (self.data + idx)[]\n            if not entry.occupied:\n                return False\n            if entry.key == key:\n                return True\n            idx = (idx + 1) % CAP\n        return False\n\n    def __del__(owned self):\n        for i in range(CAP):\n            (self.data + i).destroy_pointee()\n        self.data.free()\n\ndef main():\n    var m = SimpleMap[128]()\n    m.put(42, 100)\n    m.put(7, 200)\n    m.put(170, 300)  # 170 % 128 = 42 → 衝突\n    print(\"42:\", m.get(42))\n    print(\"7:\", m.get(7))\n    print(\"170:\", m.get(170))\n    print(\"contains 7:\", m.contains(7))\n    print(\"contains 99:\", m.contains(99))"
     },
     {
       diff: 3,
       q: "UnsafePointer で二分ヒープ（最小ヒープ）MinHeap を実装してください。\npush / pop_min / peek_min / len を持つこと。",
-      code: `# var h = MinHeap()
-# h.push(5); h.push(2); h.push(8); h.push(1)
-# h.pop_min() → 1, h.pop_min() → 2`,
-      answer: `struct MinHeap:
-    var data: UnsafePointer[Int]
-    var size: Int
-    var cap: Int
-
-    def __init__(out self):
-        self.cap = 16
-        self.size = 0
-        self.data = UnsafePointer[Int].alloc(self.cap)
-
-    def _swap(mut self, i: Int, j: Int):
-        var tmp = (self.data + i)[]
-        (self.data + i)[] = (self.data + j)[]
-        (self.data + j)[] = tmp
-
-    def _sift_up(mut self, idx: Int):
-        var i = idx
-        while i > 0:
-            var parent = (i - 1) // 2
-            if (self.data + i)[] < (self.data + parent)[]:
-                self._swap(i, parent)
-                i = parent
-            else:
-                break
-
-    def _sift_down(mut self, idx: Int):
-        var i = idx
-        while True:
-            var smallest = i
-            var left = 2 * i + 1
-            var right = 2 * i + 2
-            if left < self.size and (self.data + left)[] < (self.data + smallest)[]:
-                smallest = left
-            if right < self.size and (self.data + right)[] < (self.data + smallest)[]:
-                smallest = right
-            if smallest == i:
-                break
-            self._swap(i, smallest)
-            i = smallest
-
-    def push(mut self, val: Int):
-        if self.size == self.cap:
-            var new_cap = self.cap * 2
-            var new_data = UnsafePointer[Int].alloc(new_cap)
-            for i in range(self.size):
-                (new_data + i).init_pointee_move((self.data + i).take_pointee())
-            self.data.free()
-            self.data = new_data
-            self.cap = new_cap
-        (self.data + self.size).init_pointee_move(val)
-        self.size += 1
-        self._sift_up(self.size - 1)
-
-    def pop_min(mut self) -> Int:
-        var min_val = (self.data + 0)[]
-        self.size -= 1
-        (self.data + 0)[] = (self.data + self.size).take_pointee()
-        self._sift_down(0)
-        return min_val
-
-    def peek_min(self) -> Int:
-        return (self.data + 0)[]
-
-    def len(self) -> Int:
-        return self.size
-
-    def __del__(owned self):
-        for i in range(self.size):
-            (self.data + i).destroy_pointee()
-        self.data.free()
-
-def main():
-    var h = MinHeap()
-    h.push(5)
-    h.push(2)
-    h.push(8)
-    h.push(1)
-    h.push(9)
-    h.push(3)
-    print("min:", h.pop_min())  # 1
-    print("min:", h.pop_min())  # 2
-    print("min:", h.pop_min())  # 3
-    print("残り:", h.len())     # 3`
+      code: "# var h = MinHeap()\n# h.push(5); h.push(2); h.push(8); h.push(1)\n# h.pop_min() → 1, h.pop_min() → 2",
+      answer: "struct MinHeap:\n    var data: UnsafePointer[Int]\n    var size: Int\n    var cap: Int\n\n    def __init__(out self):\n        self.cap = 16\n        self.size = 0\n        self.data = UnsafePointer[Int].alloc(self.cap)\n\n    def _swap(mut self, i: Int, j: Int):\n        var tmp = (self.data + i)[]\n        (self.data + i)[] = (self.data + j)[]\n        (self.data + j)[] = tmp\n\n    def _sift_up(mut self, idx: Int):\n        var i = idx\n        while i > 0:\n            var parent = (i - 1) // 2\n            if (self.data + i)[] < (self.data + parent)[]:\n                self._swap(i, parent)\n                i = parent\n            else:\n                break\n\n    def _sift_down(mut self, idx: Int):\n        var i = idx\n        while True:\n            var smallest = i\n            var left = 2 * i + 1\n            var right = 2 * i + 2\n            if left < self.size and (self.data + left)[] < (self.data + smallest)[]:\n                smallest = left\n            if right < self.size and (self.data + right)[] < (self.data + smallest)[]:\n                smallest = right\n            if smallest == i:\n                break\n            self._swap(i, smallest)\n            i = smallest\n\n    def push(mut self, val: Int):\n        if self.size == self.cap:\n            var new_cap = self.cap * 2\n            var new_data = UnsafePointer[Int].alloc(new_cap)\n            for i in range(self.size):\n                (new_data + i).init_pointee_move((self.data + i).take_pointee())\n            self.data.free()\n            self.data = new_data\n            self.cap = new_cap\n        (self.data + self.size).init_pointee_move(val)\n        self.size += 1\n        self._sift_up(self.size - 1)\n\n    def pop_min(mut self) -> Int:\n        var min_val = (self.data + 0)[]\n        self.size -= 1\n        (self.data + 0)[] = (self.data + self.size).take_pointee()\n        self._sift_down(0)\n        return min_val\n\n    def peek_min(self) -> Int:\n        return (self.data + 0)[]\n\n    def len(self) -> Int:\n        return self.size\n\n    def __del__(owned self):\n        for i in range(self.size):\n            (self.data + i).destroy_pointee()\n        self.data.free()\n\ndef main():\n    var h = MinHeap()\n    h.push(5)\n    h.push(2)\n    h.push(8)\n    h.push(1)\n    h.push(9)\n    h.push(3)\n    print(\"min:\", h.pop_min())  # 1\n    print(\"min:\", h.pop_min())  # 2\n    print(\"min:\", h.pop_min())  # 3\n    print(\"残り:\", h.len())     # 3"
     }
   ],
   ch9: [
     {
       diff: 1,
       q: "トレイト合成（&）を使って、Printable & Comparable を同時に要求するジェネリック関数 print_max を書いてください。",
-      code: `# print_max(a, b) → 大きい方を表示`,
-      answer: `trait Printable:
-    def to_string(self) -> String: ...
-
-trait Comparable:
-    def __lt__(self, other: Self) -> Bool: ...
-    def __gt__(self, other: Self) -> Bool: ...
-
-struct Score(Printable, Comparable):
-    var value: Int
-
-    def __init__(out self, v: Int):
-        self.value = v
-
-    def to_string(self) -> String:
-        return "Score(" + String(self.value) + ")"
-
-    def __lt__(self, other: Self) -> Bool:
-        return self.value < other.value
-
-    def __gt__(self, other: Self) -> Bool:
-        return self.value > other.value
-
-def print_max[T: Printable & Comparable](a: T, b: T):
-    if a > b:
-        print("Max:", a.to_string())
-    else:
-        print("Max:", b.to_string())
-
-def main():
-    print_max(Score(85), Score(92))`
+      code: "# print_max(a, b) → 大きい方を表示",
+      answer: "trait Printable:\n    def to_string(self) -> String: ...\n\ntrait Comparable:\n    def __lt__(self, other: Self) -> Bool: ...\n    def __gt__(self, other: Self) -> Bool: ...\n\nstruct Score(Printable, Comparable):\n    var value: Int\n\n    def __init__(out self, v: Int):\n        self.value = v\n\n    def to_string(self) -> String:\n        return \"Score(\" + String(self.value) + \")\"\n\n    def __lt__(self, other: Self) -> Bool:\n        return self.value < other.value\n\n    def __gt__(self, other: Self) -> Bool:\n        return self.value > other.value\n\ndef print_max[T: Printable & Comparable](a: T, b: T):\n    if a > b:\n        print(\"Max:\", a.to_string())\n    else:\n        print(\"Max:\", b.to_string())\n\ndef main():\n    print_max(Score(85), Score(92))"
     },
     {
       diff: 2,
       q: "条件付きトレイト適合を使って、要素が Stringable な場合のみ describe メソッドを提供する Container struct を書いてください。\ncomptime if で T: Stringable を判定。",
-      code: `# Container[String] → describe() 使える
-# Container[SomeOpaqueType] → describe() なし`,
-      answer: `struct Container[T: Movable & Copyable]:
-    var value: T
-
-    def __init__(out self, val: T):
-        self.value = val
-
-    def get(self) -> T:
-        return self.value
-
-    def describe(self) -> String:
-        comptime if T: Stringable:
-            return "Container(" + String(self.value) + ")"
-        else:
-            return "Container(<non-stringable>)"
-
-def main():
-    var c1 = Container[Int](42)
-    print(c1.describe())  # Container(42)
-
-    var c2 = Container[String]("hello")
-    print(c2.describe())  # Container(hello)`
+      code: "# Container[String] → describe() 使える\n# Container[SomeOpaqueType] → describe() なし",
+      answer: "struct Container[T: Movable & Copyable]:\n    var value: T\n\n    def __init__(out self, val: T):\n        self.value = val\n\n    def get(self) -> T:\n        return self.value\n\n    def describe(self) -> String:\n        comptime if T: Stringable:\n            return \"Container(\" + String(self.value) + \")\"\n        else:\n            return \"Container(<non-stringable>)\"\n\ndef main():\n    var c1 = Container[Int](42)\n    print(c1.describe())  # Container(42)\n\n    var c2 = Container[String](\"hello\")\n    print(c2.describe())  # Container(hello)"
     },
     {
       diff: 3,
       q: "@implicit 変換を実装して、Meters → Kilometers の暗黙変換を可能にしてください。\n距離計算の関数が Kilometers を受け取るが、Meters も渡せるようにする。",
-      code: `# def travel_time(dist: Kilometers, speed: Float64) -> Float64
-# travel_time(Meters(5000), 60.0)  # 暗黙変換`,
-      answer: `struct Meters:
-    var value: Float64
-    def __init__(out self, v: Float64):
-        self.value = v
-
-struct Kilometers:
-    var value: Float64
-    def __init__(out self, v: Float64):
-        self.value = v
-
-    @implicit
-    def __init__(out self, m: Meters):
-        self.value = m.value / 1000.0
-
-def travel_time(dist: Kilometers, speed_kmh: Float64) -> Float64:
-    return dist.value / speed_kmh
-
-def main():
-    var km = Kilometers(100.0)
-    print("100km:", travel_time(km, 60.0), "時間")
-
-    # Meters からの暗黙変換
-    var m = Meters(5000.0)
-    print("5000m:", travel_time(m, 60.0), "時間")`
+      code: "# def travel_time(dist: Kilometers, speed: Float64) -> Float64\n# travel_time(Meters(5000), 60.0)  # 暗黙変換",
+      answer: "struct Meters:\n    var value: Float64\n    def __init__(out self, v: Float64):\n        self.value = v\n\nstruct Kilometers:\n    var value: Float64\n    def __init__(out self, v: Float64):\n        self.value = v\n\n    @implicit\n    def __init__(out self, m: Meters):\n        self.value = m.value / 1000.0\n\ndef travel_time(dist: Kilometers, speed_kmh: Float64) -> Float64:\n    return dist.value / speed_kmh\n\ndef main():\n    var km = Kilometers(100.0)\n    print(\"100km:\", travel_time(km, 60.0), \"時間\")\n\n    # Meters からの暗黙変換\n    var m = Meters(5000.0)\n    print(\"5000m:\", travel_time(m, 60.0), \"時間\")"
     },
     {
       diff: 3,
       q: "型消去パターン: 異なる型を統一的に扱う AnyPrintable ラッパーを設計してください。\n内部でUnsafePointerを使い、型情報を保持する。",
-      code: `# 異なる型を同じリストに入れて表示`,
-      answer: `trait Displayable:
-    def display(self) -> String: ...
-
-struct IntVal(Displayable):
-    var v: Int
-    def __init__(out self, v: Int): self.v = v
-    def display(self) -> String: return String(self.v)
-
-struct StrVal(Displayable):
-    var v: String
-    def __init__(out self, v: String): self.v = v
-    def display(self) -> String: return self.v
-
-struct FloatVal(Displayable):
-    var v: Float64
-    def __init__(out self, v: Float64): self.v = v
-    def display(self) -> String: return String(self.v)
-
-# 型消去: tagged union 風のアプローチ
-struct AnyDisplayable:
-    var tag: Int  # 0=Int, 1=String, 2=Float
-    var int_val: Int
-    var str_val: String
-    var float_val: Float64
-
-    @staticmethod
-    def from_int(v: Int) -> AnyDisplayable:
-        var a = AnyDisplayable()
-        a.tag = 0
-        a.int_val = v
-        return a
-
-    @staticmethod
-    def from_str(v: String) -> AnyDisplayable:
-        var a = AnyDisplayable()
-        a.tag = 1
-        a.str_val = v
-        return a
-
-    @staticmethod
-    def from_float(v: Float64) -> AnyDisplayable:
-        var a = AnyDisplayable()
-        a.tag = 2
-        a.float_val = v
-        return a
-
-    def __init__(out self):
-        self.tag = 0
-        self.int_val = 0
-        self.str_val = ""
-        self.float_val = 0.0
-
-    def display(self) -> String:
-        if self.tag == 0:
-            return String(self.int_val)
-        elif self.tag == 1:
-            return self.str_val
-        else:
-            return String(self.float_val)
-
-def main():
-    var items = List[AnyDisplayable]()
-    items.append(AnyDisplayable.from_int(42))
-    items.append(AnyDisplayable.from_str("hello"))
-    items.append(AnyDisplayable.from_float(3.14))
-
-    for i in range(len(items)):
-        print("[" + String(i) + "]", items[i].display())`
+      code: "# 異なる型を同じリストに入れて表示",
+      answer: "trait Displayable:\n    def display(self) -> String: ...\n\nstruct IntVal(Displayable):\n    var v: Int\n    def __init__(out self, v: Int): self.v = v\n    def display(self) -> String: return String(self.v)\n\nstruct StrVal(Displayable):\n    var v: String\n    def __init__(out self, v: String): self.v = v\n    def display(self) -> String: return self.v\n\nstruct FloatVal(Displayable):\n    var v: Float64\n    def __init__(out self, v: Float64): self.v = v\n    def display(self) -> String: return String(self.v)\n\n# 型消去: tagged union 風のアプローチ\nstruct AnyDisplayable:\n    var tag: Int  # 0=Int, 1=String, 2=Float\n    var int_val: Int\n    var str_val: String\n    var float_val: Float64\n\n    @staticmethod\n    def from_int(v: Int) -> AnyDisplayable:\n        var a = AnyDisplayable()\n        a.tag = 0\n        a.int_val = v\n        return a\n\n    @staticmethod\n    def from_str(v: String) -> AnyDisplayable:\n        var a = AnyDisplayable()\n        a.tag = 1\n        a.str_val = v\n        return a\n\n    @staticmethod\n    def from_float(v: Float64) -> AnyDisplayable:\n        var a = AnyDisplayable()\n        a.tag = 2\n        a.float_val = v\n        return a\n\n    def __init__(out self):\n        self.tag = 0\n        self.int_val = 0\n        self.str_val = \"\"\n        self.float_val = 0.0\n\n    def display(self) -> String:\n        if self.tag == 0:\n            return String(self.int_val)\n        elif self.tag == 1:\n            return self.str_val\n        else:\n            return String(self.float_val)\n\ndef main():\n    var items = List[AnyDisplayable]()\n    items.append(AnyDisplayable.from_int(42))\n    items.append(AnyDisplayable.from_str(\"hello\"))\n    items.append(AnyDisplayable.from_float(3.14))\n\n    for i in range(len(items)):\n        print(\"[\" + String(i) + \"]\", items[i].display())"
     }
   ],
   ch10: [
     {
       diff: 1,
       q: "@always_inline と @no_inline を使って、同じ処理を行う2つの関数を定義し、それぞれの呼び出し回数が多い場合の違いを説明するコメントを付けてください。",
-      code: `# @always_inline def fast_add(...)
-# @no_inline def slow_add(...)`,
-      answer: `@always_inline
-def fast_add(a: Int, b: Int) -> Int:
-    # 呼び出し元に展開される → 関数呼び出しオーバーヘッドゼロ
-    # ただしバイナリサイズが増加する可能性
-    return a + b
-
-@no_inline
-def slow_add(a: Int, b: Int) -> Int:
-    # 独立した関数として維持 → 呼び出しオーバーヘッドあり
-    # バイナリサイズは小さく、I-キャッシュに優しい
-    return a + b
-
-def main():
-    var sum1 = 0
-    var sum2 = 0
-    for i in range(1000):
-        sum1 += fast_add(i, 1)  # インライン展開で高速
-        sum2 += slow_add(i, 1)  # 関数呼び出しコストあり
-    print("inline:", sum1)
-    print("no_inline:", sum2)`
+      code: "# @always_inline def fast_add(...)\n# @no_inline def slow_add(...)",
+      answer: "@always_inline\ndef fast_add(a: Int, b: Int) -> Int:\n    # 呼び出し元に展開される → 関数呼び出しオーバーヘッドゼロ\n    # ただしバイナリサイズが増加する可能性\n    return a + b\n\n@no_inline\ndef slow_add(a: Int, b: Int) -> Int:\n    # 独立した関数として維持 → 呼び出しオーバーヘッドあり\n    # バイナリサイズは小さく、I-キャッシュに優しい\n    return a + b\n\ndef main():\n    var sum1 = 0\n    var sum2 = 0\n    for i in range(1000):\n        sum1 += fast_add(i, 1)  # インライン展開で高速\n        sum2 += slow_add(i, 1)  # 関数呼び出しコストあり\n    print(\"inline:\", sum1)\n    print(\"no_inline:\", sum2)"
     },
     {
       diff: 2,
       q: "SoA（Structure of Arrays）パターンを実装し、AoS（Array of Structures）と比較してください。\n粒子シミュレーション（x,y,vx,vy）のデータで、SIMD処理しやすいSoAの利点を示す。",
-      code: `# AoS: struct Particle { x, y, vx, vy }
-# SoA: struct Particles { xs, ys, vxs, vys }`,
-      answer: `# AoS: SIMD不向き（メモリが交互配置）
-struct Particle:
-    var x: Float64
-    var y: Float64
-    var vx: Float64
-    var vy: Float64
-    def __init__(out self, x: Float64, y: Float64, vx: Float64, vy: Float64):
-        self.x = x; self.y = y; self.vx = vx; self.vy = vy
-
-# SoA: SIMD向き（同種データが連続配置）
-struct Particles:
-    var xs: List[Float64]
-    var ys: List[Float64]
-    var vxs: List[Float64]
-    var vys: List[Float64]
-    var count: Int
-
-    def __init__(out self, n: Int):
-        self.count = n
-        self.xs = List[Float64]()
-        self.ys = List[Float64]()
-        self.vxs = List[Float64]()
-        self.vys = List[Float64]()
-        for i in range(n):
-            self.xs.append(Float64(i))
-            self.ys.append(Float64(i))
-            self.vxs.append(1.0)
-            self.vys.append(0.5)
-
-    def update(mut self, dt: Float64):
-        # SoA: xs 配列を連続アクセス → キャッシュ効率良好
-        # SIMD化も容易（連続メモリ）
-        for i in range(self.count):
-            self.xs[i] += self.vxs[i] * dt
-            self.ys[i] += self.vys[i] * dt
-
-def main():
-    var p = Particles(1000)
-    for _ in range(100):
-        p.update(0.016)
-    print("x[0]:", p.xs[0])
-    print("y[0]:", p.ys[0])
-    print("x[999]:", p.xs[999])`
+      code: "# AoS: struct Particle { x, y, vx, vy }\n# SoA: struct Particles { xs, ys, vxs, vys }",
+      answer: "# AoS: SIMD不向き（メモリが交互配置）\nstruct Particle:\n    var x: Float64\n    var y: Float64\n    var vx: Float64\n    var vy: Float64\n    def __init__(out self, x: Float64, y: Float64, vx: Float64, vy: Float64):\n        self.x = x; self.y = y; self.vx = vx; self.vy = vy\n\n# SoA: SIMD向き（同種データが連続配置）\nstruct Particles:\n    var xs: List[Float64]\n    var ys: List[Float64]\n    var vxs: List[Float64]\n    var vys: List[Float64]\n    var count: Int\n\n    def __init__(out self, n: Int):\n        self.count = n\n        self.xs = List[Float64]()\n        self.ys = List[Float64]()\n        self.vxs = List[Float64]()\n        self.vys = List[Float64]()\n        for i in range(n):\n            self.xs.append(Float64(i))\n            self.ys.append(Float64(i))\n            self.vxs.append(1.0)\n            self.vys.append(0.5)\n\n    def update(mut self, dt: Float64):\n        # SoA: xs 配列を連続アクセス → キャッシュ効率良好\n        # SIMD化も容易（連続メモリ）\n        for i in range(self.count):\n            self.xs[i] += self.vxs[i] * dt\n            self.ys[i] += self.vys[i] * dt\n\ndef main():\n    var p = Particles(1000)\n    for _ in range(100):\n        p.update(0.016)\n    print(\"x[0]:\", p.xs[0])\n    print(\"y[0]:\", p.ys[0])\n    print(\"x[999]:\", p.xs[999])"
     },
     {
       diff: 3,
       q: "ベンチマーク方法論: 同じ処理のスカラー版とSIMD版を書き、反復回数を十分取って比較する関数を書いてください。\nドット積の計算で比較。",
-      code: `# scalar_dot vs simd_dot
-# 大量反復で計測`,
-      answer: `from time import now
-
-def scalar_dot(a: UnsafePointer[Float32], b: UnsafePointer[Float32], n: Int) -> Float32:
-    var s: Float32 = 0
-    for i in range(n):
-        s += (a + i)[] * (b + i)[]
-    return s
-
-def simd_dot(a: UnsafePointer[Float32], b: UnsafePointer[Float32], n: Int) -> Float32:
-    alias W = 8
-    var vec_sum = SIMD[DType.float32, W](0)
-    var i = 0
-    while i + W <= n:
-        var va = (a + i).load[width=W]()
-        var vb = (b + i).load[width=W]()
-        vec_sum += va * vb
-        i += W
-    var tail: Float32 = 0
-    while i < n:
-        tail += (a + i)[] * (b + i)[]
-        i += 1
-    return vec_sum.reduce_add() + tail
-
-def main():
-    alias N = 4096
-    alias ITERS = 10000
-
-    var a = UnsafePointer[Float32].alloc(N)
-    var b = UnsafePointer[Float32].alloc(N)
-    for i in range(N):
-        (a + i).init_pointee_move(Float32(i % 100) * 0.01)
-        (b + i).init_pointee_move(Float32(i % 100) * 0.01)
-
-    # スカラー版
-    var t0 = now()
-    var result_s: Float32 = 0
-    for _ in range(ITERS):
-        result_s = scalar_dot(a, b, N)
-    var t1 = now()
-
-    # SIMD版
-    var t2 = now()
-    var result_v: Float32 = 0
-    for _ in range(ITERS):
-        result_v = simd_dot(a, b, N)
-    var t3 = now()
-
-    print("scalar result:", result_s, "time:", (t1 - t0) // 1000, "us")
-    print("simd   result:", result_v, "time:", (t3 - t2) // 1000, "us")
-
-    for i in range(N):
-        (a + i).destroy_pointee()
-        (b + i).destroy_pointee()
-    a.free()
-    b.free()`
+      code: "# scalar_dot vs simd_dot\n# 大量反復で計測",
+      answer: "from time import now\n\ndef scalar_dot(a: UnsafePointer[Float32], b: UnsafePointer[Float32], n: Int) -> Float32:\n    var s: Float32 = 0\n    for i in range(n):\n        s += (a + i)[] * (b + i)[]\n    return s\n\ndef simd_dot(a: UnsafePointer[Float32], b: UnsafePointer[Float32], n: Int) -> Float32:\n    alias W = 8\n    var vec_sum = SIMD[DType.float32, W](0)\n    var i = 0\n    while i + W <= n:\n        var va = (a + i).load[width=W]()\n        var vb = (b + i).load[width=W]()\n        vec_sum += va * vb\n        i += W\n    var tail: Float32 = 0\n    while i < n:\n        tail += (a + i)[] * (b + i)[]\n        i += 1\n    return vec_sum.reduce_add() + tail\n\ndef main():\n    alias N = 4096\n    alias ITERS = 10000\n\n    var a = UnsafePointer[Float32].alloc(N)\n    var b = UnsafePointer[Float32].alloc(N)\n    for i in range(N):\n        (a + i).init_pointee_move(Float32(i % 100) * 0.01)\n        (b + i).init_pointee_move(Float32(i % 100) * 0.01)\n\n    # スカラー版\n    var t0 = now()\n    var result_s: Float32 = 0\n    for _ in range(ITERS):\n        result_s = scalar_dot(a, b, N)\n    var t1 = now()\n\n    # SIMD版\n    var t2 = now()\n    var result_v: Float32 = 0\n    for _ in range(ITERS):\n        result_v = simd_dot(a, b, N)\n    var t3 = now()\n\n    print(\"scalar result:\", result_s, \"time:\", (t1 - t0) // 1000, \"us\")\n    print(\"simd   result:\", result_v, \"time:\", (t3 - t2) // 1000, \"us\")\n\n    for i in range(N):\n        (a + i).destroy_pointee()\n        (b + i).destroy_pointee()\n    a.free()\n    b.free()"
     }
   ],
   ch11: [
     {
       diff: 1,
       q: "@export で C ABI 互換の関数を書き、外部から呼び出せるインターフェースを定義してください。\n加算・乗算・べき乗の3関数。",
-      code: `# @export で3つの算術関数`,
-      answer: `@export
-def math_add(a: Float64, b: Float64) -> Float64:
-    return a + b
-
-@export
-def math_mul(a: Float64, b: Float64) -> Float64:
-    return a * b
-
-@export
-def math_pow(base: Float64, exp: Int) -> Float64:
-    var result: Float64 = 1.0
-    for _ in range(exp):
-        result *= base
-    return result
-
-def main():
-    print("add:", math_add(3.0, 4.0))
-    print("mul:", math_mul(3.0, 4.0))
-    print("pow:", math_pow(2.0, 10))`
+      code: "# @export で3つの算術関数",
+      answer: "@export\ndef math_add(a: Float64, b: Float64) -> Float64:\n    return a + b\n\n@export\ndef math_mul(a: Float64, b: Float64) -> Float64:\n    return a * b\n\n@export\ndef math_pow(base: Float64, exp: Int) -> Float64:\n    var result: Float64 = 1.0\n    for _ in range(exp):\n        result *= base\n    return result\n\ndef main():\n    print(\"add:\", math_add(3.0, 4.0))\n    print(\"mul:\", math_mul(3.0, 4.0))\n    print(\"pow:\", math_pow(2.0, 10))"
     },
     {
       diff: 2,
       q: "C文字列（UnsafePointer[Int8]）を Mojo の String に変換し、文字数を返す関数を書いてください。\nFFI境界での文字列処理パターン。",
-      code: `# C文字列 → Mojo String → 処理 → 結果返却`,
-      answer: `@export
-def string_length(c_str: UnsafePointer[Int8]) -> Int:
-    # C文字列の長さを手動計算（null終端）
-    var length = 0
-    while (c_str + length)[] != 0:
-        length += 1
-    return length
-
-@export
-def string_count_char(c_str: UnsafePointer[Int8], target: Int8) -> Int:
-    var count = 0
-    var i = 0
-    while (c_str + i)[] != 0:
-        if (c_str + i)[] == target:
-            count += 1
-        i += 1
-    return count
-
-def main():
-    # テスト用にMojo側でC文字列を作成
-    var msg = String("Hello, Mojo FFI!")
-    var raw = msg.unsafe_cstr_ptr()
-    print("長さ:", string_length(raw))
-    print("'o'の数:", string_count_char(raw, ord("o")))`
+      code: "# C文字列 → Mojo String → 処理 → 結果返却",
+      answer: "@export\ndef string_length(c_str: UnsafePointer[Int8]) -> Int:\n    # C文字列の長さを手動計算（null終端）\n    var length = 0\n    while (c_str + length)[] != 0:\n        length += 1\n    return length\n\n@export\ndef string_count_char(c_str: UnsafePointer[Int8], target: Int8) -> Int:\n    var count = 0\n    var i = 0\n    while (c_str + i)[] != 0:\n        if (c_str + i)[] == target:\n            count += 1\n        i += 1\n    return count\n\ndef main():\n    # テスト用にMojo側でC文字列を作成\n    var msg = String(\"Hello, Mojo FFI!\")\n    var raw = msg.unsafe_cstr_ptr()\n    print(\"長さ:\", string_length(raw))\n    print(\"'o'の数:\", string_count_char(raw, ord(\"o\")))"
     },
     {
       diff: 3,
       q: "Python から呼び出せる Mojo モジュールのインターフェースを設計してください。\n行列演算（生成、乗算、解放）の3関数を @export で提供。\nポインタベースのハンドルパターンを使用。",
-      code: `# Python: handle = create_matrix(n)
-#         multiply(handle_a, handle_b, handle_c, n)
-#         free_matrix(handle)`,
-      answer: `@export
-def create_matrix(n: Int) -> UnsafePointer[Float64]:
-    var ptr = UnsafePointer[Float64].alloc(n * n)
-    for i in range(n * n):
-        (ptr + i).init_pointee_move(0.0)
-    return ptr
-
-@export
-def set_matrix_element(m: UnsafePointer[Float64], n: Int, row: Int, col: Int, val: Float64):
-    (m + row * n + col)[] = val
-
-@export
-def get_matrix_element(m: UnsafePointer[Float64], n: Int, row: Int, col: Int) -> Float64:
-    return (m + row * n + col)[]
-
-@export
-def multiply_matrix(
-    a: UnsafePointer[Float64],
-    b: UnsafePointer[Float64],
-    c: UnsafePointer[Float64],
-    n: Int
-):
-    for i in range(n):
-        for j in range(n):
-            var s: Float64 = 0.0
-            for k in range(n):
-                s += (a + i * n + k)[] * (b + k * n + j)[]
-            (c + i * n + j)[] = s
-
-@export
-def free_matrix(m: UnsafePointer[Float64], n: Int):
-    for i in range(n * n):
-        (m + i).destroy_pointee()
-    m.free()
-
-def main():
-    alias N = 3
-    var a = create_matrix(N)
-    var b = create_matrix(N)
-    var c = create_matrix(N)
-
-    # A = 単位行列
-    for i in range(N):
-        set_matrix_element(a, N, i, i, 1.0)
-    # B = [[1,2,3],[4,5,6],[7,8,9]]
-    var v = 1.0
-    for i in range(N):
-        for j in range(N):
-            set_matrix_element(b, N, i, j, v)
-            v += 1.0
-
-    multiply_matrix(a, b, c, N)
-
-    for i in range(N):
-        for j in range(N):
-            print("C[" + String(i) + "][" + String(j) + "]:", get_matrix_element(c, N, i, j))
-
-    free_matrix(a, N)
-    free_matrix(b, N)
-    free_matrix(c, N)`
+      code: "# Python: handle = create_matrix(n)\n#         multiply(handle_a, handle_b, handle_c, n)\n#         free_matrix(handle)",
+      answer: "@export\ndef create_matrix(n: Int) -> UnsafePointer[Float64]:\n    var ptr = UnsafePointer[Float64].alloc(n * n)\n    for i in range(n * n):\n        (ptr + i).init_pointee_move(0.0)\n    return ptr\n\n@export\ndef set_matrix_element(m: UnsafePointer[Float64], n: Int, row: Int, col: Int, val: Float64):\n    (m + row * n + col)[] = val\n\n@export\ndef get_matrix_element(m: UnsafePointer[Float64], n: Int, row: Int, col: Int) -> Float64:\n    return (m + row * n + col)[]\n\n@export\ndef multiply_matrix(\n    a: UnsafePointer[Float64],\n    b: UnsafePointer[Float64],\n    c: UnsafePointer[Float64],\n    n: Int\n):\n    for i in range(n):\n        for j in range(n):\n            var s: Float64 = 0.0\n            for k in range(n):\n                s += (a + i * n + k)[] * (b + k * n + j)[]\n            (c + i * n + j)[] = s\n\n@export\ndef free_matrix(m: UnsafePointer[Float64], n: Int):\n    for i in range(n * n):\n        (m + i).destroy_pointee()\n    m.free()\n\ndef main():\n    alias N = 3\n    var a = create_matrix(N)\n    var b = create_matrix(N)\n    var c = create_matrix(N)\n\n    # A = 単位行列\n    for i in range(N):\n        set_matrix_element(a, N, i, i, 1.0)\n    # B = [[1,2,3],[4,5,6],[7,8,9]]\n    var v = 1.0\n    for i in range(N):\n        for j in range(N):\n            set_matrix_element(b, N, i, j, v)\n            v += 1.0\n\n    multiply_matrix(a, b, c, N)\n\n    for i in range(N):\n        for j in range(N):\n            print(\"C[\" + String(i) + \"][\" + String(j) + \"]:\", get_matrix_element(c, N, i, j))\n\n    free_matrix(a, N)\n    free_matrix(b, N)\n    free_matrix(c, N)"
     }
   ],
   ch12: [
     {
       diff: 2,
       q: "数値計算ライブラリの設計: Vec[N, T] ジェネリックベクトル型を定義してください。\n加算・スカラー倍・ドット積・ノルムを持つ。SIMD を活用すること。",
-      code: `# var v1 = Vec[4, DType.float64].from_values(1,2,3,4)
-# var v2 = Vec[4, DType.float64].from_values(5,6,7,8)
-# v1.dot(v2), v1.norm()`,
-      answer: `struct Vec[N: Int, T: DType]:
-    var data: SIMD[T, N]
-
-    def __init__(out self):
-        self.data = SIMD[T, N](0)
-
-    def __init__(out self, data: SIMD[T, N]):
-        self.data = data
-
-    @staticmethod
-    def splat(val: SIMD[T, 1]) -> Vec[N, T]:
-        return Vec[N, T](SIMD[T, N](val))
-
-    def __add__(self, other: Vec[N, T]) -> Vec[N, T]:
-        return Vec[N, T](self.data + other.data)
-
-    def __sub__(self, other: Vec[N, T]) -> Vec[N, T]:
-        return Vec[N, T](self.data - other.data)
-
-    def scale(self, s: SIMD[T, 1]) -> Vec[N, T]:
-        return Vec[N, T](self.data * s)
-
-    def dot(self, other: Vec[N, T]) -> SIMD[T, 1]:
-        return (self.data * other.data).reduce_add()
-
-    def norm_sq(self) -> SIMD[T, 1]:
-        return self.dot(self)
-
-    def describe(self) -> String:
-        return "Vec(" + String(self.data) + ")"
-
-def main():
-    var v1 = Vec[4, DType.float64](SIMD[DType.float64, 4](1, 2, 3, 4))
-    var v2 = Vec[4, DType.float64](SIMD[DType.float64, 4](5, 6, 7, 8))
-
-    var sum = v1 + v2
-    print("和:", sum.describe())
-    print("ドット積:", v1.dot(v2))
-    print("v1 ノルム二乗:", v1.norm_sq())
-
-    var scaled = v1.scale(3.0)
-    print("3倍:", scaled.describe())`
+      code: "# var v1 = Vec[4, DType.float64].from_values(1,2,3,4)\n# var v2 = Vec[4, DType.float64].from_values(5,6,7,8)\n# v1.dot(v2), v1.norm()",
+      answer: "struct Vec[N: Int, T: DType]:\n    var data: SIMD[T, N]\n\n    def __init__(out self):\n        self.data = SIMD[T, N](0)\n\n    def __init__(out self, data: SIMD[T, N]):\n        self.data = data\n\n    @staticmethod\n    def splat(val: SIMD[T, 1]) -> Vec[N, T]:\n        return Vec[N, T](SIMD[T, N](val))\n\n    def __add__(self, other: Vec[N, T]) -> Vec[N, T]:\n        return Vec[N, T](self.data + other.data)\n\n    def __sub__(self, other: Vec[N, T]) -> Vec[N, T]:\n        return Vec[N, T](self.data - other.data)\n\n    def scale(self, s: SIMD[T, 1]) -> Vec[N, T]:\n        return Vec[N, T](self.data * s)\n\n    def dot(self, other: Vec[N, T]) -> SIMD[T, 1]:\n        return (self.data * other.data).reduce_add()\n\n    def norm_sq(self) -> SIMD[T, 1]:\n        return self.dot(self)\n\n    def describe(self) -> String:\n        return \"Vec(\" + String(self.data) + \")\"\n\ndef main():\n    var v1 = Vec[4, DType.float64](SIMD[DType.float64, 4](1, 2, 3, 4))\n    var v2 = Vec[4, DType.float64](SIMD[DType.float64, 4](5, 6, 7, 8))\n\n    var sum = v1 + v2\n    print(\"和:\", sum.describe())\n    print(\"ドット積:\", v1.dot(v2))\n    print(\"v1 ノルム二乗:\", v1.norm_sq())\n\n    var scaled = v1.scale(3.0)\n    print(\"3倍:\", scaled.describe())"
     },
     {
       diff: 2,
       q: "行列型 Mat[M, N, T] を定義し、行列乗算 matmul を実装してください。\n結果の次元が正しく推論されること。",
-      code: `# var A = Mat[2,3, DType.float64](...)
-# var B = Mat[3,2, DType.float64](...)
-# var C = A.matmul(B)  # → Mat[2,2, DType.float64]`,
-      answer: `struct Mat[M: Int, N: Int, T: DType]:
-    var data: List[SIMD[T, 1]]
-
-    def __init__(out self):
-        self.data = List[SIMD[T, 1]]()
-        for _ in range(M * N):
-            self.data.append(SIMD[T, 1](0))
-
-    def get(self, i: Int, j: Int) -> SIMD[T, 1]:
-        return self.data[i * N + j]
-
-    def set(mut self, i: Int, j: Int, val: SIMD[T, 1]):
-        self.data[i * N + j] = val
-
-    def matmul[P: Int](self, other: Mat[N, P, T]) -> Mat[M, P, T]:
-        var result = Mat[M, P, T]()
-        for i in range(M):
-            for j in range(P):
-                var s = SIMD[T, 1](0)
-                for k in range(N):
-                    s += self.get(i, k) * other.get(k, j)
-                result.set(i, j, s)
-        return result
-
-    def describe(self) -> String:
-        var s = String("Mat[") + String(M) + "x" + String(N) + "]:\\n"
-        for i in range(M):
-            for j in range(N):
-                s += String(self.get(i, j)) + " "
-            s += "\\n"
-        return s
-
-def main():
-    var a = Mat[2, 3, DType.float64]()
-    a.set(0,0,1); a.set(0,1,2); a.set(0,2,3)
-    a.set(1,0,4); a.set(1,1,5); a.set(1,2,6)
-
-    var b = Mat[3, 2, DType.float64]()
-    b.set(0,0,7); b.set(0,1,8)
-    b.set(1,0,9); b.set(1,1,10)
-    b.set(2,0,11); b.set(2,1,12)
-
-    var c = a.matmul(b)  # Mat[2, 2]
-    print(c.describe())`
+      code: "# var A = Mat[2,3, DType.float64](...)\n# var B = Mat[3,2, DType.float64](...)\n# var C = A.matmul(B)  # → Mat[2,2, DType.float64]",
+      answer: "struct Mat[M: Int, N: Int, T: DType]:\n    var data: List[SIMD[T, 1]]\n\n    def __init__(out self):\n        self.data = List[SIMD[T, 1]]()\n        for _ in range(M * N):\n            self.data.append(SIMD[T, 1](0))\n\n    def get(self, i: Int, j: Int) -> SIMD[T, 1]:\n        return self.data[i * N + j]\n\n    def set(mut self, i: Int, j: Int, val: SIMD[T, 1]):\n        self.data[i * N + j] = val\n\n    def matmul[P: Int](self, other: Mat[N, P, T]) -> Mat[M, P, T]:\n        var result = Mat[M, P, T]()\n        for i in range(M):\n            for j in range(P):\n                var s = SIMD[T, 1](0)\n                for k in range(N):\n                    s += self.get(i, k) * other.get(k, j)\n                result.set(i, j, s)\n        return result\n\n    def describe(self) -> String:\n        var s = String(\"Mat[\") + String(M) + \"x\" + String(N) + \"]:\\n\"\n        for i in range(M):\n            for j in range(N):\n                s += String(self.get(i, j)) + \" \"\n            s += \"\\n\"\n        return s\n\ndef main():\n    var a = Mat[2, 3, DType.float64]()\n    a.set(0,0,1); a.set(0,1,2); a.set(0,2,3)\n    a.set(1,0,4); a.set(1,1,5); a.set(1,2,6)\n\n    var b = Mat[3, 2, DType.float64]()\n    b.set(0,0,7); b.set(0,1,8)\n    b.set(1,0,9); b.set(1,1,10)\n    b.set(2,0,11); b.set(2,1,12)\n\n    var c = a.matmul(b)  # Mat[2, 2]\n    print(c.describe())"
     },
     {
       diff: 3,
       q: "テスト可能な設計: assert的な検証関数群を含むテストハーネスを実装してください。\nassert_eq / assert_near（浮動小数点近似）/ assert_true を持ち、\nVec型のテストを実行するtest_vec関数を書く。",
-      code: `# test_vec() → 全テスト通過の報告`,
-      answer: `var test_count: Int = 0
-var pass_count: Int = 0
-
-def assert_eq(actual: Int, expected: Int, msg: String):
-    test_count += 1
-    if actual == expected:
-        pass_count += 1
-    else:
-        print("FAIL:", msg, "expected", expected, "got", actual)
-
-def assert_near(actual: Float64, expected: Float64, tol: Float64, msg: String):
-    test_count += 1
-    var diff = actual - expected
-    if diff < 0:
-        diff = -diff
-    if diff <= tol:
-        pass_count += 1
-    else:
-        print("FAIL:", msg, "expected", expected, "got", actual)
-
-def assert_true(cond: Bool, msg: String):
-    test_count += 1
-    if cond:
-        pass_count += 1
-    else:
-        print("FAIL:", msg)
-
-struct Vec4:
-    var data: SIMD[DType.float64, 4]
-
-    def __init__(out self, x: Float64, y: Float64, z: Float64, w: Float64):
-        self.data = SIMD[DType.float64, 4](x, y, z, w)
-
-    def __add__(self, o: Self) -> Self:
-        return Vec4(
-            (self.data + o.data)[0],
-            (self.data + o.data)[1],
-            (self.data + o.data)[2],
-            (self.data + o.data)[3],
-        )
-
-    def dot(self, o: Self) -> Float64:
-        return (self.data * o.data).reduce_add()
-
-    def norm_sq(self) -> Float64:
-        return self.dot(self)
-
-def test_vec():
-    print("=== Vec4 テスト ===")
-
-    # 加算テスト
-    var a = Vec4(1, 2, 3, 4)
-    var b = Vec4(5, 6, 7, 8)
-    var c = a + b
-    assert_near(c.data[0], 6.0, 1e-9, "add[0]")
-    assert_near(c.data[1], 8.0, 1e-9, "add[1]")
-
-    # ドット積テスト
-    assert_near(a.dot(b), 70.0, 1e-9, "dot product")
-
-    # ノルムテスト
-    var unit = Vec4(1, 0, 0, 0)
-    assert_near(unit.norm_sq(), 1.0, 1e-9, "unit norm_sq")
-
-    # ゼロベクトルテスト
-    var zero = Vec4(0, 0, 0, 0)
-    assert_near(zero.dot(a), 0.0, 1e-9, "zero dot")
-    assert_true(zero.norm_sq() == 0.0, "zero norm")
-
-def main():
-    test_count = 0
-    pass_count = 0
-    test_vec()
-    print("結果:", pass_count, "/", test_count, "テスト通過")`
+      code: "# test_vec() → 全テスト通過の報告",
+      answer: "var test_count: Int = 0\nvar pass_count: Int = 0\n\ndef assert_eq(actual: Int, expected: Int, msg: String):\n    test_count += 1\n    if actual == expected:\n        pass_count += 1\n    else:\n        print(\"FAIL:\", msg, \"expected\", expected, \"got\", actual)\n\ndef assert_near(actual: Float64, expected: Float64, tol: Float64, msg: String):\n    test_count += 1\n    var diff = actual - expected\n    if diff < 0:\n        diff = -diff\n    if diff <= tol:\n        pass_count += 1\n    else:\n        print(\"FAIL:\", msg, \"expected\", expected, \"got\", actual)\n\ndef assert_true(cond: Bool, msg: String):\n    test_count += 1\n    if cond:\n        pass_count += 1\n    else:\n        print(\"FAIL:\", msg)\n\nstruct Vec4:\n    var data: SIMD[DType.float64, 4]\n\n    def __init__(out self, x: Float64, y: Float64, z: Float64, w: Float64):\n        self.data = SIMD[DType.float64, 4](x, y, z, w)\n\n    def __add__(self, o: Self) -> Self:\n        return Vec4(\n            (self.data + o.data)[0],\n            (self.data + o.data)[1],\n            (self.data + o.data)[2],\n            (self.data + o.data)[3],\n        )\n\n    def dot(self, o: Self) -> Float64:\n        return (self.data * o.data).reduce_add()\n\n    def norm_sq(self) -> Float64:\n        return self.dot(self)\n\ndef test_vec():\n    print(\"=== Vec4 テスト ===\")\n\n    # 加算テスト\n    var a = Vec4(1, 2, 3, 4)\n    var b = Vec4(5, 6, 7, 8)\n    var c = a + b\n    assert_near(c.data[0], 6.0, 1e-9, \"add[0]\")\n    assert_near(c.data[1], 8.0, 1e-9, \"add[1]\")\n\n    # ドット積テスト\n    assert_near(a.dot(b), 70.0, 1e-9, \"dot product\")\n\n    # ノルムテスト\n    var unit = Vec4(1, 0, 0, 0)\n    assert_near(unit.norm_sq(), 1.0, 1e-9, \"unit norm_sq\")\n\n    # ゼロベクトルテスト\n    var zero = Vec4(0, 0, 0, 0)\n    assert_near(zero.dot(a), 0.0, 1e-9, \"zero dot\")\n    assert_true(zero.norm_sq() == 0.0, \"zero norm\")\n\ndef main():\n    test_count = 0\n    pass_count = 0\n    test_vec()\n    print(\"結果:\", pass_count, \"/\", test_count, \"テスト通過\")"
     },
     {
       diff: 3,
       q: "ライブラリ配布設計: パッケージのモジュール構成を設計し、公開API・内部API・型定義・テストの分離パターンを示してください。\nコードとコメントでディレクトリ構成とモジュール間の依存関係を示す。",
-      code: `# numojo/ パッケージの設計`,
-      answer: `# ============================
-# パッケージ構成設計（numojo）
-# ============================
-#
-# numojo/
-# ├── __init__.mojo    ← 公開APIの再エクスポート
-# ├── vec.mojo         ← ベクトル型
-# ├── mat.mojo         ← 行列型
-# ├── _internal/       ← 非公開モジュール
-# │   ├── __init__.mojo
-# │   ├── simd_utils.mojo
-# │   └── memory.mojo
-# └── tests/
-#     ├── test_vec.mojo
-#     └── test_mat.mojo
-
-# --- __init__.mojo (公開API) ---
-# from .vec import Vec2, Vec3, Vec4
-# from .mat import Mat2, Mat3, Mat4
-
-# --- vec.mojo ---
-alias Vec2f = Vec2[DType.float32]
-alias Vec3f = Vec3[DType.float32]
-alias Vec2d = Vec2[DType.float64]
-
-struct Vec2[T: DType]:
-    var data: SIMD[T, 2]
-
-    def __init__(out self, x: SIMD[T, 1], y: SIMD[T, 1]):
-        self.data = SIMD[T, 2](x, y)
-
-    def x(self) -> SIMD[T, 1]: return self.data[0]
-    def y(self) -> SIMD[T, 1]: return self.data[1]
-
-    def __add__(self, o: Self) -> Self:
-        return Vec2[T](
-            (self.data + o.data)[0],
-            (self.data + o.data)[1],
-        )
-
-    def dot(self, o: Self) -> SIMD[T, 1]:
-        return (self.data * o.data).reduce_add()
-
-    def length_sq(self) -> SIMD[T, 1]:
-        return self.dot(self)
-
-    @deprecated("length_sq() を使ってください")
-    def mag_squared(self) -> SIMD[T, 1]:
-        return self.length_sq()
-
-    def describe(self) -> String:
-        return "Vec2(" + String(self.x()) + ", " + String(self.y()) + ")"
-
-# --- バージョニング ---
-alias NUMOJO_VERSION = "0.1.0"
-alias NUMOJO_VERSION_MAJOR = 0
-alias NUMOJO_VERSION_MINOR = 1
-
-@export
-def numojo_version_major() -> Int:
-    return NUMOJO_VERSION_MAJOR
-
-@export
-def numojo_version_minor() -> Int:
-    return NUMOJO_VERSION_MINOR
-
-def main():
-    print("numojo v" + NUMOJO_VERSION)
-    var a = Vec2[DType.float64](3.0, 4.0)
-    var b = Vec2[DType.float64](1.0, 2.0)
-    print(a.describe())
-    print((a + b).describe())
-    print("dot:", a.dot(b))
-    print("length_sq:", a.length_sq())`
+      code: "# numojo/ パッケージの設計",
+      answer: "# ============================\n# パッケージ構成設計（numojo）\n# ============================\n#\n# numojo/\n# ├── __init__.mojo    ← 公開APIの再エクスポート\n# ├── vec.mojo         ← ベクトル型\n# ├── mat.mojo         ← 行列型\n# ├── _internal/       ← 非公開モジュール\n# │   ├── __init__.mojo\n# │   ├── simd_utils.mojo\n# │   └── memory.mojo\n# └── tests/\n#     ├── test_vec.mojo\n#     └── test_mat.mojo\n\n# --- __init__.mojo (公開API) ---\n# from .vec import Vec2, Vec3, Vec4\n# from .mat import Mat2, Mat3, Mat4\n\n# --- vec.mojo ---\nalias Vec2f = Vec2[DType.float32]\nalias Vec3f = Vec3[DType.float32]\nalias Vec2d = Vec2[DType.float64]\n\nstruct Vec2[T: DType]:\n    var data: SIMD[T, 2]\n\n    def __init__(out self, x: SIMD[T, 1], y: SIMD[T, 1]):\n        self.data = SIMD[T, 2](x, y)\n\n    def x(self) -> SIMD[T, 1]: return self.data[0]\n    def y(self) -> SIMD[T, 1]: return self.data[1]\n\n    def __add__(self, o: Self) -> Self:\n        return Vec2[T](\n            (self.data + o.data)[0],\n            (self.data + o.data)[1],\n        )\n\n    def dot(self, o: Self) -> SIMD[T, 1]:\n        return (self.data * o.data).reduce_add()\n\n    def length_sq(self) -> SIMD[T, 1]:\n        return self.dot(self)\n\n    @deprecated(\"length_sq() を使ってください\")\n    def mag_squared(self) -> SIMD[T, 1]:\n        return self.length_sq()\n\n    def describe(self) -> String:\n        return \"Vec2(\" + String(self.x()) + \", \" + String(self.y()) + \")\"\n\n# --- バージョニング ---\nalias NUMOJO_VERSION = \"0.1.0\"\nalias NUMOJO_VERSION_MAJOR = 0\nalias NUMOJO_VERSION_MINOR = 1\n\n@export\ndef numojo_version_major() -> Int:\n    return NUMOJO_VERSION_MAJOR\n\n@export\ndef numojo_version_minor() -> Int:\n    return NUMOJO_VERSION_MINOR\n\ndef main():\n    print(\"numojo v\" + NUMOJO_VERSION)\n    var a = Vec2[DType.float64](3.0, 4.0)\n    var b = Vec2[DType.float64](1.0, 2.0)\n    print(a.describe())\n    print((a + b).describe())\n    print(\"dot:\", a.dot(b))\n    print(\"length_sq:\", a.length_sq())"
     }
   ]
 };
@@ -1876,102 +501,25 @@ const chapters = [
     {
       title: "alias — コンパイル時定数",
       body: "alias はコンパイル時に確定する定数です。値だけでなく、型や関数も束縛できます。",
-      code: `# 値の alias
-alias PI = 3.14159265358979
-alias MAX_SIZE = 1024
-alias SIMD_WIDTH = 8
-
-# 型の alias
-alias Vec4f = SIMD[DType.float32, 4]
-alias Vec8d = SIMD[DType.float64, 8]
-alias Scalar = SIMD[DType.float64, 1]  # Float64 と同じ
-
-# 計算式も OK（コンパイル時に評価）
-alias GRID_SIZE = (MAX_SIZE + 255) // 256
-
-def main():
-    var v: Vec4f = Vec4f(1, 2, 3, 4)
-    print(v)
-    print("GRID_SIZE:", GRID_SIZE)`,
+      code: "# 値の alias\nalias PI = 3.14159265358979\nalias MAX_SIZE = 1024\nalias SIMD_WIDTH = 8\n\n# 型の alias\nalias Vec4f = SIMD[DType.float32, 4]\nalias Vec8d = SIMD[DType.float64, 8]\nalias Scalar = SIMD[DType.float64, 1]  # Float64 と同じ\n\n# 計算式も OK（コンパイル時に評価）\nalias GRID_SIZE = (MAX_SIZE + 255) // 256\n\ndef main():\n    var v: Vec4f = Vec4f(1, 2, 3, 4)\n    print(v)\n    print(\"GRID_SIZE:\", GRID_SIZE)",
       afterCode: "alias は型エイリアスとしても強力です。SIMD[DType.float32, 4] のような長い型名を Vec4f と短縮できます。実行時メモリを消費しません。"
     },
     {
       title: "comptime if — コンパイル時条件分岐",
       body: "comptime if は @parameter if の後継構文です。条件がコンパイル時に評価され、不要な分岐は完全に除去されます。\n\n実行時の if と異なり、両方の分岐が型的に正しい必要はありません（選ばれなかった分岐はコンパイルされない）。",
-      code: `def process[T: DType](v: SIMD[T, 1]) -> String:
-    comptime if T == DType.float64:
-        return "高精度浮動小数点: " + String(v)
-    elif T == DType.float32:
-        return "単精度浮動小数点: " + String(v)
-    elif T.is_integral():
-        return "整数型: " + String(v)
-    else:
-        return "その他: " + String(v)
-
-def main():
-    print(process(Float64(3.14)))
-    print(process(Float32(2.71)))
-    print(process(Int64(42)))`,
+      code: "def process[T: DType](v: SIMD[T, 1]) -> String:\n    comptime if T == DType.float64:\n        return \"高精度浮動小数点: \" + String(v)\n    elif T == DType.float32:\n        return \"単精度浮動小数点: \" + String(v)\n    elif T.is_integral():\n        return \"整数型: \" + String(v)\n    else:\n        return \"その他: \" + String(v)\n\ndef main():\n    print(process(Float64(3.14)))\n    print(process(Float32(2.71)))\n    print(process(Int64(42)))",
       afterCode: "comptime if の最大の利点は「選ばれなかった分岐がコンパイルされない」ことです。これにより、型Tが特定の演算をサポートしない場合でも、その分岐に入らなければエラーになりません。"
     },
     {
       title: "comptime for — コンパイル時ループ展開",
       body: "comptime for はループをコンパイル時に展開します。タプルの走査や、固定回数の処理生成に使います。\n\n通常の for と異なり、反復回数がコンパイル時に確定している必要があります。",
-      code: `# タプルの全要素を処理
-def print_tuple[*Ts: Writable](*args: *Ts):
-    comptime for i in range(len(args)):
-        print("要素", i, ":", args[i])
-
-# コンパイル時ループでSIMD幅を探索
-def find_best_width[T: DType]():
-    comptime for width in (4, 8, 16, 32):
-        alias w = width.value
-        comptime if w <= simdwidthof[T]():
-            print("  幅", w, ": 利用可能")
-
-def main():
-    print_tuple(42, "hello", 3.14)
-    print("--- float32 SIMD幅 ---")
-    find_best_width[DType.float32]()`,
+      code: "# タプルの全要素を処理\ndef print_tuple[*Ts: Writable](*args: *Ts):\n    comptime for i in range(len(args)):\n        print(\"要素\", i, \":\", args[i])\n\n# コンパイル時ループでSIMD幅を探索\ndef find_best_width[T: DType]():\n    comptime for width in (4, 8, 16, 32):\n        alias w = width.value\n        comptime if w <= simdwidthof[T]():\n            print(\"  幅\", w, \": 利用可能\")\n\ndef main():\n    print_tuple(42, \"hello\", 3.14)\n    print(\"--- float32 SIMD幅 ---\")\n    find_best_width[DType.float32]()",
       afterCode: "comptime for は特にタプル（異なる型の要素を持つ）の走査に不可欠です。通常の for ではタプルの要素型が統一されないためコンパイルエラーになりますが、comptime for ならコンパイル時に各要素の型が確定します。"
     },
     {
       title: "comptime メンバーとコンパイル時計算",
       body: "struct 内に comptime メンバーを持つことで、型レベルの情報をコンパイル時に保持できます。\n\nまた、関数自体をコンパイル時に実行して定数を生成することも可能です。",
-      code: `# コンパイル時フィボナッチ
-def fib(n: Int) -> Int:
-    if n <= 1:
-        return n
-    return fib(n - 1) + fib(n - 2)
-
-# コンパイル時にルックアップテーブルを生成
-alias FIB_10 = fib(10)   # 55
-alias FIB_20 = fib(20)   # 6765
-
-# コンパイル時メンバーを持つstruct
-struct TypeInfo[T: DType]:
-    # T自体がコンパイル時パラメータ
-    alias bits = T.bitwidth()
-    alias is_float = T.is_floating_point()
-    alias is_signed = T.is_signed()
-
-    @staticmethod
-    def describe():
-        print("DType:", T)
-        print("  bits:", Self.bits)
-        comptime if Self.is_float:
-            print("  種別: 浮動小数点")
-        elif Self.is_signed:
-            print("  種別: 符号付き整数")
-        else:
-            print("  種別: 符号なし整数")
-
-def main():
-    print("fib(10):", FIB_10)
-    print("fib(20):", FIB_20)
-    TypeInfo[DType.float64].describe()
-    TypeInfo[DType.int32].describe()
-    TypeInfo[DType.uint8].describe()`,
+      code: "# コンパイル時フィボナッチ\ndef fib(n: Int) -> Int:\n    if n <= 1:\n        return n\n    return fib(n - 1) + fib(n - 2)\n\n# コンパイル時にルックアップテーブルを生成\nalias FIB_10 = fib(10)   # 55\nalias FIB_20 = fib(20)   # 6765\n\n# コンパイル時メンバーを持つstruct\nstruct TypeInfo[T: DType]:\n    # T自体がコンパイル時パラメータ\n    alias bits = T.bitwidth()\n    alias is_float = T.is_floating_point()\n    alias is_signed = T.is_signed()\n\n    @staticmethod\n    def describe():\n        print(\"DType:\", T)\n        print(\"  bits:\", Self.bits)\n        comptime if Self.is_float:\n            print(\"  種別: 浮動小数点\")\n        elif Self.is_signed:\n            print(\"  種別: 符号付き整数\")\n        else:\n            print(\"  種別: 符号なし整数\")\n\ndef main():\n    print(\"fib(10):\", FIB_10)\n    print(\"fib(20):\", FIB_20)\n    TypeInfo[DType.float64].describe()\n    TypeInfo[DType.int32].describe()\n    TypeInfo[DType.uint8].describe()",
       afterCode: "comptime メンバーはゼロコスト抽象化の基盤です。TypeInfo[DType.float64].bits は実行時には単なる定数64になり、条件分岐も除去されます。"
     },
     {
@@ -1995,122 +543,31 @@ def main():
     {
       title: "infer-only パラメータ（//）",
       body: "// の後に書かれたパラメータは、引数の型から自動推論されます。呼び出し側で明示指定できません。\n\nこれにより、冗長な型パラメータの指定を省略しつつ、型安全性を保てます。",
-      code: `# // 以降は推論専用
-def element_sum[//, T: DType, N: Int](v: SIMD[T, N]) -> SIMD[T, 1]:
-    return v.reduce_add()
-
-def element_max[//, T: DType, N: Int](v: SIMD[T, N]) -> SIMD[T, 1]:
-    return v.reduce_max()
-
-def main():
-    var v = SIMD[DType.float32, 4](1, 2, 3, 4)
-    # T=float32, N=4 は自動推論。明示指定は不可
-    print("sum:", element_sum(v))
-    print("max:", element_max(v))
-
-    var w = SIMD[DType.int64, 8](10, 20, 30, 40, 50, 60, 70, 80)
-    print("sum:", element_sum(w))  # T=int64, N=8 を自動推論`,
+      code: "# // 以降は推論専用\ndef element_sum[//, T: DType, N: Int](v: SIMD[T, N]) -> SIMD[T, 1]:\n    return v.reduce_add()\n\ndef element_max[//, T: DType, N: Int](v: SIMD[T, N]) -> SIMD[T, 1]:\n    return v.reduce_max()\n\ndef main():\n    var v = SIMD[DType.float32, 4](1, 2, 3, 4)\n    # T=float32, N=4 は自動推論。明示指定は不可\n    print(\"sum:\", element_sum(v))\n    print(\"max:\", element_max(v))\n\n    var w = SIMD[DType.int64, 8](10, 20, 30, 40, 50, 60, 70, 80)\n    print(\"sum:\", element_sum(w))  # T=int64, N=8 を自動推論",
       afterCode: "infer-only は「ユーザーに指定させたくないが、型推論で確定するパラメータ」に最適です。ライブラリ API をシンプルに保ちつつ、内部では正確な型情報を活用できます。"
     },
     {
       title: "可変長パラメータ",
       body: "型パラメータに * を付けると、任意個のパラメータを受け取れます。comptime for と組み合わせて各パラメータにアクセスします。",
-      code: `# 可変長型パラメータ
-def print_types[*Ts: DType]():
-    comptime for i in range(len(Ts)):
-        alias T = Ts[i]
-        print(T, ":", T.bitwidth(), "bits")
-
-# 可変長値パラメータ
-def sum_params[*Vals: Int]() -> Int:
-    var total = 0
-    comptime for i in range(len(Vals)):
-        total += Vals[i]
-    return total
-
-def main():
-    print_types[DType.float32, DType.int64, DType.uint8]()
-    print("合計:", sum_params[10, 20, 30, 40]())`,
+      code: "# 可変長型パラメータ\ndef print_types[*Ts: DType]():\n    comptime for i in range(len(Ts)):\n        alias T = Ts[i]\n        print(T, \":\", T.bitwidth(), \"bits\")\n\n# 可変長値パラメータ\ndef sum_params[*Vals: Int]() -> Int:\n    var total = 0\n    comptime for i in range(len(Vals)):\n        total += Vals[i]\n    return total\n\ndef main():\n    print_types[DType.float32, DType.int64, DType.uint8]()\n    print(\"合計:\", sum_params[10, 20, 30, 40]())",
       afterCode: "可変長パラメータは、タプル的な異種コレクションの処理や、コンパイル時のコード展開に威力を発揮します。"
     },
     {
       title: "自動パラメータ化",
       body: "引数の型に SIMD のようなパラメトリック型を書き、パラメータを省略すると、関数が自動的にジェネリック化されます。\n\n__type_of() で引数と同じ型を戻り値に使えます。",
-      code: `# パラメータ省略 → 自動パラメータ化
-def negate(v: SIMD) -> __type_of(v):
-    return -v
-
-def clamp(v: SIMD, lo: __type_of(v), hi: __type_of(v)) -> __type_of(v):
-    return v.min(hi).max(lo)
-
-def main():
-    var a = SIMD[DType.float32, 4](1, -2, 3, -4)
-    print("negate:", negate(a))
-
-    var b = SIMD[DType.int32, 8](-5, 3, 12, -1, 7, 20, -3, 0)
-    var lo = SIMD[DType.int32, 8](0)
-    var hi = SIMD[DType.int32, 8](10)
-    print("clamp:", clamp(b, lo, hi))`,
+      code: "# パラメータ省略 → 自動パラメータ化\ndef negate(v: SIMD) -> __type_of(v):\n    return -v\n\ndef clamp(v: SIMD, lo: __type_of(v), hi: __type_of(v)) -> __type_of(v):\n    return v.min(hi).max(lo)\n\ndef main():\n    var a = SIMD[DType.float32, 4](1, -2, 3, -4)\n    print(\"negate:\", negate(a))\n\n    var b = SIMD[DType.int32, 8](-5, 3, 12, -1, 7, 20, -3, 0)\n    var lo = SIMD[DType.int32, 8](0)\n    var hi = SIMD[DType.int32, 8](10)\n    print(\"clamp:\", clamp(b, lo, hi))",
       afterCode: "自動パラメータ化は「Pythonのような見た目でC++のような性能」を実現する鍵です。型推論によりボイラープレートを削減しつつ、モノモーフィゼーション（型ごとの特殊化）が行われます。"
     },
     {
       title: "依存型パターン",
       body: "パラメータが他のパラメータや引数の型に依存する設計パターンです。行列の次元チェックやベクトル長の一致検証をコンパイル時に行えます。",
-      code: `# 行列の次元をパラメータで保証
-struct Matrix[M: Int, N: Int, T: DType]:
-    var data: List[SIMD[T, 1]]
-
-    def __init__(out self):
-        self.data = List[SIMD[T, 1]]()
-        for _ in range(M * N):
-            self.data.append(SIMD[T, 1](0))
-
-    # M×N * N×P → M×P（次元の整合性をコンパイル時に保証）
-    def matmul[P: Int](self, other: Matrix[N, P, T]) -> Matrix[M, P, T]:
-        var result = Matrix[M, P, T]()
-        for i in range(M):
-            for j in range(P):
-                var s = SIMD[T, 1](0)
-                for k in range(N):
-                    s += self.data[i * N + k] * other.data[k * P + j]
-                result.data[i * P + j] = s
-        return result
-
-def main():
-    var a = Matrix[2, 3, DType.float64]()
-    var b = Matrix[3, 4, DType.float64]()
-    var c = a.matmul(b)  # → Matrix[2, 4] ✅
-    # var d = a.matmul(a)  # ❌ コンパイルエラー！ 3 != 2
-    print("行列乗算OK: 2x3 * 3x4 → 2x4")`,
+      code: "# 行列の次元をパラメータで保証\nstruct Matrix[M: Int, N: Int, T: DType]:\n    var data: List[SIMD[T, 1]]\n\n    def __init__(out self):\n        self.data = List[SIMD[T, 1]]()\n        for _ in range(M * N):\n            self.data.append(SIMD[T, 1](0))\n\n    # M×N * N×P → M×P（次元の整合性をコンパイル時に保証）\n    def matmul[P: Int](self, other: Matrix[N, P, T]) -> Matrix[M, P, T]:\n        var result = Matrix[M, P, T]()\n        for i in range(M):\n            for j in range(P):\n                var s = SIMD[T, 1](0)\n                for k in range(N):\n                    s += self.data[i * N + k] * other.data[k * P + j]\n                result.data[i * P + j] = s\n        return result\n\ndef main():\n    var a = Matrix[2, 3, DType.float64]()\n    var b = Matrix[3, 4, DType.float64]()\n    var c = a.matmul(b)  # → Matrix[2, 4] ✅\n    # var d = a.matmul(a)  # ❌ コンパイルエラー！ 3 != 2\n    print(\"行列乗算OK: 2x3 * 3x4 → 2x4\")",
       afterCode: "依存型パターンにより、次元の不一致やサイズの矛盾をコンパイル時に検出できます。Pythonの numpy では実行時エラーになる問題を、Mojo ではコンパイル時に防げます。"
     },
     {
       title: "型レベルプログラミング",
       body: "パラメトリックと comptime if を組み合わせることで、型に基づくディスパッチや型の変換を行えます。",
-      code: `# 型レベルで最適な SIMD 幅を選択
-def optimal_width[T: DType]() -> Int:
-    alias native = simdwidthof[T]()
-    comptime if native >= 16:
-        return 16
-    elif native >= 8:
-        return 8
-    elif native >= 4:
-        return 4
-    else:
-        return 1
-
-# 型に基づくゼロ値の生成
-def zero[T: DType]() -> SIMD[T, 1]:
-    comptime if T.is_floating_point():
-        return SIMD[T, 1](0.0)
-    else:
-        return SIMD[T, 1](0)
-
-def main():
-    print("float32 最適幅:", optimal_width[DType.float32]())
-    print("float64 最適幅:", optimal_width[DType.float64]())
-    print("zero float32:", zero[DType.float32]())
-    print("zero int64:", zero[DType.int64]())`
+      code: "# 型レベルで最適な SIMD 幅を選択\ndef optimal_width[T: DType]() -> Int:\n    alias native = simdwidthof[T]()\n    comptime if native >= 16:\n        return 16\n    elif native >= 8:\n        return 8\n    elif native >= 4:\n        return 4\n    else:\n        return 1\n\n# 型に基づくゼロ値の生成\ndef zero[T: DType]() -> SIMD[T, 1]:\n    comptime if T.is_floating_point():\n        return SIMD[T, 1](0.0)\n    else:\n        return SIMD[T, 1](0)\n\ndef main():\n    print(\"float32 最適幅:\", optimal_width[DType.float32]())\n    print(\"float64 最適幅:\", optimal_width[DType.float64]())\n    print(\"zero float32:\", zero[DType.float32]())\n    print(\"zero int64:\", zero[DType.int64]())"
     }
   ]
 },
@@ -2130,133 +587,32 @@ def main():
       title: "引数規約の完全ガイド",
       body: "v26.2 の引数規約は read / mut / var / out / ref / deinit の6種類です。var は旧 owned に相当します。",
       table: T.argConventions,
-      code: `def show(value: Int):           # read（デフォルト）
-    print(value)
-
-def increment(mut value: Int):  # mut: 呼び出し元を変更
-    value += 1
-
-def consume(var value: String):  # var: 所有権を取得
-    print("消費:", value)
-    # value はこの関数の終了時に破棄される
-
-struct Builder:
-    var parts: List[String]
-    def __init__(out self):      # out: 未初期化→初期化
-        self.parts = List[String]()
-
-def main():
-    var x = 5
-    show(x)        # read: x は変わらない
-    increment(x)   # mut: x が 6 になる
-    show(x)
-
-    var s = String("hello")
-    consume(s^)    # var: 所有権移動。以降 s は使用不可`,
+      code: "def show(value: Int):           # read（デフォルト）\n    print(value)\n\ndef increment(mut value: Int):  # mut: 呼び出し元を変更\n    value += 1\n\ndef consume(var value: String):  # var: 所有権を取得\n    print(\"消費:\", value)\n    # value はこの関数の終了時に破棄される\n\nstruct Builder:\n    var parts: List[String]\n    def __init__(out self):      # out: 未初期化→初期化\n        self.parts = List[String]()\n\ndef main():\n    var x = 5\n    show(x)        # read: x は変わらない\n    increment(x)   # mut: x が 6 になる\n    show(x)\n\n    var s = String(\"hello\")\n    consume(s^)    # var: 所有権移動。以降 s は使用不可",
       afterCode: "ref 規約は内部データへの参照を返す場合に使います。例えば、コレクションの要素への参照を返すメソッドなどで活用されます。"
     },
     {
       title: "UnsafePointer の操作",
       body: "UnsafePointer は C のポインタに相当する低レベルな型です。メモリの確保・初期化・破棄・解放を全て手動で行う必要があります。",
       table: T.unsafeOps,
-      code: `def main():
-    # 1. メモリ確保（5個分の Int）
-    var ptr = UnsafePointer[Int].alloc(5)
-
-    # 2. 初期化（各要素にムーブで値を設定）
-    for i in range(5):
-        (ptr + i).init_pointee_move(i * 100)
-
-    # 3. 読み取り
-    for i in range(5):
-        print("ptr[" + String(i) + "] =", (ptr + i)[])
-
-    # 4. 値の上書き
-    (ptr + 2)[] = 999
-    print("変更後 ptr[2] =", (ptr + 2)[])
-
-    # 5. 破棄
-    for i in range(5):
-        (ptr + i).destroy_pointee()
-
-    # 6. メモリ解放
-    ptr.free()`,
+      code: "def main():\n    # 1. メモリ確保（5個分の Int）\n    var ptr = UnsafePointer[Int].alloc(5)\n\n    # 2. 初期化（各要素にムーブで値を設定）\n    for i in range(5):\n        (ptr + i).init_pointee_move(i * 100)\n\n    # 3. 読み取り\n    for i in range(5):\n        print(\"ptr[\" + String(i) + \"] =\", (ptr + i)[])\n\n    # 4. 値の上書き\n    (ptr + 2)[] = 999\n    print(\"変更後 ptr[2] =\", (ptr + 2)[])\n\n    # 5. 破棄\n    for i in range(5):\n        (ptr + i).destroy_pointee()\n\n    # 6. メモリ解放\n    ptr.free()",
       afterCode: "UnsafePointer のライフサイクル:\n1. alloc で確保（メモリは未初期化）\n2. init_pointee_move/copy で初期化（必須）\n3. [] で読み書き\n4. destroy_pointee で値を破棄（デストラクタ呼び出し）\n5. free でメモリ解放\n\n手順を間違えるとメモリリーク・二重解放・未定義動作が発生します。"
     },
     {
       title: "@align(N) — メモリアライメント制御",
       body: "struct のメモリ配置を指定します。SIMD演算やキャッシュ最適化に重要です。",
       table: T.alignEffect,
-      code: `@align(64)  # キャッシュライン境界
-struct CacheLine:
-    var data: SIMD[DType.float64, 8]  # 64バイト = 1キャッシュライン
-
-    def __init__(out self):
-        self.data = SIMD[DType.float64, 8](0)
-
-@align(32)  # AVX最適
-struct SimdBlock:
-    var values: SIMD[DType.float32, 8]  # 32バイト
-
-    def __init__(out self):
-        self.values = SIMD[DType.float32, 8](0)
-
-def main():
-    var line = CacheLine()
-    line.data = SIMD[DType.float64, 8](1, 2, 3, 4, 5, 6, 7, 8)
-    print("合計:", line.data.reduce_add())`
+      code: "@align(64)  # キャッシュライン境界\nstruct CacheLine:\n    var data: SIMD[DType.float64, 8]  # 64バイト = 1キャッシュライン\n\n    def __init__(out self):\n        self.data = SIMD[DType.float64, 8](0)\n\n@align(32)  # AVX最適\nstruct SimdBlock:\n    var values: SIMD[DType.float32, 8]  # 32バイト\n\n    def __init__(out self):\n        self.values = SIMD[DType.float32, 8](0)\n\ndef main():\n    var line = CacheLine()\n    line.data = SIMD[DType.float64, 8](1, 2, 3, 4, 5, 6, 7, 8)\n    print(\"合計:\", line.data.reduce_add())"
     },
     {
       title: "手動ライフサイクル管理",
       body: "ASAP（As Soon As Possible）破棄ポリシーにより、Mojo は値が最後に使われた直後に破棄します。これを理解し、必要に応じて制御することが重要です。",
-      code: `struct Resource:
-    var name: String
-
-    def __init__(out self, name: String):
-        self.name = name
-        print("確保:", self.name)
-
-    def __del__(owned self):
-        print("解放:", self.name)
-
-    def __moveinit__(out self, owned other: Self):
-        self.name = other.name^
-        print("移動:", self.name)
-
-def main():
-    var r1 = Resource("A")
-    print("使用中: r1")
-
-    var r2 = r1^   # 所有権移動。r1 はここで無効化
-    print("使用中: r2")
-
-    # r2 はスコープ終了時に自動破棄
-    # ただし ASAP ポリシーにより、最後の使用後すぐに破棄される可能性
-    print("完了")`,
+      code: "struct Resource:\n    var name: String\n\n    def __init__(out self, name: String):\n        self.name = name\n        print(\"確保:\", self.name)\n\n    def __del__(owned self):\n        print(\"解放:\", self.name)\n\n    def __moveinit__(out self, owned other: Self):\n        self.name = other.name^\n        print(\"移動:\", self.name)\n\ndef main():\n    var r1 = Resource(\"A\")\n    print(\"使用中: r1\")\n\n    var r2 = r1^   # 所有権移動。r1 はここで無効化\n    print(\"使用中: r2\")\n\n    # r2 はスコープ終了時に自動破棄\n    # ただし ASAP ポリシーにより、最後の使用後すぐに破棄される可能性\n    print(\"完了\")",
       afterCode: "ASAP 破棄ポリシーの注意点:\n- 変数が最後に使用された直後に __del__ が呼ばれる可能性がある\n- ライフタイムチェッカーが借用の安全性を検証する\n- @explicit_destroy を付けると ASAP 破棄を抑制し、スコープ末尾まで寿命を延長できる"
     },
     {
       title: "OwnedPointer と ArcPointer",
       body: "安全なポインタ型は、所有権モデルに基づいてメモリを自動管理します。",
-      code: `# OwnedPointer: 単独所有のヒープ値
-def owned_pointer_example():
-    var p = OwnedPointer[Int](42)
-    print("値:", p[])
-    p[] = 100
-    print("変更後:", p[])
-    # スコープ終了時に自動解放
-
-# ArcPointer: 参照カウント共有所有
-def arc_pointer_example():
-    var p1 = ArcPointer[String](String("shared data"))
-    var p2 = p1  # 参照カウント +1
-    print("p1:", p1[])
-    print("p2:", p2[])
-    # 両方がスコープ外に出た時点で解放
-
-def main():
-    owned_pointer_example()
-    arc_pointer_example()`,
+      code: "# OwnedPointer: 単独所有のヒープ値\ndef owned_pointer_example():\n    var p = OwnedPointer[Int](42)\n    print(\"値:\", p[])\n    p[] = 100\n    print(\"変更後:\", p[])\n    # スコープ終了時に自動解放\n\n# ArcPointer: 参照カウント共有所有\ndef arc_pointer_example():\n    var p1 = ArcPointer[String](String(\"shared data\"))\n    var p2 = p1  # 参照カウント +1\n    print(\"p1:\", p1[])\n    print(\"p2:\", p2[])\n    # 両方がスコープ外に出た時点で解放\n\ndef main():\n    owned_pointer_example()\n    arc_pointer_example()",
       afterCode: "OwnedPointer は C++ の unique_ptr に、ArcPointer は Rust の Arc に相当します。UnsafePointer と違い、解放忘れやダングリングポインタのリスクがありません。"
     }
   ]
@@ -2277,172 +633,23 @@ def main():
       title: "SIMD 演算の全パターン",
       body: "SIMD 型は要素ごとの演算、リダクション、シャッフルなど豊富な操作を提供します。",
       table: T.simdOps,
-      code: `def main():
-    var a = SIMD[DType.float32, 4](1, 2, 3, 4)
-    var b = SIMD[DType.float32, 4](5, 6, 7, 8)
-
-    # 算術
-    print("加算:", a + b)
-    print("乗算:", a * b)
-
-    # 比較 → Bool マスク
-    var mask = a > SIMD[DType.float32, 4](2)
-    print("a > 2:", mask)
-
-    # リダクション
-    print("合計:", a.reduce_add())
-    print("最大:", a.reduce_max())
-    print("積:", a.reduce_mul())
-
-    # 選択（マスク付き）
-    var zeros = SIMD[DType.float32, 4](0)
-    var result = mask.select(a, zeros)
-    print("2より大きい要素のみ:", result)
-
-    # 型変換
-    var ints = a.cast[DType.int32]()
-    print("int32に変換:", ints)`
+      code: "def main():\n    var a = SIMD[DType.float32, 4](1, 2, 3, 4)\n    var b = SIMD[DType.float32, 4](5, 6, 7, 8)\n\n    # 算術\n    print(\"加算:\", a + b)\n    print(\"乗算:\", a * b)\n\n    # 比較 → Bool マスク\n    var mask = a > SIMD[DType.float32, 4](2)\n    print(\"a > 2:\", mask)\n\n    # リダクション\n    print(\"合計:\", a.reduce_add())\n    print(\"最大:\", a.reduce_max())\n    print(\"積:\", a.reduce_mul())\n\n    # 選択（マスク付き）\n    var zeros = SIMD[DType.float32, 4](0)\n    var result = mask.select(a, zeros)\n    print(\"2より大きい要素のみ:\", result)\n\n    # 型変換\n    var ints = a.cast[DType.int32]()\n    print(\"int32に変換:\", ints)"
     },
     {
       title: "ベクトル化アルゴリズム設計",
       body: "配列処理をSIMD化するパターンです。ポイントは「テール処理」— 配列長が SIMD 幅の倍数でない場合の残り要素の処理です。",
-      code: `alias W = 8  # SIMD幅
-
-def vectorized_add(
-    a: UnsafePointer[Float32],
-    b: UnsafePointer[Float32],
-    out: UnsafePointer[Float32],
-    n: Int
-):
-    var i = 0
-    # メインループ: SIMD幅ごとに処理
-    while i + W <= n:
-        var va = (a + i).load[width=W]()
-        var vb = (b + i).load[width=W]()
-        (out + i).store(va + vb)
-        i += W
-
-    # テール処理: 残り要素をスカラーで処理
-    while i < n:
-        (out + i)[] = (a + i)[] + (b + i)[]
-        i += 1
-
-def main():
-    alias N = 100
-    var a = UnsafePointer[Float32].alloc(N)
-    var b = UnsafePointer[Float32].alloc(N)
-    var c = UnsafePointer[Float32].alloc(N)
-
-    for i in range(N):
-        (a + i).init_pointee_move(Float32(i))
-        (b + i).init_pointee_move(Float32(i * 2))
-        (c + i).init_pointee_move(Float32(0))
-
-    vectorized_add(a, b, c, N)
-    print("c[0]:", (c + 0)[])    # 0
-    print("c[50]:", (c + 50)[])  # 150
-    print("c[99]:", (c + 99)[])  # 297
-
-    for i in range(N):
-        (a + i).destroy_pointee()
-        (b + i).destroy_pointee()
-        (c + i).destroy_pointee()
-    a.free(); b.free(); c.free()`,
+      code: "alias W = 8  # SIMD幅\n\ndef vectorized_add(\n    a: UnsafePointer[Float32],\n    b: UnsafePointer[Float32],\n    out: UnsafePointer[Float32],\n    n: Int\n):\n    var i = 0\n    # メインループ: SIMD幅ごとに処理\n    while i + W <= n:\n        var va = (a + i).load[width=W]()\n        var vb = (b + i).load[width=W]()\n        (out + i).store(va + vb)\n        i += W\n\n    # テール処理: 残り要素をスカラーで処理\n    while i < n:\n        (out + i)[] = (a + i)[] + (b + i)[]\n        i += 1\n\ndef main():\n    alias N = 100\n    var a = UnsafePointer[Float32].alloc(N)\n    var b = UnsafePointer[Float32].alloc(N)\n    var c = UnsafePointer[Float32].alloc(N)\n\n    for i in range(N):\n        (a + i).init_pointee_move(Float32(i))\n        (b + i).init_pointee_move(Float32(i * 2))\n        (c + i).init_pointee_move(Float32(0))\n\n    vectorized_add(a, b, c, N)\n    print(\"c[0]:\", (c + 0)[])    # 0\n    print(\"c[50]:\", (c + 50)[])  # 150\n    print(\"c[99]:\", (c + 99)[])  # 297\n\n    for i in range(N):\n        (a + i).destroy_pointee()\n        (b + i).destroy_pointee()\n        (c + i).destroy_pointee()\n    a.free(); b.free(); c.free()",
       afterCode: "ベクトル化のベストプラクティス:\n1. simdwidthof[T]() でネイティブ SIMD 幅を取得\n2. メインループは SIMD 幅単位で処理\n3. テール処理で残り要素を処理\n4. @align で入力データのアライメントを保証するとさらに高速"
     },
     {
       title: "数値計算最適化: ソフトマックス",
       body: "実践的な数値計算の例として、ソフトマックス関数の SIMD 実装を見てみましょう。数値安定性のために最大値を引く手法も含みます。",
-      code: `from math import exp
-
-def softmax(
-    input: UnsafePointer[Float32],
-    output: UnsafePointer[Float32],
-    n: Int
-):
-    # 1. 最大値を見つける（数値安定性のため）
-    alias W = 8
-    var max_vec = SIMD[DType.float32, W](-1e30)
-    var i = 0
-    while i + W <= n:
-        var v = (input + i).load[width=W]()
-        max_vec = max_vec.max(v)
-        i += W
-    var max_val = max_vec.reduce_max()
-    while i < n:
-        if (input + i)[] > max_val:
-            max_val = (input + i)[]
-        i += 1
-
-    # 2. exp(x - max) の合計
-    var sum_vec = SIMD[DType.float32, W](0)
-    i = 0
-    while i + W <= n:
-        var v = (input + i).load[width=W]()
-        var e = exp(v - max_val)
-        (output + i).store(e)
-        sum_vec += e
-        i += W
-    var total = sum_vec.reduce_add()
-    while i < n:
-        var e = exp((input + i)[] - max_val)
-        (output + i)[] = e
-        total += e
-        i += 1
-
-    # 3. 正規化
-    i = 0
-    while i + W <= n:
-        var v = (output + i).load[width=W]()
-        (output + i).store(v / total)
-        i += W
-    while i < n:
-        (output + i)[] = (output + i)[] / total
-        i += 1
-
-def main():
-    alias N = 8
-    var input = UnsafePointer[Float32].alloc(N)
-    var output = UnsafePointer[Float32].alloc(N)
-    for i in range(N):
-        (input + i).init_pointee_move(Float32(i))
-        (output + i).init_pointee_move(Float32(0))
-
-    softmax(input, output, N)
-
-    var check_sum: Float32 = 0
-    for i in range(N):
-        print("softmax[" + String(i) + "]:", (output + i)[])
-        check_sum += (output + i)[]
-    print("合計（≈1.0）:", check_sum)
-
-    for i in range(N):
-        (input + i).destroy_pointee()
-        (output + i).destroy_pointee()
-    input.free(); output.free()`
+      code: "from math import exp\n\ndef softmax(\n    input: UnsafePointer[Float32],\n    output: UnsafePointer[Float32],\n    n: Int\n):\n    # 1. 最大値を見つける（数値安定性のため）\n    alias W = 8\n    var max_vec = SIMD[DType.float32, W](-1e30)\n    var i = 0\n    while i + W <= n:\n        var v = (input + i).load[width=W]()\n        max_vec = max_vec.max(v)\n        i += W\n    var max_val = max_vec.reduce_max()\n    while i < n:\n        if (input + i)[] > max_val:\n            max_val = (input + i)[]\n        i += 1\n\n    # 2. exp(x - max) の合計\n    var sum_vec = SIMD[DType.float32, W](0)\n    i = 0\n    while i + W <= n:\n        var v = (input + i).load[width=W]()\n        var e = exp(v - max_val)\n        (output + i).store(e)\n        sum_vec += e\n        i += W\n    var total = sum_vec.reduce_add()\n    while i < n:\n        var e = exp((input + i)[] - max_val)\n        (output + i)[] = e\n        total += e\n        i += 1\n\n    # 3. 正規化\n    i = 0\n    while i + W <= n:\n        var v = (output + i).load[width=W]()\n        (output + i).store(v / total)\n        i += W\n    while i < n:\n        (output + i)[] = (output + i)[] / total\n        i += 1\n\ndef main():\n    alias N = 8\n    var input = UnsafePointer[Float32].alloc(N)\n    var output = UnsafePointer[Float32].alloc(N)\n    for i in range(N):\n        (input + i).init_pointee_move(Float32(i))\n        (output + i).init_pointee_move(Float32(0))\n\n    softmax(input, output, N)\n\n    var check_sum: Float32 = 0\n    for i in range(N):\n        print(\"softmax[\" + String(i) + \"]:\", (output + i)[])\n        check_sum += (output + i)[]\n    print(\"合計（≈1.0）:\", check_sum)\n\n    for i in range(N):\n        (input + i).destroy_pointee()\n        (output + i).destroy_pointee()\n    input.free(); output.free()"
     },
     {
       title: "SIMD マスクとselect",
       body: "比較演算の結果は SIMD[DType.bool, N] のマスクベクトルです。select() と組み合わせて条件付き処理を分岐なしで実現します。",
-      code: `def main():
-    var data = SIMD[DType.float32, 8](3, -1, 4, -1, 5, -9, 2, -6)
-
-    # ReLU: max(0, x) を分岐なしで実装
-    var zeros = SIMD[DType.float32, 8](0)
-    var positive_mask = data > zeros
-    var relu_result = positive_mask.select(data, zeros)
-    print("ReLU:", relu_result)
-
-    # 絶対値: |x| を分岐なしで実装
-    var neg_mask = data < zeros
-    var abs_result = neg_mask.select(-data, data)
-    print("abs:", abs_result)
-
-    # クランプ: lo <= x <= hi
-    var lo = SIMD[DType.float32, 8](-2)
-    var hi = SIMD[DType.float32, 8](4)
-    var clamped = data.min(hi).max(lo)
-    print("clamp[-2,4]:", clamped)`
+      code: "def main():\n    var data = SIMD[DType.float32, 8](3, -1, 4, -1, 5, -9, 2, -6)\n\n    # ReLU: max(0, x) を分岐なしで実装\n    var zeros = SIMD[DType.float32, 8](0)\n    var positive_mask = data > zeros\n    var relu_result = positive_mask.select(data, zeros)\n    print(\"ReLU:\", relu_result)\n\n    # 絶対値: |x| を分岐なしで実装\n    var neg_mask = data < zeros\n    var abs_result = neg_mask.select(-data, data)\n    print(\"abs:\", abs_result)\n\n    # クランプ: lo <= x <= hi\n    var lo = SIMD[DType.float32, 8](-2)\n    var hi = SIMD[DType.float32, 8](4)\n    var clamped = data.min(hi).max(lo)\n    print(\"clamp[-2,4]:\", clamped)"
     }
   ]
 },
@@ -2466,111 +673,19 @@ def main():
     {
       title: "最初の GPU プログラム",
       body: "GPU プログラミングの基本的な流れ:\n1. DeviceContext を作成\n2. HostBuffer でCPU側データを準備\n3. DeviceBuffer にデータを転送\n4. カーネル関数を起動\n5. 結果を HostBuffer に戻す",
-      code: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-# GPU上で実行されるカーネル関数
-def square_kernel(data: DeviceBuffer[DType.float32]):
-    var idx = block_idx.x * block_dim.x + thread_idx.x
-    if idx < len(data):
-        var val = data[idx]
-        data[idx] = val * val
-
-def main():
-    alias N = 16
-    var ctx = DeviceContext()
-
-    # 1. CPU側データ準備
-    var host_data = HostBuffer[DType.float32](N)
-    for i in range(N):
-        host_data[i] = Float32(i + 1)
-
-    # 2. GPU側バッファ作成 & データ転送
-    var dev_data = ctx.enqueue_create_buffer[DType.float32](N)
-    ctx.enqueue_copy(dev_data, host_data)
-
-    # 3. カーネル起動（2ブロック x 8スレッド）
-    ctx.enqueue_function[square_kernel](
-        dev_data,
-        grid_dim=2,
-        block_dim=8
-    )
-
-    # 4. 結果を CPU に戻す
-    var result = HostBuffer[DType.float32](N)
-    ctx.enqueue_copy(result, dev_data)
-    ctx.synchronize()
-
-    # 5. 結果確認
-    for i in range(N):
-        print("result[" + String(i) + "]:", result[i])`,
+      code: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\n# GPU上で実行されるカーネル関数\ndef square_kernel(data: DeviceBuffer[DType.float32]):\n    var idx = block_idx.x * block_dim.x + thread_idx.x\n    if idx < len(data):\n        var val = data[idx]\n        data[idx] = val * val\n\ndef main():\n    alias N = 16\n    var ctx = DeviceContext()\n\n    # 1. CPU側データ準備\n    var host_data = HostBuffer[DType.float32](N)\n    for i in range(N):\n        host_data[i] = Float32(i + 1)\n\n    # 2. GPU側バッファ作成 & データ転送\n    var dev_data = ctx.enqueue_create_buffer[DType.float32](N)\n    ctx.enqueue_copy(dev_data, host_data)\n\n    # 3. カーネル起動（2ブロック x 8スレッド）\n    ctx.enqueue_function[square_kernel](\n        dev_data,\n        grid_dim=2,\n        block_dim=8\n    )\n\n    # 4. 結果を CPU に戻す\n    var result = HostBuffer[DType.float32](N)\n    ctx.enqueue_copy(result, dev_data)\n    ctx.synchronize()\n\n    # 5. 結果確認\n    for i in range(N):\n        print(\"result[\" + String(i) + \"]:\", result[i])",
       afterCode: "カーネル内の idx 計算がGPUプログラミングの核心です:\n- block_idx.x: このスレッドが属するブロックの番号\n- thread_idx.x: ブロック内でのスレッド番号\n- block_dim.x: 1ブロック内のスレッド数\n- global_idx = block_idx.x * block_dim.x + thread_idx.x"
     },
     {
       title: "グリッドとブロックの設計",
       body: "並列度の設計は GPU パフォーマンスの鍵です。適切なグリッド/ブロックサイズの選択が重要です。",
-      code: `# グリッドサイズの計算（切り上げ除算）
-# N要素をBLOCKスレッドで処理する場合:
-# grid_dim = (N + BLOCK - 1) // BLOCK
-
-# 1次元の例
-alias N = 1000
-alias BLOCK_1D = 256
-alias GRID_1D = (N + BLOCK_1D - 1) // BLOCK_1D  # = 4
-
-# 2次元の例（行列）
-alias ROWS = 64
-alias COLS = 128
-alias BLOCK_X = 16
-alias BLOCK_Y = 16
-alias GRID_X = (COLS + BLOCK_X - 1) // BLOCK_X  # = 8
-alias GRID_Y = (ROWS + BLOCK_Y - 1) // BLOCK_Y  # = 4
-
-# カーネル内での2次元インデックス計算
-def matrix_kernel(data: DeviceBuffer[DType.float32], rows: Int, cols: Int):
-    var row = block_idx.y * block_dim.y + thread_idx.y
-    var col = block_idx.x * block_dim.x + thread_idx.x
-    if row < rows and col < cols:
-        data[row * cols + col] = Float32(row * cols + col)`,
+      code: "# グリッドサイズの計算（切り上げ除算）\n# N要素をBLOCKスレッドで処理する場合:\n# grid_dim = (N + BLOCK - 1) // BLOCK\n\n# 1次元の例\nalias N = 1000\nalias BLOCK_1D = 256\nalias GRID_1D = (N + BLOCK_1D - 1) // BLOCK_1D  # = 4\n\n# 2次元の例（行列）\nalias ROWS = 64\nalias COLS = 128\nalias BLOCK_X = 16\nalias BLOCK_Y = 16\nalias GRID_X = (COLS + BLOCK_X - 1) // BLOCK_X  # = 8\nalias GRID_Y = (ROWS + BLOCK_Y - 1) // BLOCK_Y  # = 4\n\n# カーネル内での2次元インデックス計算\ndef matrix_kernel(data: DeviceBuffer[DType.float32], rows: Int, cols: Int):\n    var row = block_idx.y * block_dim.y + thread_idx.y\n    var col = block_idx.x * block_dim.x + thread_idx.x\n    if row < rows and col < cols:\n        data[row * cols + col] = Float32(row * cols + col)",
       afterCode: "ブロックサイズの選び方:\n- 32の倍数（ワープサイズに合わせる）\n- 通常 128〜512 が最適\n- 共有メモリ使用量とのバランス\n- 2次元の場合は 16x16 = 256 が定番"
     },
     {
       title: "DeviceBuffer と HostBuffer の詳細",
       body: "HostBuffer はページロックされたCPU側メモリです。通常のメモリより GPU との転送が高速です。DeviceBuffer はGPU上のメモリ領域です。",
-      code: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-def main():
-    var ctx = DeviceContext()
-
-    # HostBuffer: 型付き・サイズ付き
-    var h1 = HostBuffer[DType.float32](100)
-    var h2 = HostBuffer[DType.int32](50)
-
-    # 初期化
-    for i in range(100):
-        h1[i] = Float32(i) * 0.1
-
-    # DeviceBuffer: GPU上に確保
-    var d1 = ctx.enqueue_create_buffer[DType.float32](100)
-    var d2 = ctx.enqueue_create_buffer[DType.float32](100)
-
-    # 転送: CPU → GPU
-    ctx.enqueue_copy(d1, h1)
-
-    # GPU間コピー
-    ctx.enqueue_copy(d2, d1)
-
-    # 転送: GPU → CPU
-    var h_result = HostBuffer[DType.float32](100)
-    ctx.enqueue_copy(h_result, d2)
-
-    # synchronize() で全操作の完了を待つ
-    ctx.synchronize()
-
-    print("h_result[0]:", h_result[0])
-    print("h_result[50]:", h_result[50])
-    print("h_result[99]:", h_result[99])`,
+      code: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\ndef main():\n    var ctx = DeviceContext()\n\n    # HostBuffer: 型付き・サイズ付き\n    var h1 = HostBuffer[DType.float32](100)\n    var h2 = HostBuffer[DType.int32](50)\n\n    # 初期化\n    for i in range(100):\n        h1[i] = Float32(i) * 0.1\n\n    # DeviceBuffer: GPU上に確保\n    var d1 = ctx.enqueue_create_buffer[DType.float32](100)\n    var d2 = ctx.enqueue_create_buffer[DType.float32](100)\n\n    # 転送: CPU → GPU\n    ctx.enqueue_copy(d1, h1)\n\n    # GPU間コピー\n    ctx.enqueue_copy(d2, d1)\n\n    # 転送: GPU → CPU\n    var h_result = HostBuffer[DType.float32](100)\n    ctx.enqueue_copy(h_result, d2)\n\n    # synchronize() で全操作の完了を待つ\n    ctx.synchronize()\n\n    print(\"h_result[0]:\", h_result[0])\n    print(\"h_result[50]:\", h_result[50])\n    print(\"h_result[99]:\", h_result[99])",
       afterCode: "enqueue 系のメソッドは非同期です。GPU にコマンドをキューに追加するだけで、即座に次の行に進みます。synchronize() を呼ぶことで、全コマンドの完了を待ちます。"
     }
   ]
@@ -2584,155 +699,30 @@ def main():
     {
       title: "並列リダクション",
       body: "GPU上でのリダクション（合計・最大値等）は基本的だが重要なパターンです。\nブロック内で共有メモリを使ったツリーリダクションを行い、ブロック間はCPUで集約します。",
-      code: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-def reduce_sum_kernel(
-    input: DeviceBuffer[DType.float32],
-    output: DeviceBuffer[DType.float32],
-    n: Int
-):
-    var tid = thread_idx.x
-    var gid = block_idx.x * block_dim.x + tid
-
-    # 共有メモリにロード
-    var shared = stack_allocation[256, DType.float32]()
-    shared[tid] = input[gid] if gid < n else Float32(0)
-    barrier()
-
-    # ツリーリダクション（ストライド半減）
-    var stride = block_dim.x // 2
-    while stride > 0:
-        if tid < stride:
-            shared[tid] = shared[tid] + shared[tid + stride]
-        barrier()  # 同期
-        stride //= 2
-
-    # ブロック代表が結果を書き出し
-    if tid == 0:
-        output[block_idx.x] = shared[0]`,
+      code: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\ndef reduce_sum_kernel(\n    input: DeviceBuffer[DType.float32],\n    output: DeviceBuffer[DType.float32],\n    n: Int\n):\n    var tid = thread_idx.x\n    var gid = block_idx.x * block_dim.x + tid\n\n    # 共有メモリにロード\n    var shared = stack_allocation[256, DType.float32]()\n    shared[tid] = input[gid] if gid < n else Float32(0)\n    barrier()\n\n    # ツリーリダクション（ストライド半減）\n    var stride = block_dim.x // 2\n    while stride > 0:\n        if tid < stride:\n            shared[tid] = shared[tid] + shared[tid + stride]\n        barrier()  # 同期\n        stride //= 2\n\n    # ブロック代表が結果を書き出し\n    if tid == 0:\n        output[block_idx.x] = shared[0]",
       afterTable: "ツリーリダクションの計算量: O(log N) ステップ × O(N) スレッド。逐次処理の O(N) に対し、理論的に O(log N) に高速化できます。"
     },
     {
       title: "行列演算: 素朴な実装",
       body: "各スレッドが結果行列の1要素を計算する素朴な行列乗算です。理解しやすいですが、グローバルメモリアクセスが多い。",
-      code: `def naive_matmul_kernel(
-    A: DeviceBuffer[DType.float32],
-    B: DeviceBuffer[DType.float32],
-    C: DeviceBuffer[DType.float32],
-    N: Int
-):
-    var row = block_idx.y * block_dim.y + thread_idx.y
-    var col = block_idx.x * block_dim.x + thread_idx.x
-
-    if row < N and col < N:
-        var sum: Float32 = 0
-        for k in range(N):
-            sum += A[row * N + k] * B[k * N + col]
-        C[row * N + col] = sum
-
-# 起動: 2Dグリッド/ブロック
-# grid_dim = ((N+15)//16, (N+15)//16)
-# block_dim = (16, 16)`
+      code: "def naive_matmul_kernel(\n    A: DeviceBuffer[DType.float32],\n    B: DeviceBuffer[DType.float32],\n    C: DeviceBuffer[DType.float32],\n    N: Int\n):\n    var row = block_idx.y * block_dim.y + thread_idx.y\n    var col = block_idx.x * block_dim.x + thread_idx.x\n\n    if row < N and col < N:\n        var sum: Float32 = 0\n        for k in range(N):\n            sum += A[row * N + k] * B[k * N + col]\n        C[row * N + col] = sum\n\n# 起動: 2Dグリッド/ブロック\n# grid_dim = ((N+15)//16, (N+15)//16)\n# block_dim = (16, 16)"
     },
     {
       title: "行列演算: タイル化による最適化",
       body: "共有メモリにタイル（小ブロック）をロードし、再利用することでグローバルメモリアクセスを削減します。",
-      code: `alias TILE = 16
-
-def tiled_matmul_kernel(
-    A: DeviceBuffer[DType.float32],
-    B: DeviceBuffer[DType.float32],
-    C: DeviceBuffer[DType.float32],
-    N: Int
-):
-    var row = block_idx.y * TILE + thread_idx.y
-    var col = block_idx.x * TILE + thread_idx.x
-    var tx = thread_idx.x
-    var ty = thread_idx.y
-
-    # 共有メモリ（タイル）
-    var tileA = stack_allocation[TILE * TILE, DType.float32]()
-    var tileB = stack_allocation[TILE * TILE, DType.float32]()
-
-    var sum: Float32 = 0
-
-    # タイルごとにループ
-    var num_tiles = (N + TILE - 1) // TILE
-    for t in range(num_tiles):
-        # A のタイルをロード
-        if row < N and (t * TILE + tx) < N:
-            tileA[ty * TILE + tx] = A[row * N + t * TILE + tx]
-        else:
-            tileA[ty * TILE + tx] = 0
-
-        # B のタイルをロード
-        if (t * TILE + ty) < N and col < N:
-            tileB[ty * TILE + tx] = B[(t * TILE + ty) * N + col]
-        else:
-            tileB[ty * TILE + tx] = 0
-
-        barrier()
-
-        # タイル内の積和
-        for k in range(TILE):
-            sum += tileA[ty * TILE + k] * tileB[k * TILE + tx]
-
-        barrier()
-
-    if row < N and col < N:
-        C[row * N + col] = sum`,
+      code: "alias TILE = 16\n\ndef tiled_matmul_kernel(\n    A: DeviceBuffer[DType.float32],\n    B: DeviceBuffer[DType.float32],\n    C: DeviceBuffer[DType.float32],\n    N: Int\n):\n    var row = block_idx.y * TILE + thread_idx.y\n    var col = block_idx.x * TILE + thread_idx.x\n    var tx = thread_idx.x\n    var ty = thread_idx.y\n\n    # 共有メモリ（タイル）\n    var tileA = stack_allocation[TILE * TILE, DType.float32]()\n    var tileB = stack_allocation[TILE * TILE, DType.float32]()\n\n    var sum: Float32 = 0\n\n    # タイルごとにループ\n    var num_tiles = (N + TILE - 1) // TILE\n    for t in range(num_tiles):\n        # A のタイルをロード\n        if row < N and (t * TILE + tx) < N:\n            tileA[ty * TILE + tx] = A[row * N + t * TILE + tx]\n        else:\n            tileA[ty * TILE + tx] = 0\n\n        # B のタイルをロード\n        if (t * TILE + ty) < N and col < N:\n            tileB[ty * TILE + tx] = B[(t * TILE + ty) * N + col]\n        else:\n            tileB[ty * TILE + tx] = 0\n\n        barrier()\n\n        # タイル内の積和\n        for k in range(TILE):\n            sum += tileA[ty * TILE + k] * tileB[k * TILE + tx]\n\n        barrier()\n\n    if row < N and col < N:\n        C[row * N + col] = sum",
       afterCode: "タイル化の効果:\n- グローバルメモリアクセス: O(N) → O(N/TILE)\n- 共有メモリの再利用で帯域幅を節約\n- TILE=16 の場合、理論上 16倍の帯域幅削減"
     },
     {
       title: "メモリ転送最適化",
       body: "GPU プログラミングでは、CPU-GPU間のデータ転送がボトルネックになることが多いです。転送回数を最小化する設計が重要です。",
-      code: `from gpu.host import HostBuffer
-from gpu.device import DeviceContext, DeviceBuffer
-
-# ❌ 非効率: 毎ステップ転送
-def bad_pattern(ctx: DeviceContext):
-    for step in range(100):
-        var host = HostBuffer[DType.float32](1024)
-        var dev = ctx.enqueue_create_buffer[DType.float32](1024)
-        ctx.enqueue_copy(dev, host)       # 毎回転送！
-        # カーネル実行...
-        ctx.enqueue_copy(host, dev)       # 毎回転送！
-        ctx.synchronize()
-
-# ✅ 効率的: 最初と最後だけ転送
-def good_pattern(ctx: DeviceContext):
-    var host = HostBuffer[DType.float32](1024)
-    var dev = ctx.enqueue_create_buffer[DType.float32](1024)
-    ctx.enqueue_copy(dev, host)           # 1回だけ
-
-    for step in range(100):
-        pass  # カーネル実行（GPU上のみ）
-
-    ctx.enqueue_copy(host, dev)           # 1回だけ
-    ctx.synchronize()`,
+      code: "from gpu.host import HostBuffer\nfrom gpu.device import DeviceContext, DeviceBuffer\n\n# ❌ 非効率: 毎ステップ転送\ndef bad_pattern(ctx: DeviceContext):\n    for step in range(100):\n        var host = HostBuffer[DType.float32](1024)\n        var dev = ctx.enqueue_create_buffer[DType.float32](1024)\n        ctx.enqueue_copy(dev, host)       # 毎回転送！\n        # カーネル実行...\n        ctx.enqueue_copy(host, dev)       # 毎回転送！\n        ctx.synchronize()\n\n# ✅ 効率的: 最初と最後だけ転送\ndef good_pattern(ctx: DeviceContext):\n    var host = HostBuffer[DType.float32](1024)\n    var dev = ctx.enqueue_create_buffer[DType.float32](1024)\n    ctx.enqueue_copy(dev, host)           # 1回だけ\n\n    for step in range(100):\n        pass  # カーネル実行（GPU上のみ）\n\n    ctx.enqueue_copy(host, dev)           # 1回だけ\n    ctx.synchronize()",
       afterCode: "転送最適化のルール:\n1. CPU-GPU 転送は最小回数に\n2. 中間結果は GPU 上に保持\n3. 複数カーネルをチェインして GPU 上で完結\n4. synchronize() は必要な時だけ呼ぶ"
     },
     {
       title: "同期パターン",
       body: "GPU プログラミングでは、スレッド間・ブロック間の同期が重要です。barrier() はブロック内の全スレッドを同期させます。",
-      code: `# barrier() の使い方
-def sync_example_kernel(data: DeviceBuffer[DType.float32]):
-    var tid = thread_idx.x
-    var shared = stack_allocation[256, DType.float32]()
-
-    # ステップ1: 全スレッドが共有メモリにロード
-    shared[tid] = data[block_idx.x * block_dim.x + tid]
-    barrier()  # 全スレッドがロードを完了するまで待つ
-
-    # ステップ2: 隣接要素を参照する処理
-    # barrier() がないと、他のスレッドがまだロード中の可能性
-    if tid > 0:
-        shared[tid] = (shared[tid] + shared[tid - 1]) / 2
-    barrier()  # 計算完了を待つ
-
-    # ステップ3: 結果を書き戻し
-    data[block_idx.x * block_dim.x + tid] = shared[tid]`,
+      code: "# barrier() の使い方\ndef sync_example_kernel(data: DeviceBuffer[DType.float32]):\n    var tid = thread_idx.x\n    var shared = stack_allocation[256, DType.float32]()\n\n    # ステップ1: 全スレッドが共有メモリにロード\n    shared[tid] = data[block_idx.x * block_dim.x + tid]\n    barrier()  # 全スレッドがロードを完了するまで待つ\n\n    # ステップ2: 隣接要素を参照する処理\n    # barrier() がないと、他のスレッドがまだロード中の可能性\n    if tid > 0:\n        shared[tid] = (shared[tid] + shared[tid - 1]) / 2\n    barrier()  # 計算完了を待つ\n\n    # ステップ3: 結果を書き戻し\n    data[block_idx.x * block_dim.x + tid] = shared[tid]",
       afterCode: "barrier() の注意点:\n- ブロック内の全スレッドが到達する必要がある（条件分岐内で一部のスレッドのみ barrier() を呼ぶのは未定義動作）\n- ブロック間の同期は直接できない（カーネル分割で対応）\n- 過度な同期はパフォーマンス低下の原因"
     }
   ]
@@ -2751,94 +741,24 @@ def sync_example_kernel(data: DeviceBuffer[DType.float32]):
     {
       title: "@export と外部公開",
       body: "@export を付けた関数は C ABI 互換で外部に公開されます。FFI の入口として機能します。",
-      code: `# @export: C ABI互換の公開関数
-@export
-def my_lib_init() -> Int:
-    # 初期化処理
-    return 0  # 成功
-
-@export
-def my_lib_compute(data: UnsafePointer[Float64], n: Int) -> Float64:
-    var sum: Float64 = 0
-    for i in range(n):
-        sum += (data + i)[]
-    return sum / Float64(n)
-
-@export
-def my_lib_version() -> Int:
-    return 1  # バージョン 1.x`,
+      code: "# @export: C ABI互換の公開関数\n@export\ndef my_lib_init() -> Int:\n    # 初期化処理\n    return 0  # 成功\n\n@export\ndef my_lib_compute(data: UnsafePointer[Float64], n: Int) -> Float64:\n    var sum: Float64 = 0\n    for i in range(n):\n        sum += (data + i)[]\n    return sum / Float64(n)\n\n@export\ndef my_lib_version() -> Int:\n    return 1  # バージョン 1.x",
       afterCode: "@export の制約:\n- 引数・戻り値は C ABI 互換の型のみ（数値型、UnsafePointer）\n- String 等の Mojo 固有型は直接渡せない（UnsafePointer[Int8] 経由）\n- テンプレート/ジェネリック関数は export 不可"
     },
     {
       title: "@deprecated による後方互換性",
       body: "API を変更する際、旧 API を @deprecated で残しつつ新 API に誘導できます。",
-      code: `struct MathLib:
-    @staticmethod
-    def compute(x: Float64, y: Float64) -> Float64:
-        return x * x + y * y
-
-    @staticmethod
-    @deprecated("compute() を使ってください")
-    def calc(x: Float64, y: Float64) -> Float64:
-        return MathLib.compute(x, y)
-
-    @staticmethod
-    @deprecated("compute() に名称変更されました。v2.0 で削除予定")
-    def calculate(x: Float64, y: Float64) -> Float64:
-        return MathLib.compute(x, y)
-
-def main():
-    print(MathLib.compute(3.0, 4.0))  # ✅ 推奨
-    # print(MathLib.calc(3.0, 4.0))   # ⚠️ 警告が出る`,
+      code: "struct MathLib:\n    @staticmethod\n    def compute(x: Float64, y: Float64) -> Float64:\n        return x * x + y * y\n\n    @staticmethod\n    @deprecated(\"compute() を使ってください\")\n    def calc(x: Float64, y: Float64) -> Float64:\n        return MathLib.compute(x, y)\n\n    @staticmethod\n    @deprecated(\"compute() に名称変更されました。v2.0 で削除予定\")\n    def calculate(x: Float64, y: Float64) -> Float64:\n        return MathLib.compute(x, y)\n\ndef main():\n    print(MathLib.compute(3.0, 4.0))  # ✅ 推奨\n    # print(MathLib.calc(3.0, 4.0))   # ⚠️ 警告が出る",
       afterCode: "@deprecated のベストプラクティス:\n1. 移行先の関数名をメッセージに含める\n2. 削除予定のバージョンを明記する\n3. 旧 API は内部で新 API を呼ぶだけにする\n4. 少なくとも1メジャーバージョンは非推奨期間を設ける"
     },
     {
       title: "@fieldwise_init の活用",
       body: "フィールドを引数に取るコンストラクタを自動生成します。ボイラープレートの削減に有効です。",
-      code: `@fieldwise_init
-struct Point3D:
-    var x: Float64
-    var y: Float64
-    var z: Float64
-    # __init__(out self, x: Float64, y: Float64, z: Float64)
-    # が自動生成される
-
-    def length_sq(self) -> Float64:
-        return self.x * self.x + self.y * self.y + self.z * self.z
-
-@fieldwise_init
-struct Color:
-    var r: UInt8
-    var g: UInt8
-    var b: UInt8
-    var a: UInt8
-
-def main():
-    var p = Point3D(x=1.0, y=2.0, z=3.0)
-    print("length_sq:", p.length_sq())
-
-    var c = Color(r=255, g=128, b=0, a=255)
-    print("R:", c.r, "G:", c.g, "B:", c.b)`
+      code: "@fieldwise_init\nstruct Point3D:\n    var x: Float64\n    var y: Float64\n    var z: Float64\n    # __init__(out self, x: Float64, y: Float64, z: Float64)\n    # が自動生成される\n\n    def length_sq(self) -> Float64:\n        return self.x * self.x + self.y * self.y + self.z * self.z\n\n@fieldwise_init\nstruct Color:\n    var r: UInt8\n    var g: UInt8\n    var b: UInt8\n    var a: UInt8\n\ndef main():\n    var p = Point3D(x=1.0, y=2.0, z=3.0)\n    print(\"length_sq:\", p.length_sq())\n\n    var c = Color(r=255, g=128, b=0, a=255)\n    print(\"R:\", c.r, \"G:\", c.g, \"B:\", c.b)"
     },
     {
       title: "モジュール設計とパッケージ配布",
       body: "Mojo のパッケージは .mojopkg ファイルとして配布します。モジュール構成を適切に設計することで、保守性と再利用性を高められます。",
-      code: `# パッケージ構成例:
-# mylib/
-# ├── __init__.mojo     ← 公開シンボルの再エクスポート
-# ├── core.mojo         ← 中核機能
-# ├── utils.mojo        ← ユーティリティ
-# └── _internal.mojo    ← 内部実装（_ プレフィックス）
-
-# __init__.mojo の例:
-# from .core import Vector, Matrix
-# from .utils import format_number
-
-# ビルド:
-# mojo package mylib -o mylib.mojopkg
-
-# 利用:
-# from mylib import Vector, Matrix`,
+      code: "# パッケージ構成例:\n# mylib/\n# ├── __init__.mojo     ← 公開シンボルの再エクスポート\n# ├── core.mojo         ← 中核機能\n# ├── utils.mojo        ← ユーティリティ\n# └── _internal.mojo    ← 内部実装（_ プレフィックス）\n\n# __init__.mojo の例:\n# from .core import Vector, Matrix\n# from .utils import format_number\n\n# ビルド:\n# mojo package mylib -o mylib.mojopkg\n\n# 利用:\n# from mylib import Vector, Matrix",
       afterCode: "パッケージ設計のルール:\n1. 公開 API は __init__.mojo で再エクスポート\n2. 内部実装は _ プレフィックスのモジュールに\n3. 型は最小限の公開メソッドを持つ\n4. バージョン定数を alias で定義"
     }
   ]
@@ -2852,217 +772,23 @@ def main():
     {
       title: "イテレータプロトコル",
       body: "Mojo の for ループは __iter__, __next__, __has_next__ プロトコルに基づきます。\nこれらを実装することで、カスタム型を for ループで使えるようになります。",
-      code: `struct Range2D:
-    var width: Int
-    var height: Int
-    var x: Int
-    var y: Int
-
-    def __init__(out self, width: Int, height: Int):
-        self.width = width
-        self.height = height
-        self.x = 0
-        self.y = 0
-
-    def __iter__(self) -> Self:
-        return Self(self.width, self.height)
-
-    def __next__(mut self) -> Tuple[Int, Int]:
-        var result = (self.x, self.y)
-        self.x += 1
-        if self.x >= self.width:
-            self.x = 0
-            self.y += 1
-        return result
-
-    def __has_next__(self) -> Bool:
-        return self.y < self.height
-
-    def __len__(self) -> Int:
-        return self.width * self.height
-
-def main():
-    for pos in Range2D(3, 2):
-        print("(" + String(pos.get[0, Int]()) + ", " + String(pos.get[1, Int]()) + ")")`,
+      code: "struct Range2D:\n    var width: Int\n    var height: Int\n    var x: Int\n    var y: Int\n\n    def __init__(out self, width: Int, height: Int):\n        self.width = width\n        self.height = height\n        self.x = 0\n        self.y = 0\n\n    def __iter__(self) -> Self:\n        return Self(self.width, self.height)\n\n    def __next__(mut self) -> Tuple[Int, Int]:\n        var result = (self.x, self.y)\n        self.x += 1\n        if self.x >= self.width:\n            self.x = 0\n            self.y += 1\n        return result\n\n    def __has_next__(self) -> Bool:\n        return self.y < self.height\n\n    def __len__(self) -> Int:\n        return self.width * self.height\n\ndef main():\n    for pos in Range2D(3, 2):\n        print(\"(\" + String(pos.get[0, Int]()) + \", \" + String(pos.get[1, Int]()) + \")\")",
       afterCode: "イテレータの3メソッド:\n- __iter__(self) → Self: イテレータ自体を返す（初期状態に）\n- __has_next__(self) → Bool: まだ要素があるか\n- __next__(mut self) → T: 次の要素を返し、内部状態を進める"
     },
     {
       title: "動的配列の実装",
       body: "UnsafePointer を使って List[T] 相当の動的配列を実装します。\n容量管理（キャパシティ倍増）とメモリ安全性の両立がポイントです。",
-      code: `struct DynArray[T: Movable & Copyable]:
-    var ptr: UnsafePointer[T]
-    var size: Int
-    var cap: Int
-
-    def __init__(out self):
-        self.cap = 4
-        self.size = 0
-        self.ptr = UnsafePointer[T].alloc(self.cap)
-
-    def _grow(mut self):
-        var new_cap = self.cap * 2
-        var new_ptr = UnsafePointer[T].alloc(new_cap)
-        for i in range(self.size):
-            (new_ptr + i).init_pointee_move((self.ptr + i).take_pointee())
-        self.ptr.free()
-        self.ptr = new_ptr
-        self.cap = new_cap
-
-    def push(mut self, val: T):
-        if self.size >= self.cap:
-            self._grow()
-        (self.ptr + self.size).init_pointee_copy(val)
-        self.size += 1
-
-    def pop(mut self) -> T:
-        self.size -= 1
-        return (self.ptr + self.size).take_pointee()
-
-    def __getitem__(self, idx: Int) -> T:
-        return (self.ptr + idx)[]
-
-    def __setitem__(mut self, idx: Int, val: T):
-        (self.ptr + idx)[] = val
-
-    def __len__(self) -> Int:
-        return self.size
-
-    def __del__(owned self):
-        for i in range(self.size):
-            (self.ptr + i).destroy_pointee()
-        self.ptr.free()
-
-def main():
-    var arr = DynArray[Int]()
-    for i in range(10):
-        arr.push(i * 10)
-    print("len:", len(arr))
-    print("arr[3]:", arr[3])
-    print("arr[9]:", arr[9])
-    var last = arr.pop()
-    print("popped:", last, "new len:", len(arr))`
+      code: "struct DynArray[T: Movable & Copyable]:\n    var ptr: UnsafePointer[T]\n    var size: Int\n    var cap: Int\n\n    def __init__(out self):\n        self.cap = 4\n        self.size = 0\n        self.ptr = UnsafePointer[T].alloc(self.cap)\n\n    def _grow(mut self):\n        var new_cap = self.cap * 2\n        var new_ptr = UnsafePointer[T].alloc(new_cap)\n        for i in range(self.size):\n            (new_ptr + i).init_pointee_move((self.ptr + i).take_pointee())\n        self.ptr.free()\n        self.ptr = new_ptr\n        self.cap = new_cap\n\n    def push(mut self, val: T):\n        if self.size >= self.cap:\n            self._grow()\n        (self.ptr + self.size).init_pointee_copy(val)\n        self.size += 1\n\n    def pop(mut self) -> T:\n        self.size -= 1\n        return (self.ptr + self.size).take_pointee()\n\n    def __getitem__(self, idx: Int) -> T:\n        return (self.ptr + idx)[]\n\n    def __setitem__(mut self, idx: Int, val: T):\n        (self.ptr + idx)[] = val\n\n    def __len__(self) -> Int:\n        return self.size\n\n    def __del__(owned self):\n        for i in range(self.size):\n            (self.ptr + i).destroy_pointee()\n        self.ptr.free()\n\ndef main():\n    var arr = DynArray[Int]()\n    for i in range(10):\n        arr.push(i * 10)\n    print(\"len:\", len(arr))\n    print(\"arr[3]:\", arr[3])\n    print(\"arr[9]:\", arr[9])\n    var last = arr.pop()\n    print(\"popped:\", last, \"new len:\", len(arr))"
     },
     {
       title: "双方向連結リスト",
       body: "OwnedPointer（または UnsafePointer）を使った連結リストの実装例です。\n各ノードが前後のポインタを持ちます。",
-      code: `struct Node:
-    var value: Int
-    var next: UnsafePointer[Node]
-    var prev: UnsafePointer[Node]
-
-    def __init__(out self, val: Int):
-        self.value = val
-        self.next = UnsafePointer[Node]()
-        self.prev = UnsafePointer[Node]()
-
-struct DoublyLinked:
-    var head: UnsafePointer[Node]
-    var tail: UnsafePointer[Node]
-    var size: Int
-
-    def __init__(out self):
-        self.head = UnsafePointer[Node]()
-        self.tail = UnsafePointer[Node]()
-        self.size = 0
-
-    def push_back(mut self, val: Int):
-        var node = UnsafePointer[Node].alloc(1)
-        node.init_pointee_move(Node(val))
-        if self.size == 0:
-            self.head = node
-            self.tail = node
-        else:
-            node[].prev = self.tail
-            self.tail[].next = node
-            self.tail = node
-        self.size += 1
-
-    def push_front(mut self, val: Int):
-        var node = UnsafePointer[Node].alloc(1)
-        node.init_pointee_move(Node(val))
-        if self.size == 0:
-            self.head = node
-            self.tail = node
-        else:
-            node[].next = self.head
-            self.head[].prev = node
-            self.head = node
-        self.size += 1
-
-    def print_forward(self):
-        var cur = self.head
-        while cur:
-            print(cur[].value)
-            cur = cur[].next
-
-    def __len__(self) -> Int:
-        return self.size
-
-    def __del__(owned self):
-        var cur = self.head
-        while cur:
-            var next = cur[].next
-            cur.destroy_pointee()
-            cur.free()
-            cur = next
-
-def main():
-    var ll = DoublyLinked()
-    ll.push_back(10)
-    ll.push_back(20)
-    ll.push_back(30)
-    ll.push_front(5)
-    print("len:", len(ll))
-    ll.print_forward()`
+      code: "struct Node:\n    var value: Int\n    var next: UnsafePointer[Node]\n    var prev: UnsafePointer[Node]\n\n    def __init__(out self, val: Int):\n        self.value = val\n        self.next = UnsafePointer[Node]()\n        self.prev = UnsafePointer[Node]()\n\nstruct DoublyLinked:\n    var head: UnsafePointer[Node]\n    var tail: UnsafePointer[Node]\n    var size: Int\n\n    def __init__(out self):\n        self.head = UnsafePointer[Node]()\n        self.tail = UnsafePointer[Node]()\n        self.size = 0\n\n    def push_back(mut self, val: Int):\n        var node = UnsafePointer[Node].alloc(1)\n        node.init_pointee_move(Node(val))\n        if self.size == 0:\n            self.head = node\n            self.tail = node\n        else:\n            node[].prev = self.tail\n            self.tail[].next = node\n            self.tail = node\n        self.size += 1\n\n    def push_front(mut self, val: Int):\n        var node = UnsafePointer[Node].alloc(1)\n        node.init_pointee_move(Node(val))\n        if self.size == 0:\n            self.head = node\n            self.tail = node\n        else:\n            node[].next = self.head\n            self.head[].prev = node\n            self.head = node\n        self.size += 1\n\n    def print_forward(self):\n        var cur = self.head\n        while cur:\n            print(cur[].value)\n            cur = cur[].next\n\n    def __len__(self) -> Int:\n        return self.size\n\n    def __del__(owned self):\n        var cur = self.head\n        while cur:\n            var next = cur[].next\n            cur.destroy_pointee()\n            cur.free()\n            cur = next\n\ndef main():\n    var ll = DoublyLinked()\n    ll.push_back(10)\n    ll.push_back(20)\n    ll.push_back(30)\n    ll.push_front(5)\n    print(\"len:\", len(ll))\n    ll.print_forward()"
     },
     {
       title: "メモリ効率の良いスタック",
       body: "固定サイズバッファを使ったスタック実装。ヒープ割り当てを避け、高速に動作します。",
-      code: `struct FixedStack[T: Movable & Copyable, CAP: Int]:
-    var buf: UnsafePointer[T]
-    var top: Int
-
-    def __init__(out self):
-        self.buf = UnsafePointer[T].alloc(CAP)
-        self.top = 0
-
-    def push(mut self, val: T) -> Bool:
-        if self.top >= CAP:
-            return False  # 満杯
-        (self.buf + self.top).init_pointee_copy(val)
-        self.top += 1
-        return True
-
-    def pop(mut self) -> T:
-        self.top -= 1
-        return (self.buf + self.top).take_pointee()
-
-    def peek(self) -> T:
-        return (self.buf + self.top - 1)[]
-
-    def is_empty(self) -> Bool:
-        return self.top == 0
-
-    def is_full(self) -> Bool:
-        return self.top >= CAP
-
-    def __len__(self) -> Int:
-        return self.top
-
-    def __del__(owned self):
-        for i in range(self.top):
-            (self.buf + i).destroy_pointee()
-        self.buf.free()
-
-def main():
-    var stack = FixedStack[Int, 8]()
-    _ = stack.push(10)
-    _ = stack.push(20)
-    _ = stack.push(30)
-    print("peek:", stack.peek())  # 30
-    print("pop:", stack.pop())    # 30
-    print("pop:", stack.pop())    # 20
-    print("len:", len(stack))     # 1`
+      code: "struct FixedStack[T: Movable & Copyable, CAP: Int]:\n    var buf: UnsafePointer[T]\n    var top: Int\n\n    def __init__(out self):\n        self.buf = UnsafePointer[T].alloc(CAP)\n        self.top = 0\n\n    def push(mut self, val: T) -> Bool:\n        if self.top >= CAP:\n            return False  # 満杯\n        (self.buf + self.top).init_pointee_copy(val)\n        self.top += 1\n        return True\n\n    def pop(mut self) -> T:\n        self.top -= 1\n        return (self.buf + self.top).take_pointee()\n\n    def peek(self) -> T:\n        return (self.buf + self.top - 1)[]\n\n    def is_empty(self) -> Bool:\n        return self.top == 0\n\n    def is_full(self) -> Bool:\n        return self.top >= CAP\n\n    def __len__(self) -> Int:\n        return self.top\n\n    def __del__(owned self):\n        for i in range(self.top):\n            (self.buf + i).destroy_pointee()\n        self.buf.free()\n\ndef main():\n    var stack = FixedStack[Int, 8]()\n    _ = stack.push(10)\n    _ = stack.push(20)\n    _ = stack.push(30)\n    print(\"peek:\", stack.peek())  # 30\n    print(\"pop:\", stack.pop())    # 30\n    print(\"pop:\", stack.pop())    # 20\n    print(\"len:\", len(stack))     # 1"
     }
   ]
 },
@@ -3076,141 +802,25 @@ def main():
       title: "条件付きトレイト適合とトレイト合成",
       body: "v26.2 のトレイトシステムは、条件付き適合とトレイト合成（&）をサポートしています。",
       table: T.traitComposition,
-      code: `# トレイト合成: 複数のトレイトを同時に要求
-def process[T: Movable & Copyable & Stringable](val: T):
-    var copy = val   # Copyable
-    print(String(copy))  # Stringable
-
-# 条件付き: T が特定トレイトを満たす場合のみ追加機能
-struct Wrapper[T: Movable & Copyable]:
-    var inner: T
-
-    def __init__(out self, val: T):
-        self.inner = val
-
-    def describe(self) -> String:
-        comptime if T: Stringable:
-            return "Wrapper(" + String(self.inner) + ")"
-        else:
-            return "Wrapper(<opaque>)"
-
-def main():
-    var w1 = Wrapper[Int](42)
-    print(w1.describe())  # Wrapper(42)
-
-    var w2 = Wrapper[String]("hello")
-    print(w2.describe())  # Wrapper(hello)`
+      code: "# トレイト合成: 複数のトレイトを同時に要求\ndef process[T: Movable & Copyable & Stringable](val: T):\n    var copy = val   # Copyable\n    print(String(copy))  # Stringable\n\n# 条件付き: T が特定トレイトを満たす場合のみ追加機能\nstruct Wrapper[T: Movable & Copyable]:\n    var inner: T\n\n    def __init__(out self, val: T):\n        self.inner = val\n\n    def describe(self) -> String:\n        comptime if T: Stringable:\n            return \"Wrapper(\" + String(self.inner) + \")\"\n        else:\n            return \"Wrapper(<opaque>)\"\n\ndef main():\n    var w1 = Wrapper[Int](42)\n    print(w1.describe())  # Wrapper(42)\n\n    var w2 = Wrapper[String](\"hello\")\n    print(w2.describe())  # Wrapper(hello)"
     },
     {
       title: "@implicit 変換",
       body: "@implicit を __init__ に付けることで、暗黙的な型変換を可能にします。\nAPIの使いやすさ向上に効果的ですが、乱用すると意図しない変換が起きるため注意が必要です。",
-      code: `struct Celsius:
-    var value: Float64
-    def __init__(out self, v: Float64):
-        self.value = v
-
-struct Fahrenheit:
-    var value: Float64
-    def __init__(out self, v: Float64):
-        self.value = v
-
-    @implicit
-    def __init__(out self, c: Celsius):
-        self.value = c.value * 9.0 / 5.0 + 32.0
-
-# Fahrenheit を受け取る関数に Celsius を渡せる
-def print_temp(f: Fahrenheit):
-    print("Temperature:", f.value, "°F")
-
-def main():
-    var c = Celsius(100.0)
-    print_temp(c)    # 暗黙変換: Celsius → Fahrenheit
-    print_temp(Fahrenheit(72.0))  # 直接渡しも OK`,
+      code: "struct Celsius:\n    var value: Float64\n    def __init__(out self, v: Float64):\n        self.value = v\n\nstruct Fahrenheit:\n    var value: Float64\n    def __init__(out self, v: Float64):\n        self.value = v\n\n    @implicit\n    def __init__(out self, c: Celsius):\n        self.value = c.value * 9.0 / 5.0 + 32.0\n\n# Fahrenheit を受け取る関数に Celsius を渡せる\ndef print_temp(f: Fahrenheit):\n    print(\"Temperature:\", f.value, \"°F\")\n\ndef main():\n    var c = Celsius(100.0)\n    print_temp(c)    # 暗黙変換: Celsius → Fahrenheit\n    print_temp(Fahrenheit(72.0))  # 直接渡しも OK",
       afterCode: "@implicit のルール:\n- 1段階の変換のみ（A→B→C の連鎖は不可）\n- 曖昧性がある場合はコンパイルエラー\n- 数値変換（Int→Float64 等）は言語組み込みの暗黙変換"
     },
     {
       title: "エラー処理の高度な設計",
       body: "v26.2 では型付きエラー、パラメトリック raises、Never 型が導入されました。",
       table: T.errorHandling,
-      code: `# 基本的なエラー処理
-def parse_int(s: String) raises -> Int:
-    return Int(s)
-
-# Never 型: 決して返らない関数
-def fatal_error(msg: String) -> Never:
-    print("FATAL:", msg)
-    abort()
-
-# エラー処理のパターン
-def safe_divide(a: Float64, b: Float64) raises -> Float64:
-    if b == 0:
-        raise Error("division by zero")
-    return a / b
-
-def main():
-    # try/except パターン
-    try:
-        var result = safe_divide(10.0, 3.0)
-        print("結果:", result)
-    except e:
-        print("エラー:", e)
-
-    try:
-        var result = safe_divide(10.0, 0.0)
-        print("結果:", result)
-    except e:
-        print("エラー:", e)`,
+      code: "# 基本的なエラー処理\ndef parse_int(s: String) raises -> Int:\n    return Int(s)\n\n# Never 型: 決して返らない関数\ndef fatal_error(msg: String) -> Never:\n    print(\"FATAL:\", msg)\n    abort()\n\n# エラー処理のパターン\ndef safe_divide(a: Float64, b: Float64) raises -> Float64:\n    if b == 0:\n        raise Error(\"division by zero\")\n    return a / b\n\ndef main():\n    # try/except パターン\n    try:\n        var result = safe_divide(10.0, 3.0)\n        print(\"結果:\", result)\n    except e:\n        print(\"エラー:\", e)\n\n    try:\n        var result = safe_divide(10.0, 0.0)\n        print(\"結果:\", result)\n    except e:\n        print(\"エラー:\", e)",
       afterCode: "def は v26.2 で暗黙的に raises しなくなりました。エラーを投げる可能性がある場合は明示的に raises を書く必要があります。これにより、エラーの可能性がシグネチャから明確になります。"
     },
     {
       title: "型消去パターン",
       body: "異なる型を統一的に扱うパターンです。Mojo では tagged union やトレイトオブジェクト相当の仕組みで実現します。",
-      code: `# Tagged Union パターン
-struct AnyValue:
-    var tag: Int     # 0=Int, 1=Float64, 2=String
-    var i: Int
-    var f: Float64
-    var s: String
-
-    def __init__(out self):
-        self.tag = 0; self.i = 0; self.f = 0; self.s = ""
-
-    @staticmethod
-    def from_int(v: Int) -> AnyValue:
-        var a = AnyValue()
-        a.tag = 0; a.i = v
-        return a
-
-    @staticmethod
-    def from_float(v: Float64) -> AnyValue:
-        var a = AnyValue()
-        a.tag = 1; a.f = v
-        return a
-
-    @staticmethod
-    def from_string(v: String) -> AnyValue:
-        var a = AnyValue()
-        a.tag = 2; a.s = v
-        return a
-
-    def to_string(self) -> String:
-        if self.tag == 0: return String(self.i)
-        if self.tag == 1: return String(self.f)
-        return self.s
-
-    def type_name(self) -> String:
-        if self.tag == 0: return "Int"
-        if self.tag == 1: return "Float64"
-        return "String"
-
-def main():
-    var items = List[AnyValue]()
-    items.append(AnyValue.from_int(42))
-    items.append(AnyValue.from_float(3.14))
-    items.append(AnyValue.from_string("hello"))
-
-    for i in range(len(items)):
-        print(items[i].type_name() + ":", items[i].to_string())`
+      code: "# Tagged Union パターン\nstruct AnyValue:\n    var tag: Int     # 0=Int, 1=Float64, 2=String\n    var i: Int\n    var f: Float64\n    var s: String\n\n    def __init__(out self):\n        self.tag = 0; self.i = 0; self.f = 0; self.s = \"\"\n\n    @staticmethod\n    def from_int(v: Int) -> AnyValue:\n        var a = AnyValue()\n        a.tag = 0; a.i = v\n        return a\n\n    @staticmethod\n    def from_float(v: Float64) -> AnyValue:\n        var a = AnyValue()\n        a.tag = 1; a.f = v\n        return a\n\n    @staticmethod\n    def from_string(v: String) -> AnyValue:\n        var a = AnyValue()\n        a.tag = 2; a.s = v\n        return a\n\n    def to_string(self) -> String:\n        if self.tag == 0: return String(self.i)\n        if self.tag == 1: return String(self.f)\n        return self.s\n\n    def type_name(self) -> String:\n        if self.tag == 0: return \"Int\"\n        if self.tag == 1: return \"Float64\"\n        return \"String\"\n\ndef main():\n    var items = List[AnyValue]()\n    items.append(AnyValue.from_int(42))\n    items.append(AnyValue.from_float(3.14))\n    items.append(AnyValue.from_string(\"hello\"))\n\n    for i in range(len(items)):\n        print(items[i].type_name() + \":\", items[i].to_string())"
     }
   ]
 },
@@ -3228,140 +838,24 @@ def main():
     {
       title: "@always_inline と @no_inline",
       body: "インライン化は関数呼び出しのオーバーヘッドを除去しますが、バイナリサイズが増加します。\n\n@always_inline: 必ずインライン展開（小さな関数・ホットパス向け）\n@no_inline: インライン展開を禁止（大きな関数・コールドパス向け）",
-      code: `@always_inline
-def fast_abs(x: Float64) -> Float64:
-    if x < 0:
-        return -x
-    return x
-
-@always_inline
-def fast_min(a: Float64, b: Float64) -> Float64:
-    if a < b:
-        return a
-    return b
-
-@no_inline
-def log_error(msg: String):
-    # エラーログは滅多に呼ばれないのでインライン化不要
-    print("[ERROR]", msg)
-
-def main():
-    var data = SIMD[DType.float64, 4](-1.5, 2.3, -3.7, 4.1)
-    for i in range(4):
-        # fast_abs はインライン展開されるため関数呼び出しコストなし
-        print(fast_abs(data[i]))`,
+      code: "@always_inline\ndef fast_abs(x: Float64) -> Float64:\n    if x < 0:\n        return -x\n    return x\n\n@always_inline\ndef fast_min(a: Float64, b: Float64) -> Float64:\n    if a < b:\n        return a\n    return b\n\n@no_inline\ndef log_error(msg: String):\n    # エラーログは滅多に呼ばれないのでインライン化不要\n    print(\"[ERROR]\", msg)\n\ndef main():\n    var data = SIMD[DType.float64, 4](-1.5, 2.3, -3.7, 4.1)\n    for i in range(4):\n        # fast_abs はインライン展開されるため関数呼び出しコストなし\n        print(fast_abs(data[i]))",
       afterCode: "インライン化の判断基準:\n- 小さい（数行）& 頻繁に呼ばれる → @always_inline\n- 大きい or 滅多に呼ばれない → @no_inline\n- 迷ったら → コンパイラに任せる（デフォルト）"
     },
     {
       title: "キャッシュ最適化",
       body: "CPU キャッシュの効率的な利用はパフォーマンスに大きく影響します。\n\nデータの局所性（spatial locality / temporal locality）を意識したアクセスパターンが重要です。",
-      code: `# ❌ 列方向アクセス（キャッシュミス多発）
-def bad_access(data: UnsafePointer[Float64], rows: Int, cols: Int):
-    var sum: Float64 = 0
-    for col in range(cols):
-        for row in range(rows):
-            sum += (data + row * cols + col)[]  # ストライドが大きい
-    return sum
-
-# ✅ 行方向アクセス（キャッシュフレンドリー）
-def good_access(data: UnsafePointer[Float64], rows: Int, cols: Int):
-    var sum: Float64 = 0
-    for row in range(rows):
-        for col in range(cols):
-            sum += (data + row * cols + col)[]  # 連続アクセス
-    return sum
-
-# ✅ SIMD + キャッシュフレンドリー
-def simd_access(data: UnsafePointer[Float64], rows: Int, cols: Int):
-    alias W = 4
-    var total = SIMD[DType.float64, W](0)
-    for row in range(rows):
-        var i = 0
-        while i + W <= cols:
-            total += (data + row * cols + i).load[width=W]()
-            i += W
-    return total.reduce_add()`,
+      code: "# ❌ 列方向アクセス（キャッシュミス多発）\ndef bad_access(data: UnsafePointer[Float64], rows: Int, cols: Int):\n    var sum: Float64 = 0\n    for col in range(cols):\n        for row in range(rows):\n            sum += (data + row * cols + col)[]  # ストライドが大きい\n    return sum\n\n# ✅ 行方向アクセス（キャッシュフレンドリー）\ndef good_access(data: UnsafePointer[Float64], rows: Int, cols: Int):\n    var sum: Float64 = 0\n    for row in range(rows):\n        for col in range(cols):\n            sum += (data + row * cols + col)[]  # 連続アクセス\n    return sum\n\n# ✅ SIMD + キャッシュフレンドリー\ndef simd_access(data: UnsafePointer[Float64], rows: Int, cols: Int):\n    alias W = 4\n    var total = SIMD[DType.float64, W](0)\n    for row in range(rows):\n        var i = 0\n        while i + W <= cols:\n            total += (data + row * cols + i).load[width=W]()\n            i += W\n    return total.reduce_add()",
       afterCode: "キャッシュ最適化のルール:\n1. 連続メモリアクセスを優先（行優先）\n2. @align(64) でキャッシュライン境界に配置\n3. ホットデータとコールドデータを分離（SoA パターン）\n4. 作業セットをキャッシュに収める（タイル化）"
     },
     {
       title: "ベンチマーク方法論",
       body: "正確なベンチマークのためのルール:\n1. ウォームアップ実行を行う（JIT最適化・キャッシュ準備）\n2. 十分な反復回数で平均を取る\n3. 結果を使用する（デッドコード除去防止）\n4. 複数回計測して中央値を使う",
-      code: `from time import now
-
-def benchmark[func: def(UnsafePointer[Float32], Int) -> Float32](
-    data: UnsafePointer[Float32],
-    n: Int,
-    iters: Int,
-    name: String
-):
-    # ウォームアップ
-    for _ in range(10):
-        var _ = func(data, n)
-
-    # 本計測
-    var best_time = Int.MAX
-    for trial in range(5):
-        var t0 = now()
-        var result: Float32 = 0
-        for _ in range(iters):
-            result = func(data, n)
-        var elapsed = now() - t0
-        if elapsed < best_time:
-            best_time = elapsed
-        # result を使用（最適化除去防止）
-        if result == -999.999:
-            print("never")
-
-    print(name, ": best", best_time // 1000, "us /", iters, "iters")`
+      code: "from time import now\n\ndef benchmark[func: def(UnsafePointer[Float32], Int) -> Float32](\n    data: UnsafePointer[Float32],\n    n: Int,\n    iters: Int,\n    name: String\n):\n    # ウォームアップ\n    for _ in range(10):\n        var _ = func(data, n)\n\n    # 本計測\n    var best_time = Int.MAX\n    for trial in range(5):\n        var t0 = now()\n        var result: Float32 = 0\n        for _ in range(iters):\n            result = func(data, n)\n        var elapsed = now() - t0\n        if elapsed < best_time:\n            best_time = elapsed\n        # result を使用（最適化除去防止）\n        if result == -999.999:\n            print(\"never\")\n\n    print(name, \": best\", best_time // 1000, \"us /\", iters, \"iters\")"
     },
     {
       title: "SoA vs AoS パターン",
       body: "Structure of Arrays（SoA）は SIMD 処理とキャッシュ効率に優れたメモリレイアウトです。\nArray of Structures（AoS）は直感的ですが、SIMD化が困難です。",
-      code: `# AoS: 直感的だがSIMD不向き
-# メモリ: [x0,y0,z0, x1,y1,z1, x2,y2,z2, ...]
-struct ParticleAoS:
-    var x: Float32
-    var y: Float32
-    var z: Float32
-
-# SoA: SIMD向き
-# メモリ: [x0,x1,x2,..., y0,y1,y2,..., z0,z1,z2,...]
-struct ParticlesSoA:
-    var x: UnsafePointer[Float32]
-    var y: UnsafePointer[Float32]
-    var z: UnsafePointer[Float32]
-    var count: Int
-
-    def __init__(out self, n: Int):
-        self.count = n
-        self.x = UnsafePointer[Float32].alloc(n)
-        self.y = UnsafePointer[Float32].alloc(n)
-        self.z = UnsafePointer[Float32].alloc(n)
-        for i in range(n):
-            (self.x + i).init_pointee_move(Float32(0))
-            (self.y + i).init_pointee_move(Float32(0))
-            (self.z + i).init_pointee_move(Float32(0))
-
-    def update_positions(mut self, dt: Float32):
-        alias W = 8
-        var i = 0
-        var dt_vec = SIMD[DType.float32, W](dt)
-        while i + W <= self.count:
-            var vx = (self.x + i).load[width=W]()
-            (self.x + i).store(vx + dt_vec)
-            i += W
-        while i < self.count:
-            (self.x + i)[] += dt
-            i += 1
-
-    def __del__(owned self):
-        for i in range(self.count):
-            (self.x + i).destroy_pointee()
-            (self.y + i).destroy_pointee()
-            (self.z + i).destroy_pointee()
-        self.x.free()
-        self.y.free()
-        self.z.free()`
+      code: "# AoS: 直感的だがSIMD不向き\n# メモリ: [x0,y0,z0, x1,y1,z1, x2,y2,z2, ...]\nstruct ParticleAoS:\n    var x: Float32\n    var y: Float32\n    var z: Float32\n\n# SoA: SIMD向き\n# メモリ: [x0,x1,x2,..., y0,y1,y2,..., z0,z1,z2,...]\nstruct ParticlesSoA:\n    var x: UnsafePointer[Float32]\n    var y: UnsafePointer[Float32]\n    var z: UnsafePointer[Float32]\n    var count: Int\n\n    def __init__(out self, n: Int):\n        self.count = n\n        self.x = UnsafePointer[Float32].alloc(n)\n        self.y = UnsafePointer[Float32].alloc(n)\n        self.z = UnsafePointer[Float32].alloc(n)\n        for i in range(n):\n            (self.x + i).init_pointee_move(Float32(0))\n            (self.y + i).init_pointee_move(Float32(0))\n            (self.z + i).init_pointee_move(Float32(0))\n\n    def update_positions(mut self, dt: Float32):\n        alias W = 8\n        var i = 0\n        var dt_vec = SIMD[DType.float32, W](dt)\n        while i + W <= self.count:\n            var vx = (self.x + i).load[width=W]()\n            (self.x + i).store(vx + dt_vec)\n            i += W\n        while i < self.count:\n            (self.x + i)[] += dt\n            i += 1\n\n    def __del__(owned self):\n        for i in range(self.count):\n            (self.x + i).destroy_pointee()\n            (self.y + i).destroy_pointee()\n            (self.z + i).destroy_pointee()\n        self.x.free()\n        self.y.free()\n        self.z.free()"
     }
   ]
 },
@@ -3380,131 +874,25 @@ struct ParticlesSoA:
     {
       title: "@export 関数の設計",
       body: "外部から呼び出される関数は @export デコレータで公開します。引数と戻り値は C ABI 互換の型に限定されます。",
-      code: `# 基本的な @export パターン
-@export
-def add(a: Int64, b: Int64) -> Int64:
-    return a + b
-
-@export
-def dot_product(
-    a: UnsafePointer[Float64],
-    b: UnsafePointer[Float64],
-    n: Int64
-) -> Float64:
-    var sum: Float64 = 0
-    for i in range(Int(n)):
-        sum += (a + i)[] * (b + i)[]
-    return sum
-
-# エラーコードパターン（例外は C に伝えられない）
-@export
-def safe_sqrt(x: Float64, result: UnsafePointer[Float64]) -> Int32:
-    if x < 0:
-        return Int32(-1)  # エラーコード
-    result[] = x ** 0.5
-    return Int32(0)  # 成功`,
+      code: "# 基本的な @export パターン\n@export\ndef add(a: Int64, b: Int64) -> Int64:\n    return a + b\n\n@export\ndef dot_product(\n    a: UnsafePointer[Float64],\n    b: UnsafePointer[Float64],\n    n: Int64\n) -> Float64:\n    var sum: Float64 = 0\n    for i in range(Int(n)):\n        sum += (a + i)[] * (b + i)[]\n    return sum\n\n# エラーコードパターン（例外は C に伝えられない）\n@export\ndef safe_sqrt(x: Float64, result: UnsafePointer[Float64]) -> Int32:\n    if x < 0:\n        return Int32(-1)  # エラーコード\n    result[] = x ** 0.5\n    return Int32(0)  # 成功",
       afterCode: "FFI 設計のルール:\n1. 例外は C に伝播できない → エラーコードを返す\n2. Mojo の String は使えない → UnsafePointer[Int8] で C文字列を扱う\n3. メモリの確保・解放の責任を明確にする\n4. ハンドルパターン（不透明ポインタ）で内部状態を隠蔽"
     },
     {
       title: "Cライブラリの呼び出し",
       body: "external_call を使って C ライブラリの関数を呼び出せます。",
-      code: `from sys.ffi import external_call
-
-def main():
-    # C の math.h から sqrt を呼び出し
-    var result = external_call["sqrt", Float64, Float64](2.0)
-    print("sqrt(2):", result)
-
-    # C の abs
-    var abs_val = external_call["abs", Int32, Int32](Int32(-42))
-    print("abs(-42):", abs_val)
-
-    # C の strlen
-    var s = String("Hello, FFI!")
-    var len = external_call["strlen", Int64, UnsafePointer[Int8]](
-        s.unsafe_cstr_ptr()
-    )
-    print("strlen:", len)`,
+      code: "from sys.ffi import external_call\n\ndef main():\n    # C の math.h から sqrt を呼び出し\n    var result = external_call[\"sqrt\", Float64, Float64](2.0)\n    print(\"sqrt(2):\", result)\n\n    # C の abs\n    var abs_val = external_call[\"abs\", Int32, Int32](Int32(-42))\n    print(\"abs(-42):\", abs_val)\n\n    # C の strlen\n    var s = String(\"Hello, FFI!\")\n    var len = external_call[\"strlen\", Int64, UnsafePointer[Int8]](\n        s.unsafe_cstr_ptr()\n    )\n    print(\"strlen:\", len)",
       afterCode: "external_call のシグネチャ:\nexternal_call[\"関数名\", 戻り値型, 引数型1, 引数型2, ...](引数1, 引数2, ...)\n\nリンクするライブラリは mojo build 時に指定します。"
     },
     {
       title: "Python 双方向バインディング",
       body: "Mojo は Python モジュールをインポートでき、逆に @export した Mojo 関数を Python から呼ぶこともできます。",
-      code: `# Mojo → Python
-from python import Python
-
-def mojo_calls_python():
-    var json = Python.import_module("json")
-    var data = json.loads('{"name": "Mojo", "version": 26.2}')
-    print("name:", data["name"])
-    print("version:", data["version"])
-
-    var np = Python.import_module("numpy")
-    var arr = np.array([1, 2, 3, 4, 5])
-    print("mean:", arr.mean())
-    print("std:", arr.std())
-
-# Python → Mojo
-# (Mojo側: @export 関数を .mojopkg にビルド)
-# (Python側: ctypes で読み込み)
-#
-# import ctypes
-# lib = ctypes.CDLL("./mylib.so")
-# lib.dot_product.restype = ctypes.c_double
-# result = lib.dot_product(a_ptr, b_ptr, n)
-
-def main():
-    mojo_calls_python()`,
+      code: "# Mojo → Python\nfrom python import Python\n\ndef mojo_calls_python():\n    var json = Python.import_module(\"json\")\n    var data = json.loads('{\"name\": \"Mojo\", \"version\": 26.2}')\n    print(\"name:\", data[\"name\"])\n    print(\"version:\", data[\"version\"])\n\n    var np = Python.import_module(\"numpy\")\n    var arr = np.array([1, 2, 3, 4, 5])\n    print(\"mean:\", arr.mean())\n    print(\"std:\", arr.std())\n\n# Python → Mojo\n# (Mojo側: @export 関数を .mojopkg にビルド)\n# (Python側: ctypes で読み込み)\n#\n# import ctypes\n# lib = ctypes.CDLL(\"./mylib.so\")\n# lib.dot_product.restype = ctypes.c_double\n# result = lib.dot_product(a_ptr, b_ptr, n)\n\ndef main():\n    mojo_calls_python()",
       afterCode: "Python連携のパターン:\n1. Python → Mojo（高速化）: 計算集約処理を Mojo で書き、Python から ctypes で呼ぶ\n2. Mojo → Python（エコシステム活用）: NumPy, Pandas 等の既存ライブラリを活用\n3. 双方向: データパイプラインの一部を Mojo で高速化"
     },
     {
       title: "ハンドルパターン",
       body: "内部状態を不透明ポインタ（ハンドル）として外部に公開するパターンです。内部実装の詳細を隠蔽しつつ、安定した ABI を提供します。",
-      code: `# 内部状態を持つ struct
-struct _Engine:
-    var data: List[Float64]
-    var name: String
-
-    def __init__(out self, name: String):
-        self.data = List[Float64]()
-        self.name = name
-
-    def add_data(mut self, val: Float64):
-        self.data.append(val)
-
-    def compute(self) -> Float64:
-        var sum: Float64 = 0
-        for i in range(len(self.data)):
-            sum += self.data[i]
-        return sum
-
-# ハンドルベースの API
-@export
-def engine_create(name: UnsafePointer[Int8]) -> UnsafePointer[_Engine]:
-    var ptr = UnsafePointer[_Engine].alloc(1)
-    ptr.init_pointee_move(_Engine(String("engine")))
-    return ptr
-
-@export
-def engine_add(handle: UnsafePointer[_Engine], value: Float64):
-    handle[].add_data(value)
-
-@export
-def engine_compute(handle: UnsafePointer[_Engine]) -> Float64:
-    return handle[].compute()
-
-@export
-def engine_destroy(handle: UnsafePointer[_Engine]):
-    handle.destroy_pointee()
-    handle.free()
-
-def main():
-    var h = engine_create(UnsafePointer[Int8]())
-    engine_add(h, 10.0)
-    engine_add(h, 20.0)
-    engine_add(h, 30.0)
-    print("result:", engine_compute(h))
-    engine_destroy(h)`
+      code: "# 内部状態を持つ struct\nstruct _Engine:\n    var data: List[Float64]\n    var name: String\n\n    def __init__(out self, name: String):\n        self.data = List[Float64]()\n        self.name = name\n\n    def add_data(mut self, val: Float64):\n        self.data.append(val)\n\n    def compute(self) -> Float64:\n        var sum: Float64 = 0\n        for i in range(len(self.data)):\n            sum += self.data[i]\n        return sum\n\n# ハンドルベースの API\n@export\ndef engine_create(name: UnsafePointer[Int8]) -> UnsafePointer[_Engine]:\n    var ptr = UnsafePointer[_Engine].alloc(1)\n    ptr.init_pointee_move(_Engine(String(\"engine\")))\n    return ptr\n\n@export\ndef engine_add(handle: UnsafePointer[_Engine], value: Float64):\n    handle[].add_data(value)\n\n@export\ndef engine_compute(handle: UnsafePointer[_Engine]) -> Float64:\n    return handle[].compute()\n\n@export\ndef engine_destroy(handle: UnsafePointer[_Engine]):\n    handle.destroy_pointee()\n    handle.free()\n\ndef main():\n    var h = engine_create(UnsafePointer[Int8]())\n    engine_add(h, 10.0)\n    engine_add(h, 20.0)\n    engine_add(h, 30.0)\n    print(\"result:\", engine_compute(h))\n    engine_destroy(h)"
     }
   ]
 },
@@ -3522,285 +910,22 @@ def main():
     {
       title: "Vec[N, T] の実装",
       body: "SIMD ベースのジェネリックベクトル型です。N は次元数、T は要素の DType です。",
-      code: `struct Vec[N: Int, T: DType]:
-    var data: SIMD[T, N]
-
-    def __init__(out self):
-        self.data = SIMD[T, N](0)
-
-    def __init__(out self, data: SIMD[T, N]):
-        self.data = data
-
-    @staticmethod
-    def splat(val: SIMD[T, 1]) -> Vec[N, T]:
-        return Vec[N, T](SIMD[T, N](val))
-
-    @staticmethod
-    def unit(idx: Int) -> Vec[N, T]:
-        var v = Vec[N, T]()
-        v.data[idx] = SIMD[T, 1](1)
-        return v
-
-    # 算術演算
-    def __add__(self, o: Self) -> Self:
-        return Vec[N, T](self.data + o.data)
-
-    def __sub__(self, o: Self) -> Self:
-        return Vec[N, T](self.data - o.data)
-
-    def __mul__(self, s: SIMD[T, 1]) -> Self:
-        return Vec[N, T](self.data * s)
-
-    def __neg__(self) -> Self:
-        return Vec[N, T](-self.data)
-
-    # ベクトル演算
-    def dot(self, o: Self) -> SIMD[T, 1]:
-        return (self.data * o.data).reduce_add()
-
-    def norm_sq(self) -> SIMD[T, 1]:
-        return self.dot(self)
-
-    def element_wise_mul(self, o: Self) -> Self:
-        return Vec[N, T](self.data * o.data)
-
-    # アクセス
-    def __getitem__(self, idx: Int) -> SIMD[T, 1]:
-        return self.data[idx]
-
-    def describe(self) -> String:
-        var s = String("Vec[") + String(N) + "](")
-        for i in range(N):
-            if i > 0: s += ", "
-            s += String(self.data[i])
-        s += ")"
-        return s
-
-# 型エイリアス
-alias Vec2f = Vec[2, DType.float32]
-alias Vec3f = Vec[3, DType.float32]
-alias Vec4f = Vec[4, DType.float32]
-alias Vec3d = Vec[3, DType.float64]
-
-def main():
-    var a = Vec4f(SIMD[DType.float32, 4](1, 2, 3, 4))
-    var b = Vec4f(SIMD[DType.float32, 4](5, 6, 7, 8))
-    print("a:", a.describe())
-    print("b:", b.describe())
-    print("a+b:", (a + b).describe())
-    print("dot:", a.dot(b))
-    print("norm_sq:", a.norm_sq())`
+      code: "struct Vec[N: Int, T: DType]:\n    var data: SIMD[T, N]\n\n    def __init__(out self):\n        self.data = SIMD[T, N](0)\n\n    def __init__(out self, data: SIMD[T, N]):\n        self.data = data\n\n    @staticmethod\n    def splat(val: SIMD[T, 1]) -> Vec[N, T]:\n        return Vec[N, T](SIMD[T, N](val))\n\n    @staticmethod\n    def unit(idx: Int) -> Vec[N, T]:\n        var v = Vec[N, T]()\n        v.data[idx] = SIMD[T, 1](1)\n        return v\n\n    # 算術演算\n    def __add__(self, o: Self) -> Self:\n        return Vec[N, T](self.data + o.data)\n\n    def __sub__(self, o: Self) -> Self:\n        return Vec[N, T](self.data - o.data)\n\n    def __mul__(self, s: SIMD[T, 1]) -> Self:\n        return Vec[N, T](self.data * s)\n\n    def __neg__(self) -> Self:\n        return Vec[N, T](-self.data)\n\n    # ベクトル演算\n    def dot(self, o: Self) -> SIMD[T, 1]:\n        return (self.data * o.data).reduce_add()\n\n    def norm_sq(self) -> SIMD[T, 1]:\n        return self.dot(self)\n\n    def element_wise_mul(self, o: Self) -> Self:\n        return Vec[N, T](self.data * o.data)\n\n    # アクセス\n    def __getitem__(self, idx: Int) -> SIMD[T, 1]:\n        return self.data[idx]\n\n    def describe(self) -> String:\n        var s = String(\"Vec[\") + String(N) + \"](\")\n        for i in range(N):\n            if i > 0: s += \", \"\n            s += String(self.data[i])\n        s += \")\"\n        return s\n\n# 型エイリアス\nalias Vec2f = Vec[2, DType.float32]\nalias Vec3f = Vec[3, DType.float32]\nalias Vec4f = Vec[4, DType.float32]\nalias Vec3d = Vec[3, DType.float64]\n\ndef main():\n    var a = Vec4f(SIMD[DType.float32, 4](1, 2, 3, 4))\n    var b = Vec4f(SIMD[DType.float32, 4](5, 6, 7, 8))\n    print(\"a:\", a.describe())\n    print(\"b:\", b.describe())\n    print(\"a+b:\", (a + b).describe())\n    print(\"dot:\", a.dot(b))\n    print(\"norm_sq:\", a.norm_sq())"
     },
     {
       title: "Mat[M, N, T] の実装",
       body: "パラメトリック行列型。M×N のサイズがコンパイル時に確定し、行列乗算の次元チェックもコンパイル時に行われます。",
-      code: `struct Mat[M: Int, N: Int, T: DType]:
-    var data: List[SIMD[T, 1]]
-
-    def __init__(out self):
-        self.data = List[SIMD[T, 1]]()
-        for _ in range(M * N):
-            self.data.append(SIMD[T, 1](0))
-
-    def get(self, i: Int, j: Int) -> SIMD[T, 1]:
-        return self.data[i * N + j]
-
-    def set(mut self, i: Int, j: Int, val: SIMD[T, 1]):
-        self.data[i * N + j] = val
-
-    # 行列加算
-    def __add__(self, o: Self) -> Self:
-        var result = Mat[M, N, T]()
-        for i in range(M * N):
-            result.data[i] = self.data[i] + o.data[i]
-        return result
-
-    # スカラー倍
-    def scale(self, s: SIMD[T, 1]) -> Self:
-        var result = Mat[M, N, T]()
-        for i in range(M * N):
-            result.data[i] = self.data[i] * s
-        return result
-
-    # 行列乗算（次元チェック: M×N * N×P → M×P）
-    def matmul[P: Int](self, o: Mat[N, P, T]) -> Mat[M, P, T]:
-        var result = Mat[M, P, T]()
-        for i in range(M):
-            for j in range(P):
-                var s = SIMD[T, 1](0)
-                for k in range(N):
-                    s += self.get(i, k) * o.get(k, j)
-                result.set(i, j, s)
-        return result
-
-    # 転置
-    def transpose(self) -> Mat[N, M, T]:
-        var result = Mat[N, M, T]()
-        for i in range(M):
-            for j in range(N):
-                result.set(j, i, self.get(i, j))
-        return result
-
-    # 単位行列（M==Nの場合のみ意味がある）
-    @staticmethod
-    def identity() -> Mat[M, N, T]:
-        var result = Mat[M, N, T]()
-        alias dim = M if M < N else N
-        for i in range(dim):
-            result.set(i, i, SIMD[T, 1](1))
-        return result
-
-    def describe(self) -> String:
-        var s = String("Mat[") + String(M) + "x" + String(N) + "]:\\n"
-        for i in range(M):
-            s += "  "
-            for j in range(N):
-                s += String(self.get(i, j))
-                if j < N - 1: s += "\\t"
-            s += "\\n"
-        return s
-
-def main():
-    var a = Mat[2, 3, DType.float64]()
-    a.set(0,0,1); a.set(0,1,2); a.set(0,2,3)
-    a.set(1,0,4); a.set(1,1,5); a.set(1,2,6)
-    print(a.describe())
-
-    var b = Mat[3, 2, DType.float64]()
-    b.set(0,0,7); b.set(0,1,8)
-    b.set(1,0,9); b.set(1,1,10)
-    b.set(2,0,11); b.set(2,1,12)
-    print(b.describe())
-
-    var c = a.matmul(b)
-    print("A * B =")
-    print(c.describe())
-
-    var I = Mat[3, 3, DType.float64].identity()
-    print("I =")
-    print(I.describe())`
+      code: "struct Mat[M: Int, N: Int, T: DType]:\n    var data: List[SIMD[T, 1]]\n\n    def __init__(out self):\n        self.data = List[SIMD[T, 1]]()\n        for _ in range(M * N):\n            self.data.append(SIMD[T, 1](0))\n\n    def get(self, i: Int, j: Int) -> SIMD[T, 1]:\n        return self.data[i * N + j]\n\n    def set(mut self, i: Int, j: Int, val: SIMD[T, 1]):\n        self.data[i * N + j] = val\n\n    # 行列加算\n    def __add__(self, o: Self) -> Self:\n        var result = Mat[M, N, T]()\n        for i in range(M * N):\n            result.data[i] = self.data[i] + o.data[i]\n        return result\n\n    # スカラー倍\n    def scale(self, s: SIMD[T, 1]) -> Self:\n        var result = Mat[M, N, T]()\n        for i in range(M * N):\n            result.data[i] = self.data[i] * s\n        return result\n\n    # 行列乗算（次元チェック: M×N * N×P → M×P）\n    def matmul[P: Int](self, o: Mat[N, P, T]) -> Mat[M, P, T]:\n        var result = Mat[M, P, T]()\n        for i in range(M):\n            for j in range(P):\n                var s = SIMD[T, 1](0)\n                for k in range(N):\n                    s += self.get(i, k) * o.get(k, j)\n                result.set(i, j, s)\n        return result\n\n    # 転置\n    def transpose(self) -> Mat[N, M, T]:\n        var result = Mat[N, M, T]()\n        for i in range(M):\n            for j in range(N):\n                result.set(j, i, self.get(i, j))\n        return result\n\n    # 単位行列（M==Nの場合のみ意味がある）\n    @staticmethod\n    def identity() -> Mat[M, N, T]:\n        var result = Mat[M, N, T]()\n        alias dim = M if M < N else N\n        for i in range(dim):\n            result.set(i, i, SIMD[T, 1](1))\n        return result\n\n    def describe(self) -> String:\n        var s = String(\"Mat[\") + String(M) + \"x\" + String(N) + \"]:\\n\"\n        for i in range(M):\n            s += \"  \"\n            for j in range(N):\n                s += String(self.get(i, j))\n                if j < N - 1: s += \"\\t\"\n            s += \"\\n\"\n        return s\n\ndef main():\n    var a = Mat[2, 3, DType.float64]()\n    a.set(0,0,1); a.set(0,1,2); a.set(0,2,3)\n    a.set(1,0,4); a.set(1,1,5); a.set(1,2,6)\n    print(a.describe())\n\n    var b = Mat[3, 2, DType.float64]()\n    b.set(0,0,7); b.set(0,1,8)\n    b.set(1,0,9); b.set(1,1,10)\n    b.set(2,0,11); b.set(2,1,12)\n    print(b.describe())\n\n    var c = a.matmul(b)\n    print(\"A * B =\")\n    print(c.describe())\n\n    var I = Mat[3, 3, DType.float64].identity()\n    print(\"I =\")\n    print(I.describe())"
     },
     {
       title: "テストハーネスの実装",
       body: "数値計算ライブラリには堅牢なテストが不可欠です。浮動小数点の近似比較を含むテストフレームワークを実装します。",
-      code: `struct TestRunner:
-    var total: Int
-    var passed: Int
-    var failed: Int
-    var suite_name: String
-
-    def __init__(out self, name: String):
-        self.total = 0
-        self.passed = 0
-        self.failed = 0
-        self.suite_name = name
-        print("=== " + name + " ===")
-
-    def assert_eq(mut self, actual: Int, expected: Int, msg: String):
-        self.total += 1
-        if actual == expected:
-            self.passed += 1
-        else:
-            self.failed += 1
-            print("  FAIL:", msg, "- expected", expected, "got", actual)
-
-    def assert_near(mut self, actual: Float64, expected: Float64, tol: Float64, msg: String):
-        self.total += 1
-        var diff = actual - expected
-        if diff < 0: diff = -diff
-        if diff <= tol:
-            self.passed += 1
-        else:
-            self.failed += 1
-            print("  FAIL:", msg, "- expected", expected, "got", actual, "diff", diff)
-
-    def assert_true(mut self, cond: Bool, msg: String):
-        self.total += 1
-        if cond:
-            self.passed += 1
-        else:
-            self.failed += 1
-            print("  FAIL:", msg)
-
-    def report(self):
-        print("結果:", self.passed, "/", self.total, "通過")
-        if self.failed > 0:
-            print("  !!!", self.failed, "件失敗 !!!")
-        else:
-            print("  全テスト通過")
-
-def main():
-    var t = TestRunner("Vec テスト")
-
-    # Vec の加算テスト
-    var a = SIMD[DType.float64, 4](1, 2, 3, 4)
-    var b = SIMD[DType.float64, 4](5, 6, 7, 8)
-    var c = a + b
-    t.assert_near(c[0], 6.0, 1e-9, "add[0]")
-    t.assert_near(c[1], 8.0, 1e-9, "add[1]")
-    t.assert_near(c[2], 10.0, 1e-9, "add[2]")
-    t.assert_near(c[3], 12.0, 1e-9, "add[3]")
-
-    # ドット積テスト
-    var dot = (a * b).reduce_add()
-    t.assert_near(dot, 70.0, 1e-9, "dot product")
-
-    # ノルムテスト
-    var unit = SIMD[DType.float64, 4](1, 0, 0, 0)
-    t.assert_near((unit * unit).reduce_add(), 1.0, 1e-9, "unit norm")
-
-    t.report()`
+      code: "struct TestRunner:\n    var total: Int\n    var passed: Int\n    var failed: Int\n    var suite_name: String\n\n    def __init__(out self, name: String):\n        self.total = 0\n        self.passed = 0\n        self.failed = 0\n        self.suite_name = name\n        print(\"=== \" + name + \" ===\")\n\n    def assert_eq(mut self, actual: Int, expected: Int, msg: String):\n        self.total += 1\n        if actual == expected:\n            self.passed += 1\n        else:\n            self.failed += 1\n            print(\"  FAIL:\", msg, \"- expected\", expected, \"got\", actual)\n\n    def assert_near(mut self, actual: Float64, expected: Float64, tol: Float64, msg: String):\n        self.total += 1\n        var diff = actual - expected\n        if diff < 0: diff = -diff\n        if diff <= tol:\n            self.passed += 1\n        else:\n            self.failed += 1\n            print(\"  FAIL:\", msg, \"- expected\", expected, \"got\", actual, \"diff\", diff)\n\n    def assert_true(mut self, cond: Bool, msg: String):\n        self.total += 1\n        if cond:\n            self.passed += 1\n        else:\n            self.failed += 1\n            print(\"  FAIL:\", msg)\n\n    def report(self):\n        print(\"結果:\", self.passed, \"/\", self.total, \"通過\")\n        if self.failed > 0:\n            print(\"  !!!\", self.failed, \"件失敗 !!!\")\n        else:\n            print(\"  全テスト通過\")\n\ndef main():\n    var t = TestRunner(\"Vec テスト\")\n\n    # Vec の加算テスト\n    var a = SIMD[DType.float64, 4](1, 2, 3, 4)\n    var b = SIMD[DType.float64, 4](5, 6, 7, 8)\n    var c = a + b\n    t.assert_near(c[0], 6.0, 1e-9, \"add[0]\")\n    t.assert_near(c[1], 8.0, 1e-9, \"add[1]\")\n    t.assert_near(c[2], 10.0, 1e-9, \"add[2]\")\n    t.assert_near(c[3], 12.0, 1e-9, \"add[3]\")\n\n    # ドット積テスト\n    var dot = (a * b).reduce_add()\n    t.assert_near(dot, 70.0, 1e-9, \"dot product\")\n\n    # ノルムテスト\n    var unit = SIMD[DType.float64, 4](1, 0, 0, 0)\n    t.assert_near((unit * unit).reduce_add(), 1.0, 1e-9, \"unit norm\")\n\n    t.report()"
     },
     {
       title: "公開APIと配布",
       body: "ライブラリの公開 API を @export で定義し、.mojopkg として配布する方法です。\n\nバージョニング、後方互換性、ドキュメント生成のパターンも含みます。",
-      code: `# === パッケージ公開API設計 ===
-
-alias LIB_VERSION = "1.0.0"
-alias LIB_VERSION_MAJOR = 1
-
-# 公開する型エイリアス
-alias Vec2 = Vec[2, DType.float64]
-alias Vec3 = Vec[3, DType.float64]
-alias Vec4 = Vec[4, DType.float64]
-alias Mat3 = Mat[3, 3, DType.float64]
-alias Mat4 = Mat[4, 4, DType.float64]
-
-# C ABI互換の公開関数群
-@export
-def numlib_version() -> Int32:
-    return Int32(LIB_VERSION_MAJOR)
-
-@export
-def numlib_dot3(
-    ax: Float64, ay: Float64, az: Float64,
-    bx: Float64, by: Float64, bz: Float64
-) -> Float64:
-    return ax*bx + ay*by + az*bz
-
-@export
-def numlib_mat4_multiply(
-    a: UnsafePointer[Float64],
-    b: UnsafePointer[Float64],
-    result: UnsafePointer[Float64]
-):
-    for i in range(4):
-        for j in range(4):
-            var s: Float64 = 0
-            for k in range(4):
-                s += (a + i*4+k)[] * (b + k*4+j)[]
-            (result + i*4+j)[] = s
-
-# ビルドコマンド:
-# mojo package numlib -o numlib.mojopkg
-#
-# 利用側:
-# from numlib import Vec3, Mat4
-
-def main():
-    print("numlib v" + LIB_VERSION)
-    var dot = numlib_dot3(1, 2, 3, 4, 5, 6)
-    print("dot(1,2,3 . 4,5,6):", dot)  # 32.0`
+      code: "# === パッケージ公開API設計 ===\n\nalias LIB_VERSION = \"1.0.0\"\nalias LIB_VERSION_MAJOR = 1\n\n# 公開する型エイリアス\nalias Vec2 = Vec[2, DType.float64]\nalias Vec3 = Vec[3, DType.float64]\nalias Vec4 = Vec[4, DType.float64]\nalias Mat3 = Mat[3, 3, DType.float64]\nalias Mat4 = Mat[4, 4, DType.float64]\n\n# C ABI互換の公開関数群\n@export\ndef numlib_version() -> Int32:\n    return Int32(LIB_VERSION_MAJOR)\n\n@export\ndef numlib_dot3(\n    ax: Float64, ay: Float64, az: Float64,\n    bx: Float64, by: Float64, bz: Float64\n) -> Float64:\n    return ax*bx + ay*by + az*bz\n\n@export\ndef numlib_mat4_multiply(\n    a: UnsafePointer[Float64],\n    b: UnsafePointer[Float64],\n    result: UnsafePointer[Float64]\n):\n    for i in range(4):\n        for j in range(4):\n            var s: Float64 = 0\n            for k in range(4):\n                s += (a + i*4+k)[] * (b + k*4+j)[]\n            (result + i*4+j)[] = s\n\n# ビルドコマンド:\n# mojo package numlib -o numlib.mojopkg\n#\n# 利用側:\n# from numlib import Vec3, Mat4\n\ndef main():\n    print(\"numlib v\" + LIB_VERSION)\n    var dot = numlib_dot3(1, 2, 3, 4, 5, 6)\n    print(\"dot(1,2,3 . 4,5,6):\", dot)  # 32.0"
     }
   ]
 }

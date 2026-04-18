@@ -108,1064 +108,64 @@ const T = {
 
 const EX = {
 ch1:[
-  {diff:2,q:"GOMAXPROCSを動的に変更してgoroutineのスケジューリングに影響させるコードを書け。変更前後でBenchmarkの差を確認する方法も示せ。",code:`package main
-
-import (
-    "fmt"
-    "runtime"
-)
-
-func main() {
-    // GOMAXPROCS = 1 で実行した場合と runtime.NumCPU() で実行した場合を比較
-}`,answer:`package main
-
-import (
-    "fmt"
-    "runtime"
-    "sync"
-    "time"
-)
-
-func countTask(n int) {
-    var wg sync.WaitGroup
-    for i := 0; i < n; i++ {
-        wg.Add(1)
-        go func() { defer wg.Done(); runtime.Gosched() }()
-    }
-    wg.Wait()
-}
-
-func main() {
-    for _, p := range []int{1, runtime.NumCPU()} {
-        prev := runtime.GOMAXPROCS(p)
-        start := time.Now()
-        countTask(100_000)
-        fmt.Printf("GOMAXPROCS=%d: %v\n", p, time.Since(start))
-        runtime.GOMAXPROCS(prev)
-    }
-}`},
-  {diff:3,q:"runtime.ReadMemStatsを使ってGC前後のHeapAllocとNumGCを記録し、GCの影響を可視化するコードを書け。",code:`package main
-
-import (
-    "fmt"
-    "runtime"
-)
-
-func main() {
-    // GC前のメモリ状態を記録
-    // 大量のデータを生成してGCを促す
-    // GC後のメモリ状態を比較
-}`,answer:`package main
-
-import (
-    "fmt"
-    "runtime"
-)
-
-func main() {
-    var ms runtime.MemStats
-
-    runtime.ReadMemStats(&ms)
-    before := ms.HeapAlloc
-
-    // 大量のデータを生成
-    data := make([][]byte, 10000)
-    for i := range data { data[i] = make([]byte, 1024) }
-
-    runtime.ReadMemStats(&ms)
-    after := ms.HeapAlloc
-
-    _ = data
-    data = nil
-    runtime.GC()
-
-    runtime.ReadMemStats(&ms)
-    fmt.Printf("before: %d KB\n", before/1024)
-    fmt.Printf("after alloc: %d KB\n", after/1024)
-    fmt.Printf("after GC: %d KB, NumGC=%d\n", ms.HeapAlloc/1024, ms.NumGC)
-}`},
-  {diff:1,q:"GODEBUGでGCトレースを有効にする環境変数設定とその出力の読み方を示せ（コードではなく解説）。",code:`# GODEBUGを使ったGCトレースの方法を示せ`,answer:`# GCトレース出力
-GODEBUG=gctrace=1 ./myapp
-
-# 出力例:
-# gc 1 @0.012s 0%: 0.028+0.30+0.003 ms clock, ...
-# gc 番号 @起動からの秒数 CPU割合: STW(mark setup)+並行(mark)+STW(term) ms
-
-# スケジューラトレース
-GODEBUG=schedtrace=1000 ./myapp  # 1000msごとに出力
-
-# エスケープ解析確認
-go build -gcflags="-m" ./...  # 変数のヒープ/スタック割り当てを表示`},
+  {diff:2,q:"GOMAXPROCSを動的に変更してgoroutineのスケジューリングに影響させるコードを書け。変更前後でBenchmarkの差を確認する方法も示せ。",code:"package main\n\nimport (\n    \"fmt\"\n    \"runtime\"\n)\n\nfunc main() {\n    // GOMAXPROCS = 1 で実行した場合と runtime.NumCPU() で実行した場合を比較\n}",answer:"package main\n\nimport (\n    \"fmt\"\n    \"runtime\"\n    \"sync\"\n    \"time\"\n)\n\nfunc countTask(n int) {\n    var wg sync.WaitGroup\n    for i := 0; i < n; i++ {\n        wg.Add(1)\n        go func() { defer wg.Done(); runtime.Gosched() }()\n    }\n    wg.Wait()\n}\n\nfunc main() {\n    for _, p := range []int{1, runtime.NumCPU()} {\n        prev := runtime.GOMAXPROCS(p)\n        start := time.Now()\n        countTask(100_000)\n        fmt.Printf(\"GOMAXPROCS=%d: %v\n\", p, time.Since(start))\n        runtime.GOMAXPROCS(prev)\n    }\n}"},
+  {diff:3,q:"runtime.ReadMemStatsを使ってGC前後のHeapAllocとNumGCを記録し、GCの影響を可視化するコードを書け。",code:"package main\n\nimport (\n    \"fmt\"\n    \"runtime\"\n)\n\nfunc main() {\n    // GC前のメモリ状態を記録\n    // 大量のデータを生成してGCを促す\n    // GC後のメモリ状態を比較\n}",answer:"package main\n\nimport (\n    \"fmt\"\n    \"runtime\"\n)\n\nfunc main() {\n    var ms runtime.MemStats\n\n    runtime.ReadMemStats(&ms)\n    before := ms.HeapAlloc\n\n    // 大量のデータを生成\n    data := make([][]byte, 10000)\n    for i := range data { data[i] = make([]byte, 1024) }\n\n    runtime.ReadMemStats(&ms)\n    after := ms.HeapAlloc\n\n    _ = data\n    data = nil\n    runtime.GC()\n\n    runtime.ReadMemStats(&ms)\n    fmt.Printf(\"before: %d KB\n\", before/1024)\n    fmt.Printf(\"after alloc: %d KB\n\", after/1024)\n    fmt.Printf(\"after GC: %d KB, NumGC=%d\n\", ms.HeapAlloc/1024, ms.NumGC)\n}"},
+  {diff:1,q:"GODEBUGでGCトレースを有効にする環境変数設定とその出力の読み方を示せ（コードではなく解説）。",code:"# GODEBUGを使ったGCトレースの方法を示せ",answer:"# GCトレース出力\nGODEBUG=gctrace=1 ./myapp\n\n# 出力例:\n# gc 1 @0.012s 0%: 0.028+0.30+0.003 ms clock, ...\n# gc 番号 @起動からの秒数 CPU割合: STW(mark setup)+並行(mark)+STW(term) ms\n\n# スケジューラトレース\nGODEBUG=schedtrace=1000 ./myapp  # 1000msごとに出力\n\n# エスケープ解析確認\ngo build -gcflags=\"-m\" ./...  # 変数のヒープ/スタック割り当てを表示"},
 ],
 ch2:[
-  {diff:1,q:"cgoを使ってCのabs()関数をGoから呼び出す最小構成コードを書け。",code:`package main
-
-/*
-#include <stdlib.h>
-*/
-import "C"
-import "fmt"
-
-func main() {
-    // C.abs を呼び出す
-}`,answer:`package main
-
-/*
-#include <stdlib.h>
-*/
-import "C"
-import "fmt"
-
-func main() {
-    x := C.int(-42)
-    result := C.abs(x)
-    fmt.Println(int(result)) // 42
-}`},
-  {diff:2,q:"CGO_ENABLED=0でcgoなしにクロスコンパイルするコマンドと、純粋Goのみのファイル制約（//go:build !cgo）を示せ。",code:`# Linuxバイナリをmacから生成するコマンドとbuildタグを書け`,answer:`# クロスコンパイル（cgoなし）
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o myapp-linux .
-
-# Windows向け
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o myapp.exe .
-
-// cgoを使わない実装ファイルに付けるbuildタグ
-//go:build !cgo`},
-  {diff:3,q:"Extism（Wasm plugin system）を使ってGoホストからWasmプラグインを呼び出すコードの概念構造を示せ。",code:`// extism.io/go-sdk
-package main
-
-import (
-    "context"
-    extism "github.com/extism/go-sdk"
-)
-
-func main() {
-    // Wasmファイルを読み込んでプラグイン呼び出し
-}`,answer:`package main
-
-import (
-    "context"
-    "fmt"
-    extism "github.com/extism/go-sdk"
-)
-
-func main() {
-    manifest := extism.Manifest{
-        Wasm: []extism.Wasm{extism.WasmFile{Path: "plugin.wasm"}},
-    }
-    plugin, err := extism.NewPlugin(context.Background(), manifest, extism.PluginConfig{}, nil)
-    if err != nil { panic(err) }
-    defer plugin.Close(context.Background())
-
-    _, out, err := plugin.Call("greet", []byte("World"))
-    if err != nil { panic(err) }
-    fmt.Println(string(out))
-}`},
+  {diff:1,q:"cgoを使ってCのabs()関数をGoから呼び出す最小構成コードを書け。",code:"package main\n\n/*\n#include <stdlib.h>\n*/\nimport \"C\"\nimport \"fmt\"\n\nfunc main() {\n    // C.abs を呼び出す\n}",answer:"package main\n\n/*\n#include <stdlib.h>\n*/\nimport \"C\"\nimport \"fmt\"\n\nfunc main() {\n    x := C.int(-42)\n    result := C.abs(x)\n    fmt.Println(int(result)) // 42\n}"},
+  {diff:2,q:"CGO_ENABLED=0でcgoなしにクロスコンパイルするコマンドと、純粋Goのみのファイル制約（//go:build !cgo）を示せ。",code:"# Linuxバイナリをmacから生成するコマンドとbuildタグを書け",answer:"# クロスコンパイル（cgoなし）\nCGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o myapp-linux .\n\n# Windows向け\nCGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o myapp.exe .\n\n// cgoを使わない実装ファイルに付けるbuildタグ\n//go:build !cgo"},
+  {diff:3,q:"Extism（Wasm plugin system）を使ってGoホストからWasmプラグインを呼び出すコードの概念構造を示せ。",code:"// extism.io/go-sdk\npackage main\n\nimport (\n    \"context\"\n    extism \"github.com/extism/go-sdk\"\n)\n\nfunc main() {\n    // Wasmファイルを読み込んでプラグイン呼び出し\n}",answer:"package main\n\nimport (\n    \"context\"\n    \"fmt\"\n    extism \"github.com/extism/go-sdk\"\n)\n\nfunc main() {\n    manifest := extism.Manifest{\n        Wasm: []extism.Wasm{extism.WasmFile{Path: \"plugin.wasm\"}},\n    }\n    plugin, err := extism.NewPlugin(context.Background(), manifest, extism.PluginConfig{}, nil)\n    if err != nil { panic(err) }\n    defer plugin.Close(context.Background())\n\n    _, out, err := plugin.Call(\"greet\", []byte(\"World\"))\n    if err != nil { panic(err) }\n    fmt.Println(string(out))\n}"},
 ],
 ch3:[
-  {diff:1,q:"go build -gcflags='-m'でエスケープ解析の結果を確認し、変数がヒープに逃げる例とスタックに留まる例を書け。",code:`package main
-
-import "fmt"
-
-// ヒープに逃げる例
-func escapesToHeap() *int {
-    // ここに書く
-}
-
-// スタックに留まる例
-func staysOnStack() int {
-    // ここに書く
-}
-
-func main() {
-    fmt.Println(*escapesToHeap(), staysOnStack())
-}`,answer:`package main
-
-import "fmt"
-
-// ヒープに逃げる（戻り値として返すため）
-func escapesToHeap() *int {
-    x := 42      // escape analysis: x escapes to heap
-    return &x
-}
-
-// スタックに留まる（関数内で完結）
-func staysOnStack() int {
-    x := 42      // x does not escape
-    return x
-}
-
-func main() {
-    fmt.Println(*escapesToHeap(), staysOnStack())
-}
-
-// 確認コマンド: go build -gcflags="-m" .`},
-  {diff:2,q:"unsafe.Pointerを使って[]byteを文字列にゼロコピー変換するコードを書け（unsafe.SliceDataとunsafe.StringDataを使うこと）。",code:`package main
-
-import (
-    "fmt"
-    "unsafe"
-)
-
-func bytesToString(b []byte) string {
-    // zero-copy変換
-}
-
-func main() {
-    b := []byte("hello")
-    fmt.Println(bytesToString(b))
-}`,answer:`package main
-
-import (
-    "fmt"
-    "unsafe"
-)
-
-func bytesToString(b []byte) string {
-    if len(b) == 0 { return "" }
-    return unsafe.String(unsafe.SliceData(b), len(b))
-}
-
-func main() {
-    b := []byte("hello")
-    fmt.Println(bytesToString(b))
-    // 注意: bが変更されると文字列も変わる（mutableなbをコピーしないこと）
-}`},
-  {diff:3,q:"Goのinlining制御ディレクティブ（//go:noinline, //go:inline）を使ったベンチマーク比較コードを書け。",code:`package main
-
-import "testing"
-
-//go:noinline
-func addNoInline(a, b int) int { return a + b }
-
-// inlineされる（デフォルト）
-func addInline(a, b int) int { return a + b }
-
-func BenchmarkNoInline(b *testing.B) { /* ここに書く */ }
-func BenchmarkInline(b *testing.B)   { /* ここに書く */ }`,answer:`package main
-
-import "testing"
-
-//go:noinline
-func addNoInline(a, b int) int { return a + b }
-
-func addInline(a, b int) int { return a + b }
-
-func BenchmarkNoInline(b *testing.B) {
-    x, y := 1, 2
-    for i := 0; i < b.N; i++ { _ = addNoInline(x, y) }
-}
-
-func BenchmarkInline(b *testing.B) {
-    x, y := 1, 2
-    for i := 0; i < b.N; i++ { _ = addInline(x, y) }
-}
-// go test -bench=. -gcflags="-m" で inline判定を確認`},
+  {diff:1,q:"go build -gcflags='-m'でエスケープ解析の結果を確認し、変数がヒープに逃げる例とスタックに留まる例を書け。",code:"package main\n\nimport \"fmt\"\n\n// ヒープに逃げる例\nfunc escapesToHeap() *int {\n    // ここに書く\n}\n\n// スタックに留まる例\nfunc staysOnStack() int {\n    // ここに書く\n}\n\nfunc main() {\n    fmt.Println(*escapesToHeap(), staysOnStack())\n}",answer:"package main\n\nimport \"fmt\"\n\n// ヒープに逃げる（戻り値として返すため）\nfunc escapesToHeap() *int {\n    x := 42      // escape analysis: x escapes to heap\n    return &x\n}\n\n// スタックに留まる（関数内で完結）\nfunc staysOnStack() int {\n    x := 42      // x does not escape\n    return x\n}\n\nfunc main() {\n    fmt.Println(*escapesToHeap(), staysOnStack())\n}\n\n// 確認コマンド: go build -gcflags=\"-m\" ."},
+  {diff:2,q:"unsafe.Pointerを使って[]byteを文字列にゼロコピー変換するコードを書け（unsafe.SliceDataとunsafe.StringDataを使うこと）。",code:"package main\n\nimport (\n    \"fmt\"\n    \"unsafe\"\n)\n\nfunc bytesToString(b []byte) string {\n    // zero-copy変換\n}\n\nfunc main() {\n    b := []byte(\"hello\")\n    fmt.Println(bytesToString(b))\n}",answer:"package main\n\nimport (\n    \"fmt\"\n    \"unsafe\"\n)\n\nfunc bytesToString(b []byte) string {\n    if len(b) == 0 { return \"\" }\n    return unsafe.String(unsafe.SliceData(b), len(b))\n}\n\nfunc main() {\n    b := []byte(\"hello\")\n    fmt.Println(bytesToString(b))\n    // 注意: bが変更されると文字列も変わる（mutableなbをコピーしないこと）\n}"},
+  {diff:3,q:"Goのinlining制御ディレクティブ（//go:noinline, //go:inline）を使ったベンチマーク比較コードを書け。",code:"package main\n\nimport \"testing\"\n\n//go:noinline\nfunc addNoInline(a, b int) int { return a + b }\n\n// inlineされる（デフォルト）\nfunc addInline(a, b int) int { return a + b }\n\nfunc BenchmarkNoInline(b *testing.B) { /* ここに書く */ }\nfunc BenchmarkInline(b *testing.B)   { /* ここに書く */ }",answer:"package main\n\nimport \"testing\"\n\n//go:noinline\nfunc addNoInline(a, b int) int { return a + b }\n\nfunc addInline(a, b int) int { return a + b }\n\nfunc BenchmarkNoInline(b *testing.B) {\n    x, y := 1, 2\n    for i := 0; i < b.N; i++ { _ = addNoInline(x, y) }\n}\n\nfunc BenchmarkInline(b *testing.B) {\n    x, y := 1, 2\n    for i := 0; i < b.N; i++ { _ = addInline(x, y) }\n}\n// go test -bench=. -gcflags=\"-m\" で inline判定を確認"},
 ],
 ch4:[
-  {diff:1,q:"go build -pgo=auto でPGO（Profile-Guided Optimization）を使ったビルドを行う手順を示せ。",code:`# PGOを使ったビルドの全手順を示せ`,answer:`# 1. instrumented版でビルド
-go build -o myapp .
-
-# 2. プロファイルを収集（実際のワークロードで実行）
-# 本番またはステージングで動かしてcpuプロファイルを取得
-curl "http://localhost:6060/debug/pprof/profile?seconds=30" > cpu.pprof
-
-# 3. PGOでビルド
-go build -pgo=cpu.pprof -o myapp-pgo .
-
-# または default.pgo をソースに置いて自動検出
-cp cpu.pprof default.pgo
-go build -pgo=auto -o myapp-auto .
-
-# 効果確認: benchmarkで比較`},
-  {diff:2,q:"fieldalignmentリンターを使ってstructのメモリレイアウトを最適化する前後の例を示せ。",code:`// Before: 非効率なfieldの順序
-type Inefficient struct {
-    A bool    // 1 byte + 7 byte padding
-    B int64   // 8 bytes
-    C bool    // 1 byte + 7 byte padding
-}
-
-// After: 最適化された順序を書け`,answer:`// Before
-type Inefficient struct {
-    A bool  // 1 + 7 padding
-    B int64 // 8
-    C bool  // 1 + 7 padding
-}
-// size: 24 bytes
-
-// After（ツールで自動提案）
-type Efficient struct {
-    B int64 // 8
-    A bool  // 1
-    C bool  // 1 + 6 padding
-}
-// size: 16 bytes
-
-// 確認コマンド:
-// go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
-// fieldalignment ./...`},
-  {diff:3,q:"メモリ割り当てを最小化するためにsync.Poolとリングバッファを組み合わせた高スループットキューを実装せよ（概念コード可）。",code:`package main
-
-import "sync"
-
-type Item struct{ Value int }
-
-// sync.Pool + 固定サイズリングバッファの組み合わせ
-type FastQueue struct {
-    pool *sync.Pool
-    // ring buffer fields
-}`,answer:`package main
-
-import "sync"
-
-type Item struct{ Value int }
-
-var itemPool = &sync.Pool{
-    New: func() any { return &Item{} },
-}
-
-type RingQueue struct {
-    buf  []*Item
-    head int
-    tail int
-    size int
-    mu   sync.Mutex
-}
-
-func NewRingQueue(cap int) *RingQueue {
-    return &RingQueue{buf: make([]*Item, cap), size: cap}
-}
-
-func (q *RingQueue) Enqueue(v int) bool {
-    q.mu.Lock()
-    defer q.mu.Unlock()
-    next := (q.tail + 1) % q.size
-    if next == q.head { return false } // full
-    item := itemPool.Get().(*Item)
-    item.Value = v
-    q.buf[q.tail] = item
-    q.tail = next
-    return true
-}
-
-func (q *RingQueue) Dequeue() (*Item, bool) {
-    q.mu.Lock()
-    defer q.mu.Unlock()
-    if q.head == q.tail { return nil, false } // empty
-    item := q.buf[q.head]
-    q.buf[q.head] = nil
-    q.head = (q.head + 1) % q.size
-    return item, true
-}`},
+  {diff:1,q:"go build -pgo=auto でPGO（Profile-Guided Optimization）を使ったビルドを行う手順を示せ。",code:"# PGOを使ったビルドの全手順を示せ",answer:"# 1. instrumented版でビルド\ngo build -o myapp .\n\n# 2. プロファイルを収集（実際のワークロードで実行）\n# 本番またはステージングで動かしてcpuプロファイルを取得\ncurl \"http://localhost:6060/debug/pprof/profile?seconds=30\" > cpu.pprof\n\n# 3. PGOでビルド\ngo build -pgo=cpu.pprof -o myapp-pgo .\n\n# または default.pgo をソースに置いて自動検出\ncp cpu.pprof default.pgo\ngo build -pgo=auto -o myapp-auto .\n\n# 効果確認: benchmarkで比較"},
+  {diff:2,q:"fieldalignmentリンターを使ってstructのメモリレイアウトを最適化する前後の例を示せ。",code:"// Before: 非効率なfieldの順序\ntype Inefficient struct {\n    A bool    // 1 byte + 7 byte padding\n    B int64   // 8 bytes\n    C bool    // 1 byte + 7 byte padding\n}\n\n// After: 最適化された順序を書け",answer:"// Before\ntype Inefficient struct {\n    A bool  // 1 + 7 padding\n    B int64 // 8\n    C bool  // 1 + 7 padding\n}\n// size: 24 bytes\n\n// After（ツールで自動提案）\ntype Efficient struct {\n    B int64 // 8\n    A bool  // 1\n    C bool  // 1 + 6 padding\n}\n// size: 16 bytes\n\n// 確認コマンド:\n// go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest\n// fieldalignment ./..."},
+  {diff:3,q:"メモリ割り当てを最小化するためにsync.Poolとリングバッファを組み合わせた高スループットキューを実装せよ（概念コード可）。",code:"package main\n\nimport \"sync\"\n\ntype Item struct{ Value int }\n\n// sync.Pool + 固定サイズリングバッファの組み合わせ\ntype FastQueue struct {\n    pool *sync.Pool\n    // ring buffer fields\n}",answer:"package main\n\nimport \"sync\"\n\ntype Item struct{ Value int }\n\nvar itemPool = &sync.Pool{\n    New: func() any { return &Item{} },\n}\n\ntype RingQueue struct {\n    buf  []*Item\n    head int\n    tail int\n    size int\n    mu   sync.Mutex\n}\n\nfunc NewRingQueue(cap int) *RingQueue {\n    return &RingQueue{buf: make([]*Item, cap), size: cap}\n}\n\nfunc (q *RingQueue) Enqueue(v int) bool {\n    q.mu.Lock()\n    defer q.mu.Unlock()\n    next := (q.tail + 1) % q.size\n    if next == q.head { return false } // full\n    item := itemPool.Get().(*Item)\n    item.Value = v\n    q.buf[q.tail] = item\n    q.tail = next\n    return true\n}\n\nfunc (q *RingQueue) Dequeue() (*Item, bool) {\n    q.mu.Lock()\n    defer q.mu.Unlock()\n    if q.head == q.tail { return nil, false } // empty\n    item := q.buf[q.head]\n    q.buf[q.head] = nil\n    q.head = (q.head + 1) % q.size\n    return item, true\n}"},
 ],
 ch5:[
-  {diff:1,q:"Functional Optionsパターンを使ってHTTPクライアントを設定するNewClient関数を書け。",code:`package client
-
-import (
-    "net/http"
-    "time"
-)
-
-type Client struct {
-    baseURL string
-    timeout time.Duration
-    headers map[string]string
-}
-
-type Option func(*Client)
-
-func NewClient(baseURL string, opts ...Option) *Client {
-    // ここに書く
-}`,answer:`func WithTimeout(d time.Duration) Option {
-    return func(c *Client) { c.timeout = d }
-}
-
-func WithHeader(k, v string) Option {
-    return func(c *Client) { c.headers[k] = v }
-}
-
-func NewClient(baseURL string, opts ...Option) *Client {
-    c := &Client{
-        baseURL: baseURL,
-        timeout: 30 * time.Second,
-        headers: make(map[string]string),
-    }
-    for _, opt := range opts { opt(c) }
-    return c
-}`},
-  {diff:2,q:"io.Readerインターフェースを実装するCountingReaderを書け。Readを呼ぶたびに読み込んだバイト数を累積記録する。",code:`package main
-
-import "io"
-
-type CountingReader struct {
-    r     io.Reader
-    count int64
-}
-
-func (cr *CountingReader) Read(p []byte) (int, error) {
-    // ここに書く
-}
-
-func (cr *CountingReader) BytesRead() int64 { return cr.count }`,answer:`func (cr *CountingReader) Read(p []byte) (int, error) {
-    n, err := cr.r.Read(p)
-    cr.count += int64(n)
-    return n, err
-}
-
-// 使い方
-// cr := &CountingReader{r: someReader}
-// io.Copy(io.Discard, cr)
-// fmt.Println(cr.BytesRead())`},
-  {diff:3,q:"Goのライブラリとして公開する際のGo doc形式のドキュメントを含む、Functional Optionsパターン+例示+CHANGELOG参照のpkg-level docを書け。",code:`// パッケージレベルのドキュメントを書け (doc.go)`,answer:`// Package client provides an HTTP client with configurable options.
-//
-// # Basic Usage
-//
-//	c := client.NewClient("https://api.example.com",
-//	    client.WithTimeout(10*time.Second),
-//	    client.WithHeader("Authorization", "Bearer token"),
-//	)
-//
-// # Options
-//
-// Use functional options to configure the client:
-//
-//   - [WithTimeout]: set request timeout
-//   - [WithHeader]: add a default header
-//
-// # Errors
-//
-// All methods return errors using the standard error interface.
-// Use [errors.As] to extract [*ClientError] for status code details.
-//
-// See CHANGELOG.md for version history.
-package client`},
+  {diff:1,q:"Functional Optionsパターンを使ってHTTPクライアントを設定するNewClient関数を書け。",code:"package client\n\nimport (\n    \"net/http\"\n    \"time\"\n)\n\ntype Client struct {\n    baseURL string\n    timeout time.Duration\n    headers map[string]string\n}\n\ntype Option func(*Client)\n\nfunc NewClient(baseURL string, opts ...Option) *Client {\n    // ここに書く\n}",answer:"func WithTimeout(d time.Duration) Option {\n    return func(c *Client) { c.timeout = d }\n}\n\nfunc WithHeader(k, v string) Option {\n    return func(c *Client) { c.headers[k] = v }\n}\n\nfunc NewClient(baseURL string, opts ...Option) *Client {\n    c := &Client{\n        baseURL: baseURL,\n        timeout: 30 * time.Second,\n        headers: make(map[string]string),\n    }\n    for _, opt := range opts { opt(c) }\n    return c\n}"},
+  {diff:2,q:"io.Readerインターフェースを実装するCountingReaderを書け。Readを呼ぶたびに読み込んだバイト数を累積記録する。",code:"package main\n\nimport \"io\"\n\ntype CountingReader struct {\n    r     io.Reader\n    count int64\n}\n\nfunc (cr *CountingReader) Read(p []byte) (int, error) {\n    // ここに書く\n}\n\nfunc (cr *CountingReader) BytesRead() int64 { return cr.count }",answer:"func (cr *CountingReader) Read(p []byte) (int, error) {\n    n, err := cr.r.Read(p)\n    cr.count += int64(n)\n    return n, err\n}\n\n// 使い方\n// cr := &CountingReader{r: someReader}\n// io.Copy(io.Discard, cr)\n// fmt.Println(cr.BytesRead())"},
+  {diff:3,q:"Goのライブラリとして公開する際のGo doc形式のドキュメントを含む、Functional Optionsパターン+例示+CHANGELOG参照のpkg-level docを書け。",code:"// パッケージレベルのドキュメントを書け (doc.go)",answer:"// Package client provides an HTTP client with configurable options.\n//\n// # Basic Usage\n//\n//	c := client.NewClient(\"https://api.example.com\",\n//	    client.WithTimeout(10*time.Second),\n//	    client.WithHeader(\"Authorization\", \"Bearer token\"),\n//	)\n//\n// # Options\n//\n// Use functional options to configure the client:\n//\n//   - [WithTimeout]: set request timeout\n//   - [WithHeader]: add a default header\n//\n// # Errors\n//\n// All methods return errors using the standard error interface.\n// Use [errors.As] to extract [*ClientError] for status code details.\n//\n// See CHANGELOG.md for version history.\npackage client"},
 ],
 ch6:[
-  {diff:1,q:"kubebuilder でカスタムリソース MyApp を作成するscaffoldコマンドを示せ（コマンドのみ）。",code:`# kubebuilderでCRDとControllerを生成するコマンドを書け`,answer:`# kubebuilderのインストール
-curl -L -o kubebuilder https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)
-chmod +x kubebuilder && sudo mv kubebuilder /usr/local/bin/
-
-# プロジェクト初期化
-kubebuilder init --domain mycompany.com --repo github.com/me/myoperator
-
-# APIとControllerのscaffold
-kubebuilder create api --group apps --version v1 --kind MyApp
-
-# CRDをクラスタに適用
-make install
-
-# Controllerをlocally実行（開発時）
-make run`},
-  {diff:2,q:"controller-runtimeのReconcilerインターフェースを実装してMyAppのdesired state（replicas）を実現するControllerの骨格を書け。",code:`package controllers
-
-import (
-    "context"
-    ctrl "sigs.k8s.io/controller-runtime"
-    "sigs.k8s.io/controller-runtime/pkg/client"
-    appsv1alpha1 "myoperator/api/v1alpha1"
-)
-
-type MyAppReconciler struct {
-    client.Client
-}
-
-func (r *MyAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-    // MyAppを取得して desired state を実現
-}`,answer:`func (r *MyAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-    var app appsv1alpha1.MyApp
-    if err := r.Get(ctx, req.NamespacedName, &app); err != nil {
-        return ctrl.Result{}, client.IgnoreNotFound(err)
-    }
-
-    // desired state との差分を調整
-    // 例: Deploymentを作成/更新
-    // if err := r.ensureDeployment(ctx, &app); err != nil {
-    //     return ctrl.Result{}, err
-    // }
-
-    return ctrl.Result{}, nil
-}`},
-  {diff:3,q:"k8s client-goを使ってDeploymentのrolling updateを実行してステータスを監視するコードを書け。",code:`package main
-
-import (
-    "context"
-    appsv1 "k8s.io/api/apps/v1"
-    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-    "k8s.io/client-go/kubernetes"
-    "k8s.io/client-go/rest"
-)`,answer:`func patchDeploymentImage(clientset *kubernetes.Clientset, ns, name, image string) error {
-    dep, err := clientset.AppsV1().Deployments(ns).Get(context.Background(), name, metav1.GetOptions{})
-    if err != nil { return err }
-
-    dep.Spec.Template.Spec.Containers[0].Image = image
-    _, err = clientset.AppsV1().Deployments(ns).Update(context.Background(), dep, metav1.UpdateOptions{})
-    return err
-}
-
-func waitForRollout(clientset *kubernetes.Clientset, ns, name string) error {
-    for {
-        dep, err := clientset.AppsV1().Deployments(ns).Get(context.Background(), name, metav1.GetOptions{})
-        if err != nil { return err }
-        if dep.Status.UpdatedReplicas == *dep.Spec.Replicas &&
-            dep.Status.ReadyReplicas == *dep.Spec.Replicas { break }
-        time.Sleep(2 * time.Second)
-    }
-    return nil
-}`},
+  {diff:1,q:"kubebuilder でカスタムリソース MyApp を作成するscaffoldコマンドを示せ（コマンドのみ）。",code:"# kubebuilderでCRDとControllerを生成するコマンドを書け",answer:"# kubebuilderのインストール\ncurl -L -o kubebuilder https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)\nchmod +x kubebuilder && sudo mv kubebuilder /usr/local/bin/\n\n# プロジェクト初期化\nkubebuilder init --domain mycompany.com --repo github.com/me/myoperator\n\n# APIとControllerのscaffold\nkubebuilder create api --group apps --version v1 --kind MyApp\n\n# CRDをクラスタに適用\nmake install\n\n# Controllerをlocally実行（開発時）\nmake run"},
+  {diff:2,q:"controller-runtimeのReconcilerインターフェースを実装してMyAppのdesired state（replicas）を実現するControllerの骨格を書け。",code:"package controllers\n\nimport (\n    \"context\"\n    ctrl \"sigs.k8s.io/controller-runtime\"\n    \"sigs.k8s.io/controller-runtime/pkg/client\"\n    appsv1alpha1 \"myoperator/api/v1alpha1\"\n)\n\ntype MyAppReconciler struct {\n    client.Client\n}\n\nfunc (r *MyAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {\n    // MyAppを取得して desired state を実現\n}",answer:"func (r *MyAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {\n    var app appsv1alpha1.MyApp\n    if err := r.Get(ctx, req.NamespacedName, &app); err != nil {\n        return ctrl.Result{}, client.IgnoreNotFound(err)\n    }\n\n    // desired state との差分を調整\n    // 例: Deploymentを作成/更新\n    // if err := r.ensureDeployment(ctx, &app); err != nil {\n    //     return ctrl.Result{}, err\n    // }\n\n    return ctrl.Result{}, nil\n}"},
+  {diff:3,q:"k8s client-goを使ってDeploymentのrolling updateを実行してステータスを監視するコードを書け。",code:"package main\n\nimport (\n    \"context\"\n    appsv1 \"k8s.io/api/apps/v1\"\n    metav1 \"k8s.io/apimachinery/pkg/apis/meta/v1\"\n    \"k8s.io/client-go/kubernetes\"\n    \"k8s.io/client-go/rest\"\n)",answer:"func patchDeploymentImage(clientset *kubernetes.Clientset, ns, name, image string) error {\n    dep, err := clientset.AppsV1().Deployments(ns).Get(context.Background(), name, metav1.GetOptions{})\n    if err != nil { return err }\n\n    dep.Spec.Template.Spec.Containers[0].Image = image\n    _, err = clientset.AppsV1().Deployments(ns).Update(context.Background(), dep, metav1.UpdateOptions{})\n    return err\n}\n\nfunc waitForRollout(clientset *kubernetes.Clientset, ns, name string) error {\n    for {\n        dep, err := clientset.AppsV1().Deployments(ns).Get(context.Background(), name, metav1.GetOptions{})\n        if err != nil { return err }\n        if dep.Status.UpdatedReplicas == *dep.Spec.Replicas &&\n            dep.Status.ReadyReplicas == *dep.Spec.Replicas { break }\n        time.Sleep(2 * time.Second)\n    }\n    return nil\n}"},
 ],
 ch7:[
-  {diff:1,q:"gobreaker（sony/gobreaker）でサーキットブレーカーを実装し、失敗が続いたらopen状態に移行することを示すコードを書け。",code:`package main
-
-import (
-    "fmt"
-    "github.com/sony/gobreaker"
-)
-
-func main() {
-    // サーキットブレーカーの設定と使用
-}`,answer:`package main
-
-import (
-    "errors"
-    "fmt"
-    "github.com/sony/gobreaker"
-)
-
-func main() {
-    cb := gobreaker.NewCircuitBreaker(gobreaker.Settings{
-        Name:        "myService",
-        MaxRequests: 1,
-        Interval:    0,
-        Timeout:     60,
-        ReadyToTrip: func(counts gobreaker.Counts) bool {
-            return counts.ConsecutiveFailures > 3
-        },
-    })
-
-    for i := 0; i < 6; i++ {
-        _, err := cb.Execute(func() (any, error) {
-            return nil, errors.New("service unavailable")
-        })
-        fmt.Printf("attempt %d: state=%s err=%v\n", i, cb.State(), err)
-    }
-}`},
-  {diff:2,q:"cenkalti/backoffを使って指数バックオフ付きのリトライを実装するコードを書け（最大3回リトライ）。",code:`package main
-
-import (
-    "fmt"
-    "github.com/cenkalti/backoff/v4"
-)
-
-func unstableOperation() error {
-    // 70%の確率で失敗する仮の操作
-    return fmt.Errorf("temporary error")
-}
-
-func main() {
-    // 指数バックオフでリトライ
-}`,answer:`package main
-
-import (
-    "fmt"
-    "github.com/cenkalti/backoff/v4"
-    "math/rand"
-)
-
-var attempts int
-
-func unstableOperation() error {
-    attempts++
-    if rand.Float64() < 0.7 { return fmt.Errorf("temporary error") }
-    return nil
-}
-
-func main() {
-    b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
-    err := backoff.Retry(unstableOperation, b)
-    fmt.Printf("attempts=%d, err=%v\n", attempts, err)
-}`},
-  {diff:3,q:"etcdを使って分散ロックを取得・解放するコードを書け（clientv3.NewSession + concurrency.NewMutex）。",code:`package main
-
-import (
-    "context"
-    clientv3 "go.etcd.io/etcd/client/v3"
-    "go.etcd.io/etcd/client/v3/concurrency"
-)
-
-func withDistributedLock(key string, fn func() error) error {
-    // ここに書く
-}`,answer:`func withDistributedLock(client *clientv3.Client, key string, fn func() error) error {
-    sess, err := concurrency.NewSession(client)
-    if err != nil { return err }
-    defer sess.Close()
-
-    mu := concurrency.NewMutex(sess, "/locks/"+key)
-    if err := mu.Lock(context.Background()); err != nil { return err }
-    defer mu.Unlock(context.Background())
-
-    return fn()
-}`},
+  {diff:1,q:"gobreaker（sony/gobreaker）でサーキットブレーカーを実装し、失敗が続いたらopen状態に移行することを示すコードを書け。",code:"package main\n\nimport (\n    \"fmt\"\n    \"github.com/sony/gobreaker\"\n)\n\nfunc main() {\n    // サーキットブレーカーの設定と使用\n}",answer:"package main\n\nimport (\n    \"errors\"\n    \"fmt\"\n    \"github.com/sony/gobreaker\"\n)\n\nfunc main() {\n    cb := gobreaker.NewCircuitBreaker(gobreaker.Settings{\n        Name:        \"myService\",\n        MaxRequests: 1,\n        Interval:    0,\n        Timeout:     60,\n        ReadyToTrip: func(counts gobreaker.Counts) bool {\n            return counts.ConsecutiveFailures > 3\n        },\n    })\n\n    for i := 0; i < 6; i++ {\n        _, err := cb.Execute(func() (any, error) {\n            return nil, errors.New(\"service unavailable\")\n        })\n        fmt.Printf(\"attempt %d: state=%s err=%v\n\", i, cb.State(), err)\n    }\n}"},
+  {diff:2,q:"cenkalti/backoffを使って指数バックオフ付きのリトライを実装するコードを書け（最大3回リトライ）。",code:"package main\n\nimport (\n    \"fmt\"\n    \"github.com/cenkalti/backoff/v4\"\n)\n\nfunc unstableOperation() error {\n    // 70%の確率で失敗する仮の操作\n    return fmt.Errorf(\"temporary error\")\n}\n\nfunc main() {\n    // 指数バックオフでリトライ\n}",answer:"package main\n\nimport (\n    \"fmt\"\n    \"github.com/cenkalti/backoff/v4\"\n    \"math/rand\"\n)\n\nvar attempts int\n\nfunc unstableOperation() error {\n    attempts++\n    if rand.Float64() < 0.7 { return fmt.Errorf(\"temporary error\") }\n    return nil\n}\n\nfunc main() {\n    b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)\n    err := backoff.Retry(unstableOperation, b)\n    fmt.Printf(\"attempts=%d, err=%v\n\", attempts, err)\n}"},
+  {diff:3,q:"etcdを使って分散ロックを取得・解放するコードを書け（clientv3.NewSession + concurrency.NewMutex）。",code:"package main\n\nimport (\n    \"context\"\n    clientv3 \"go.etcd.io/etcd/client/v3\"\n    \"go.etcd.io/etcd/client/v3/concurrency\"\n)\n\nfunc withDistributedLock(key string, fn func() error) error {\n    // ここに書く\n}",answer:"func withDistributedLock(client *clientv3.Client, key string, fn func() error) error {\n    sess, err := concurrency.NewSession(client)\n    if err != nil { return err }\n    defer sess.Close()\n\n    mu := concurrency.NewMutex(sess, \"/locks/\"+key)\n    if err := mu.Lock(context.Background()); err != nil { return err }\n    defer mu.Unlock(context.Background())\n\n    return fn()\n}"},
 ],
 ch8:[
-  {diff:1,q:"html/templateでXSSを防ぐ方法を示すコードを書け。text/templateとの違いも説明すること。",code:`package main
-
-import (
-    "html/template"
-    "os"
-)
-
-func main() {
-    // ユーザー入力をHTMLに埋め込む（XSS対策あり）
-}`,answer:`package main
-
-import (
-    "html/template"
-    "os"
-)
-
-func main() {
-    // html/templateは自動エスケープ（XSS防止）
-    tmpl := template.Must(template.New("").Parse("<p>{{.}}</p>"))
-    userInput := "<script>alert('XSS')<\/script>"
-    tmpl.Execute(os.Stdout, userInput)
-    // 出力: <p>&lt;script&gt;alert(&#39;XSS&#39;)&lt;/script&gt;</p>
-
-    // text/templateはエスケープしない（危険）
-    // import "text/template"を使うと生のHTMLが出力される
-}`},
-  {diff:2,q:"gosecで検出されるSQLインジェクション脆弱性のあるコードと、修正版を書け。",code:`package main
-
-import (
-    "database/sql"
-    "fmt"
-)
-
-// 脆弱なバージョン
-func getUser(db *sql.DB, name string) error {
-    // 文字列連結でSQLを組み立てる（危険）
-    query := fmt.Sprintf("SELECT * FROM users WHERE name='%s'", name)
-    _, err := db.Query(query)
-    return err
-}
-
-// 修正版を書け`,answer:`// 脆弱なバージョン（gosecがG201で検出）
-func getUserVulnerable(db *sql.DB, name string) error {
-    query := fmt.Sprintf("SELECT * FROM users WHERE name='%s'", name)
-    _, err := db.Query(query)
-    return err
-}
-
-// 修正版: プレースホルダを使用
-func getUserSafe(db *sql.DB, name string) error {
-    _, err := db.Query("SELECT * FROM users WHERE name=$1", name)
-    return err
-}
-
-// gosecでチェック: gosec ./...`},
-  {diff:3,q:"crypto/randを使って暗号学的に安全なランダムトークンを生成するコードを書け（32バイト・hex文字列）。",code:`package main
-
-import (
-    "crypto/rand"
-    "encoding/hex"
-    "fmt"
-)
-
-func generateToken() (string, error) {
-    // ここに書く
-}`,answer:`package main
-
-import (
-    "crypto/rand"
-    "encoding/hex"
-    "fmt"
-)
-
-func generateToken() (string, error) {
-    b := make([]byte, 32)
-    if _, err := rand.Read(b); err != nil { return "", err }
-    return hex.EncodeToString(b), nil
-}
-
-func main() {
-    token, _ := generateToken()
-    fmt.Println(token) // 64文字のhex文字列
-    // math/randは使わない（暗号学的に安全でない）
-}`},
+  {diff:1,q:"html/templateでXSSを防ぐ方法を示すコードを書け。text/templateとの違いも説明すること。",code:"package main\n\nimport (\n    \"html/template\"\n    \"os\"\n)\n\nfunc main() {\n    // ユーザー入力をHTMLに埋め込む（XSS対策あり）\n}",answer:"package main\n\nimport (\n    \"html/template\"\n    \"os\"\n)\n\nfunc main() {\n    // html/templateは自動エスケープ（XSS防止）\n    tmpl := template.Must(template.New(\"\").Parse(\"<p>{{.}}</p>\"))\n    userInput := \"<script>alert('XSS')<\/script>\"\n    tmpl.Execute(os.Stdout, userInput)\n    // 出力: <p>&lt;script&gt;alert(&#39;XSS&#39;)&lt;/script&gt;</p>\n\n    // text/templateはエスケープしない（危険）\n    // import \"text/template\"を使うと生のHTMLが出力される\n}"},
+  {diff:2,q:"gosecで検出されるSQLインジェクション脆弱性のあるコードと、修正版を書け。",code:"package main\n\nimport (\n    \"database/sql\"\n    \"fmt\"\n)\n\n// 脆弱なバージョン\nfunc getUser(db *sql.DB, name string) error {\n    // 文字列連結でSQLを組み立てる（危険）\n    query := fmt.Sprintf(\"SELECT * FROM users WHERE name='%s'\", name)\n    _, err := db.Query(query)\n    return err\n}\n\n// 修正版を書け",answer:"// 脆弱なバージョン（gosecがG201で検出）\nfunc getUserVulnerable(db *sql.DB, name string) error {\n    query := fmt.Sprintf(\"SELECT * FROM users WHERE name='%s'\", name)\n    _, err := db.Query(query)\n    return err\n}\n\n// 修正版: プレースホルダを使用\nfunc getUserSafe(db *sql.DB, name string) error {\n    _, err := db.Query(\"SELECT * FROM users WHERE name=$1\", name)\n    return err\n}\n\n// gosecでチェック: gosec ./..."},
+  {diff:3,q:"crypto/randを使って暗号学的に安全なランダムトークンを生成するコードを書け（32バイト・hex文字列）。",code:"package main\n\nimport (\n    \"crypto/rand\"\n    \"encoding/hex\"\n    \"fmt\"\n)\n\nfunc generateToken() (string, error) {\n    // ここに書く\n}",answer:"package main\n\nimport (\n    \"crypto/rand\"\n    \"encoding/hex\"\n    \"fmt\"\n)\n\nfunc generateToken() (string, error) {\n    b := make([]byte, 32)\n    if _, err := rand.Read(b); err != nil { return \"\", err }\n    return hex.EncodeToString(b), nil\n}\n\nfunc main() {\n    token, _ := generateToken()\n    fmt.Println(token) // 64文字のhex文字列\n    // math/randは使わない（暗号学的に安全でない）\n}"},
 ],
 ch9:[
-  {diff:1,q:"hashicorp/raftを使ったRaftクラスタの最小構成を示すコードを書け（3ノード構成の概念）。",code:`// hashicorp/raft
-package main
-
-import (
-    "github.com/hashicorp/raft"
-)
-
-// Raftクラスタのセットアップコードを書け（概念・骨格のみ）`,answer:`package main
-
-import (
-    "net"
-    "os"
-    "time"
-    "github.com/hashicorp/raft"
-    raftboltdb "github.com/hashicorp/raft-boltdb/v2"
-)
-
-func setupRaft(myID, myAddr string, peers []string) (*raft.Raft, error) {
-    cfg := raft.DefaultConfig()
-    cfg.LocalID = raft.ServerID(myID)
-
-    addr, _ := net.ResolveTCPAddr("tcp", myAddr)
-    transport, _ := raft.NewTCPTransport(myAddr, addr, 3, 10*time.Second, os.Stderr)
-
-    snapshots, _ := raft.NewFileSnapshotStore("/tmp/raft/"+myID, 2, os.Stderr)
-    logStore, _ := raftboltdb.NewBoltStore("/tmp/raft/"+myID+"/logs.bolt")
-    stableStore, _ := raftboltdb.NewBoltStore("/tmp/raft/"+myID+"/stable.bolt")
-
-    // FSMはビジネスロジックを持つstate machine
-    var fsm raft.FSM // = &MyFSM{}
-
-    r, _ := raft.NewRaft(cfg, fsm, logStore, stableStore, snapshots, transport)
-    return r, nil
-}`},
-  {diff:2,q:"Goで実装したFSM（有限状態機械）をRaftのFSMインターフェースで実装するコードを書け。",code:`package main
-
-import (
-    "io"
-    "github.com/hashicorp/raft"
-)
-
-type KVStore struct {
-    data map[string]string
-}
-
-// raft.FSMインターフェースを実装: Apply, Snapshot, Restore`,answer:`type KVStore struct {
-    data map[string]string
-    mu   sync.RWMutex
-}
-
-func (k *KVStore) Apply(log *raft.Log) any {
-    k.mu.Lock()
-    defer k.mu.Unlock()
-    // ログエントリを解析してkey-valueを更新
-    parts := strings.SplitN(string(log.Data), "=", 2)
-    if len(parts) == 2 { k.data[parts[0]] = parts[1] }
-    return nil
-}
-
-func (k *KVStore) Snapshot() (raft.FSMSnapshot, error) {
-    k.mu.RLock()
-    defer k.mu.RUnlock()
-    clone := make(map[string]string, len(k.data))
-    for key, val := range k.data { clone[key] = val }
-    return &KVSnapshot{data: clone}, nil
-}
-
-func (k *KVStore) Restore(rc io.ReadCloser) error {
-    return json.NewDecoder(rc).Decode(&k.data)
-}`},
-  {diff:3,q:"分散システムのIDMPリクエストを保証するidempotenteキーパターンをGoのHTTPサーバーで実装するコードを書け。",code:`package main
-
-import (
-    "net/http"
-    "sync"
-)
-
-// Idempotency-Keyヘッダを使って同じリクエストの重複を防ぐミドルウェアを書け`,answer:`package main
-
-import (
-    "net/http"
-    "sync"
-    "time"
-)
-
-type idempotencyStore struct {
-    mu      sync.RWMutex
-    records map[string]struct{ code int; body []byte; at time.Time }
-}
-
-func (s *idempotencyStore) middleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        key := r.Header.Get("Idempotency-Key")
-        if key == "" { next.ServeHTTP(w, r); return }
-
-        s.mu.RLock()
-        if rec, ok := s.records[key]; ok && time.Since(rec.at) < 24*time.Hour {
-            s.mu.RUnlock()
-            w.WriteHeader(rec.code)
-            w.Write(rec.body)
-            return
-        }
-        s.mu.RUnlock()
-
-        rw := &responseWriter{ResponseWriter: w}
-        next.ServeHTTP(rw, r)
-
-        s.mu.Lock()
-        s.records[key] = struct{ code int; body []byte; at time.Time }{rw.code, rw.body, time.Now()}
-        s.mu.Unlock()
-    })
-}`},
+  {diff:1,q:"hashicorp/raftを使ったRaftクラスタの最小構成を示すコードを書け（3ノード構成の概念）。",code:"// hashicorp/raft\npackage main\n\nimport (\n    \"github.com/hashicorp/raft\"\n)\n\n// Raftクラスタのセットアップコードを書け（概念・骨格のみ）",answer:"package main\n\nimport (\n    \"net\"\n    \"os\"\n    \"time\"\n    \"github.com/hashicorp/raft\"\n    raftboltdb \"github.com/hashicorp/raft-boltdb/v2\"\n)\n\nfunc setupRaft(myID, myAddr string, peers []string) (*raft.Raft, error) {\n    cfg := raft.DefaultConfig()\n    cfg.LocalID = raft.ServerID(myID)\n\n    addr, _ := net.ResolveTCPAddr(\"tcp\", myAddr)\n    transport, _ := raft.NewTCPTransport(myAddr, addr, 3, 10*time.Second, os.Stderr)\n\n    snapshots, _ := raft.NewFileSnapshotStore(\"/tmp/raft/\"+myID, 2, os.Stderr)\n    logStore, _ := raftboltdb.NewBoltStore(\"/tmp/raft/\"+myID+\"/logs.bolt\")\n    stableStore, _ := raftboltdb.NewBoltStore(\"/tmp/raft/\"+myID+\"/stable.bolt\")\n\n    // FSMはビジネスロジックを持つstate machine\n    var fsm raft.FSM // = &MyFSM{}\n\n    r, _ := raft.NewRaft(cfg, fsm, logStore, stableStore, snapshots, transport)\n    return r, nil\n}"},
+  {diff:2,q:"Goで実装したFSM（有限状態機械）をRaftのFSMインターフェースで実装するコードを書け。",code:"package main\n\nimport (\n    \"io\"\n    \"github.com/hashicorp/raft\"\n)\n\ntype KVStore struct {\n    data map[string]string\n}\n\n// raft.FSMインターフェースを実装: Apply, Snapshot, Restore",answer:"type KVStore struct {\n    data map[string]string\n    mu   sync.RWMutex\n}\n\nfunc (k *KVStore) Apply(log *raft.Log) any {\n    k.mu.Lock()\n    defer k.mu.Unlock()\n    // ログエントリを解析してkey-valueを更新\n    parts := strings.SplitN(string(log.Data), \"=\", 2)\n    if len(parts) == 2 { k.data[parts[0]] = parts[1] }\n    return nil\n}\n\nfunc (k *KVStore) Snapshot() (raft.FSMSnapshot, error) {\n    k.mu.RLock()\n    defer k.mu.RUnlock()\n    clone := make(map[string]string, len(k.data))\n    for key, val := range k.data { clone[key] = val }\n    return &KVSnapshot{data: clone}, nil\n}\n\nfunc (k *KVStore) Restore(rc io.ReadCloser) error {\n    return json.NewDecoder(rc).Decode(&k.data)\n}"},
+  {diff:3,q:"分散システムのIDMPリクエストを保証するidempotenteキーパターンをGoのHTTPサーバーで実装するコードを書け。",code:"package main\n\nimport (\n    \"net/http\"\n    \"sync\"\n)\n\n// Idempotency-Keyヘッダを使って同じリクエストの重複を防ぐミドルウェアを書け",answer:"package main\n\nimport (\n    \"net/http\"\n    \"sync\"\n    \"time\"\n)\n\ntype idempotencyStore struct {\n    mu      sync.RWMutex\n    records map[string]struct{ code int; body []byte; at time.Time }\n}\n\nfunc (s *idempotencyStore) middleware(next http.Handler) http.Handler {\n    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n        key := r.Header.Get(\"Idempotency-Key\")\n        if key == \"\" { next.ServeHTTP(w, r); return }\n\n        s.mu.RLock()\n        if rec, ok := s.records[key]; ok && time.Since(rec.at) < 24*time.Hour {\n            s.mu.RUnlock()\n            w.WriteHeader(rec.code)\n            w.Write(rec.body)\n            return\n        }\n        s.mu.RUnlock()\n\n        rw := &responseWriter{ResponseWriter: w}\n        next.ServeHTTP(rw, r)\n\n        s.mu.Lock()\n        s.records[key] = struct{ code int; body []byte; at time.Time }{rw.code, rw.body, time.Now()}\n        s.mu.Unlock()\n    })\n}"},
 ],
 ch10:[
-  {diff:1,q:"tinygoでArduino向けにLEDを点滅させるコードの概念（//go:build tinygoタグ）を書け。",code:`//go:build tinygo
-
-package main
-
-// tinygoでArduino Nanoのビルトインledを制御`,answer:`//go:build tinygo
-
-package main
-
-import (
-    "machine"
-    "time"
-)
-
-func main() {
-    led := machine.LED
-    led.Configure(machine.PinConfig{Mode: machine.PinOutput})
-
-    for {
-        led.High()
-        time.Sleep(500 * time.Millisecond)
-        led.Low()
-        time.Sleep(500 * time.Millisecond)
-    }
-}
-
-// ビルドコマンド:
-// tinygo flash -target=arduino-nano ./`},
-  {diff:2,q:"GOOS=wasip1 GOARCH=wasmでGoコードをWASI向けにビルドし、wasmtimeで実行するコマンドを示せ。",code:`// main.go (WASI向け)
-package main
-
-import "fmt"
-
-func main() {
-    fmt.Println("Hello from WASI!")
-}
-
-// ビルドと実行コマンドを示せ`,answer:`// main.go
-package main
-
-import "fmt"
-
-func main() {
-    fmt.Println("Hello from WASI!")
-}
-
-// ビルド（Go 1.21+）
-// GOOS=wasip1 GOARCH=wasm go build -o main.wasm .
-
-// 実行（wasmtimeが必要）
-// wasmtime main.wasm
-
-// または wazero（pure Go WASM runtime）で実行:
-// go install github.com/tetratelabs/wazero/cmd/wazero@latest
-// wazero run main.wasm`},
-  {diff:3,q:"Goで実装した数値計算関数をWasmにコンパイルしてJavaScriptから呼び出す一連のコードを書け。",code:`// Go側: fibonacci関数をWasm公開
-// JS側: importして呼び出し
-
-// Go (main.go)
-//go:build js && wasm
-
-package main`,answer:`//go:build js && wasm
-
-package main
-
-import (
-    "syscall/js"
-)
-
-func fibonacci(n int) int {
-    if n <= 1 { return n }
-    return fibonacci(n-1) + fibonacci(n-2)
-}
-
-func fibJS(this js.Value, args []js.Value) any {
-    return fibonacci(args[0].Int())
-}
-
-func main() {
-    js.Global().Set("goFib", js.FuncOf(fibJS))
-    <-make(chan struct{}) // JSからの呼び出しを待機
-}
-
-// index.html側:
-// <script src="wasm_exec.js"><\/script>
-// <script>
-//   const go = new Go();
-//   WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject)
-//     .then(r => go.run(r.instance))
-//     .then(() => console.log(goFib(10)));
-// <\/script>
-
-// ビルド:
-// GOOS=js GOARCH=wasm go build -o main.wasm .
-// cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" .`},
+  {diff:1,q:"tinygoでArduino向けにLEDを点滅させるコードの概念（//go:build tinygoタグ）を書け。",code:"//go:build tinygo\n\npackage main\n\n// tinygoでArduino Nanoのビルトインledを制御",answer:"//go:build tinygo\n\npackage main\n\nimport (\n    \"machine\"\n    \"time\"\n)\n\nfunc main() {\n    led := machine.LED\n    led.Configure(machine.PinConfig{Mode: machine.PinOutput})\n\n    for {\n        led.High()\n        time.Sleep(500 * time.Millisecond)\n        led.Low()\n        time.Sleep(500 * time.Millisecond)\n    }\n}\n\n// ビルドコマンド:\n// tinygo flash -target=arduino-nano ./"},
+  {diff:2,q:"GOOS=wasip1 GOARCH=wasmでGoコードをWASI向けにビルドし、wasmtimeで実行するコマンドを示せ。",code:"// main.go (WASI向け)\npackage main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello from WASI!\")\n}\n\n// ビルドと実行コマンドを示せ",answer:"// main.go\npackage main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello from WASI!\")\n}\n\n// ビルド（Go 1.21+）\n// GOOS=wasip1 GOARCH=wasm go build -o main.wasm .\n\n// 実行（wasmtimeが必要）\n// wasmtime main.wasm\n\n// または wazero（pure Go WASM runtime）で実行:\n// go install github.com/tetratelabs/wazero/cmd/wazero@latest\n// wazero run main.wasm"},
+  {diff:3,q:"Goで実装した数値計算関数をWasmにコンパイルしてJavaScriptから呼び出す一連のコードを書け。",code:"// Go側: fibonacci関数をWasm公開\n// JS側: importして呼び出し\n\n// Go (main.go)\n//go:build js && wasm\n\npackage main",answer:"//go:build js && wasm\n\npackage main\n\nimport (\n    \"syscall/js\"\n)\n\nfunc fibonacci(n int) int {\n    if n <= 1 { return n }\n    return fibonacci(n-1) + fibonacci(n-2)\n}\n\nfunc fibJS(this js.Value, args []js.Value) any {\n    return fibonacci(args[0].Int())\n}\n\nfunc main() {\n    js.Global().Set(\"goFib\", js.FuncOf(fibJS))\n    <-make(chan struct{}) // JSからの呼び出しを待機\n}\n\n// index.html側:\n// <script src=\"wasm_exec.js\"><\/script>\n// <script>\n//   const go = new Go();\n//   WebAssembly.instantiateStreaming(fetch(\"main.wasm\"), go.importObject)\n//     .then(r => go.run(r.instance))\n//     .then(() => console.log(goFib(10)));\n// <\/script>\n\n// ビルド:\n// GOOS=js GOARCH=wasm go build -o main.wasm .\n// cp \"$(go env GOROOT)/misc/wasm/wasm_exec.js\" ."},
 ],
 ch11:[
-  {diff:1,q:"Goのリリースエンジニアリングで使うgoreleaserとghの組み合わせでGitHubリリースを自動化するworkflowを書け。",code:`# .github/workflows/release.yml`,answer:`name: Release
-
-on:
-  push:
-    tags:
-      - 'v*'
-
-jobs:
-  release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - uses: goreleaser/goreleaser-action@v5
-        with:
-          version: latest
-          args: release --clean
-        env:
-          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}`},
-  {diff:2,q:"Goのopen telemetry SDKでexemplarを付きのメトリクスをPrometheusに送るコードを書け。",code:`package main
-
-// OpenTelemetry + Prometheusエクスポーターのセットアップ
-import (
-    "github.com/prometheus/client_golang/prometheus"
-    "go.opentelemetry.io/otel/metric"
-)`,answer:`package main
-
-import (
-    "go.opentelemetry.io/otel"
-    "go.opentelemetry.io/otel/exporters/prometheus"
-    "go.opentelemetry.io/otel/sdk/metric"
-    "net/http"
-    promclient "github.com/prometheus/client_golang/prometheus/promhttp"
-)
-
-func initMetrics() {
-    exporter, _ := prometheus.New()
-    provider := metric.NewMeterProvider(metric.WithReader(exporter))
-    otel.SetMeterProvider(provider)
-}
-
-func main() {
-    initMetrics()
-    meter := otel.Meter("myapp")
-    counter, _ := meter.Int64Counter("requests_total")
-    _ = counter
-
-    http.Handle("/metrics", promclient.Handler())
-    http.ListenAndServe(":2112", nil)
-}`},
-  {diff:3,q:"Goのライブラリを設計する際の「10の鉄則」をGoコードコメントで書け。",code:`// Goライブラリ設計の10の鉄則`,answer:`// 1. Accept interfaces, return structs
-//    → 引数はインターフェース型、戻り値は具体型でAPIを安定化
-
-// 2. Errors are values
-//    → errorをパニックではなく戻り値として返す。テスト可能に設計する
-
-// 3. Make the zero value useful
-//    → var buf bytes.Buffer; buf.Write(...)  初期化なしで使えるように設計
-
-// 4. Functional Options for complex configs
-//    → WithTimeout(d) 等のオプション関数でAPIの後方互換を保つ
-
-// 5. io.Reader/Writer を受け取って汎用化
-//    → os.File, bytes.Buffer, net.Conn どれでも受け取れる
-
-// 6. Context を第一引数に
-//    → キャンセル・タイムアウトをライブラリ全体に伝播
-
-// 7. Minimal public API
-//    → Export するのは必要最小限。後から追加はできるが削除はbreaking change
-
-// 8. Document every exported symbol
-//    → godoc + go vet で全exportに//コメントを強制
-
-// 9. Semver を遵守
-//    → v2以降はモジュールパスに/v2を追加する
-
-// 10. Provide example tests
-//     → _test.go内のExample関数でgo docに実行可能な例を示す`},
+  {diff:1,q:"Goのリリースエンジニアリングで使うgoreleaserとghの組み合わせでGitHubリリースを自動化するworkflowを書け。",code:"# .github/workflows/release.yml",answer:"name: Release\n\non:\n  push:\n    tags:\n      - 'v*'\n\njobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n\n      - uses: actions/setup-go@v5\n        with:\n          go-version: '1.22'\n\n      - uses: goreleaser/goreleaser-action@v5\n        with:\n          version: latest\n          args: release --clean\n        env:\n          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}"},
+  {diff:2,q:"Goのopen telemetry SDKでexemplarを付きのメトリクスをPrometheusに送るコードを書け。",code:"package main\n\n// OpenTelemetry + Prometheusエクスポーターのセットアップ\nimport (\n    \"github.com/prometheus/client_golang/prometheus\"\n    \"go.opentelemetry.io/otel/metric\"\n)",answer:"package main\n\nimport (\n    \"go.opentelemetry.io/otel\"\n    \"go.opentelemetry.io/otel/exporters/prometheus\"\n    \"go.opentelemetry.io/otel/sdk/metric\"\n    \"net/http\"\n    promclient \"github.com/prometheus/client_golang/prometheus/promhttp\"\n)\n\nfunc initMetrics() {\n    exporter, _ := prometheus.New()\n    provider := metric.NewMeterProvider(metric.WithReader(exporter))\n    otel.SetMeterProvider(provider)\n}\n\nfunc main() {\n    initMetrics()\n    meter := otel.Meter(\"myapp\")\n    counter, _ := meter.Int64Counter(\"requests_total\")\n    _ = counter\n\n    http.Handle(\"/metrics\", promclient.Handler())\n    http.ListenAndServe(\":2112\", nil)\n}"},
+  {diff:3,q:"Goのライブラリを設計する際の「10の鉄則」をGoコードコメントで書け。",code:"// Goライブラリ設計の10の鉄則",answer:"// 1. Accept interfaces, return structs\n//    → 引数はインターフェース型、戻り値は具体型でAPIを安定化\n\n// 2. Errors are values\n//    → errorをパニックではなく戻り値として返す。テスト可能に設計する\n\n// 3. Make the zero value useful\n//    → var buf bytes.Buffer; buf.Write(...)  初期化なしで使えるように設計\n\n// 4. Functional Options for complex configs\n//    → WithTimeout(d) 等のオプション関数でAPIの後方互換を保つ\n\n// 5. io.Reader/Writer を受け取って汎用化\n//    → os.File, bytes.Buffer, net.Conn どれでも受け取れる\n\n// 6. Context を第一引数に\n//    → キャンセル・タイムアウトをライブラリ全体に伝播\n\n// 7. Minimal public API\n//    → Export するのは必要最小限。後から追加はできるが削除はbreaking change\n\n// 8. Document every exported symbol\n//    → godoc + go vet で全exportに//コメントを強制\n\n// 9. Semver を遵守\n//    → v2以降はモジュールパスに/v2を追加する\n\n// 10. Provide example tests\n//     → _test.go内のExample関数でgo docに実行可能な例を示す"},
 ],
 ch12:[
-  {diff:1,q:"GoプロジェクトのCIで使うすべてのcheckをMakefileにまとめよ（fmt/vet/lint/test/build/security）。",code:`# Makefile: all checkターゲット`,answer:`.PHONY: check fmt vet lint test build security
-
-check: fmt vet lint test build security
-
-fmt:
-	gofmt -l . | grep . && exit 1 || true
-	goimports -l . | grep . && exit 1 || true
-
-vet:
-	go vet ./...
-
-lint:
-	golangci-lint run --timeout=5m
-
-test:
-	go test -race -count=1 ./...
-
-build:
-	go build ./...
-
-security:
-	govulncheck ./...
-	gosec ./...`},
-  {diff:2,q:"Goコードのアーキテクチャを強制するgo-arch-lintの設定ファイル（.go-arch-lint.yml）でdomain→infra依存を禁止する設定を書け。",code:`# .go-arch-lint.yml`,answer:`version: 2
-
-workdir: ./
-
-allow:
-  depOnAnyVendor: false
-
-components:
-  domain:
-    in: internal/domain
-  usecase:
-    in: internal/usecase
-  handler:
-    in: internal/handler
-  infra:
-    in: internal/infra
-
-deps:
-  domain:
-    # domainは何にも依存しない（外部ライブラリ除く）
-    mayDependOn: []
-  usecase:
-    mayDependOn: [domain]
-  handler:
-    mayDependOn: [domain, usecase]
-  infra:
-    mayDependOn: [domain]`},
-  {diff:3,q:"Goの10年分の学習ロードマップを段階別にコメントで書け（初級→上級→エキスパートの目安）。",code:`// Goの学習ロードマップ`,answer:`// === Level 1: 基礎（1〜3ヶ月）===
-// □ 変数・型・関数・struct・interface
-// □ goroutine・channel・WaitGroup
-// □ error handling（errors.Is/As）
-// □ encoding/json・os・net/http
-// □ go modules・go test
-
-// === Level 2: 実務（3〜6ヶ月）===
-// □ PostgreSQL + pgx / sqlx
-// □ go-chi / gin でREST API
-// □ Docker + Kubernetes基礎
-// □ Prometheus + OpenTelemetry
-// □ testcontainers・table-driven tests
-// □ CI/CD（GitHub Actions）
-
-// === Level 3: 上級（6〜12ヶ月）===
-// □ gRPC + protobuf
-// □ goroutineパターン（pipeline・fan-out・errgroup）
-// □ pprof・GC tuning・escape analysis
-// □ cgo・unsafe・Wasm
-// □ Kubernetes Operator（kubebuilder）
-// □ 分散システム（Raft・etcd・circuit breaker）
-
-// === Level 4: エキスパート（1〜3年）===
-// □ Goコンパイラ・ランタイムのソースコード読解
-// □ Go言語仕様の完全把握
-// □ 大規模ライブラリの設計・公開
-// □ GopherConでの発表・OSSコントリビューション`},
+  {diff:1,q:"GoプロジェクトのCIで使うすべてのcheckをMakefileにまとめよ（fmt/vet/lint/test/build/security）。",code:"# Makefile: all checkターゲット",answer:".PHONY: check fmt vet lint test build security\n\ncheck: fmt vet lint test build security\n\nfmt:\n	gofmt -l . | grep . && exit 1 || true\n	goimports -l . | grep . && exit 1 || true\n\nvet:\n	go vet ./...\n\nlint:\n	golangci-lint run --timeout=5m\n\ntest:\n	go test -race -count=1 ./...\n\nbuild:\n	go build ./...\n\nsecurity:\n	govulncheck ./...\n	gosec ./..."},
+  {diff:2,q:"Goコードのアーキテクチャを強制するgo-arch-lintの設定ファイル（.go-arch-lint.yml）でdomain→infra依存を禁止する設定を書け。",code:"# .go-arch-lint.yml",answer:"version: 2\n\nworkdir: ./\n\nallow:\n  depOnAnyVendor: false\n\ncomponents:\n  domain:\n    in: internal/domain\n  usecase:\n    in: internal/usecase\n  handler:\n    in: internal/handler\n  infra:\n    in: internal/infra\n\ndeps:\n  domain:\n    # domainは何にも依存しない（外部ライブラリ除く）\n    mayDependOn: []\n  usecase:\n    mayDependOn: [domain]\n  handler:\n    mayDependOn: [domain, usecase]\n  infra:\n    mayDependOn: [domain]"},
+  {diff:3,q:"Goの10年分の学習ロードマップを段階別にコメントで書け（初級→上級→エキスパートの目安）。",code:"// Goの学習ロードマップ",answer:"// === Level 1: 基礎（1〜3ヶ月）===\n// □ 変数・型・関数・struct・interface\n// □ goroutine・channel・WaitGroup\n// □ error handling（errors.Is/As）\n// □ encoding/json・os・net/http\n// □ go modules・go test\n\n// === Level 2: 実務（3〜6ヶ月）===\n// □ PostgreSQL + pgx / sqlx\n// □ go-chi / gin でREST API\n// □ Docker + Kubernetes基礎\n// □ Prometheus + OpenTelemetry\n// □ testcontainers・table-driven tests\n// □ CI/CD（GitHub Actions）\n\n// === Level 3: 上級（6〜12ヶ月）===\n// □ gRPC + protobuf\n// □ goroutineパターン（pipeline・fan-out・errgroup）\n// □ pprof・GC tuning・escape analysis\n// □ cgo・unsafe・Wasm\n// □ Kubernetes Operator（kubebuilder）\n// □ 分散システム（Raft・etcd・circuit breaker）\n\n// === Level 4: エキスパート（1〜3年）===\n// □ Goコンパイラ・ランタイムのソースコード読解\n// □ Go言語仕様の完全把握\n// □ 大規模ライブラリの設計・公開\n// □ GopherConでの発表・OSSコントリビューション"},
 ],
 };
 
@@ -1174,341 +174,117 @@ const chapters = [
 goal:"GMPスケジューラ・GCアルゴリズム・goroutineのスタック管理を説明できる。GODEBUGでランタイムを観察できる。",
 sections:[
 {title:"GMPスケジューラ",
-body:`GoランタイムはM:Nスケジューラを実装しており、多数のgoroutineを少数のOSスレッドで効率的にスケジュールします。G（goroutine）・M（machine = OSスレッド）・P（processor = 実行コンテキスト）の三要素から成るGMPモデルが核心です。GOMAXPROCSはPの数を制御し、デフォルトはCPUコア数です。
-
-Pythonのスレッドが真の並列実行できない（GIL）のと異なり、GoのgoroutineはGOMACPROCS個のOSスレッドで真の並列実行が可能です。goroutineは協調的スケジューリング（関数呼び出し時・channel操作時・syscall時に切り替え）と非協調的スケジューリング（10ms毎にpreempt）を組み合わせます。`,
+body:"GoランタイムはM:Nスケジューラを実装しており、多数のgoroutineを少数のOSスレッドで効率的にスケジュールします。G（goroutine）・M（machine = OSスレッド）・P（processor = 実行コンテキスト）の三要素から成るGMPモデルが核心です。GOMAXPROCSはPの数を制御し、デフォルトはCPUコア数です。\n\nPythonのスレッドが真の並列実行できない（GIL）のと異なり、GoのgoroutineはGOMACPROCS個のOSスレッドで真の並列実行が可能です。goroutineは協調的スケジューリング（関数呼び出し時・channel操作時・syscall時に切り替え）と非協調的スケジューリング（10ms毎にpreempt）を組み合わせます。",
 table:T.runtimeInternals,
-afterTable:`GODEBUG=schedtrace=1000でスケジューラの状態をミリ秒単位でトレースできます。goroutineが増えすぎてスケジューラがボトルネックになっているかどうかを確認する際に役立ちます。`},
+afterTable:"GODEBUG=schedtrace=1000でスケジューラの状態をミリ秒単位でトレースできます。goroutineが増えすぎてスケジューラがボトルネックになっているかどうかを確認する際に役立ちます。"},
 {title:"GCとメモリ管理",
-body:`GoのGCはトライカラーマーク&スイープアルゴリズムを使います。並行フェーズとStop-The-World（STW）フェーズを組み合わせて、アプリのレイテンシへの影響を最小化します。GOGC=100はヒープがGC後のサイズの100%増えたらGCするという設定です。
-
-GOMEMLIMIT（Go 1.19以降）はソフトメモリ上限で、OOMキラーに殺される前にGCが積極的に回収します。コンテナ環境でメモリリミットを設定している場合、GOGCよりGOMEMLIMITの方が効果的です。runtime.ReadMemStatsでヒープの詳細な統計を取得できます。`,
+body:"GoのGCはトライカラーマーク&スイープアルゴリズムを使います。並行フェーズとStop-The-World（STW）フェーズを組み合わせて、アプリのレイテンシへの影響を最小化します。GOGC=100はヒープがGC後のサイズの100%増えたらGCするという設定です。\n\nGOMEMLIMIT（Go 1.19以降）はソフトメモリ上限で、OOMキラーに殺される前にGCが積極的に回収します。コンテナ環境でメモリリミットを設定している場合、GOGCよりGOMEMLIMITの方が効果的です。runtime.ReadMemStatsでヒープの詳細な統計を取得できます。",
 table:T.goRuntime,
-code:`package main
-
-import (
-    "fmt"
-    "runtime"
-    "time"
-)
-
-func main() {
-    // スケジューラに処理を促す
-    go func() {
-        for {
-            runtime.Gosched() // 他のgoroutineにCPUを譲る
-            time.Sleep(time.Millisecond)
-        }
-    }()
-
-    // GCの統計
-    var ms runtime.MemStats
-    runtime.ReadMemStats(&ms)
-    fmt.Printf("NumGC=%d, HeapAlloc=%dKB, NextGC=%dKB\n",
-        ms.NumGC, ms.HeapAlloc/1024, ms.NextGC/1024)
-
-    // 明示的GC
-    runtime.GC()
-}`,
-afterCode:`runtime.NumCPU()でCPUコア数、runtime.GOMAXPROCS(-1)で現在のGOMAXPROCS値を取得できます。本番環境でGOMAXPROCSを変更する場合はgolangci.com/automaxprocsクレートを使うと、コンテナのCPUリミットに合わせて自動設定されます。`},
+code:"package main\n\nimport (\n    \"fmt\"\n    \"runtime\"\n    \"time\"\n)\n\nfunc main() {\n    // スケジューラに処理を促す\n    go func() {\n        for {\n            runtime.Gosched() // 他のgoroutineにCPUを譲る\n            time.Sleep(time.Millisecond)\n        }\n    }()\n\n    // GCの統計\n    var ms runtime.MemStats\n    runtime.ReadMemStats(&ms)\n    fmt.Printf(\"NumGC=%d, HeapAlloc=%dKB, NextGC=%dKB\n\",\n        ms.NumGC, ms.HeapAlloc/1024, ms.NextGC/1024)\n\n    // 明示的GC\n    runtime.GC()\n}",
+afterCode:"runtime.NumCPU()でCPUコア数、runtime.GOMAXPROCS(-1)で現在のGOMAXPROCS値を取得できます。本番環境でGOMAXPROCSを変更する場合はgolangci.com/automaxprocsクレートを使うと、コンテナのCPUリミットに合わせて自動設定されます。"},
 ]},
 {id:"ch2",num:2,title:"cgo・プラグイン・WebAssembly",est:"70分",
 goal:"cgoでCライブラリを呼び出せる。WASIターゲットでGoをWasmにコンパイルできる。Extismでwasm pluginシステムを構築できる。",
 sections:[
 {title:"cgoとGoの境界",
-body:`cgoはGoとCの相互運用を可能にする機能です。import "C"と書き、コメント内にCヘッダとコードを書くことでCの関数をGoから呼べます。ただしcgoには重大なデメリットがあります。CGO_ENABLED=0が効かずクロスコンパイルができなくなる・関数呼び出しコストが高い（goroutineスタックとCスタックの切り替え）・静的解析ツールの一部が効かなくなる等です。
-
-cgoの代替として、gRPCによる別プロセス化・WasmプラグインシステムのExtism・Goのpure実装を使う方法があります。どうしてもCライブラリが必要な場合のみcgoを選択してください。Pythonのctypesよりも型安全ですが、複雑さでは劣ります。`,
+body:"cgoはGoとCの相互運用を可能にする機能です。import \"C\"と書き、コメント内にCヘッダとコードを書くことでCの関数をGoから呼べます。ただしcgoには重大なデメリットがあります。CGO_ENABLED=0が効かずクロスコンパイルができなくなる・関数呼び出しコストが高い（goroutineスタックとCスタックの切り替え）・静的解析ツールの一部が効かなくなる等です。\n\ncgoの代替として、gRPCによる別プロセス化・WasmプラグインシステムのExtism・Goのpure実装を使う方法があります。どうしてもCライブラリが必要な場合のみcgoを選択してください。Pythonのctypesよりも型安全ですが、複雑さでは劣ります。",
 table:T.cgoVsPlugin,
-afterTable:`Extism（extism.org）はWasmをプラグインとして安全に実行できるシステムで、GoホストからRust・Go・Python等で書いたWasmプラグインを呼べます。サンドボックス実行・メモリ分離・言語非依存という点でcgoやplugin.Openより優れています。`},
+afterTable:"Extism（extism.org）はWasmをプラグインとして安全に実行できるシステムで、GoホストからRust・Go・Python等で書いたWasmプラグインを呼べます。サンドボックス実行・メモリ分離・言語非依存という点でcgoやplugin.Openより優れています。"},
 {title:"Go WebAssembly",
-body:`Go 1.21でGOOS=wasip1というWASI（WebAssembly System Interface）ターゲットが安定化しました。これによりDockerなしでサーバーレスWasmとして動かせます。ブラウザ向けにはGOOS=js GOARCH=wasm + syscall/jsで引き続き対応しています。
-
-tinygoはGo互換のコンパイラで組み込み・Wasmに特化しており、ランタイムが非常に小さいバイナリを生成します。標準Goコンパイラのwasmバイナリが2MB+になるのに対し、tinygoは数十KBに抑えられます。完全な互換性はないため、使用するパッケージに注意が必要です。`,
+body:"Go 1.21でGOOS=wasip1というWASI（WebAssembly System Interface）ターゲットが安定化しました。これによりDockerなしでサーバーレスWasmとして動かせます。ブラウザ向けにはGOOS=js GOARCH=wasm + syscall/jsで引き続き対応しています。\n\ntinygoはGo互換のコンパイラで組み込み・Wasmに特化しており、ランタイムが非常に小さいバイナリを生成します。標準Goコンパイラのwasmバイナリが2MB+になるのに対し、tinygoは数十KBに抑えられます。完全な互換性はないため、使用するパッケージに注意が必要です。",
 table:T.wasm,
-code:`// WASI向けGoプログラム
-// GOOS=wasip1 GOARCH=wasm go build -o main.wasm .
-
-//go:build wasip1
-
-package main
-
-import (
-    "fmt"
-    "os"
-)
-
-func main() {
-    // WASIの標準入出力を使用
-    fmt.Fprintln(os.Stdout, "Hello from WASI!")
-    args := os.Args
-    for i, arg := range args {
-        fmt.Fprintf(os.Stdout, "arg[%d]: %s\n", i, arg)
-    }
-}`,
-afterCode:`WASIX（WASIの拡張）はスレッドをサポートしており、GoのgoroutineをWasm内で動かす実験的な取り組みも進んでいます。Wasmエコシステムは急速に進化中で、最新情報はwebassembly.orgと各ランタイムのリリースノートを確認してください。`},
+code:"// WASI向けGoプログラム\n// GOOS=wasip1 GOARCH=wasm go build -o main.wasm .\n\n//go:build wasip1\n\npackage main\n\nimport (\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // WASIの標準入出力を使用\n    fmt.Fprintln(os.Stdout, \"Hello from WASI!\")\n    args := os.Args\n    for i, arg := range args {\n        fmt.Fprintf(os.Stdout, \"arg[%d]: %s\n\", i, arg)\n    }\n}",
+afterCode:"WASIX（WASIの拡張）はスレッドをサポートしており、GoのgoroutineをWasm内で動かす実験的な取り組みも進んでいます。Wasmエコシステムは急速に進化中で、最新情報はwebassembly.orgと各ランタイムのリリースノートを確認してください。"},
 ]},
 {id:"ch3",num:3,title:"コンパイラと最適化の深掘り",est:"70分",
 goal:"Goコンパイラのパイプラインを説明できる。エスケープ解析・inlining・SSAを活用した最適化ができる。",
 sections:[
 {title:"コンパイラパイプラインの理解",
-body:`Goコンパイラ（gc）は字句解析→AST→型チェック→SSA→最適化パス→機械語生成のパイプラインを持ちます。go build -gcflags="-S"でアセンブリ出力、-gcflags="-m"でエスケープ解析とインライン化の判定結果を確認できます。
-
-エスケープ解析は変数がスタックに留まれるかヒープに逃げるかを決定します。ヒープに逃げるとGCの対象になり性能に影響します。ポインタを返す関数・インターフェースに代入した値・goroutineにキャプチャされた変数はヒープに逃げます。エスケープ解析を意識した設計でGC圧力を下げられます。`,
+body:"Goコンパイラ（gc）は字句解析→AST→型チェック→SSA→最適化パス→機械語生成のパイプラインを持ちます。go build -gcflags=\"-S\"でアセンブリ出力、-gcflags=\"-m\"でエスケープ解析とインライン化の判定結果を確認できます。\n\nエスケープ解析は変数がスタックに留まれるかヒープに逃げるかを決定します。ヒープに逃げるとGCの対象になり性能に影響します。ポインタを返す関数・インターフェースに代入した値・goroutineにキャプチャされた変数はヒープに逃げます。エスケープ解析を意識した設計でGC圧力を下げられます。",
 table:T.compilerInternals,
-afterTable:`go tool compile -S でSSA (Static Single Assignment) 形式の中間表現を出力できます。GOSSAFUNC=FuncName go build でSSAパスごとの変換を可視化するHTMLレポートが生成されます。コンパイラの最適化を深く理解するのに役立ちます。`},
+afterTable:"go tool compile -S でSSA (Static Single Assignment) 形式の中間表現を出力できます。GOSSAFUNC=FuncName go build でSSAパスごとの変換を可視化するHTMLレポートが生成されます。コンパイラの最適化を深く理解するのに役立ちます。"},
 {title:"エスケープ解析と最適化",
-body:`エスケープ解析の結果はgo build -gcflags="-m -m"（-mを2回）で詳細に確認できます。「moved to heap」と表示された変数はヒープ割り当てが発生します。インターフェースに代入するとサイズが実行時に不明になるためほぼ必ずヒープに逃げます。
-
-PGO（Profile-Guided Optimization）はGo 1.21で安定化し、実際のプロファイルデータを使ってinlining判定等を改善します。デフォルトのgo buildは保守的なinlining基準ですが、PGOにより実際のホットパスを積極的にinlineします。Googleの内部測定では2〜7%の速度改善が報告されています。`,
+body:"エスケープ解析の結果はgo build -gcflags=\"-m -m\"（-mを2回）で詳細に確認できます。「moved to heap」と表示された変数はヒープ割り当てが発生します。インターフェースに代入するとサイズが実行時に不明になるためほぼ必ずヒープに逃げます。\n\nPGO（Profile-Guided Optimization）はGo 1.21で安定化し、実際のプロファイルデータを使ってinlining判定等を改善します。デフォルトのgo buildは保守的なinlining基準ですが、PGOにより実際のホットパスを積極的にinlineします。Googleの内部測定では2〜7%の速度改善が報告されています。",
 table:T.escapeAnalysis,
 table2: T.performanceAdv,
-code:`// エスケープ解析の例と対策
-
-// BAD: インターフェース経由でヒープに逃げる
-func addToInterface(nums []int) any {
-    return nums // any（interface{}）に代入 → ヒープ
-}
-
-// GOOD: 具体的な型を返す
-func addToSlice(nums []int) []int {
-    return nums
-}
-
-// BAD: ポインタを返す（ヒープ逃げ）
-func newInt() *int {
-    x := 42 // heapに逃げる
-    return &x
-}
-
-// GOOD: スタック上の値を返す
-func getInt() int {
-    x := 42 // stackに留まる
-    return x
-}`,
-afterCode:`unsafe.Sizeofで構造体のサイズ・unsafe.Offsetofでフィールドオフセットを確認できます。fieldalignment linterはフィールドの並び順を最適化する提案を自動生成します。`},
+code:"// エスケープ解析の例と対策\n\n// BAD: インターフェース経由でヒープに逃げる\nfunc addToInterface(nums []int) any {\n    return nums // any（interface{}）に代入 → ヒープ\n}\n\n// GOOD: 具体的な型を返す\nfunc addToSlice(nums []int) []int {\n    return nums\n}\n\n// BAD: ポインタを返す（ヒープ逃げ）\nfunc newInt() *int {\n    x := 42 // heapに逃げる\n    return &x\n}\n\n// GOOD: スタック上の値を返す\nfunc getInt() int {\n    x := 42 // stackに留まる\n    return x\n}",
+afterCode:"unsafe.Sizeofで構造体のサイズ・unsafe.Offsetofでフィールドオフセットを確認できます。fieldalignment linterはフィールドの並び順を最適化する提案を自動生成します。"},
 ]},
 {id:"ch4",num:4,title:"高度なパフォーマンス最適化",est:"70分",
 goal:"PGO・fieldalignment・inlining制御・unsafe.Pointerを使った高度な最適化を実践できる。",
 sections:[
 {title:"PGOとフィールドアラインメント",
-body:`PGO（Profile-Guided Optimization）は実際のワークロードのCPUプロファイルを元にコンパイラが最適化を調整します。default.pgoファイルをソースツリーに置くとgo build -pgo=autoで自動的に適用されます。Googleの本番データでは2〜7%の改善が報告されており、特に大規模サービスでは無視できない効果です。
-
-structのフィールド順序はメモリレイアウトに影響します。小さいフィールドの後に大きいフィールドを置くとパディングが増えてキャッシュ効率が下がります。fieldalignmentツールが最適な順序を自動提案します。メモリ集約的なデータ構造（大量に作る構造体）での効果が大きいです。`,
+body:"PGO（Profile-Guided Optimization）は実際のワークロードのCPUプロファイルを元にコンパイラが最適化を調整します。default.pgoファイルをソースツリーに置くとgo build -pgo=autoで自動的に適用されます。Googleの本番データでは2〜7%の改善が報告されており、特に大規模サービスでは無視できない効果です。\n\nstructのフィールド順序はメモリレイアウトに影響します。小さいフィールドの後に大きいフィールドを置くとパディングが増えてキャッシュ効率が下がります。fieldalignmentツールが最適な順序を自動提案します。メモリ集約的なデータ構造（大量に作る構造体）での効果が大きいです。",
 table:T.performanceAdv,
-afterTable:`go build -pgo=auto はGo 1.21以降で使えます。プロファイルはcontinuous profiling（Pyroscope・Polar Signals）を使って本番からサンプリングするとより効果的です。`},
+afterTable:"go build -pgo=auto はGo 1.21以降で使えます。プロファイルはcontinuous profiling（Pyroscope・Polar Signals）を使って本番からサンプリングするとより効果的です。"},
 ]},
 {id:"ch5",num:5,title:"ライブラリ設計の哲学",est:"65分",
 goal:"Goのライブラリ設計哲学（Accept interfaces, return structs等）を実践できる。Functional Optionsとio.Reader/Writerを活用したAPIを設計できる。",
 sections:[
 {title:"Goの設計哲学",
-body:`「Accept interfaces, return structs」はGoで最も重要な設計原則の一つです。関数の引数をインターフェース型にすることで、呼び出し側が具体的な実装（ファイル・メモリ・ネットワーク）を選べます。戻り値を具体的な構造体にすることでAPIが明確で、後から実装を変えやすくなります。
-
-Functional Optionsパターンは後方互換を保ちながら設定オプションを追加できます。NewClient(opts ...Option)の形式で任意数のオプションを受け取り、struct内に適用します。Pythonのキーワード引数に似ていますが、型安全でデフォルト値を持つ設定が明確です。`,
+body:"「Accept interfaces, return structs」はGoで最も重要な設計原則の一つです。関数の引数をインターフェース型にすることで、呼び出し側が具体的な実装（ファイル・メモリ・ネットワーク）を選べます。戻り値を具体的な構造体にすることでAPIが明確で、後から実装を変えやすくなります。\n\nFunctional Optionsパターンは後方互換を保ちながら設定オプションを追加できます。NewClient(opts ...Option)の形式で任意数のオプションを受け取り、struct内に適用します。Pythonのキーワード引数に似ていますが、型安全でデフォルト値を持つ設定が明確です。",
 table:T.libraryDesign,
-code:`// io.Reader を受け取るAPIの設計
-package parser
-
-import (
-    "bufio"
-    "io"
-)
-
-type Parser struct {
-    maxLineLength int
-}
-
-type Option func(*Parser)
-
-func WithMaxLineLength(n int) Option {
-    return func(p *Parser) { p.maxLineLength = n }
-}
-
-func New(opts ...Option) *Parser {
-    p := &Parser{maxLineLength: 4096}
-    for _, opt := range opts { opt(p) }
-    return p
-}
-
-// io.Readerを受け取る → ファイル・bytes.Buffer・net.Conn何でも渡せる
-func (p *Parser) Parse(r io.Reader) ([]string, error) {
-    var lines []string
-    sc := bufio.NewScanner(r)
-    buf := make([]byte, p.maxLineLength)
-    sc.Buffer(buf, p.maxLineLength)
-    for sc.Scan() { lines = append(lines, sc.Text()) }
-    return lines, sc.Err()
-}`,
-afterCode:`io.Readerを引数にする設計はテスト時にstrings.NewReader("...")を渡せるため、ファイルなしでテストできます。同様にio.Writerを使うとbytes.Bufferに出力してテスト可能です。これはGoのテスト容易性の核心です。`},
+code:"// io.Reader を受け取るAPIの設計\npackage parser\n\nimport (\n    \"bufio\"\n    \"io\"\n)\n\ntype Parser struct {\n    maxLineLength int\n}\n\ntype Option func(*Parser)\n\nfunc WithMaxLineLength(n int) Option {\n    return func(p *Parser) { p.maxLineLength = n }\n}\n\nfunc New(opts ...Option) *Parser {\n    p := &Parser{maxLineLength: 4096}\n    for _, opt := range opts { opt(p) }\n    return p\n}\n\n// io.Readerを受け取る → ファイル・bytes.Buffer・net.Conn何でも渡せる\nfunc (p *Parser) Parse(r io.Reader) ([]string, error) {\n    var lines []string\n    sc := bufio.NewScanner(r)\n    buf := make([]byte, p.maxLineLength)\n    sc.Buffer(buf, p.maxLineLength)\n    for sc.Scan() { lines = append(lines, sc.Text()) }\n    return lines, sc.Err()\n}",
+afterCode:"io.Readerを引数にする設計はテスト時にstrings.NewReader(\"...\")を渡せるため、ファイルなしでテストできます。同様にio.Writerを使うとbytes.Bufferに出力してテスト可能です。これはGoのテスト容易性の核心です。"},
 ]},
 {id:"ch6",num:6,title:"Kubernetes Operator開発",est:"75分",
 goal:"kubebuilderでCustom Resourceを定義し、Controllerを実装できる。k8s client-goでKubernetes APIを操作できる。",
 sections:[
 {title:"Kubernetes Operator入門",
-body:`Kubernetes Operatorはアプリのデプロイ・設定・スケーリングをCRD（Custom Resource Definition）とコントローラで自動化するパターンです。Goで書かれたkubebuilderがOperatorのスキャフォールドを生成し、Reconcileループを実装するだけでCRDの管理が実現できます。
-
-Reconcileループは「desired state（CRDで宣言）とactual state（実際のKubernetesリソース）を一致させ続ける」無限ループです。HTTPサーバーとは異なり、失敗しても再試行され結果整合性が保証されます。PythonのKopfや他言語のOperator SDKと同じ概念ですが、Goが最も充実したサポートを持ちます。`,
+body:"Kubernetes Operatorはアプリのデプロイ・設定・スケーリングをCRD（Custom Resource Definition）とコントローラで自動化するパターンです。Goで書かれたkubebuilderがOperatorのスキャフォールドを生成し、Reconcileループを実装するだけでCRDの管理が実現できます。\n\nReconcileループは「desired state（CRDで宣言）とactual state（実際のKubernetesリソース）を一致させ続ける」無限ループです。HTTPサーバーとは異なり、失敗しても再試行され結果整合性が保証されます。PythonのKopfや他言語のOperator SDKと同じ概念ですが、Goが最も充実したサポートを持ちます。",
 table:T.k8sOperator,
-afterTable:`kubebuilder v4はcontroller-runtime v0.17以降を使います。生成されたコードの骨格に Reconcile メソッドを実装するだけでOperatorが完成します。operator-sdkはRedHat版のkubebuilder互換ツールで、Ansible・Helm Operatorも作れます。`},
+afterTable:"kubebuilder v4はcontroller-runtime v0.17以降を使います。生成されたコードの骨格に Reconcile メソッドを実装するだけでOperatorが完成します。operator-sdkはRedHat版のkubebuilder互換ツールで、Ansible・Helm Operatorも作れます。"},
 ]},
 {id:"ch7",num:7,title:"分散システムパターン",est:"70分",
 goal:"サーキットブレーカー・指数バックオフ・分散ロック・Raftコンセンサスを実装できる。",
 sections:[
 {title:"分散システムの信頼性パターン",
-body:`分散システムでは部分障害が頻繁に発生します。サーキットブレーカーは連続失敗後に「open」状態に移行してリクエストを遮断し、下流サービスの回復時間を確保します。指数バックオフは失敗時の待機時間を指数的に増やし、過負荷状態のサービスへの圧力を緩和します。
-
-Pythonのtenacityライブラリに相当する機能がcentkalti/backoffとsonya/gobreakerで提供されます。これらのパターンはNetflixのHystrixが広めた概念で、マイクロサービスの信頼性向上に不可欠です。分散ロックはRedis・etcdを使って実装し、複数インスタンス間の排他制御を実現します。`,
+body:"分散システムでは部分障害が頻繁に発生します。サーキットブレーカーは連続失敗後に「open」状態に移行してリクエストを遮断し、下流サービスの回復時間を確保します。指数バックオフは失敗時の待機時間を指数的に増やし、過負荷状態のサービスへの圧力を緩和します。\n\nPythonのtenacityライブラリに相当する機能がcentkalti/backoffとsonya/gobreakerで提供されます。これらのパターンはNetflixのHystrixが広めた概念で、マイクロサービスの信頼性向上に不可欠です。分散ロックはRedis・etcdを使って実装し、複数インスタンス間の排他制御を実現します。",
 table:T.distributedSystems,
-afterTable:`Raftコンセンサスはhashicorp/raftで実装されており、etcdやVaultもRaftを使っています。分散システムのトランザクションにはTwo-Phase Commit（2PC）またはSAGAパターンを使います。`},
+afterTable:"Raftコンセンサスはhashicorp/raftで実装されており、etcdやVaultもRaftを使っています。分散システムのトランザクションにはTwo-Phase Commit（2PC）またはSAGAパターンを使います。"},
 ]},
 {id:"ch8",num:8,title:"Goセキュリティ",est:"65分",
 goal:"SQLインジェクション・XSS・CSRF等の主要な脆弱性をGoで防止できる。crypto/randで安全な乱数を生成できる。gosecで脆弱性を自動検出できる。",
 sections:[
 {title:"Goのセキュリティベストプラクティス",
-body:`GoはCよりも安全ですが、SQLインジェクション・XSS等のアプリケーションレイヤーの脆弱性は言語に関係なく存在します。database/sqlのプレースホルダ（$1, ?等）でSQLインジェクションを防止、html/templateでXSSを防止するのが基本です。
-
-gosecはAST解析でセキュリティ脆弱性を静的に検出するツールです。Pythonのbanditに相当します。CIに組み込んで新たな脆弱性がマージされないよう自動チェックします。govulncheckはDependency内の既知CVEを検出します。両方をCIに入れることを強く推奨します。`,
+body:"GoはCよりも安全ですが、SQLインジェクション・XSS等のアプリケーションレイヤーの脆弱性は言語に関係なく存在します。database/sqlのプレースホルダ（$1, ?等）でSQLインジェクションを防止、html/templateでXSSを防止するのが基本です。\n\ngosecはAST解析でセキュリティ脆弱性を静的に検出するツールです。Pythonのbanditに相当します。CIに組み込んで新たな脆弱性がマージされないよう自動チェックします。govulncheckはDependency内の既知CVEを検出します。両方をCIに入れることを強く推奨します。",
 table:T.goSecurity,
-code:`package main
-
-import (
-    "crypto/rand"
-    "encoding/base64"
-    "fmt"
-    "golang.org/x/crypto/bcrypt"
-)
-
-// CSRFトークン生成
-func generateCSRFToken() (string, error) {
-    b := make([]byte, 32)
-    if _, err := rand.Read(b); err != nil { return "", err }
-    return base64.URLEncoding.EncodeToString(b), nil
-}
-
-// パスワードハッシュ化（bcrypt）
-func hashPassword(password string) (string, error) {
-    bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-    return string(bytes), err
-}
-
-func checkPassword(password, hash string) bool {
-    return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
-}`,
-afterCode:`golang.org/x/crypto/bcryptはパスワードのハッシュ化に使います。DefaultCost（10）は2024年現在のハードウェアで0.1秒程度かかり、ブルートフォース攻撃を緩和します。MD5・SHA256はパスワードハッシュには使わないでください。`},
+code:"package main\n\nimport (\n    \"crypto/rand\"\n    \"encoding/base64\"\n    \"fmt\"\n    \"golang.org/x/crypto/bcrypt\"\n)\n\n// CSRFトークン生成\nfunc generateCSRFToken() (string, error) {\n    b := make([]byte, 32)\n    if _, err := rand.Read(b); err != nil { return \"\", err }\n    return base64.URLEncoding.EncodeToString(b), nil\n}\n\n// パスワードハッシュ化（bcrypt）\nfunc hashPassword(password string) (string, error) {\n    bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)\n    return string(bytes), err\n}\n\nfunc checkPassword(password, hash string) bool {\n    return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil\n}",
+afterCode:"golang.org/x/crypto/bcryptはパスワードのハッシュ化に使います。DefaultCost（10）は2024年現在のハードウェアで0.1秒程度かかり、ブルートフォース攻撃を緩和します。MD5・SHA256はパスワードハッシュには使わないでください。"},
 ]},
 {id:"ch9",num:9,title:"Raftとコンセンサスアルゴリズム",est:"70分",
 goal:"Raftコンセンサスアルゴリズムの仕組みを説明できる。hashicorp/raftでシンプルなkey-valueストアのRaftクラスタを実装できる。",
 sections:[
 {title:"Raftコンセンサス入門",
-body:`Raftはリーダー選出・ログ複製・スナップショットの3機能で分散合意を実現するアルゴリズムです。Paxosより理解しやすく設計されており、etcd・CockroachDB・TiKV等の主要な分散データベースで使われています。hashicorp/raftはGoでRaftを実装するための最も成熟したライブラリです。
-
-FSM（有限状態機械）はRaftによってコミットされたログエントリを適用するコンポーネントです。Apply・Snapshot・Restoreの3メソッドを実装するだけでアプリ固有のstate machineを作れます。etcd上に構築したdistributed lockはRaftによってクラスタ全体で安全に実現されます。`,
-code:`// Raftの動作原理（擬似コード）
-// 1. クライアントがLeaderに書き込みリクエスト送信
-// 2. LeaderがRaftログにエントリを追記
-// 3. LeaderがFollowerに並列でAppendEntries RPC
-// 4. 過半数（quorum）が確認応答
-// 5. LeaderがコミットしてクライアントにOK
-// 6. LeaderがFollowerにコミット通知
-// 7. 全ノードがFSM.Apply()でstate更新
-
-// Leader障害時:
-// 1. FollowerがHeartbeat timeout（150-300ms）を検出
-// 2. Candidateに昇格してRequestVote RPCを送信
-// 3. 過半数の票を得たCandidateが新Leaderになる`,
-afterCode:`hashicorp/raftの実用例として、HashiCorp VaultのHAモード・nomad・consulがあります。これらのソースコードを読むことでRaftの実際の使い方が学べます。Raftのシュミレーションはraft.github.ioのビジュアライゼーションで理解を深められます。`},
+body:"Raftはリーダー選出・ログ複製・スナップショットの3機能で分散合意を実現するアルゴリズムです。Paxosより理解しやすく設計されており、etcd・CockroachDB・TiKV等の主要な分散データベースで使われています。hashicorp/raftはGoでRaftを実装するための最も成熟したライブラリです。\n\nFSM（有限状態機械）はRaftによってコミットされたログエントリを適用するコンポーネントです。Apply・Snapshot・Restoreの3メソッドを実装するだけでアプリ固有のstate machineを作れます。etcd上に構築したdistributed lockはRaftによってクラスタ全体で安全に実現されます。",
+code:"// Raftの動作原理（擬似コード）\n// 1. クライアントがLeaderに書き込みリクエスト送信\n// 2. LeaderがRaftログにエントリを追記\n// 3. LeaderがFollowerに並列でAppendEntries RPC\n// 4. 過半数（quorum）が確認応答\n// 5. LeaderがコミットしてクライアントにOK\n// 6. LeaderがFollowerにコミット通知\n// 7. 全ノードがFSM.Apply()でstate更新\n\n// Leader障害時:\n// 1. FollowerがHeartbeat timeout（150-300ms）を検出\n// 2. Candidateに昇格してRequestVote RPCを送信\n// 3. 過半数の票を得たCandidateが新Leaderになる",
+afterCode:"hashicorp/raftの実用例として、HashiCorp VaultのHAモード・nomad・consulがあります。これらのソースコードを読むことでRaftの実際の使い方が学べます。Raftのシュミレーションはraft.github.ioのビジュアライゼーションで理解を深められます。"},
 ]},
 {id:"ch10",num:10,title:"tinygoと組み込み・WebAssembly",est:"65分",
 goal:"tinygoでArduino・Raspberry Pi向けにGoをコンパイルできる。WASI向けGoアプリを書いてwasmtimeで実行できる。",
 sections:[
 {title:"tinygoと組み込みGo",
-body:`tinygoはGoの仕様と互換性を保ちながら、組み込みシステムとWebAssembly向けに最適化されたコンパイラです。標準Goランタイムが不要とするOSやGCを持たない環境でも動作し、Arduino・Raspberry Pi Pico・STM32等のマイコンでGoを動かせます。
-
-Pythonでラズパイを制御するのはMicroPythonが一般的ですが、tinygoはより高いパフォーマンスと型安全を提供します。machineパッケージがGPIO・SPI・I2C・UARTを抽象化しており、ハードウェアごとに異なるコードを書かなくてすみます。`,
+body:"tinygoはGoの仕様と互換性を保ちながら、組み込みシステムとWebAssembly向けに最適化されたコンパイラです。標準Goランタイムが不要とするOSやGCを持たない環境でも動作し、Arduino・Raspberry Pi Pico・STM32等のマイコンでGoを動かせます。\n\nPythonでラズパイを制御するのはMicroPythonが一般的ですが、tinygoはより高いパフォーマンスと型安全を提供します。machineパッケージがGPIO・SPI・I2C・UARTを抽象化しており、ハードウェアごとに異なるコードを書かなくてすみます。",
 table:T.wasm,
-code:`//go:build tinygo
-
-package main
-
-import (
-    "machine"
-    "time"
-)
-
-// LEDのモールス符号
-var sos = []bool{
-    true, false, true, false, true, false, // S: ...
-    true, true, true, false, true, true, true, false, true, true, true, false, // O: ---
-    true, false, true, false, true, // S: ...
-}
-
-func main() {
-    led := machine.LED
-    led.Configure(machine.PinConfig{Mode: machine.PinOutput})
-
-    for _, on := range sos {
-        if on { led.High() } else { led.Low() }
-        time.Sleep(250 * time.Millisecond)
-    }
-}`,
-afterCode:`tinygoはGo標準ライブラリの一部しか実装していません。reflect・sync.Mutex等が制限されることがあります。互換性はtinygo.orgのCompatibilityページで確認してください。Picoでは2コアを使いたい場合はmachine.CPUFrequency()と並列実行の仕組みを学ぶ必要があります。`},
+code:"//go:build tinygo\n\npackage main\n\nimport (\n    \"machine\"\n    \"time\"\n)\n\n// LEDのモールス符号\nvar sos = []bool{\n    true, false, true, false, true, false, // S: ...\n    true, true, true, false, true, true, true, false, true, true, true, false, // O: ---\n    true, false, true, false, true, // S: ...\n}\n\nfunc main() {\n    led := machine.LED\n    led.Configure(machine.PinConfig{Mode: machine.PinOutput})\n\n    for _, on := range sos {\n        if on { led.High() } else { led.Low() }\n        time.Sleep(250 * time.Millisecond)\n    }\n}",
+afterCode:"tinygoはGo標準ライブラリの一部しか実装していません。reflect・sync.Mutex等が制限されることがあります。互換性はtinygo.orgのCompatibilityページで確認してください。Picoでは2コアを使いたい場合はmachine.CPUFrequency()と並列実行の仕組みを学ぶ必要があります。"},
 ]},
 {id:"ch11",num:11,title:"リリースエンジニアリングと継続的デリバリー",est:"60分",
 goal:"goreleaserとGitHub ActionsでGitHubリリースを自動化できる。OpenTelemetryとPrometheusを組み合わせたメトリクス配信を設定できる。",
 sections:[
 {title:"自動リリースパイプライン",
-body:`goreleaserはGoの標準的なリリース自動化ツールです。git tagをpushするとGitHub Actionsがトリガーされ、Linux・macOS・Windows向けバイナリのクロスコンパイル・GitHubリリースへのアップロード・チェックサム計算・Homebrewフォーミュラ更新まで全自動で行います。
-
-セマンティックバージョニング（semver）はgit tagで管理します。conventional commits（feat: / fix: / chore:等の接頭辞）を採用するとrelease-pleaseやsemanticrelease等のツールが自動的にバージョン番号とCHANGELOGを生成します。これにより手動のリリース作業がゼロになります。`,
-code:`# goreleaserの設定例（.goreleaser.yaml）
-project_name: myapp
-before:
-  hooks:
-    - go mod tidy
-    - go generate ./...
-
-builds:
-  - main: ./cmd/myapp
-    env: [CGO_ENABLED=0]
-    goos: [linux, darwin, windows]
-    goarch: [amd64, arm64]
-    ldflags:
-      - -s -w
-      - -X main.Version={{.Version}}
-      - -X main.Commit={{.Commit}}
-      - -X main.Date={{.Date}}
-
-archives:
-  - id: default
-    format: tar.gz
-
-brews:
-  - name: myapp
-    tap:
-      owner: yourname
-      name: homebrew-tap`,
-afterCode:`goreleaser release --snapshot --clean でタグなしでビルドのテストができます。本番releaseではGITHUB_TOKENが必要です。GitHub Actions経由でactionをsecrets.GITHUB_TOKENを使って実行するのが標準パターンです。`},
+body:"goreleaserはGoの標準的なリリース自動化ツールです。git tagをpushするとGitHub Actionsがトリガーされ、Linux・macOS・Windows向けバイナリのクロスコンパイル・GitHubリリースへのアップロード・チェックサム計算・Homebrewフォーミュラ更新まで全自動で行います。\n\nセマンティックバージョニング（semver）はgit tagで管理します。conventional commits（feat: / fix: / chore:等の接頭辞）を採用するとrelease-pleaseやsemanticrelease等のツールが自動的にバージョン番号とCHANGELOGを生成します。これにより手動のリリース作業がゼロになります。",
+code:"# goreleaserの設定例（.goreleaser.yaml）\nproject_name: myapp\nbefore:\n  hooks:\n    - go mod tidy\n    - go generate ./...\n\nbuilds:\n  - main: ./cmd/myapp\n    env: [CGO_ENABLED=0]\n    goos: [linux, darwin, windows]\n    goarch: [amd64, arm64]\n    ldflags:\n      - -s -w\n      - -X main.Version={{.Version}}\n      - -X main.Commit={{.Commit}}\n      - -X main.Date={{.Date}}\n\narchives:\n  - id: default\n    format: tar.gz\n\nbrews:\n  - name: myapp\n    tap:\n      owner: yourname\n      name: homebrew-tap",
+afterCode:"goreleaser release --snapshot --clean でタグなしでビルドのテストができます。本番releaseではGITHUB_TOKENが必要です。GitHub Actions経由でactionをsecrets.GITHUB_TOKENを使って実行するのが標準パターンです。"},
 ]},
 {id:"ch12",num:12,title:"Goエキスパートへの道",est:"60分",
 goal:"Goのエコシステム全体を俯瞰できる。ライブラリ設計・OSSコントリビューション・コミュニティへの参加方法を理解している。",
 sections:[
 {title:"Goエキスパートとしての全体像",
-body:`このコース全体を通じて、Goのランタイム内部・コンパイラ最適化・分散システム・Kubernetes Operator・WebAssemblyまで学びました。これらは実際のGo本番サービスを構築・運用するために必要な最高レベルの知識です。
-
-次のステップはOSSへのコントリビューションです。gophercon.comのトークを見てGoの最新動向を把握し、github.com/golang/go のIssueを読むことでGoコアチームの設計思想を理解できます。自分のライブラリをcrates.ioではなくpkg.go.devで公開することで、コミュニティへの貢献が始まります。`,
+body:"このコース全体を通じて、Goのランタイム内部・コンパイラ最適化・分散システム・Kubernetes Operator・WebAssemblyまで学びました。これらは実際のGo本番サービスを構築・運用するために必要な最高レベルの知識です。\n\n次のステップはOSSへのコントリビューションです。gophercon.comのトークを見てGoの最新動向を把握し、github.com/golang/go のIssueを読むことでGoコアチームの設計思想を理解できます。自分のライブラリをcrates.ioではなくpkg.go.devで公開することで、コミュニティへの貢献が始まります。",
 table:T.goVersions,
-code:`// Goエキスパートが日常的に使うコマンド一覧
-// go build -pgo=auto                   : PGOビルド
-// go build -gcflags="-m"               : エスケープ解析確認
-// go test -race -fuzz ./...            : テスト + データ競合 + ファジング
-// go tool pprof cpu.prof               : CPUプロファイル解析
-// govulncheck ./...                    : 脆弱性チェック
-// golangci-lint run                    : linter全実行
-// goreleaser release --clean           : リリース実行
-// kubectl logs -f deploy/myapp         : K8sログ監視
-// go tool trace trace.out              : goroutineトレース可視化
-// go doc -http=:6060                   : ドキュメントサーバー`,
-afterCode:`Goコミュニティのリソース: Gopher Slack（gophers.slack.com）・Go Forum（forum.golangbridge.org）・Go Blog（go.dev/blog）・This Week in Go（golangweekly.com）。GopherConとGopherCon EuropeはGoの最新動向を把握する最良の場です。このコース修了を祝福します。あなたは本物のGoエキスパートです。`},
+code:"// Goエキスパートが日常的に使うコマンド一覧\n// go build -pgo=auto                   : PGOビルド\n// go build -gcflags=\"-m\"               : エスケープ解析確認\n// go test -race -fuzz ./...            : テスト + データ競合 + ファジング\n// go tool pprof cpu.prof               : CPUプロファイル解析\n// govulncheck ./...                    : 脆弱性チェック\n// golangci-lint run                    : linter全実行\n// goreleaser release --clean           : リリース実行\n// kubectl logs -f deploy/myapp         : K8sログ監視\n// go tool trace trace.out              : goroutineトレース可視化\n// go doc -http=:6060                   : ドキュメントサーバー",
+afterCode:"Goコミュニティのリソース: Gopher Slack（gophers.slack.com）・Go Forum（forum.golangbridge.org）・Go Blog（go.dev/blog）・This Week in Go（golangweekly.com）。GopherConとGopherCon EuropeはGoの最新動向を把握する最良の場です。このコース修了を祝福します。あなたは本物のGoエキスパートです。"},
 ]},
 ];
 

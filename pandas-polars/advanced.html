@@ -90,572 +90,67 @@ const T = {
 const EX = {
 ch1:[
   {diff:2,q:"pandas 2.0のCopy-on-Writeを確認せよ。df.iloc[0, 0]への代入がコピーに対して行われることをid()で検証すること。",
-   code:`import pandas as pd
-import warnings
-warnings.filterwarnings('error')
-
-df = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
-subset = df[df['a'] > 1]
-
-# CoWではsubsetはコピー。subsetへの変更は df に影響しない
-# id() を使って別オブジェクトであることを確認
-print("df id:", id(df))
-print("subset id:", id(subset))
-print("同じオブジェクト?", id(df) == id(subset))`,
-   answer:`import pandas as pd
-
-df = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
-subset = df[df['a'] > 1]
-
-print("df id:", id(df))
-print("subset id:", id(subset))
-print("同じオブジェクト?", id(df) == id(subset))
-# → False。CoWによりsubsetは独立したコピー。
-# subsetを変更してもdfは不変。
-subset = subset.assign(a=0)
-print("df after modifying subset:", df['a'].tolist())  # [1, 2, 3] のまま`},
+   code:"import pandas as pd\nimport warnings\nwarnings.filterwarnings('error')\n\ndf = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})\nsubset = df[df['a'] > 1]\n\n# CoWではsubsetはコピー。subsetへの変更は df に影響しない\n# id() を使って別オブジェクトであることを確認\nprint(\"df id:\", id(df))\nprint(\"subset id:\", id(subset))\nprint(\"同じオブジェクト?\", id(df) == id(subset))",
+   answer:"import pandas as pd\n\ndf = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})\nsubset = df[df['a'] > 1]\n\nprint(\"df id:\", id(df))\nprint(\"subset id:\", id(subset))\nprint(\"同じオブジェクト?\", id(df) == id(subset))\n# → False。CoWによりsubsetは独立したコピー。\n# subsetを変更してもdfは不変。\nsubset = subset.assign(a=0)\nprint(\"df after modifying subset:\", df['a'].tolist())  # [1, 2, 3] のまま"},
   {diff:3,q:"polarsのlazy APIでCSVを読み込み、explain(optimized=True)でクエリプランを確認し、predicate pushdownが効いていることを示せ。",
-   code:`import polars as pl
-
-# ダミーデータを用意（実際はCSVファイルを使う）
-df = pl.DataFrame({
-    'id': range(1000),
-    'value': range(1000),
-    'category': ['A','B'] * 500
-})
-df.write_csv('/tmp/sample.csv')
-
-# lazy APIで読み込み
-lf = pl.scan_csv('/tmp/sample.csv')
-
-# filterとselectを組み合わせる
-query = (
-    lf
-    .filter(pl.col('value') > 500)
-    .select(['id', 'value'])
-)
-
-# クエリプランを確認
-print(query.explain(optimized=True))`,
-   answer:`import polars as pl
-
-df = pl.DataFrame({
-    'id': range(1000),
-    'value': range(1000),
-    'category': ['A','B'] * 500
-})
-df.write_csv('/tmp/sample.csv')
-
-lf = pl.scan_csv('/tmp/sample.csv')
-
-query = (
-    lf
-    .filter(pl.col('value') > 500)
-    .select(['id', 'value'])
-)
-
-# explain で最適化済みプランを出力
-# FILTER が CSV_SCAN の内部に押し込まれていることを確認
-print(query.explain(optimized=True))
-result = query.collect()
-print(result.shape)  # (499, 2)`},
+   code:"import polars as pl\n\n# ダミーデータを用意（実際はCSVファイルを使う）\ndf = pl.DataFrame({\n    'id': range(1000),\n    'value': range(1000),\n    'category': ['A','B'] * 500\n})\ndf.write_csv('/tmp/sample.csv')\n\n# lazy APIで読み込み\nlf = pl.scan_csv('/tmp/sample.csv')\n\n# filterとselectを組み合わせる\nquery = (\n    lf\n    .filter(pl.col('value') > 500)\n    .select(['id', 'value'])\n)\n\n# クエリプランを確認\nprint(query.explain(optimized=True))",
+   answer:"import polars as pl\n\ndf = pl.DataFrame({\n    'id': range(1000),\n    'value': range(1000),\n    'category': ['A','B'] * 500\n})\ndf.write_csv('/tmp/sample.csv')\n\nlf = pl.scan_csv('/tmp/sample.csv')\n\nquery = (\n    lf\n    .filter(pl.col('value') > 500)\n    .select(['id', 'value'])\n)\n\n# explain で最適化済みプランを出力\n# FILTER が CSV_SCAN の内部に押し込まれていることを確認\nprint(query.explain(optimized=True))\nresult = query.collect()\nprint(result.shape)  # (499, 2)"},
 ],
 ch2:[
   {diff:2,q:"PyArrowでChunkedArrayを作成し、pc.sum()とpc.mean()で集計せよ。またto_pandas()でpandas Seriesに変換せよ。",
-   code:`import pyarrow as pa
-import pyarrow.compute as pc
-
-# 3つのチャンクに分けたChunkedArrayを作成
-chunks = [
-    pa.array([1, 2, 3]),
-    pa.array([4, 5, 6]),
-    pa.array([7, 8, 9])
-]
-ca = pa.chunked_array(chunks)
-
-# 集計
-total = # ここに書く
-avg   = # ここに書く
-print("合計:", total, "平均:", avg)
-
-# pandas変換
-s = # ここに書く
-print(type(s), s.tolist())`,
-   answer:`import pyarrow as pa
-import pyarrow.compute as pc
-
-chunks = [
-    pa.array([1, 2, 3]),
-    pa.array([4, 5, 6]),
-    pa.array([7, 8, 9])
-]
-ca = pa.chunked_array(chunks)
-
-total = pc.sum(ca)
-avg   = pc.mean(ca)
-print("合計:", total.as_py(), "平均:", avg.as_py())
-
-s = ca.to_pandas()
-print(type(s), s.tolist())`},
+   code:"import pyarrow as pa\nimport pyarrow.compute as pc\n\n# 3つのチャンクに分けたChunkedArrayを作成\nchunks = [\n    pa.array([1, 2, 3]),\n    pa.array([4, 5, 6]),\n    pa.array([7, 8, 9])\n]\nca = pa.chunked_array(chunks)\n\n# 集計\ntotal = # ここに書く\navg   = # ここに書く\nprint(\"合計:\", total, \"平均:\", avg)\n\n# pandas変換\ns = # ここに書く\nprint(type(s), s.tolist())",
+   answer:"import pyarrow as pa\nimport pyarrow.compute as pc\n\nchunks = [\n    pa.array([1, 2, 3]),\n    pa.array([4, 5, 6]),\n    pa.array([7, 8, 9])\n]\nca = pa.chunked_array(chunks)\n\ntotal = pc.sum(ca)\navg   = pc.mean(ca)\nprint(\"合計:\", total.as_py(), \"平均:\", avg.as_py())\n\ns = ca.to_pandas()\nprint(type(s), s.tolist())"},
   {diff:3,q:"PyArrow Datasetを使ってパーティション化されたParquetを書き出し、フィルタ付きで読み込め。",
-   code:`import pyarrow as pa
-import pyarrow.parquet as pq
-import pyarrow.dataset as ds
-import pandas as pd
-
-df = pd.DataFrame({
-    'year': [2022,2022,2023,2023,2023],
-    'sales': [100,200,150,300,250],
-    'region': ['A','B','A','B','A']
-})
-table = pa.Table.from_pandas(df)
-
-# year でパーティション化して書き出す
-pq.write_to_dataset(table, root_path='/tmp/sales_ds',
-                    partition_cols=['year'])
-
-# year==2023 のみ読み込む
-dataset = ds.dataset('/tmp/sales_ds', format='parquet', partitioning='hive')
-result = dataset.to_table(filter=ds.field('year') == 2023)
-print(result.to_pandas())`,
-   answer:`import pyarrow as pa
-import pyarrow.parquet as pq
-import pyarrow.dataset as ds
-import pandas as pd
-
-df = pd.DataFrame({
-    'year': [2022,2022,2023,2023,2023],
-    'sales': [100,200,150,300,250],
-    'region': ['A','B','A','B','A']
-})
-table = pa.Table.from_pandas(df)
-
-pq.write_to_dataset(table, root_path='/tmp/sales_ds',
-                    partition_cols=['year'])
-
-dataset = ds.dataset('/tmp/sales_ds', format='parquet', partitioning='hive')
-result = dataset.to_table(filter=ds.field('year') == 2023)
-print(result.to_pandas())
-# → 2023年の3行だけが返る`},
+   code:"import pyarrow as pa\nimport pyarrow.parquet as pq\nimport pyarrow.dataset as ds\nimport pandas as pd\n\ndf = pd.DataFrame({\n    'year': [2022,2022,2023,2023,2023],\n    'sales': [100,200,150,300,250],\n    'region': ['A','B','A','B','A']\n})\ntable = pa.Table.from_pandas(df)\n\n# year でパーティション化して書き出す\npq.write_to_dataset(table, root_path='/tmp/sales_ds',\n                    partition_cols=['year'])\n\n# year==2023 のみ読み込む\ndataset = ds.dataset('/tmp/sales_ds', format='parquet', partitioning='hive')\nresult = dataset.to_table(filter=ds.field('year') == 2023)\nprint(result.to_pandas())",
+   answer:"import pyarrow as pa\nimport pyarrow.parquet as pq\nimport pyarrow.dataset as ds\nimport pandas as pd\n\ndf = pd.DataFrame({\n    'year': [2022,2022,2023,2023,2023],\n    'sales': [100,200,150,300,250],\n    'region': ['A','B','A','B','A']\n})\ntable = pa.Table.from_pandas(df)\n\npq.write_to_dataset(table, root_path='/tmp/sales_ds',\n                    partition_cols=['year'])\n\ndataset = ds.dataset('/tmp/sales_ds', format='parquet', partitioning='hive')\nresult = dataset.to_table(filter=ds.field('year') == 2023)\nprint(result.to_pandas())\n# → 2023年の3行だけが返る"},
 ],
 ch3:[
   {diff:2,q:"DaskでCSVファイルを読み込み、特定列の平均をcompute()で求めよ。npartitionsも確認すること。",
-   code:`import dask.dataframe as dd
-import pandas as pd
-
-# ダミーCSVを作成
-pd.DataFrame({
-    'id': range(100),
-    'value': range(100),
-    'group': ['A','B'] * 50
-}).to_csv('/tmp/dask_sample.csv', index=False)
-
-# Dask で読み込み
-ddf = dd.read_csv('/tmp/dask_sample.csv')
-
-# npartitions 確認
-print("partitions:", ddf.npartitions)
-
-# value 列の平均を compute
-mean_val = # ここに書く
-print("平均:", mean_val)`,
-   answer:`import dask.dataframe as dd
-import pandas as pd
-
-pd.DataFrame({
-    'id': range(100),
-    'value': range(100),
-    'group': ['A','B'] * 50
-}).to_csv('/tmp/dask_sample.csv', index=False)
-
-ddf = dd.read_csv('/tmp/dask_sample.csv')
-print("partitions:", ddf.npartitions)
-
-mean_val = ddf['value'].mean().compute()
-print("平均:", mean_val)  # 49.5`},
+   code:"import dask.dataframe as dd\nimport pandas as pd\n\n# ダミーCSVを作成\npd.DataFrame({\n    'id': range(100),\n    'value': range(100),\n    'group': ['A','B'] * 50\n}).to_csv('/tmp/dask_sample.csv', index=False)\n\n# Dask で読み込み\nddf = dd.read_csv('/tmp/dask_sample.csv')\n\n# npartitions 確認\nprint(\"partitions:\", ddf.npartitions)\n\n# value 列の平均を compute\nmean_val = # ここに書く\nprint(\"平均:\", mean_val)",
+   answer:"import dask.dataframe as dd\nimport pandas as pd\n\npd.DataFrame({\n    'id': range(100),\n    'value': range(100),\n    'group': ['A','B'] * 50\n}).to_csv('/tmp/dask_sample.csv', index=False)\n\nddf = dd.read_csv('/tmp/dask_sample.csv')\nprint(\"partitions:\", ddf.npartitions)\n\nmean_val = ddf['value'].mean().compute()\nprint(\"平均:\", mean_val)  # 49.5"},
   {diff:3,q:"Daskでgroupby集計を行い、task graphを可視化（文字列表示）せよ。",
-   code:`import dask.dataframe as dd
-import pandas as pd
-
-pd.DataFrame({
-    'group': ['A','B','A','B','A'] * 20,
-    'value': range(100)
-}).to_csv('/tmp/dask_group.csv', index=False)
-
-ddf = dd.read_csv('/tmp/dask_group.csv')
-
-# groupby して group ごとの合計を計算
-result = ddf.groupby('group')['value'].sum()
-
-# task graph を文字列で確認（visualize は不要）
-print(result.__dask_graph__())
-
-# 実際に計算
-print(result.compute())`,
-   answer:`import dask.dataframe as dd
-import pandas as pd
-
-pd.DataFrame({
-    'group': ['A','B','A','B','A'] * 20,
-    'value': range(100)
-}).to_csv('/tmp/dask_group.csv', index=False)
-
-ddf = dd.read_csv('/tmp/dask_group.csv')
-result = ddf.groupby('group')['value'].sum()
-
-# task graph はキーの辞書（遅延グラフの中身）
-print(type(result.__dask_graph__()))
-# 実計算
-print(result.compute())`},
+   code:"import dask.dataframe as dd\nimport pandas as pd\n\npd.DataFrame({\n    'group': ['A','B','A','B','A'] * 20,\n    'value': range(100)\n}).to_csv('/tmp/dask_group.csv', index=False)\n\nddf = dd.read_csv('/tmp/dask_group.csv')\n\n# groupby して group ごとの合計を計算\nresult = ddf.groupby('group')['value'].sum()\n\n# task graph を文字列で確認（visualize は不要）\nprint(result.__dask_graph__())\n\n# 実際に計算\nprint(result.compute())",
+   answer:"import dask.dataframe as dd\nimport pandas as pd\n\npd.DataFrame({\n    'group': ['A','B','A','B','A'] * 20,\n    'value': range(100)\n}).to_csv('/tmp/dask_group.csv', index=False)\n\nddf = dd.read_csv('/tmp/dask_group.csv')\nresult = ddf.groupby('group')['value'].sum()\n\n# task graph はキーの辞書（遅延グラフの中身）\nprint(type(result.__dask_graph__()))\n# 実計算\nprint(result.compute())"},
 ],
 ch4:[
   {diff:2,q:"polarsのmap_batches()を使って、文字列列を独自ロジックで変換せよ（例：各値をreverse）。",
-   code:`import polars as pl
-
-df = pl.DataFrame({'word': ['hello', 'world', 'polars', 'rust']})
-
-# map_batches を使って各文字列を逆順にする
-result = df.with_columns(
-    pl.col('word').map_batches(
-        lambda s: # ここに書く
-    ).alias('reversed')
-)
-print(result)`,
-   answer:`import polars as pl
-
-df = pl.DataFrame({'word': ['hello', 'world', 'polars', 'rust']})
-
-result = df.with_columns(
-    pl.col('word').map_batches(
-        lambda s: pl.Series([v[::-1] for v in s.to_list()])
-    ).alias('reversed')
-)
-print(result)`},
+   code:"import polars as pl\n\ndf = pl.DataFrame({'word': ['hello', 'world', 'polars', 'rust']})\n\n# map_batches を使って各文字列を逆順にする\nresult = df.with_columns(\n    pl.col('word').map_batches(\n        lambda s: # ここに書く\n    ).alias('reversed')\n)\nprint(result)",
+   answer:"import polars as pl\n\ndf = pl.DataFrame({'word': ['hello', 'world', 'polars', 'rust']})\n\nresult = df.with_columns(\n    pl.col('word').map_batches(\n        lambda s: pl.Series([v[::-1] for v in s.to_list()])\n    ).alias('reversed')\n)\nprint(result)"},
   {diff:3,q:"polarsでカスタムExprを関数として定義し、再利用せよ。引数に列名を受け取り、z-score正規化を返すExprを作ること。",
-   code:`import polars as pl
-
-def zscore_expr(col_name: str) -> pl.Expr:
-    """指定列の z-score を返す Expr"""
-    col = pl.col(col_name)
-    # ここに書く: (x - mean) / std を返す Expr
-
-df = pl.DataFrame({'value': [10.0, 20.0, 30.0, 40.0, 50.0]})
-
-result = df.with_columns(
-    zscore_expr('value').alias('z_value')
-)
-print(result)`,
-   answer:`import polars as pl
-
-def zscore_expr(col_name: str) -> pl.Expr:
-    col = pl.col(col_name)
-    mean = col.mean()
-    std  = col.std()
-    return (col - mean) / std
-
-df = pl.DataFrame({'value': [10.0, 20.0, 30.0, 40.0, 50.0]})
-result = df.with_columns(zscore_expr('value').alias('z_value'))
-print(result)`},
+   code:"import polars as pl\n\ndef zscore_expr(col_name: str) -> pl.Expr:\n    \"\"\"指定列の z-score を返す Expr\"\"\"\n    col = pl.col(col_name)\n    # ここに書く: (x - mean) / std を返す Expr\n\ndf = pl.DataFrame({'value': [10.0, 20.0, 30.0, 40.0, 50.0]})\n\nresult = df.with_columns(\n    zscore_expr('value').alias('z_value')\n)\nprint(result)",
+   answer:"import polars as pl\n\ndef zscore_expr(col_name: str) -> pl.Expr:\n    col = pl.col(col_name)\n    mean = col.mean()\n    std  = col.std()\n    return (col - mean) / std\n\ndf = pl.DataFrame({'value': [10.0, 20.0, 30.0, 40.0, 50.0]})\nresult = df.with_columns(zscore_expr('value').alias('z_value'))\nprint(result)"},
 ],
 ch5:[
   {diff:2,q:"pandasで増分処理（新しい行だけ追加）を実装せよ。既存Parquetに差分を append して重複排除する。",
-   code:`import pandas as pd
-
-# 既存データ
-existing = pd.DataFrame({
-    'id': [1, 2, 3],
-    'value': [10, 20, 30]
-})
-existing.to_parquet('/tmp/existing.parquet', index=False)
-
-# 新しいデータ（idが3は重複、4は新規）
-new_data = pd.DataFrame({
-    'id': [3, 4],
-    'value': [30, 40]
-})
-
-# 増分処理: 既存を読んで新規分だけ追加し重複除去して保存
-# ここに書く`,
-   answer:`import pandas as pd
-
-existing = pd.DataFrame({'id': [1, 2, 3], 'value': [10, 20, 30]})
-existing.to_parquet('/tmp/existing.parquet', index=False)
-
-new_data = pd.DataFrame({'id': [3, 4], 'value': [30, 40]})
-
-df = pd.read_parquet('/tmp/existing.parquet')
-combined = pd.concat([df, new_data], ignore_index=True)
-result = combined.drop_duplicates(subset=['id'], keep='last')
-result.to_parquet('/tmp/existing.parquet', index=False)
-print(result)`},
+   code:"import pandas as pd\n\n# 既存データ\nexisting = pd.DataFrame({\n    'id': [1, 2, 3],\n    'value': [10, 20, 30]\n})\nexisting.to_parquet('/tmp/existing.parquet', index=False)\n\n# 新しいデータ（idが3は重複、4は新規）\nnew_data = pd.DataFrame({\n    'id': [3, 4],\n    'value': [30, 40]\n})\n\n# 増分処理: 既存を読んで新規分だけ追加し重複除去して保存\n# ここに書く",
+   answer:"import pandas as pd\n\nexisting = pd.DataFrame({'id': [1, 2, 3], 'value': [10, 20, 30]})\nexisting.to_parquet('/tmp/existing.parquet', index=False)\n\nnew_data = pd.DataFrame({'id': [3, 4], 'value': [30, 40]})\n\ndf = pd.read_parquet('/tmp/existing.parquet')\ncombined = pd.concat([df, new_data], ignore_index=True)\nresult = combined.drop_duplicates(subset=['id'], keep='last')\nresult.to_parquet('/tmp/existing.parquet', index=False)\nprint(result)"},
   {diff:3,q:"polarsで複数のParquetファイルをまとめてlazy読み込みし、フィルタ・集計してからcollect()せよ。",
-   code:`import polars as pl
-import os
-
-# ダミーParquetを複数作成
-for i, grp in enumerate(['A', 'B', 'C']):
-    pl.DataFrame({
-        'group': [grp] * 5,
-        'value': list(range(i*5, i*5+5))
-    }).write_parquet(f'/tmp/part_{grp}.parquet')
-
-# scan_parquet でまとめて lazy 読み込み
-lf = pl.scan_parquet('/tmp/part_*.parquet')
-
-# group ごとの合計を集計
-result = (
-    lf
-    # ここに書く
-)
-print(result)`,
-   answer:`import polars as pl
-
-for i, grp in enumerate(['A', 'B', 'C']):
-    pl.DataFrame({
-        'group': [grp] * 5,
-        'value': list(range(i*5, i*5+5))
-    }).write_parquet(f'/tmp/part_{grp}.parquet')
-
-lf = pl.scan_parquet('/tmp/part_*.parquet')
-
-result = (
-    lf
-    .group_by('group')
-    .agg(pl.col('value').sum().alias('total'))
-    .sort('group')
-    .collect()
-)
-print(result)`},
+   code:"import polars as pl\nimport os\n\n# ダミーParquetを複数作成\nfor i, grp in enumerate(['A', 'B', 'C']):\n    pl.DataFrame({\n        'group': [grp] * 5,\n        'value': list(range(i*5, i*5+5))\n    }).write_parquet(f'/tmp/part_{grp}.parquet')\n\n# scan_parquet でまとめて lazy 読み込み\nlf = pl.scan_parquet('/tmp/part_*.parquet')\n\n# group ごとの合計を集計\nresult = (\n    lf\n    # ここに書く\n)\nprint(result)",
+   answer:"import polars as pl\n\nfor i, grp in enumerate(['A', 'B', 'C']):\n    pl.DataFrame({\n        'group': [grp] * 5,\n        'value': list(range(i*5, i*5+5))\n    }).write_parquet(f'/tmp/part_{grp}.parquet')\n\nlf = pl.scan_parquet('/tmp/part_*.parquet')\n\nresult = (\n    lf\n    .group_by('group')\n    .agg(pl.col('value').sum().alias('total'))\n    .sort('group')\n    .collect()\n)\nprint(result)"},
 ],
 ch6:[
   {diff:2,q:"pandasとscikit-learnのPipelineを組み合わせて、前処理（中央値補完+StandardScaler）→ロジスティック回帰を一本化せよ。",
-   code:`import pandas as pd
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-
-X = pd.DataFrame({
-    'age':    [25, None, 35, 28, None],
-    'salary': [50000, 60000, None, 45000, 70000]
-})
-y = [0, 1, 1, 0, 1]
-
-# Pipeline を組み立てて fit する
-pipe = Pipeline([
-    # ここに書く
-])
-pipe.fit(X, y)
-print(pipe.predict(X))`,
-   answer:`import pandas as pd
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-
-X = pd.DataFrame({
-    'age':    [25, None, 35, 28, None],
-    'salary': [50000, 60000, None, 45000, 70000]
-})
-y = [0, 1, 1, 0, 1]
-
-pipe = Pipeline([
-    ('imputer', SimpleImputer(strategy='median')),
-    ('scaler',  StandardScaler()),
-    ('clf',     LogisticRegression())
-])
-pipe.fit(X, y)
-print(pipe.predict(X))`},
+   code:"import pandas as pd\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\n\nX = pd.DataFrame({\n    'age':    [25, None, 35, 28, None],\n    'salary': [50000, 60000, None, 45000, 70000]\n})\ny = [0, 1, 1, 0, 1]\n\n# Pipeline を組み立てて fit する\npipe = Pipeline([\n    # ここに書く\n])\npipe.fit(X, y)\nprint(pipe.predict(X))",
+   answer:"import pandas as pd\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\n\nX = pd.DataFrame({\n    'age':    [25, None, 35, 28, None],\n    'salary': [50000, 60000, None, 45000, 70000]\n})\ny = [0, 1, 1, 0, 1]\n\npipe = Pipeline([\n    ('imputer', SimpleImputer(strategy='median')),\n    ('scaler',  StandardScaler()),\n    ('clf',     LogisticRegression())\n])\npipe.fit(X, y)\nprint(pipe.predict(X))"},
   {diff:3,q:"polarsでTarget Encodingを手動実装せよ。カテゴリ列の各値をターゲット列の平均値に置換する。",
-   code:`import polars as pl
-
-df = pl.DataFrame({
-    'city':   ['Tokyo','Osaka','Tokyo','Kyoto','Osaka','Tokyo'],
-    'target': [1, 0, 1, 1, 0, 0]
-})
-
-# city ごとの target 平均を計算し、city 列を置換
-# ここに書く`,
-   answer:`import polars as pl
-
-df = pl.DataFrame({
-    'city':   ['Tokyo','Osaka','Tokyo','Kyoto','Osaka','Tokyo'],
-    'target': [1, 0, 1, 1, 0, 0]
-})
-
-encoding = (
-    df.group_by('city')
-      .agg(pl.col('target').mean().alias('city_enc'))
-)
-
-result = (
-    df.join(encoding, on='city', how='left')
-      .drop('city')
-      .rename({'city_enc': 'city'})
-)
-print(result)`},
+   code:"import polars as pl\n\ndf = pl.DataFrame({\n    'city':   ['Tokyo','Osaka','Tokyo','Kyoto','Osaka','Tokyo'],\n    'target': [1, 0, 1, 1, 0, 0]\n})\n\n# city ごとの target 平均を計算し、city 列を置換\n# ここに書く",
+   answer:"import polars as pl\n\ndf = pl.DataFrame({\n    'city':   ['Tokyo','Osaka','Tokyo','Kyoto','Osaka','Tokyo'],\n    'target': [1, 0, 1, 1, 0, 0]\n})\n\nencoding = (\n    df.group_by('city')\n      .agg(pl.col('target').mean().alias('city_enc'))\n)\n\nresult = (\n    df.join(encoding, on='city', how='left')\n      .drop('city')\n      .rename({'city_enc': 'city'})\n)\nprint(result)"},
 ],
 ch7:[
   {diff:2,q:"panderaでDataFrameスキーマを定義し、不正データで ValidationError が発生することを確認せよ。",
-   code:`import pandas as pd
-import pandera as pa
-
-schema = pa.DataFrameSchema({
-    'name':  pa.Column(str, pa.Check.str_length(min_value=1)),
-    'age':   pa.Column(int, pa.Check.ge(0)),
-    'score': pa.Column(float, pa.Check.between(0.0, 100.0))
-})
-
-# 正常データ
-good = pd.DataFrame({
-    'name':  ['Alice', 'Bob'],
-    'age':   [25, 30],
-    'score': [85.0, 92.0]
-})
-
-# 不正データ（ageが負）
-bad = pd.DataFrame({
-    'name':  ['Carol'],
-    'age':   [-1],
-    'score': [70.0]
-})
-
-# ここに書く: スキーマ検証を実行し、エラーを catch して表示`,
-   answer:`import pandas as pd
-import pandera as pa
-
-schema = pa.DataFrameSchema({
-    'name':  pa.Column(str, pa.Check.str_length(min_value=1)),
-    'age':   pa.Column(int, pa.Check.ge(0)),
-    'score': pa.Column(float, pa.Check.between(0.0, 100.0))
-})
-
-good = pd.DataFrame({'name':['Alice','Bob'], 'age':[25,30], 'score':[85.0,92.0]})
-bad  = pd.DataFrame({'name':['Carol'], 'age':[-1], 'score':[70.0]})
-
-schema.validate(good)
-print("good: OK")
-
-try:
-    schema.validate(bad)
-except pa.errors.SchemaError as e:
-    print("bad: ValidationError →", e.failure_cases)`},
+   code:"import pandas as pd\nimport pandera as pa\n\nschema = pa.DataFrameSchema({\n    'name':  pa.Column(str, pa.Check.str_length(min_value=1)),\n    'age':   pa.Column(int, pa.Check.ge(0)),\n    'score': pa.Column(float, pa.Check.between(0.0, 100.0))\n})\n\n# 正常データ\ngood = pd.DataFrame({\n    'name':  ['Alice', 'Bob'],\n    'age':   [25, 30],\n    'score': [85.0, 92.0]\n})\n\n# 不正データ（ageが負）\nbad = pd.DataFrame({\n    'name':  ['Carol'],\n    'age':   [-1],\n    'score': [70.0]\n})\n\n# ここに書く: スキーマ検証を実行し、エラーを catch して表示",
+   answer:"import pandas as pd\nimport pandera as pa\n\nschema = pa.DataFrameSchema({\n    'name':  pa.Column(str, pa.Check.str_length(min_value=1)),\n    'age':   pa.Column(int, pa.Check.ge(0)),\n    'score': pa.Column(float, pa.Check.between(0.0, 100.0))\n})\n\ngood = pd.DataFrame({'name':['Alice','Bob'], 'age':[25,30], 'score':[85.0,92.0]})\nbad  = pd.DataFrame({'name':['Carol'], 'age':[-1], 'score':[70.0]})\n\nschema.validate(good)\nprint(\"good: OK\")\n\ntry:\n    schema.validate(bad)\nexcept pa.errors.SchemaError as e:\n    print(\"bad: ValidationError →\", e.failure_cases)"},
   {diff:3,q:"Great Expectationsのexpect_column_values_to_not_be_nullとexpect_column_values_to_be_betweenをpandasで実行せよ。",
-   code:`import pandas as pd
-import great_expectations as gx
-
-df = pd.DataFrame({
-    'age':   [25, None, 35, -5, 28],
-    'score': [80.0, 90.0, None, 70.0, 110.0]
-})
-
-context = gx.get_context(mode='ephemeral')
-ds = context.sources.add_pandas("demo")
-da = ds.add_dataframe_asset("df_asset")
-batch = da.build_batch_request(dataframe=df)
-
-validator = context.get_validator(batch_request=batch)
-
-# age が null でないことを期待
-r1 = validator.expect_column_values_to_not_be_null('age')
-# score が 0〜100 の間であることを期待
-r2 = validator.expect_column_values_to_be_between('score', min_value=0, max_value=100)
-
-print("age not null:", r1['success'])
-print("score 0-100:", r2['success'])`,
-   answer:`import pandas as pd
-import great_expectations as gx
-
-df = pd.DataFrame({
-    'age':   [25, None, 35, -5, 28],
-    'score': [80.0, 90.0, None, 70.0, 110.0]
-})
-
-context = gx.get_context(mode='ephemeral')
-ds = context.sources.add_pandas("demo")
-da = ds.add_dataframe_asset("df_asset")
-batch = da.build_batch_request(dataframe=df)
-
-validator = context.get_validator(batch_request=batch)
-
-r1 = validator.expect_column_values_to_not_be_null('age')
-r2 = validator.expect_column_values_to_be_between('score', min_value=0, max_value=100)
-
-# age に Null があるので r1 は success=False
-# score に 110 があるので r2 は success=False
-print("age not null:", r1['success'])   # False
-print("score 0-100:", r2['success'])    # False`},
+   code:"import pandas as pd\nimport great_expectations as gx\n\ndf = pd.DataFrame({\n    'age':   [25, None, 35, -5, 28],\n    'score': [80.0, 90.0, None, 70.0, 110.0]\n})\n\ncontext = gx.get_context(mode='ephemeral')\nds = context.sources.add_pandas(\"demo\")\nda = ds.add_dataframe_asset(\"df_asset\")\nbatch = da.build_batch_request(dataframe=df)\n\nvalidator = context.get_validator(batch_request=batch)\n\n# age が null でないことを期待\nr1 = validator.expect_column_values_to_not_be_null('age')\n# score が 0〜100 の間であることを期待\nr2 = validator.expect_column_values_to_be_between('score', min_value=0, max_value=100)\n\nprint(\"age not null:\", r1['success'])\nprint(\"score 0-100:\", r2['success'])",
+   answer:"import pandas as pd\nimport great_expectations as gx\n\ndf = pd.DataFrame({\n    'age':   [25, None, 35, -5, 28],\n    'score': [80.0, 90.0, None, 70.0, 110.0]\n})\n\ncontext = gx.get_context(mode='ephemeral')\nds = context.sources.add_pandas(\"demo\")\nda = ds.add_dataframe_asset(\"df_asset\")\nbatch = da.build_batch_request(dataframe=df)\n\nvalidator = context.get_validator(batch_request=batch)\n\nr1 = validator.expect_column_values_to_not_be_null('age')\nr2 = validator.expect_column_values_to_be_between('score', min_value=0, max_value=100)\n\n# age に Null があるので r1 は success=False\n# score に 110 があるので r2 は success=False\nprint(\"age not null:\", r1['success'])   # False\nprint(\"score 0-100:\", r2['success'])    # False"},
 ],
 ch8:[
   {diff:2,q:"DuckDBでpandasのDataFrameを直接SQLで集計せよ（in-memoryクエリ）。",
-   code:`import duckdb
-import pandas as pd
-
-df = pd.DataFrame({
-    'category': ['A','B','A','C','B','A'],
-    'value':    [10, 20, 30, 15, 25, 5]
-})
-
-# DuckDB で df を直接クエリ
-result = duckdb.sql(
-    # ここに書く: category ごとの合計と件数
-).df()
-print(result)`,
-   answer:`import duckdb
-import pandas as pd
-
-df = pd.DataFrame({
-    'category': ['A','B','A','C','B','A'],
-    'value':    [10, 20, 30, 15, 25, 5]
-})
-
-result = duckdb.sql("""
-    SELECT category,
-           SUM(value) AS total,
-           COUNT(*)   AS cnt
-    FROM df
-    GROUP BY category
-    ORDER BY category
-""").df()
-print(result)`},
+   code:"import duckdb\nimport pandas as pd\n\ndf = pd.DataFrame({\n    'category': ['A','B','A','C','B','A'],\n    'value':    [10, 20, 30, 15, 25, 5]\n})\n\n# DuckDB で df を直接クエリ\nresult = duckdb.sql(\n    # ここに書く: category ごとの合計と件数\n).df()\nprint(result)",
+   answer:"import duckdb\nimport pandas as pd\n\ndf = pd.DataFrame({\n    'category': ['A','B','A','C','B','A'],\n    'value':    [10, 20, 30, 15, 25, 5]\n})\n\nresult = duckdb.sql(\"\"\"\n    SELECT category,\n           SUM(value) AS total,\n           COUNT(*)   AS cnt\n    FROM df\n    GROUP BY category\n    ORDER BY category\n\"\"\").df()\nprint(result)"},
   {diff:3,q:"IbisでDuckDBバックエンドに接続し、pandas互換APIでgroup_byと集計を実行せよ。",
-   code:`import ibis
-import pandas as pd
-
-ibis.options.interactive = True
-con = ibis.duckdb.connect()  # in-memory DuckDB
-
-# pandas DataFrameを登録
-df = pd.DataFrame({
-    'dept':   ['Eng','HR','Eng','Finance','HR'],
-    'salary': [80000, 60000, 90000, 70000, 65000]
-})
-t = con.create_table('employees', df, overwrite=True)
-
-# Ibis API で dept ごとの平均給与を集計
-result = (
-    t
-    # ここに書く
-)
-print(result)`,
-   answer:`import ibis
-import pandas as pd
-
-ibis.options.interactive = True
-con = ibis.duckdb.connect()
-
-df = pd.DataFrame({
-    'dept':   ['Eng','HR','Eng','Finance','HR'],
-    'salary': [80000, 60000, 90000, 70000, 65000]
-})
-t = con.create_table('employees', df, overwrite=True)
-
-result = (
-    t.group_by('dept')
-     .aggregate(avg_salary=t.salary.mean())
-     .order_by('dept')
-)
-print(result)`},
+   code:"import ibis\nimport pandas as pd\n\nibis.options.interactive = True\ncon = ibis.duckdb.connect()  # in-memory DuckDB\n\n# pandas DataFrameを登録\ndf = pd.DataFrame({\n    'dept':   ['Eng','HR','Eng','Finance','HR'],\n    'salary': [80000, 60000, 90000, 70000, 65000]\n})\nt = con.create_table('employees', df, overwrite=True)\n\n# Ibis API で dept ごとの平均給与を集計\nresult = (\n    t\n    # ここに書く\n)\nprint(result)",
+   answer:"import ibis\nimport pandas as pd\n\nibis.options.interactive = True\ncon = ibis.duckdb.connect()\n\ndf = pd.DataFrame({\n    'dept':   ['Eng','HR','Eng','Finance','HR'],\n    'salary': [80000, 60000, 90000, 70000, 65000]\n})\nt = con.create_table('employees', df, overwrite=True)\n\nresult = (\n    t.group_by('dept')\n     .aggregate(avg_salary=t.salary.mean())\n     .order_by('dept')\n)\nprint(result)"},
 ],
 };
 
@@ -664,325 +159,103 @@ const chapters = [
 goal:"pandas 2.0のCopy-on-Write(CoW)が従来との何が変わったかを説明できる。PyArrow backedのdtypeを使ってデータを扱える。Polarsのlazy APIとpredicate/projection pushdownを実際に動かして効果を確認できる。",
 sections:[
 {title:"pandas 2.0 Copy-on-Write",
-body:`pandas 1.x では、DataFrameをスライスして部分的に代入すると「元の DataFrame に反映されるかどうか」がケースによって変わり、SettingWithCopyWarning が頻繁に発生していました。これはライブラリの内部で「このオブジェクトはコピーか、ビューか」を追跡する仕組みが不完全だったためです。
-
-pandas 2.0 で導入されたCopy-on-Write（CoW）はこの問題を根本から解決します。CoWでは「変更が実際に発生するまではコピーを作らない」という戦略を採用しており、スライスや選択によって返されるオブジェクトは論理的に独立したコピーとして扱われます。実際のメモリコピーは変更が行われた瞬間に遅延して実行されるため、読み取りのみの場合はコストがかかりません。これにより、代入が元のDataFrameに影響するかどうかで悩む必要がなくなり、コードの予測可能性が格段に向上します。`,
+body:"pandas 1.x では、DataFrameをスライスして部分的に代入すると「元の DataFrame に反映されるかどうか」がケースによって変わり、SettingWithCopyWarning が頻繁に発生していました。これはライブラリの内部で「このオブジェクトはコピーか、ビューか」を追跡する仕組みが不完全だったためです。\n\npandas 2.0 で導入されたCopy-on-Write（CoW）はこの問題を根本から解決します。CoWでは「変更が実際に発生するまではコピーを作らない」という戦略を採用しており、スライスや選択によって返されるオブジェクトは論理的に独立したコピーとして扱われます。実際のメモリコピーは変更が行われた瞬間に遅延して実行されるため、読み取りのみの場合はコストがかかりません。これにより、代入が元のDataFrameに影響するかどうかで悩む必要がなくなり、コードの予測可能性が格段に向上します。",
 table:T.cowSummary,
-afterTable:`CoW の移行は pandas 2.0 でオプトイン、2.x 系で完全デフォルトになる予定です。既存コードでは pd.options.mode.copy_on_write = True を設定して動作を事前確認することが推奨されています。`},
+afterTable:"CoW の移行は pandas 2.0 でオプトイン、2.x 系で完全デフォルトになる予定です。既存コードでは pd.options.mode.copy_on_write = True を設定して動作を事前確認することが推奨されています。"},
 {title:"PyArrow backed dtypes と Polars クエリ最適化",
-body:`pandas 2.0 からは列のバックエンドとして PyArrow を選択できるようになりました。通常の pandas は NumPy 配列を内部に持ちますが、ArrowBacked dtype を使うと Apache Arrow のメモリレイアウトがそのまま利用されます。これにより、文字列列での null 値の扱いが改善し（NaN（float）の混入が不要になる）、polars や PyArrow と直接データを受け渡しする際のゼロコピー転送が可能になります。
-
-Polars は最初から Apache Arrow をネイティブに採用しており、さらにLazy APIと呼ばれる遅延評価機構を持っています。scan_csv()やscan_parquet()でファイルを"宣言的に"読み込み、filter()・select()・group_by()等の操作をチェーンしてから最後にcollect()を呼ぶと、Polarsの最適化エンジンがクエリプランを解析し、predicate pushdown（フィルタを読み込み段階に前倒し）やprojection pushdown（必要な列だけ読み込む）を自動で適用します。これにより、数十GBのParquetファイルでも必要な部分だけを読んで処理できます。`,
+body:"pandas 2.0 からは列のバックエンドとして PyArrow を選択できるようになりました。通常の pandas は NumPy 配列を内部に持ちますが、ArrowBacked dtype を使うと Apache Arrow のメモリレイアウトがそのまま利用されます。これにより、文字列列での null 値の扱いが改善し（NaN（float）の混入が不要になる）、polars や PyArrow と直接データを受け渡しする際のゼロコピー転送が可能になります。\n\nPolars は最初から Apache Arrow をネイティブに採用しており、さらにLazy APIと呼ばれる遅延評価機構を持っています。scan_csv()やscan_parquet()でファイルを\"宣言的に\"読み込み、filter()・select()・group_by()等の操作をチェーンしてから最後にcollect()を呼ぶと、Polarsの最適化エンジンがクエリプランを解析し、predicate pushdown（フィルタを読み込み段階に前倒し）やprojection pushdown（必要な列だけ読み込む）を自動で適用します。これにより、数十GBのParquetファイルでも必要な部分だけを読んで処理できます。",
 table:T.polarsOptim,
-afterTable:`explain(optimized=True) を呼ぶとPolarsが適用した最適化の詳細を文字列で確認できます。SELECTION や FILTER が CSV_SCAN や PARQUET_SCAN の内部に埋め込まれていれば最適化が効いています。`},
+afterTable:"explain(optimized=True) を呼ぶとPolarsが適用した最適化の詳細を文字列で確認できます。SELECTION や FILTER が CSV_SCAN や PARQUET_SCAN の内部に埋め込まれていれば最適化が効いています。"},
 {title:"PyArrow Backed DTYPEの実践",
-body:`pandasで ArrowBacked dtype を使うには、dtype_backend='pyarrow' オプションをread_csv等に渡すか、既存のDataFrameをconvert_dtypes(dtype_backend='pyarrow')で変換します。各列の dtype が int64[pyarrow] や string[pyarrow] のように表示されれば成功です。
-
-ArrowBacked DataFrame は to_arrow() で PyArrow Table に、from_arrow() で逆方向に変換でき、polars との相互変換も arrow 経由でほぼゼロコピーで行えます。大量データをパイプラインで受け渡す際はこのゼロコピー転送が大きなメモリ節約につながります。`,
+body:"pandasで ArrowBacked dtype を使うには、dtype_backend='pyarrow' オプションをread_csv等に渡すか、既存のDataFrameをconvert_dtypes(dtype_backend='pyarrow')で変換します。各列の dtype が int64[pyarrow] や string[pyarrow] のように表示されれば成功です。\n\nArrowBacked DataFrame は to_arrow() で PyArrow Table に、from_arrow() で逆方向に変換でき、polars との相互変換も arrow 経由でほぼゼロコピーで行えます。大量データをパイプラインで受け渡す際はこのゼロコピー転送が大きなメモリ節約につながります。",
 table:T.arrowDtypes,
-code:`import pandas as pd
-import pyarrow as pa
-
-# ArrowBacked で CSV 読み込み
-df = pd.read_csv('/tmp/sample.csv', dtype_backend='pyarrow')
-print(df.dtypes)   # int64[pyarrow], string[pyarrow] など
-
-# Arrow Table への変換（ゼロコピーに近い）
-table = pa.Table.from_pandas(df)
-print(table.schema)
-
-# polars への変換
-import polars as pl
-pl_df = pl.from_arrow(table)
-print(pl_df.dtypes)`,
-afterCode:`dtype_backend='pyarrow' は pandas 1.5 以上で利用可能ですが、全機能をフルサポートするのは 2.0 以降です。ArrowBacked DataFrame は一部の pandas 拡張機能（例: pd.cut の一部パラメータ）と互換性がない場合があるため、移行時は単体テストを必ず実行してください。`},
+code:"import pandas as pd\nimport pyarrow as pa\n\n# ArrowBacked で CSV 読み込み\ndf = pd.read_csv('/tmp/sample.csv', dtype_backend='pyarrow')\nprint(df.dtypes)   # int64[pyarrow], string[pyarrow] など\n\n# Arrow Table への変換（ゼロコピーに近い）\ntable = pa.Table.from_pandas(df)\nprint(table.schema)\n\n# polars への変換\nimport polars as pl\npl_df = pl.from_arrow(table)\nprint(pl_df.dtypes)",
+afterCode:"dtype_backend='pyarrow' は pandas 1.5 以上で利用可能ですが、全機能をフルサポートするのは 2.0 以降です。ArrowBacked DataFrame は一部の pandas 拡張機能（例: pd.cut の一部パラメータ）と互換性がない場合があるため、移行時は単体テストを必ず実行してください。"},
 ]},
 {id:"ch2",num:2,title:"PyArrow深化",est:"65分",
 goal:"ChunkedArray・RecordBatchを直接操作できる。PyArrow Compute Functionsで効率的に集計・変換ができる。Arrow Datasetを使ってパーティション化ファイルをフィルタ付きで読み込める。",
 sections:[
 {title:"ChunkedArray と Compute Functions",
-body:`PyArrowの基本単位は Array（単一のチャンク）ですが、複数のArrayをまとめたChunkedArrayを使うと、大きなデータを複数の連続メモリ領域に分けて格納できます。pandas の Series が内部的に一つの連続配列を持つのに対し、ChunkedArray はチャンクをリストとして管理するため、超大規模データでもメモリを効率よく使えます。
-
-PyArrow には pyarrow.compute モジュール（慣習的に pc と alias）に多数の演算関数が用意されており、C++の Arrow実装に直接ブリッジされているため非常に高速です。pandas の apply() や map() がPythonレベルのループを実行するのと比べ、pc.utf8_lower() や pc.add() 等は SIMD命令を活用したベクトル演算で動作します。`,
+body:"PyArrowの基本単位は Array（単一のチャンク）ですが、複数のArrayをまとめたChunkedArrayを使うと、大きなデータを複数の連続メモリ領域に分けて格納できます。pandas の Series が内部的に一つの連続配列を持つのに対し、ChunkedArray はチャンクをリストとして管理するため、超大規模データでもメモリを効率よく使えます。\n\nPyArrow には pyarrow.compute モジュール（慣習的に pc と alias）に多数の演算関数が用意されており、C++の Arrow実装に直接ブリッジされているため非常に高速です。pandas の apply() や map() がPythonレベルのループを実行するのと比べ、pc.utf8_lower() や pc.add() 等は SIMD命令を活用したベクトル演算で動作します。",
 table:T.arrowCompute,
-afterTable:`pc.list_flatten() や pc.list_sum() のように、リスト型の列（ネスト構造）を扱う関数も豊富です。JSON配列を列として持つデータを正規化する際に活躍します。`},
+afterTable:"pc.list_flatten() や pc.list_sum() のように、リスト型の列（ネスト構造）を扱う関数も豊富です。JSON配列を列として持つデータを正規化する際に活躍します。"},
 {title:"RecordBatch と Arrow Dataset",
-body:`RecordBatch は Schema（列名と型の定義）+ 複数の Array で構成される「まとまったデータの塊」です。pandas の DataFrame に相当しますが、メタデータ（Schema）が厳密に型付けされています。RecordBatch はストリーミング処理で1バッチずつ処理する際によく使われ、IPC（Inter-Process Communication）形式でプロセス間通信やファイル保存にも使われます。
-
-Arrow Dataset は、ディレクトリ以下に分散した複数のParquetやCSVファイルをひとつの論理テーブルとして扱うAPIです。Hiveスタイルのパーティション（year=2023/month=01/part-0.parquet のようなディレクトリ構造）を自動認識し、filter= を指定するとパーティションキーに一致するフォルダだけを読むため、スキャンコストが劇的に下がります。`,
+body:"RecordBatch は Schema（列名と型の定義）+ 複数の Array で構成される「まとまったデータの塊」です。pandas の DataFrame に相当しますが、メタデータ（Schema）が厳密に型付けされています。RecordBatch はストリーミング処理で1バッチずつ処理する際によく使われ、IPC（Inter-Process Communication）形式でプロセス間通信やファイル保存にも使われます。\n\nArrow Dataset は、ディレクトリ以下に分散した複数のParquetやCSVファイルをひとつの論理テーブルとして扱うAPIです。Hiveスタイルのパーティション（year=2023/month=01/part-0.parquet のようなディレクトリ構造）を自動認識し、filter= を指定するとパーティションキーに一致するフォルダだけを読むため、スキャンコストが劇的に下がります。",
 table:T.arrowDtypes,
-code:`import pyarrow as pa
-import pyarrow.compute as pc
-
-# ChunkedArray 操作
-ca = pa.chunked_array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
-print("chunks:", ca.num_chunks)
-print("sum:", pc.sum(ca).as_py())
-print("mean:", pc.mean(ca).as_py())
-
-# RecordBatch
-schema = pa.schema([('name', pa.string()), ('age', pa.int32())])
-batch = pa.RecordBatch.from_pydict(
-    {'name': ['Alice', 'Bob'], 'age': [25, 30]},
-    schema=schema
-)
-print(batch.schema)
-print(batch.to_pandas())`,
-afterCode:`RecordBatch は pyarrow.ipc.new_stream() / new_file() でバイナリに書き出し、別プロセスや別マシンに転送できます。pandas の pickle より高速で、型情報も厳密に保持されます。`},
+code:"import pyarrow as pa\nimport pyarrow.compute as pc\n\n# ChunkedArray 操作\nca = pa.chunked_array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])\nprint(\"chunks:\", ca.num_chunks)\nprint(\"sum:\", pc.sum(ca).as_py())\nprint(\"mean:\", pc.mean(ca).as_py())\n\n# RecordBatch\nschema = pa.schema([('name', pa.string()), ('age', pa.int32())])\nbatch = pa.RecordBatch.from_pydict(\n    {'name': ['Alice', 'Bob'], 'age': [25, 30]},\n    schema=schema\n)\nprint(batch.schema)\nprint(batch.to_pandas())",
+afterCode:"RecordBatch は pyarrow.ipc.new_stream() / new_file() でバイナリに書き出し、別プロセスや別マシンに転送できます。pandas の pickle より高速で、型情報も厳密に保持されます。"},
 ]},
 {id:"ch3",num:3,title:"分散データ処理（Dask）",est:"65分",
 goal:"Dask DataFrameを作成しcompute()で結果を取得できる。task graphの概念を理解し、persist()とcompute()の使い分けができる。ParquetのDask読み込みとS3連携のパターンを説明できる。",
 sections:[
 {title:"Dask DataFrameの基本",
-body:`Dask はpandasと互換のAPIを持ちながら、DataFrameを複数のパーティション（pandas DataFrameの配列）に分割して処理するライブラリです。各パーティションは独立して処理され、マルチコアやクラスタにまたがって並列実行されます。pandas でメモリに乗り切らないデータセットでも、Daskはチャンク単位で処理するため扱えます。
-
-Dask の最大の特徴は「遅延評価」です。dd.read_csv() や groupby() 等の操作は実際には計算グラフ（task graph）を構築するだけで、.compute() を呼んだときに初めて実行されます。これにより、複数の変換をチェーンしてからまとめて最適化・並列実行できます。メモリに余裕がある場合は .persist() でワーカーメモリにデータを保持し、その後の .compute() を高速化できます。`,
+body:"Dask はpandasと互換のAPIを持ちながら、DataFrameを複数のパーティション（pandas DataFrameの配列）に分割して処理するライブラリです。各パーティションは独立して処理され、マルチコアやクラスタにまたがって並列実行されます。pandas でメモリに乗り切らないデータセットでも、Daskはチャンク単位で処理するため扱えます。\n\nDask の最大の特徴は「遅延評価」です。dd.read_csv() や groupby() 等の操作は実際には計算グラフ（task graph）を構築するだけで、.compute() を呼んだときに初めて実行されます。これにより、複数の変換をチェーンしてからまとめて最適化・並列実行できます。メモリに余裕がある場合は .persist() でワーカーメモリにデータを保持し、その後の .compute() を高速化できます。",
 table:T.daskCompare,
-afterTable:`Dask はローカルのマルチコアで動作する LocalCluster がデフォルトです。クラウドに移行したい場合は Coiled（SaaS）や Dask on Kubernetes を使うと pandas と同じコードのまま分散実行できます。`},
+afterTable:"Dask はローカルのマルチコアで動作する LocalCluster がデフォルトです。クラウドに移行したい場合は Coiled（SaaS）や Dask on Kubernetes を使うと pandas と同じコードのまま分散実行できます。"},
 {title:"Dask + Parquet と S3 連携",
-body:`Dask は dd.read_parquet('s3://bucket/path/') のように S3 パスをそのまま受け付けます。内部では fsspec というファイルシステム抽象化ライブラリを使い、ローカル・S3・GCS・Azure Blob を統一的に扱います。Parquetはパーティション化されていれば必要なファイルだけを読み、さらにfilters=引数でパーティションキーに基づくプルーニングが効きます。
-
-実務では「数十億行のログデータをS3に日付パーティションで保存し、Daskで特定日だけ読んで集計」というパターンがよく使われます。persist() でワーカーキャッシュに乗せてから複数の集計を実行すると、同じデータを何度もS3から読む無駄を省けます。`,
-code:`import dask.dataframe as dd
-
-# ローカルParquetの並列読み込み
-ddf = dd.read_parquet(
-    '/tmp/sales_ds/',
-    columns=['year', 'sales'],
-    filters=[('year', '==', 2023)]
-)
-
-# 遅延集計（まだ実行されない）
-agg = ddf.groupby('year')['sales'].sum()
-
-# 実行
-result = agg.compute()
-print(result)
-
-# S3 の場合（boto3とs3fsが必要）
-# ddf_s3 = dd.read_parquet(
-#     's3://my-bucket/sales/',
-#     storage_options={'anon': False}
-# )`,
-afterCode:`ddf.visualize() を呼ぶと graphviz で task graph を画像出力できます（graphviz のインストールが必要）。数百ノードのグラフを見ると Dask がどれだけ並列化しているかが視覚的に分かります。`},
+body:"Dask は dd.read_parquet('s3://bucket/path/') のように S3 パスをそのまま受け付けます。内部では fsspec というファイルシステム抽象化ライブラリを使い、ローカル・S3・GCS・Azure Blob を統一的に扱います。Parquetはパーティション化されていれば必要なファイルだけを読み、さらにfilters=引数でパーティションキーに基づくプルーニングが効きます。\n\n実務では「数十億行のログデータをS3に日付パーティションで保存し、Daskで特定日だけ読んで集計」というパターンがよく使われます。persist() でワーカーキャッシュに乗せてから複数の集計を実行すると、同じデータを何度もS3から読む無駄を省けます。",
+code:"import dask.dataframe as dd\n\n# ローカルParquetの並列読み込み\nddf = dd.read_parquet(\n    '/tmp/sales_ds/',\n    columns=['year', 'sales'],\n    filters=[('year', '==', 2023)]\n)\n\n# 遅延集計（まだ実行されない）\nagg = ddf.groupby('year')['sales'].sum()\n\n# 実行\nresult = agg.compute()\nprint(result)\n\n# S3 の場合（boto3とs3fsが必要）\n# ddf_s3 = dd.read_parquet(\n#     's3://my-bucket/sales/',\n#     storage_options={'anon': False}\n# )",
+afterCode:"ddf.visualize() を呼ぶと graphviz で task graph を画像出力できます（graphviz のインストールが必要）。数百ノードのグラフを見ると Dask がどれだけ並列化しているかが視覚的に分かります。"},
 ]},
 {id:"ch4",num:4,title:"Polarsプラグインとカスタム拡張",est:"60分",
 goal:"map_batches()でカスタム変換をPolarsのDataFrameに適用できる。カスタムExprを関数として定義して再利用できる。Polarsプラグイン（Rust拡張）の仕組みと活用場面を説明できる。",
 sections:[
 {title:"map_batches と カスタム Expr",
-body:`Polars はほとんどの処理を内蔵のArrow実装（Rust）で実行しますが、独自のロジックが必要な場合は map_batches() でPython関数を列単位で適用できます。map_batches() に渡す関数はpolarsSeries（1列分）を受け取り、変換後の Series を返します。pandasの apply() と異なり、map_batches() は列全体をまとめてSeriesとして受け取るため、Pythonレベルの行ループは起きません。
-
-さらに強力なのがカスタムExpr（式）です。pl.col('name').str.to_lowercase() のような組み込みExprと同じように使える関数を自分で定義できます。z-score 正規化・カスタムエンコーディング・複合条件フラグなど、繰り返し使う変換ロジックをExprとして定義しておくと、with_columns() の中でそのまま使え、lazy APIの最適化も受けられます。`,
-code:`import polars as pl
-
-# カスタム Expr: 偏差値計算
-def hensachi_expr(col_name: str) -> pl.Expr:
-    col = pl.col(col_name)
-    return (col - col.mean()) / col.std() * 10 + 50
-
-df = pl.DataFrame({'score': [60.0, 70.0, 80.0, 90.0, 55.0]})
-
-result = df.with_columns(
-    hensachi_expr('score').alias('hensachi'),
-    pl.col('score').map_batches(
-        lambda s: pl.Series([f"Lv{int(v//20)}" for v in s.to_list()])
-    ).alias('level')
-)
-print(result)`,
-afterCode:`map_batches() の return_dtype 引数で戻り値の型を明示すると、lazy API でのクエリプラン生成が正確になります。型が不明だとPolarsが推論できず実行時エラーになることがあります。`},
+body:"Polars はほとんどの処理を内蔵のArrow実装（Rust）で実行しますが、独自のロジックが必要な場合は map_batches() でPython関数を列単位で適用できます。map_batches() に渡す関数はpolarsSeries（1列分）を受け取り、変換後の Series を返します。pandasの apply() と異なり、map_batches() は列全体をまとめてSeriesとして受け取るため、Pythonレベルの行ループは起きません。\n\nさらに強力なのがカスタムExpr（式）です。pl.col('name').str.to_lowercase() のような組み込みExprと同じように使える関数を自分で定義できます。z-score 正規化・カスタムエンコーディング・複合条件フラグなど、繰り返し使う変換ロジックをExprとして定義しておくと、with_columns() の中でそのまま使え、lazy APIの最適化も受けられます。",
+code:"import polars as pl\n\n# カスタム Expr: 偏差値計算\ndef hensachi_expr(col_name: str) -> pl.Expr:\n    col = pl.col(col_name)\n    return (col - col.mean()) / col.std() * 10 + 50\n\ndf = pl.DataFrame({'score': [60.0, 70.0, 80.0, 90.0, 55.0]})\n\nresult = df.with_columns(\n    hensachi_expr('score').alias('hensachi'),\n    pl.col('score').map_batches(\n        lambda s: pl.Series([f\"Lv{int(v//20)}\" for v in s.to_list()])\n    ).alias('level')\n)\nprint(result)",
+afterCode:"map_batches() の return_dtype 引数で戻り値の型を明示すると、lazy API でのクエリプラン生成が正確になります。型が不明だとPolarsが推論できず実行時エラーになることがあります。"},
 {title:"Polarsプラグイン（Rust拡張）の概要",
-body:`Polarsはmaturin（RustのPythonバインディングビルドツール）を使ったプラグイン機構を提供しています。Rustで処理ロジックを書き、plugin_function() デコレータと組み合わせると、自作のExprを組み込みと同じ速度で動かせます。Pythonレベルのmap_batches()ではGILが解放されないため並列化に制限がありますが、Rustプラグインはこの制約を受けません。
-
-プラグインを書くには: Rustでpolars-core等に依存するcrateを作成し、maturin develop でビルドしてPythonパッケージとして登録します。その後import した関数をpl.col('x').register_plugin(...)で呼び出せます。ライブラリ・フレームワーク開発者向けの機能ですが、超高速なカスタム集計関数が必要な場合に有効です。大半の実務ユースケースではmap_batches()で十分です。`,
-code:`# Polars Plugin の最小構成（Rustコード例・概念説明）
-# Cargo.toml:
-#   [lib]
-#   name = "my_plugin"
-#   crate-type = ["cdylib"]
-#   [dependencies]
-#   polars = { version = "0.39", features = ["plugin"] }
-
-# src/lib.rs:
-# #[polars_expr(output_type=Float64)]
-# fn double(inputs: &[Series]) -> PolarsResult<Series> {
-#     let ca = inputs[0].f64()?;
-#     Ok((ca * 2.0).into_series())
-# }
-
-# Python 側（maturin develop 後）:
-import polars as pl
-
-# プラグイン関数を Expr に登録して使う（概念）
-# result = df.with_columns(
-#     pl.col('value').register_plugin(
-#         lib='my_plugin', symbol='double'
-#     ).alias('doubled')
-# )`,
-afterCode:`Polarsの公式GitHubには polars-plugins-tutorial というリポジトリがあり、最小構成からステップバイステップで学べます。実務でRustプラグインが必要な規模になったら、そのチュートリアルから始めるのが最短経路です。`},
+body:"Polarsはmaturin（RustのPythonバインディングビルドツール）を使ったプラグイン機構を提供しています。Rustで処理ロジックを書き、plugin_function() デコレータと組み合わせると、自作のExprを組み込みと同じ速度で動かせます。Pythonレベルのmap_batches()ではGILが解放されないため並列化に制限がありますが、Rustプラグインはこの制約を受けません。\n\nプラグインを書くには: Rustでpolars-core等に依存するcrateを作成し、maturin develop でビルドしてPythonパッケージとして登録します。その後import した関数をpl.col('x').register_plugin(...)で呼び出せます。ライブラリ・フレームワーク開発者向けの機能ですが、超高速なカスタム集計関数が必要な場合に有効です。大半の実務ユースケースではmap_batches()で十分です。",
+code:"# Polars Plugin の最小構成（Rustコード例・概念説明）\n# Cargo.toml:\n#   [lib]\n#   name = \"my_plugin\"\n#   crate-type = [\"cdylib\"]\n#   [dependencies]\n#   polars = { version = \"0.39\", features = [\"plugin\"] }\n\n# src/lib.rs:\n# #[polars_expr(output_type=Float64)]\n# fn double(inputs: &[Series]) -> PolarsResult<Series> {\n#     let ca = inputs[0].f64()?;\n#     Ok((ca * 2.0).into_series())\n# }\n\n# Python 側（maturin develop 後）:\nimport polars as pl\n\n# プラグイン関数を Expr に登録して使う（概念）\n# result = df.with_columns(\n#     pl.col('value').register_plugin(\n#         lib='my_plugin', symbol='double'\n#     ).alias('doubled')\n# )",
+afterCode:"Polarsの公式GitHubには polars-plugins-tutorial というリポジトリがあり、最小構成からステップバイステップで学べます。実務でRustプラグインが必要な規模になったら、そのチュートリアルから始めるのが最短経路です。"},
 ]},
 {id:"ch5",num:5,title:"データパイプライン設計",est:"65分",
 goal:"ETL/ELTパターンの違いを説明できる。増分処理（incremental load）をpandas/polarsで実装できる。Airflow/Prefect/Dagsterのタスク内でpandas/polarsを適切に使うパターンを理解している。",
 sections:[
 {title:"ETL/ELTパターンと増分処理",
-body:`データパイプラインには大きく ETL（Extract→Transform→Load）と ELT（Extract→Load→Transform）の2つのパターンがあります。ETLはデータを取り出して変換してからDWHに入れるため、入力データの変換がDWHの外で完結します。pandasやpolarsが活躍するのは主にこのETLフェーズです。ELTはデータを生のままDWH（BigQueryやSnowflake）に入れて、DWH内のSQLで変換します。クラウドDWHの高い処理能力を活かせるため近年主流になっています。
-
-増分処理（incremental load）は「前回実行時以降に追加・変更されたデータだけを処理する」パターンです。全量再処理（full refresh）は単純ですが、データ量が増えると非現実的です。増分処理では「最終処理タイムスタンプ」をどこかに保存しておき、次回は updated_at > last_run のデータだけを読んで処理します。pandas/polarsでは read_parquet のfilterや、SQL WHERE句でこれを実現します。`,
+body:"データパイプラインには大きく ETL（Extract→Transform→Load）と ELT（Extract→Load→Transform）の2つのパターンがあります。ETLはデータを取り出して変換してからDWHに入れるため、入力データの変換がDWHの外で完結します。pandasやpolarsが活躍するのは主にこのETLフェーズです。ELTはデータを生のままDWH（BigQueryやSnowflake）に入れて、DWH内のSQLで変換します。クラウドDWHの高い処理能力を活かせるため近年主流になっています。\n\n増分処理（incremental load）は「前回実行時以降に追加・変更されたデータだけを処理する」パターンです。全量再処理（full refresh）は単純ですが、データ量が増えると非現実的です。増分処理では「最終処理タイムスタンプ」をどこかに保存しておき、次回は updated_at > last_run のデータだけを読んで処理します。pandas/polarsでは read_parquet のfilterや、SQL WHERE句でこれを実現します。",
 table:T.pipelinePatterns,
-afterTable:`Upsert（新規は INSERT、既存は UPDATE）はDWHでは MERGE 文で行いますが、pandas では read→concat→drop_duplicates→write というパターンが基本です。大規模になったら Delta Lake の upsert API を使うのが効率的です。`},
+afterTable:"Upsert（新規は INSERT、既存は UPDATE）はDWHでは MERGE 文で行いますが、pandas では read→concat→drop_duplicates→write というパターンが基本です。大規模になったら Delta Lake の upsert API を使うのが効率的です。"},
 {title:"Airflow / Prefect / Dagster との統合",
-body:`Airflow・Prefect・Dagsterはどれも「タスクの依存グラフを定義して実行管理する」ワークフローオーケストレーターです。pandas/polarsのコードはそれぞれのタスク/フロー/オペレーションとして包むだけで動きます。重要なのはタスク間のデータ受け渡しで、大きなDataFrameをそのままワーカー間で渡すのは非効率なため、中間結果はParquetやS3に書き出してパスを受け渡すパターンが推奨されます。
-
-Prefect 2.x では @task デコレータを付けた関数をそのまま呼べばDAGが構築されます。Dagsterは Assets（データアセット）という概念でデータの系譜（lineage）を自動で管理してくれます。どのオーケストレーターを選ぶかはチームの規模・クラウド環境によりますが、pandas/polarsのコード自体は変わりません。`,
-code:`# Prefect 2.x の例（概念）
-from prefect import task, flow
-import polars as pl
-
-@task
-def extract() -> str:
-    df = pl.read_csv('s3://bucket/raw/sales.csv')
-    df.write_parquet('/tmp/raw.parquet')
-    return '/tmp/raw.parquet'
-
-@task
-def transform(path: str) -> str:
-    df = pl.read_parquet(path)
-    result = (
-        df.filter(pl.col('amount') > 0)
-          .group_by('region')
-          .agg(pl.col('amount').sum().alias('total'))
-    )
-    out = '/tmp/transformed.parquet'
-    result.write_parquet(out)
-    return out
-
-@flow
-def sales_pipeline():
-    raw_path = extract()
-    transform(raw_path)
-
-# sales_pipeline()`,
-afterCode:`タスク間でDataFrameを直接返すと Prefect がそれをシリアライズしてキャッシュしようとします。大きなDataFrameはファイルパスで受け渡す「ファイルベースの受け渡し」パターンにするとメモリ効率・再実行効率ともに向上します。`},
+body:"Airflow・Prefect・Dagsterはどれも「タスクの依存グラフを定義して実行管理する」ワークフローオーケストレーターです。pandas/polarsのコードはそれぞれのタスク/フロー/オペレーションとして包むだけで動きます。重要なのはタスク間のデータ受け渡しで、大きなDataFrameをそのままワーカー間で渡すのは非効率なため、中間結果はParquetやS3に書き出してパスを受け渡すパターンが推奨されます。\n\nPrefect 2.x では @task デコレータを付けた関数をそのまま呼べばDAGが構築されます。Dagsterは Assets（データアセット）という概念でデータの系譜（lineage）を自動で管理してくれます。どのオーケストレーターを選ぶかはチームの規模・クラウド環境によりますが、pandas/polarsのコード自体は変わりません。",
+code:"# Prefect 2.x の例（概念）\nfrom prefect import task, flow\nimport polars as pl\n\n@task\ndef extract() -> str:\n    df = pl.read_csv('s3://bucket/raw/sales.csv')\n    df.write_parquet('/tmp/raw.parquet')\n    return '/tmp/raw.parquet'\n\n@task\ndef transform(path: str) -> str:\n    df = pl.read_parquet(path)\n    result = (\n        df.filter(pl.col('amount') > 0)\n          .group_by('region')\n          .agg(pl.col('amount').sum().alias('total'))\n    )\n    out = '/tmp/transformed.parquet'\n    result.write_parquet(out)\n    return out\n\n@flow\ndef sales_pipeline():\n    raw_path = extract()\n    transform(raw_path)\n\n# sales_pipeline()",
+afterCode:"タスク間でDataFrameを直接返すと Prefect がそれをシリアライズしてキャッシュしようとします。大きなDataFrameはファイルパスで受け渡す「ファイルベースの受け渡し」パターンにするとメモリ効率・再実行効率ともに向上します。"},
 ]},
 {id:"ch6",num:6,title:"ML特徴量エンジニアリング",est:"60分",
 goal:"scikit-learn Pipelineにpandas/polarsの前処理を統合できる。Target Encodingをpolarsで実装できる。Feature Store（Feast等）の役割と基本的な使い方を説明できる。",
 sections:[
 {title:"scikit-learn Pipeline との統合",
-body:`scikit-learnのPipelineはデータ変換と学習器を一本のオブジェクトにまとめる仕組みです。fit()を呼ぶと各ステップが順に実行され、predict()も同じ変換を自動で適用します。これにより、学習時とテスト時で同じ前処理が確実に行われ、学習・テスト間のデータ漏洩（data leakage）を防ぎやすくなります。
-
-pandas は sklearn の estimator と直接連携できます。ColumnTransformer を使えば「数値列はScaler、カテゴリ列はOneHotEncoder」のように列ごとに異なる変換を定義でき、Pipeline に組み込めます。polarsでは前処理を先に行ってNumPy配列として sklearn に渡すのが現状もっとも安定したパターンです。将来的には sklearn-polars 等のブリッジライブラリが充実してきています。`,
+body:"scikit-learnのPipelineはデータ変換と学習器を一本のオブジェクトにまとめる仕組みです。fit()を呼ぶと各ステップが順に実行され、predict()も同じ変換を自動で適用します。これにより、学習時とテスト時で同じ前処理が確実に行われ、学習・テスト間のデータ漏洩（data leakage）を防ぎやすくなります。\n\npandas は sklearn の estimator と直接連携できます。ColumnTransformer を使えば「数値列はScaler、カテゴリ列はOneHotEncoder」のように列ごとに異なる変換を定義でき、Pipeline に組み込めます。polarsでは前処理を先に行ってNumPy配列として sklearn に渡すのが現状もっとも安定したパターンです。将来的には sklearn-polars 等のブリッジライブラリが充実してきています。",
 table:T.featureEngg,
-afterTable:`cross_val_score() に Pipeline を渡すと、各foldで fit/transform が leak なく実行されます。Pipeline を joblib.dump() で保存すれば、前処理+モデルをセットで本番に持ち込めます。`},
+afterTable:"cross_val_score() に Pipeline を渡すと、各foldで fit/transform が leak なく実行されます。Pipeline を joblib.dump() で保存すれば、前処理+モデルをセットで本番に持ち込めます。"},
 {title:"Target Encoding と Feature Store",
-body:`Target Encoding はカテゴリ変数をそのカテゴリに対応するターゲット変数の平均値で置き換える手法です。One-Hot Encoding と比べてカーディナリティが高い列（都市名・商品IDなど）でも列数が増えず、ツリー系モデルとの相性が良いです。ただし、ターゲット変数の情報を使うため学習データでleakが起きやすく、cross-validation内でfoldごとにエンコーダをfitし直す必要があります。category_encoders ライブラリが sklearn 互換の TargetEncoder を提供しています。
-
-Feature Store（Feast・Tecton・Vertex AI Feature Store等）は「学習と推論で同じ特徴量計算を共有する」仕組みです。特徴量の定義をコードで管理し、学習時・オンライン推論時の両方から一貫して取得できます。pandasやpolarsで計算した特徴量をFeature Storeにmaterializeしておき、推論時にkey（ユーザーIDなど）でlookupするのが典型的なフローです。`,
-code:`import pandas as pd
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.linear_model import LogisticRegression
-from sklearn.impute import SimpleImputer
-
-X = pd.DataFrame({
-    'age':    [25, 30, None, 28, 35],
-    'salary': [50000, 60000, 45000, None, 80000],
-    'dept':   ['Eng', 'HR', 'Eng', 'Finance', 'HR']
-})
-y = [1, 0, 1, 0, 1]
-
-num_pipe = Pipeline([
-    ('imp', SimpleImputer(strategy='median')),
-    ('sc',  StandardScaler())
-])
-cat_pipe = Pipeline([
-    ('imp', SimpleImputer(strategy='most_frequent')),
-    ('ohe', OneHotEncoder(handle_unknown='ignore'))
-])
-ct = ColumnTransformer([
-    ('num', num_pipe, ['age', 'salary']),
-    ('cat', cat_pipe, ['dept'])
-])
-pipe = Pipeline([('prep', ct), ('clf', LogisticRegression())])
-pipe.fit(X, y)
-print(pipe.predict(X))`,
-afterCode:`Pipeline を ONNX 形式でエクスポートすると Python 以外の環境（C#・Java・Rust等）でも同じモデルを動かせます。sklearn-onnx ライブラリが変換を支援します。`},
+body:"Target Encoding はカテゴリ変数をそのカテゴリに対応するターゲット変数の平均値で置き換える手法です。One-Hot Encoding と比べてカーディナリティが高い列（都市名・商品IDなど）でも列数が増えず、ツリー系モデルとの相性が良いです。ただし、ターゲット変数の情報を使うため学習データでleakが起きやすく、cross-validation内でfoldごとにエンコーダをfitし直す必要があります。category_encoders ライブラリが sklearn 互換の TargetEncoder を提供しています。\n\nFeature Store（Feast・Tecton・Vertex AI Feature Store等）は「学習と推論で同じ特徴量計算を共有する」仕組みです。特徴量の定義をコードで管理し、学習時・オンライン推論時の両方から一貫して取得できます。pandasやpolarsで計算した特徴量をFeature Storeにmaterializeしておき、推論時にkey（ユーザーIDなど）でlookupするのが典型的なフローです。",
+code:"import pandas as pd\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.preprocessing import StandardScaler, OneHotEncoder\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.impute import SimpleImputer\n\nX = pd.DataFrame({\n    'age':    [25, 30, None, 28, 35],\n    'salary': [50000, 60000, 45000, None, 80000],\n    'dept':   ['Eng', 'HR', 'Eng', 'Finance', 'HR']\n})\ny = [1, 0, 1, 0, 1]\n\nnum_pipe = Pipeline([\n    ('imp', SimpleImputer(strategy='median')),\n    ('sc',  StandardScaler())\n])\ncat_pipe = Pipeline([\n    ('imp', SimpleImputer(strategy='most_frequent')),\n    ('ohe', OneHotEncoder(handle_unknown='ignore'))\n])\nct = ColumnTransformer([\n    ('num', num_pipe, ['age', 'salary']),\n    ('cat', cat_pipe, ['dept'])\n])\npipe = Pipeline([('prep', ct), ('clf', LogisticRegression())])\npipe.fit(X, y)\nprint(pipe.predict(X))",
+afterCode:"Pipeline を ONNX 形式でエクスポートすると Python 以外の環境（C#・Java・Rust等）でも同じモデルを動かせます。sklearn-onnx ライブラリが変換を支援します。"},
 ]},
 {id:"ch7",num:7,title:"データ品質・テスト",est:"60分",
 goal:"panderaでDataFrameのスキーマを定義・検証できる。Great Expectationsで基本的なExpectationを定義・実行できる。データ品質モニタリングの概念と実務での組み込み方を説明できる。",
 sections:[
 {title:"pandera によるスキーマ定義と検証",
-body:`pandera は pandas（および polars）の DataFrame に対して型・値・制約を宣言的に定義し、検証するライブラリです。DataFrameSchema オブジェクトでスキーマを定義し、.validate(df) を呼ぶと不正なデータがあった場合に SchemaError を発生させます。関数の引数・戻り値に @pa.check_input / @pa.check_output デコレータを付けると、関数呼び出し時に自動検証されます。
-
-pandera の強みは「スキーマをコードで管理できること」です。JSON や YAML でスキーマを別ファイルに書くアプローチと違い、pandera は Python クラス（pa.DataFrameModel を継承）でスキーマを定義でき、型ヒント・IDEの補完・バージョン管理が自然に機能します。ETLパイプラインの入口と出口にpanderaのバリデーションを挟むだけで、予期しないデータ変化に早く気づける仕組みが作れます。`,
+body:"pandera は pandas（および polars）の DataFrame に対して型・値・制約を宣言的に定義し、検証するライブラリです。DataFrameSchema オブジェクトでスキーマを定義し、.validate(df) を呼ぶと不正なデータがあった場合に SchemaError を発生させます。関数の引数・戻り値に @pa.check_input / @pa.check_output デコレータを付けると、関数呼び出し時に自動検証されます。\n\npandera の強みは「スキーマをコードで管理できること」です。JSON や YAML でスキーマを別ファイルに書くアプローチと違い、pandera は Python クラス（pa.DataFrameModel を継承）でスキーマを定義でき、型ヒント・IDEの補完・バージョン管理が自然に機能します。ETLパイプラインの入口と出口にpanderaのバリデーションを挟むだけで、予期しないデータ変化に早く気づける仕組みが作れます。",
 table:T.dqTools,
-afterTable:`pandera は polars にも対応しており、pa.DataFrameSchema を polars の DataFrame に対しても同様に使えます（pandera 0.18以降）。pandas と polars を混在させているプロジェクトでも統一的なスキーマ管理が可能です。`},
+afterTable:"pandera は polars にも対応しており、pa.DataFrameSchema を polars の DataFrame に対しても同様に使えます（pandera 0.18以降）。pandas と polars を混在させているプロジェクトでも統一的なスキーマ管理が可能です。"},
 {title:"Great Expectations によるデータ品質管理",
-body:`Great Expectations（GX）は「期待値（Expectation）」という単位でデータ品質のルールを定義するフレームワークです。expect_column_values_to_not_be_null() や expect_column_values_to_be_between() のように自然言語に近い形でルールを記述でき、その期待値を集めた Expectation Suite をCI/CDパイプラインで実行することでデータの品質を継続的に監視できます。
-
-GX はデータソース（pandas DataFrame・PostgreSQL・Spark等）に依存せず同じExpectation定義が使えます。実行結果はHTMLの「Data Docs」として可視化でき、ビジネスチームにも共有しやすいレポートが自動生成されます。本番データパイプラインでは「Airflow のタスクとしてGXを毎日実行し、品質が落ちたらアラートを送る」という構成が一般的です。`,
-code:`import pandas as pd
-import pandera as pa
-from pandera.typing import Series
-
-# DataFrameModel でスキーマ定義
-class SalesSchema(pa.DataFrameModel):
-    product_id: Series[int]   = pa.Field(ge=1)
-    price:      Series[float] = pa.Field(ge=0.0)
-    quantity:   Series[int]   = pa.Field(ge=0)
-    region:     Series[str]   = pa.Field(isin=['East','West','North','South'])
-
-# @pa.check_output(SalesSchema)
-def clean_sales(df: pd.DataFrame) -> pd.DataFrame:
-    return df.dropna()
-
-df_ok = pd.DataFrame({
-    'product_id': [1, 2],
-    'price': [100.0, 200.0],
-    'quantity': [5, 3],
-    'region': ['East', 'West']
-})
-SalesSchema.validate(df_ok)
-print("Validation passed")`,
-afterCode:`pandera の lazy=True オプションを validate() に渡すと、最初のエラーで止まらず全エラーをまとめて報告する SchemaErrors が発生します。大量のカラムを一度に検証する場合に便利です。`},
+body:"Great Expectations（GX）は「期待値（Expectation）」という単位でデータ品質のルールを定義するフレームワークです。expect_column_values_to_not_be_null() や expect_column_values_to_be_between() のように自然言語に近い形でルールを記述でき、その期待値を集めた Expectation Suite をCI/CDパイプラインで実行することでデータの品質を継続的に監視できます。\n\nGX はデータソース（pandas DataFrame・PostgreSQL・Spark等）に依存せず同じExpectation定義が使えます。実行結果はHTMLの「Data Docs」として可視化でき、ビジネスチームにも共有しやすいレポートが自動生成されます。本番データパイプラインでは「Airflow のタスクとしてGXを毎日実行し、品質が落ちたらアラートを送る」という構成が一般的です。",
+code:"import pandas as pd\nimport pandera as pa\nfrom pandera.typing import Series\n\n# DataFrameModel でスキーマ定義\nclass SalesSchema(pa.DataFrameModel):\n    product_id: Series[int]   = pa.Field(ge=1)\n    price:      Series[float] = pa.Field(ge=0.0)\n    quantity:   Series[int]   = pa.Field(ge=0)\n    region:     Series[str]   = pa.Field(isin=['East','West','North','South'])\n\n# @pa.check_output(SalesSchema)\ndef clean_sales(df: pd.DataFrame) -> pd.DataFrame:\n    return df.dropna()\n\ndf_ok = pd.DataFrame({\n    'product_id': [1, 2],\n    'price': [100.0, 200.0],\n    'quantity': [5, 3],\n    'region': ['East', 'West']\n})\nSalesSchema.validate(df_ok)\nprint(\"Validation passed\")",
+afterCode:"pandera の lazy=True オプションを validate() に渡すと、最初のエラーで止まらず全エラーをまとめて報告する SchemaErrors が発生します。大量のカラムを一度に検証する場合に便利です。"},
 ]},
 {id:"ch8",num:8,title:"次世代データエコシステム",est:"60分",
 goal:"Apache Iceberg・Delta Lakeのテーブルフォーマットの特徴を説明できる。DuckDBでpandasとSQLを組み合わせてin-memory集計できる。Ibisを使って複数バックエンドで同じAPIを使えることを理解している。",
 sections:[
 {title:"Apache Iceberg・Delta Lake・DuckDB",
-body:`Apache Iceberg と Delta Lake はどちらも「Parquet ファイルの上にトランザクション管理層を追加したテーブルフォーマット」です。Parquet は高速な列指向ファイルですが、それ単体では ACID トランザクションやタイムトラベル（過去のスナップショットを参照する機能）が使えません。IcebergやDelta Lakeのメタデータ管理層がこれを実現します。
-
-DuckDB は「組み込みOLAPデータベース」で、Pythonプロセス内にSQLエンジンをembedして高速に分析クエリを実行できます。pandas DataFrameや Polars DataFrame、ParquetファイルをそのままSQL の FROM 句で参照でき、大きなDataFrameの集計は pandas のgroupby より DuckDB の SQL の方が速いことが多いです。インストールが pip install duckdb だけで完結し、設定不要ですぐ使えるのも魅力です。`,
+body:"Apache Iceberg と Delta Lake はどちらも「Parquet ファイルの上にトランザクション管理層を追加したテーブルフォーマット」です。Parquet は高速な列指向ファイルですが、それ単体では ACID トランザクションやタイムトラベル（過去のスナップショットを参照する機能）が使えません。IcebergやDelta Lakeのメタデータ管理層がこれを実現します。\n\nDuckDB は「組み込みOLAPデータベース」で、Pythonプロセス内にSQLエンジンをembedして高速に分析クエリを実行できます。pandas DataFrameや Polars DataFrame、ParquetファイルをそのままSQL の FROM 句で参照でき、大きなDataFrameの集計は pandas のgroupby より DuckDB の SQL の方が速いことが多いです。インストールが pip install duckdb だけで完結し、設定不要ですぐ使えるのも魅力です。",
 table:T.lakeFormats,
-afterTable:`DuckDB は Iceberg・Delta Lake のテーブルを直接読む拡張（iceberg extension、delta extension）も持っており、複雑なインフラを構築せずにデータレイクハウスのデータをローカルで試せます。`},
+afterTable:"DuckDB は Iceberg・Delta Lake のテーブルを直接読む拡張（iceberg extension、delta extension）も持っており、複雑なインフラを構築せずにデータレイクハウスのデータをローカルで試せます。"},
 {title:"Ibis：多バックエンド共通API",
-body:`Ibis は「pandasのようなAPIでDuckDB・BigQuery・Snowflake・Spark等のバックエンドを切り替えられる」データフレームライブラリです。ibis.duckdb.connect() でローカルDuckDBに、ibis.bigquery.connect(...) でBigQueryに接続し、以降の group_by・filter・select・join などのAPIは完全に同じです。同じコードをローカルでプロトタイプして本番のBigQueryに切り替えるといった使い方ができます。
-
-DataFusion は Rustで実装されたApacheの分散クエリエンジンで、Arrow IPC フォーマットをネイティブに扱い、PythonバインディングからDataFrameやSQLを実行できます。Polars と同様にArrowをベースにするため相互運用性が高く、将来的にPolarsのバックエンドとしても統合が検討されています。これらの次世代エコシステムはすべてApache ArrowをコアのデータフォーマットとしてIPC/飛行機プロトコルで通信する「Arrow native」なスタックを形成しています。`,
-code:`import ibis
-import pandas as pd
-
-ibis.options.interactive = True
-con = ibis.duckdb.connect()
-
-df = pd.DataFrame({
-    'dept':   ['Eng','HR','Eng','Finance','HR','Eng'],
-    'salary': [80000, 60000, 90000, 70000, 65000, 85000],
-    'yoe':    [3, 5, 7, 4, 2, 6]
-})
-t = con.create_table('employees', df, overwrite=True)
-
-# Ibis API（バックエンドに依存しない）
-result = (
-    t.filter(t.yoe >= 3)
-     .group_by('dept')
-     .aggregate(
-         avg_salary=t.salary.mean(),
-         headcount=t.dept.count()
-     )
-     .order_by('dept')
-)
-print(result)`,
-afterCode:`ibis.to_pandas(result) で Ibis テーブルを pandas DataFrame に変換できます。ibis.options.interactive = True にすると repr 時に自動でクエリが実行され、Jupyter での探索が快適になります。本番コードでは interactive を False にして明示的に execute() を呼ぶのが推奨です。`},
+body:"Ibis は「pandasのようなAPIでDuckDB・BigQuery・Snowflake・Spark等のバックエンドを切り替えられる」データフレームライブラリです。ibis.duckdb.connect() でローカルDuckDBに、ibis.bigquery.connect(...) でBigQueryに接続し、以降の group_by・filter・select・join などのAPIは完全に同じです。同じコードをローカルでプロトタイプして本番のBigQueryに切り替えるといった使い方ができます。\n\nDataFusion は Rustで実装されたApacheの分散クエリエンジンで、Arrow IPC フォーマットをネイティブに扱い、PythonバインディングからDataFrameやSQLを実行できます。Polars と同様にArrowをベースにするため相互運用性が高く、将来的にPolarsのバックエンドとしても統合が検討されています。これらの次世代エコシステムはすべてApache ArrowをコアのデータフォーマットとしてIPC/飛行機プロトコルで通信する「Arrow native」なスタックを形成しています。",
+code:"import ibis\nimport pandas as pd\n\nibis.options.interactive = True\ncon = ibis.duckdb.connect()\n\ndf = pd.DataFrame({\n    'dept':   ['Eng','HR','Eng','Finance','HR','Eng'],\n    'salary': [80000, 60000, 90000, 70000, 65000, 85000],\n    'yoe':    [3, 5, 7, 4, 2, 6]\n})\nt = con.create_table('employees', df, overwrite=True)\n\n# Ibis API（バックエンドに依存しない）\nresult = (\n    t.filter(t.yoe >= 3)\n     .group_by('dept')\n     .aggregate(\n         avg_salary=t.salary.mean(),\n         headcount=t.dept.count()\n     )\n     .order_by('dept')\n)\nprint(result)",
+afterCode:"ibis.to_pandas(result) で Ibis テーブルを pandas DataFrame に変換できます。ibis.options.interactive = True にすると repr 時に自動でクエリが実行され、Jupyter での探索が快適になります。本番コードでは interactive を False にして明示的に execute() を呼ぶのが推奨です。"},
 ]},
 ];
 

@@ -112,647 +112,90 @@ const EX = {
   ch1: [{
     diff: 2,
     q: "以下の汎用的なキャッシュクラスを実装してください。\n・Cache<K, V> — キーと値の型を型パラメータで指定\n・get(key: K): V | undefined\n・set(key: K, value: V, ttlMs?: number): void — TTL付きで保存\n・has(key: K): boolean — 期限切れは false を返す",
-    code: `// Cache<K, V> クラスを実装してください
-class Cache<K, V> {
-  // ここに実装
-}`,
-    answer: `class Cache<K, V> {
-  private store = new Map<K, { value: V; expiresAt: number | null }>();
-
-  get(key: K): V | undefined {
-    const entry = this.store.get(key);
-    if (!entry) return undefined;
-    if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {
-      this.store.delete(key);
-      return undefined;
-    }
-    return entry.value;
-  }
-
-  set(key: K, value: V, ttlMs?: number): void {
-    this.store.set(key, {
-      value,
-      expiresAt: ttlMs !== undefined ? Date.now() + ttlMs : null,
-    });
-  }
-
-  has(key: K): boolean {
-    return this.get(key) !== undefined;
-  }
-}
-
-// 使用例
-const cache = new Cache<string, number>();
-cache.set('score', 100, 5000); // 5秒TTL
-console.log(cache.get('score')); // 100`
+    code: "// Cache<K, V> クラスを実装してください\nclass Cache<K, V> {\n  // ここに実装\n}",
+    answer: "class Cache<K, V> {\n  private store = new Map<K, { value: V; expiresAt: number | null }>();\n\n  get(key: K): V | undefined {\n    const entry = this.store.get(key);\n    if (!entry) return undefined;\n    if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {\n      this.store.delete(key);\n      return undefined;\n    }\n    return entry.value;\n  }\n\n  set(key: K, value: V, ttlMs?: number): void {\n    this.store.set(key, {\n      value,\n      expiresAt: ttlMs !== undefined ? Date.now() + ttlMs : null,\n    });\n  }\n\n  has(key: K): boolean {\n    return this.get(key) !== undefined;\n  }\n}\n\n// 使用例\nconst cache = new Cache<string, number>();\ncache.set('score', 100, 5000); // 5秒TTL\nconsole.log(cache.get('score')); // 100"
   }, {
     diff: 3,
     q: "ReturnType と Parameters を使って、任意の非同期関数をメモ化する memoizeAsync<F> 関数を実装してください。\n引数が同じならキャッシュした Promise を返すこと。",
-    code: `// memoizeAsync<F extends (...args: any[]) => Promise<any>> を実装`,
-    answer: `function memoizeAsync<F extends (...args: any[]) => Promise<any>>(
-  fn: F
-): (...args: Parameters<F>) => ReturnType<F> {
-  const cache = new Map<string, ReturnType<F>>();
-  return (...args: Parameters<F>): ReturnType<F> => {
-    const key = JSON.stringify(args);
-    if (cache.has(key)) return cache.get(key)!;
-    const result = fn(...args) as ReturnType<F>;
-    cache.set(key, result);
-    // 失敗したらキャッシュから削除
-    (result as Promise<any>).catch(() => cache.delete(key));
-    return result;
-  };
-}
-
-// 使用例
-async function fetchUser(id: number): Promise<{ name: string }> {
-  // APIコール想定
-  return { name: 'Alice' };
-}
-
-const cachedFetch = memoizeAsync(fetchUser);
-// 2回目以降は同じPromiseが返る
-await cachedFetch(1);
-await cachedFetch(1);`
+    code: "// memoizeAsync<F extends (...args: any[]) => Promise<any>> を実装",
+    answer: "function memoizeAsync<F extends (...args: any[]) => Promise<any>>(\n  fn: F\n): (...args: Parameters<F>) => ReturnType<F> {\n  const cache = new Map<string, ReturnType<F>>();\n  return (...args: Parameters<F>): ReturnType<F> => {\n    const key = JSON.stringify(args);\n    if (cache.has(key)) return cache.get(key)!;\n    const result = fn(...args) as ReturnType<F>;\n    cache.set(key, result);\n    // 失敗したらキャッシュから削除\n    (result as Promise<any>).catch(() => cache.delete(key));\n    return result;\n  };\n}\n\n// 使用例\nasync function fetchUser(id: number): Promise<{ name: string }> {\n  // APIコール想定\n  return { name: 'Alice' };\n}\n\nconst cachedFetch = memoizeAsync(fetchUser);\n// 2回目以降は同じPromiseが返る\nawait cachedFetch(1);\nawait cachedFetch(1);"
   }],
   ch2: [{
     diff: 2,
     q: "infer を使って、配列型から要素型を取り出す ElementType<T> と、Promise型から解決値を取り出す UnwrapPromise<T> を実装してください。",
-    code: `// 条件型 + infer で型を実装してください
-type ElementType<T> = // ...
-type UnwrapPromise<T> = // ...`,
-    answer: `// 配列の要素型を取り出す
-type ElementType<T> = T extends Array<infer U> ? U : never;
-
-// テスト
-type A = ElementType<string[]>;    // string
-type B = ElementType<number[][]>;  // number[] (1段階のみ)
-
-// Promise の解決値を取り出す（再帰でネストにも対応）
-type UnwrapPromise<T> =
-  T extends Promise<infer U> ? UnwrapPromise<U> : T;
-
-// テスト
-type C = UnwrapPromise<Promise<string>>;           // string
-type D = UnwrapPromise<Promise<Promise<number>>>;  // number
-type E = UnwrapPromise<boolean>;                   // boolean (Promiseでない)
-
-// 組み合わせ例
-type AsyncArrayResult = UnwrapPromise<Promise<string[]>>;
-type Elem = ElementType<AsyncArrayResult>; // string`
+    code: "// 条件型 + infer で型を実装してください\ntype ElementType<T> = // ...\ntype UnwrapPromise<T> = // ...",
+    answer: "// 配列の要素型を取り出す\ntype ElementType<T> = T extends Array<infer U> ? U : never;\n\n// テスト\ntype A = ElementType<string[]>;    // string\ntype B = ElementType<number[][]>;  // number[] (1段階のみ)\n\n// Promise の解決値を取り出す（再帰でネストにも対応）\ntype UnwrapPromise<T> =\n  T extends Promise<infer U> ? UnwrapPromise<U> : T;\n\n// テスト\ntype C = UnwrapPromise<Promise<string>>;           // string\ntype D = UnwrapPromise<Promise<Promise<number>>>;  // number\ntype E = UnwrapPromise<boolean>;                   // boolean (Promiseでない)\n\n// 組み合わせ例\ntype AsyncArrayResult = UnwrapPromise<Promise<string[]>>;\ntype Elem = ElementType<AsyncArrayResult>; // string"
   }, {
     diff: 3,
     q: "DeepReadonly<T> を条件型と再帰を使って実装してください。\nプリミティブ型はそのまま、オブジェクトと配列は再帰的に readonly 化すること。",
-    code: `// DeepReadonly<T> を実装してください
-type DeepReadonly<T> = // ...`,
-    answer: `type DeepReadonly<T> =
-  T extends (infer U)[]
-    ? ReadonlyArray<DeepReadonly<U>>
-    : T extends object
-      ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
-      : T;
-
-// テスト
-interface Config {
-  server: { host: string; port: number };
-  features: string[];
-}
-
-type FrozenConfig = DeepReadonly<Config>;
-// {
-//   readonly server: { readonly host: string; readonly port: number };
-//   readonly features: ReadonlyArray<string>;
-// }
-
-declare const cfg: FrozenConfig;
-// cfg.server.host = 'x'; // ← コンパイルエラー
-// cfg.features.push('x'); // ← コンパイルエラー`
+    code: "// DeepReadonly<T> を実装してください\ntype DeepReadonly<T> = // ...",
+    answer: "type DeepReadonly<T> =\n  T extends (infer U)[]\n    ? ReadonlyArray<DeepReadonly<U>>\n    : T extends object\n      ? { readonly [K in keyof T]: DeepReadonly<T[K]> }\n      : T;\n\n// テスト\ninterface Config {\n  server: { host: string; port: number };\n  features: string[];\n}\n\ntype FrozenConfig = DeepReadonly<Config>;\n// {\n//   readonly server: { readonly host: string; readonly port: number };\n//   readonly features: ReadonlyArray<string>;\n// }\n\ndeclare const cfg: FrozenConfig;\n// cfg.server.host = 'x'; // ← コンパイルエラー\n// cfg.features.push('x'); // ← コンパイルエラー"
   }],
   ch3: [{
     diff: 2,
     q: "Mapped Types を使って、オブジェクトの全プロパティを getter メソッドに変換する型 Getterify<T> を実装してください。\n例: { name: string } → { getName: () => string }",
-    code: `// Getterify<T> を Template Literal Types + Mapped Types で実装
-type Getterify<T> = // ...`,
-    answer: `type Getterify<T> = {
-  [K in keyof T as \`get\${Capitalize<string & K>}\`]: () => T[K];
-};
-
-// テスト
-interface User {
-  name: string;
-  age: number;
-  email: string;
-}
-
-type UserGetters = Getterify<User>;
-// {
-//   getName: () => string;
-//   getAge: () => number;
-//   getEmail: () => string;
-// }
-
-// 実装例
-function makeGetters<T extends object>(obj: T): Getterify<T> {
-  const result: any = {};
-  for (const key of Object.keys(obj) as (keyof T)[]) {
-    const getter = \`get\${String(key).charAt(0).toUpperCase() + String(key).slice(1)}\`;
-    result[getter] = () => obj[key];
-  }
-  return result as Getterify<T>;
-}
-
-const user = { name: 'Alice', age: 30, email: 'a@example.com' };
-const getters = makeGetters(user);
-console.log(getters.getName()); // 'Alice'`
+    code: "// Getterify<T> を Template Literal Types + Mapped Types で実装\ntype Getterify<T> = // ...",
+    answer: "type Getterify<T> = {\n  [K in keyof T as `get\${Capitalize<string & K>}`]: () => T[K];\n};\n\n// テスト\ninterface User {\n  name: string;\n  age: number;\n  email: string;\n}\n\ntype UserGetters = Getterify<User>;\n// {\n//   getName: () => string;\n//   getAge: () => number;\n//   getEmail: () => string;\n// }\n\n// 実装例\nfunction makeGetters<T extends object>(obj: T): Getterify<T> {\n  const result: any = {};\n  for (const key of Object.keys(obj) as (keyof T)[]) {\n    const getter = `get\${String(key).charAt(0).toUpperCase() + String(key).slice(1)}`;\n    result[getter] = () => obj[key];\n  }\n  return result as Getterify<T>;\n}\n\nconst user = { name: 'Alice', age: 30, email: 'a@example.com' };\nconst getters = makeGetters(user);\nconsole.log(getters.getName()); // 'Alice'"
   }, {
     diff: 3,
     q: "EventMap<T> 型を実装してください。\nT が { click: MouseEvent; keydown: KeyboardEvent } のようなオブジェクトのとき、\naddListener<K extends keyof T>(event: K, handler: (e: T[K]) => void): void という型安全な関数を実装してください。",
-    code: `// EventEmitter<T> クラスを型安全に実装してください`,
-    answer: `type EventMap = Record<string, unknown>;
-
-class TypedEventEmitter<T extends EventMap> {
-  private listeners = new Map<keyof T, Set<(e: any) => void>>();
-
-  on<K extends keyof T>(event: K, handler: (e: T[K]) => void): void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
-    }
-    this.listeners.get(event)!.add(handler);
-  }
-
-  off<K extends keyof T>(event: K, handler: (e: T[K]) => void): void {
-    this.listeners.get(event)?.delete(handler);
-  }
-
-  emit<K extends keyof T>(event: K, data: T[K]): void {
-    this.listeners.get(event)?.forEach(h => h(data));
-  }
-}
-
-// 使用例
-interface AppEvents {
-  userLogin: { userId: string; timestamp: Date };
-  taskCreated: { taskId: string; title: string };
-}
-
-const emitter = new TypedEventEmitter<AppEvents>();
-emitter.on('userLogin', (e) => {
-  console.log(e.userId); // 型: string
-});
-emitter.emit('userLogin', { userId: 'u1', timestamp: new Date() });`
+    code: "// EventEmitter<T> クラスを型安全に実装してください",
+    answer: "type EventMap = Record<string, unknown>;\n\nclass TypedEventEmitter<T extends EventMap> {\n  private listeners = new Map<keyof T, Set<(e: any) => void>>();\n\n  on<K extends keyof T>(event: K, handler: (e: T[K]) => void): void {\n    if (!this.listeners.has(event)) {\n      this.listeners.set(event, new Set());\n    }\n    this.listeners.get(event)!.add(handler);\n  }\n\n  off<K extends keyof T>(event: K, handler: (e: T[K]) => void): void {\n    this.listeners.get(event)?.delete(handler);\n  }\n\n  emit<K extends keyof T>(event: K, data: T[K]): void {\n    this.listeners.get(event)?.forEach(h => h(data));\n  }\n}\n\n// 使用例\ninterface AppEvents {\n  userLogin: { userId: string; timestamp: Date };\n  taskCreated: { taskId: string; title: string };\n}\n\nconst emitter = new TypedEventEmitter<AppEvents>();\nemitter.on('userLogin', (e) => {\n  console.log(e.userId); // 型: string\n});\nemitter.emit('userLogin', { userId: 'u1', timestamp: new Date() });"
   }],
   ch4: [{
     diff: 2,
     q: "zod を使って、以下のAPIレスポンスを型安全に取得する fetchTasks 関数を実装してください。\nスキーマ: { id: string, title: string, status: 'todo'|'done', priority: number(1-5) }\nバリデーション失敗時は Error をスローすること。",
-    code: `import { z } from 'zod';
-
-// TaskSchema と fetchTasks を実装してください
-const TaskSchema = z.object({ /* ... */ });
-async function fetchTasks(baseUrl: string): Promise<???> {
-  // ...
-}`,
-    answer: `import { z } from 'zod';
-
-const TaskSchema = z.object({
-  id: z.string().uuid(),
-  title: z.string().min(1),
-  status: z.enum(['todo', 'done']),
-  priority: z.number().int().min(1).max(5),
-});
-
-const TaskListSchema = z.array(TaskSchema);
-type Task = z.infer<typeof TaskSchema>;
-
-async function fetchTasks(baseUrl: string): Promise<Task[]> {
-  const res = await fetch(\`\${baseUrl}/tasks\`);
-  if (!res.ok) {
-    throw new Error(\`HTTP \${res.status}: \${res.statusText}\`);
-  }
-  const raw: unknown = await res.json();
-  const result = TaskListSchema.safeParse(raw);
-  if (!result.success) {
-    throw new Error(
-      'APIレスポンスの型が不正: ' + JSON.stringify(result.error.format())
-    );
-  }
-  return result.data;
-}
-
-// zod の infer で型をスキーマから自動導出
-// → Task = { id: string; title: string; status: 'todo'|'done'; priority: number }`
+    code: "import { z } from 'zod';\n\n// TaskSchema と fetchTasks を実装してください\nconst TaskSchema = z.object({ /* ... */ });\nasync function fetchTasks(baseUrl: string): Promise<???> {\n  // ...\n}",
+    answer: "import { z } from 'zod';\n\nconst TaskSchema = z.object({\n  id: z.string().uuid(),\n  title: z.string().min(1),\n  status: z.enum(['todo', 'done']),\n  priority: z.number().int().min(1).max(5),\n});\n\nconst TaskListSchema = z.array(TaskSchema);\ntype Task = z.infer<typeof TaskSchema>;\n\nasync function fetchTasks(baseUrl: string): Promise<Task[]> {\n  const res = await fetch(`\${baseUrl}/tasks`);\n  if (!res.ok) {\n    throw new Error(`HTTP \${res.status}: \${res.statusText}`);\n  }\n  const raw: unknown = await res.json();\n  const result = TaskListSchema.safeParse(raw);\n  if (!result.success) {\n    throw new Error(\n      'APIレスポンスの型が不正: ' + JSON.stringify(result.error.format())\n    );\n  }\n  return result.data;\n}\n\n// zod の infer で型をスキーマから自動導出\n// → Task = { id: string; title: string; status: 'todo'|'done'; priority: number }"
   }, {
     diff: 3,
     q: "型安全なHTTPクライアントクラス ApiClient を実装してください。\n・get<T>(path: string, schema: z.ZodType<T>): Promise<T>\n・post<TBody, TRes>(path: string, body: TBody, schema: z.ZodType<TRes>): Promise<TRes>\n・リクエストヘッダーはコンストラクタで設定",
-    code: `// ApiClient クラスを実装してください`,
-    answer: `import { z } from 'zod';
-
-class ApiClient {
-  constructor(
-    private readonly baseUrl: string,
-    private readonly headers: Record<string, string> = {},
-  ) {}
-
-  private async request<T>(
-    path: string,
-    init: RequestInit,
-    schema: z.ZodType<T>,
-  ): Promise<T> {
-    const res = await fetch(\`\${this.baseUrl}\${path}\`, {
-      ...init,
-      headers: { 'Content-Type': 'application/json', ...this.headers, ...init.headers },
-    });
-    if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
-    const raw: unknown = await res.json();
-    return schema.parse(raw); // 失敗時は ZodError をスロー
-  }
-
-  get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-    return this.request(path, { method: 'GET' }, schema);
-  }
-
-  post<TBody, TRes>(
-    path: string, body: TBody, schema: z.ZodType<TRes>
-  ): Promise<TRes> {
-    return this.request(
-      path,
-      { method: 'POST', body: JSON.stringify(body) },
-      schema,
-    );
-  }
-}
-
-const client = new ApiClient('https://api.example.com', {
-  Authorization: 'Bearer token',
-});
-const tasks = await client.get('/tasks', z.array(TaskSchema));`
+    code: "// ApiClient クラスを実装してください",
+    answer: "import { z } from 'zod';\n\nclass ApiClient {\n  constructor(\n    private readonly baseUrl: string,\n    private readonly headers: Record<string, string> = {},\n  ) {}\n\n  private async request<T>(\n    path: string,\n    init: RequestInit,\n    schema: z.ZodType<T>,\n  ): Promise<T> {\n    const res = await fetch(`\${this.baseUrl}\${path}`, {\n      ...init,\n      headers: { 'Content-Type': 'application/json', ...this.headers, ...init.headers },\n    });\n    if (!res.ok) throw new Error(`HTTP \${res.status}`);\n    const raw: unknown = await res.json();\n    return schema.parse(raw); // 失敗時は ZodError をスロー\n  }\n\n  get<T>(path: string, schema: z.ZodType<T>): Promise<T> {\n    return this.request(path, { method: 'GET' }, schema);\n  }\n\n  post<TBody, TRes>(\n    path: string, body: TBody, schema: z.ZodType<TRes>\n  ): Promise<TRes> {\n    return this.request(\n      path,\n      { method: 'POST', body: JSON.stringify(body) },\n      schema,\n    );\n  }\n}\n\nconst client = new ApiClient('https://api.example.com', {\n  Authorization: 'Bearer token',\n});\nconst tasks = await client.get('/tasks', z.array(TaskSchema));"
   }],
   ch5: [{
     diff: 2,
     q: "メソッドデコレータ @log を作成してください。\nメソッド呼び出しのたびに、メソッド名・引数・戻り値・実行時間をコンソールに出力すること。\nStage 3 スタイル（Context引数あり）で実装してください。",
-    code: `// @log デコレータを実装してください（Stage 3スタイル）
-function log(target: unknown, context: ClassMethodDecoratorContext) {
-  // ...
-}
-
-class TaskService {
-  @log
-  async create(title: string, priority: number): Promise<{ id: string }> {
-    return { id: Math.random().toString(36).slice(2) };
-  }
-}`,
-    answer: `function log<T extends (...args: any[]) => any>(
-  target: T,
-  context: ClassMethodDecoratorContext
-): T {
-  return function (this: unknown, ...args: Parameters<T>): ReturnType<T> {
-    const name = String(context.name);
-    console.log(\`[\${name}] 呼び出し: 引数=\${JSON.stringify(args)}\`);
-    const start = performance.now();
-    const result = target.apply(this, args);
-    if (result instanceof Promise) {
-      return result.then((val: any) => {
-        const ms = (performance.now() - start).toFixed(1);
-        console.log(\`[\${name}] 完了(\${ms}ms): 戻り値=\${JSON.stringify(val)}\`);
-        return val;
-      }) as ReturnType<T>;
-    }
-    const ms = (performance.now() - start).toFixed(1);
-    console.log(\`[\${name}] 完了(\${ms}ms): 戻り値=\${JSON.stringify(result)}\`);
-    return result;
-  } as T;
-}
-
-class TaskService {
-  @log
-  async create(title: string): Promise<{ id: string }> {
-    return { id: 'abc123' };
-  }
-}
-
-const svc = new TaskService();
-await svc.create('テストタスク');
-// [create] 呼び出し: 引数=["テストタスク"]
-// [create] 完了(0.5ms): 戻り値={"id":"abc123"}`
+    code: "// @log デコレータを実装してください（Stage 3スタイル）\nfunction log(target: unknown, context: ClassMethodDecoratorContext) {\n  // ...\n}\n\nclass TaskService {\n  @log\n  async create(title: string, priority: number): Promise<{ id: string }> {\n    return { id: Math.random().toString(36).slice(2) };\n  }\n}",
+    answer: "function log<T extends (...args: any[]) => any>(\n  target: T,\n  context: ClassMethodDecoratorContext\n): T {\n  return function (this: unknown, ...args: Parameters<T>): ReturnType<T> {\n    const name = String(context.name);\n    console.log(`[\${name}] 呼び出し: 引数=\${JSON.stringify(args)}`);\n    const start = performance.now();\n    const result = target.apply(this, args);\n    if (result instanceof Promise) {\n      return result.then((val: any) => {\n        const ms = (performance.now() - start).toFixed(1);\n        console.log(`[\${name}] 完了(\${ms}ms): 戻り値=\${JSON.stringify(val)}`);\n        return val;\n      }) as ReturnType<T>;\n    }\n    const ms = (performance.now() - start).toFixed(1);\n    console.log(`[\${name}] 完了(\${ms}ms): 戻り値=\${JSON.stringify(result)}`);\n    return result;\n  } as T;\n}\n\nclass TaskService {\n  @log\n  async create(title: string): Promise<{ id: string }> {\n    return { id: 'abc123' };\n  }\n}\n\nconst svc = new TaskService();\nawait svc.create('テストタスク');\n// [create] 呼び出し: 引数=[\"テストタスク\"]\n// [create] 完了(0.5ms): 戻り値={\"id\":\"abc123\"}"
   }, {
     diff: 3,
     q: "@retry(times, delayMs) デコレータを作成してください。\n非同期メソッドが失敗（Promise.reject）した場合、指定回数リトライし、全回失敗したら最後のエラーをスローすること。",
-    code: `// @retry(3, 500) のように使えるデコレータを実装してください`,
-    answer: `function retry(times: number, delayMs = 0) {
-  return function <T extends (...args: any[]) => Promise<any>>(
-    target: T,
-    _context: ClassMethodDecoratorContext
-  ): T {
-    return async function (this: unknown, ...args: Parameters<T>): Promise<Awaited<ReturnType<T>>> {
-      let lastError: unknown;
-      for (let attempt = 0; attempt <= times; attempt++) {
-        try {
-          return await target.apply(this, args);
-        } catch (e) {
-          lastError = e;
-          if (attempt < times) {
-            console.warn(\`リトライ \${attempt + 1}/\${times}...\`);
-            if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));
-          }
-        }
-      }
-      throw lastError;
-    } as T;
-  };
-}
-
-class EmailService {
-  private failCount = 0;
-
-  @retry(3, 100)
-  async send(to: string): Promise<void> {
-    if (this.failCount++ < 2) throw new Error('SMTP error');
-    console.log(\`送信成功: \${to}\`);
-  }
-}
-
-const svc = new EmailService();
-await svc.send('test@example.com'); // 2回失敗後に成功`
+    code: "// @retry(3, 500) のように使えるデコレータを実装してください",
+    answer: "function retry(times: number, delayMs = 0) {\n  return function <T extends (...args: any[]) => Promise<any>>(\n    target: T,\n    _context: ClassMethodDecoratorContext\n  ): T {\n    return async function (this: unknown, ...args: Parameters<T>): Promise<Awaited<ReturnType<T>>> {\n      let lastError: unknown;\n      for (let attempt = 0; attempt <= times; attempt++) {\n        try {\n          return await target.apply(this, args);\n        } catch (e) {\n          lastError = e;\n          if (attempt < times) {\n            console.warn(`リトライ \${attempt + 1}/\${times}...`);\n            if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));\n          }\n        }\n      }\n      throw lastError;\n    } as T;\n  };\n}\n\nclass EmailService {\n  private failCount = 0;\n\n  @retry(3, 100)\n  async send(to: string): Promise<void> {\n    if (this.failCount++ < 2) throw new Error('SMTP error');\n    console.log(`送信成功: \${to}`);\n  }\n}\n\nconst svc = new EmailService();\nawait svc.send('test@example.com'); // 2回失敗後に成功"
   }],
   ch6: [{
     diff: 2,
     q: "neverthrow を使わずに Result 型と ResultAsync 型を自作してください。\n・ok<T>(v) / err<E>(e) ヘルパー\n・ResultAsync<T,E> — Promise<Result<T,E>> のエイリアス\n・tryAsync<T>(fn) — 非同期関数を実行しResultAsyncで包む関数",
-    code: `// Result型 / ResultAsync型 / tryAsync を実装してください`,
-    answer: `type Ok<T> = { ok: true; value: T };
-type Err<E> = { ok: false; error: E };
-type Result<T, E = Error> = Ok<T> | Err<E>;
-type ResultAsync<T, E = Error> = Promise<Result<T, E>>;
-
-function ok<T>(value: T): Ok<T> {
-  return { ok: true, value };
-}
-
-function err<E>(error: E): Err<E> {
-  return { ok: false, error };
-}
-
-async function tryAsync<T>(
-  fn: () => Promise<T>
-): ResultAsync<T, Error> {
-  try {
-    return ok(await fn());
-  } catch (e) {
-    return err(e instanceof Error ? e : new Error(String(e)));
-  }
-}
-
-// 使用例
-async function fetchConfig(url: string): ResultAsync<unknown, Error> {
-  return tryAsync(async () => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
-    return res.json();
-  });
-}
-
-const result = await fetchConfig('https://api.example.com/config');
-if (result.ok) {
-  console.log(result.value);
-} else {
-  console.error(result.error.message);
-}`
+    code: "// Result型 / ResultAsync型 / tryAsync を実装してください",
+    answer: "type Ok<T> = { ok: true; value: T };\ntype Err<E> = { ok: false; error: E };\ntype Result<T, E = Error> = Ok<T> | Err<E>;\ntype ResultAsync<T, E = Error> = Promise<Result<T, E>>;\n\nfunction ok<T>(value: T): Ok<T> {\n  return { ok: true, value };\n}\n\nfunction err<E>(error: E): Err<E> {\n  return { ok: false, error };\n}\n\nasync function tryAsync<T>(\n  fn: () => Promise<T>\n): ResultAsync<T, Error> {\n  try {\n    return ok(await fn());\n  } catch (e) {\n    return err(e instanceof Error ? e : new Error(String(e)));\n  }\n}\n\n// 使用例\nasync function fetchConfig(url: string): ResultAsync<unknown, Error> {\n  return tryAsync(async () => {\n    const res = await fetch(url);\n    if (!res.ok) throw new Error(`HTTP \${res.status}`);\n    return res.json();\n  });\n}\n\nconst result = await fetchConfig('https://api.example.com/config');\nif (result.ok) {\n  console.log(result.value);\n} else {\n  console.error(result.error.message);\n}"
   }, {
     diff: 3,
     q: "Awaited<T> を自分で実装してください（TSの組み込み版と同じ挙動）。\nさらに AsyncReturnType<F> — 非同期関数Fの解決後の戻り値型 を実装してください。",
-    code: `// MyAwaited<T> と AsyncReturnType<F> を条件型+inferで実装`,
-    answer: `// Awaited の自前実装
-type MyAwaited<T> =
-  T extends null | undefined
-    ? T
-    : T extends object & { then(fn: infer F, ...args: any[]): any }
-      ? F extends (value: infer V, ...args: any[]) => any
-        ? MyAwaited<V>
-        : never
-      : T;
-
-// テスト
-type A = MyAwaited<Promise<string>>;         // string
-type B = MyAwaited<Promise<Promise<number>>>; // number
-type C = MyAwaited<boolean>;                  // boolean
-
-// 非同期関数の戻り値型
-type AsyncReturnType<F extends (...args: any[]) => Promise<any>> =
-  MyAwaited<ReturnType<F>>;
-
-// テスト
-async function getUser(id: string) {
-  return { id, name: 'Alice', createdAt: new Date() };
-}
-
-type User = AsyncReturnType<typeof getUser>;
-// { id: string; name: string; createdAt: Date }
-
-// ユースケース: APIハンドラーの戻り値型を逆算
-async function fetchPost(id: number) {
-  return { id, title: '記事', body: '本文', tags: ['ts'] };
-}
-type Post = AsyncReturnType<typeof fetchPost>;`
+    code: "// MyAwaited<T> と AsyncReturnType<F> を条件型+inferで実装",
+    answer: "// Awaited の自前実装\ntype MyAwaited<T> =\n  T extends null | undefined\n    ? T\n    : T extends object & { then(fn: infer F, ...args: any[]): any }\n      ? F extends (value: infer V, ...args: any[]) => any\n        ? MyAwaited<V>\n        : never\n      : T;\n\n// テスト\ntype A = MyAwaited<Promise<string>>;         // string\ntype B = MyAwaited<Promise<Promise<number>>>; // number\ntype C = MyAwaited<boolean>;                  // boolean\n\n// 非同期関数の戻り値型\ntype AsyncReturnType<F extends (...args: any[]) => Promise<any>> =\n  MyAwaited<ReturnType<F>>;\n\n// テスト\nasync function getUser(id: string) {\n  return { id, name: 'Alice', createdAt: new Date() };\n}\n\ntype User = AsyncReturnType<typeof getUser>;\n// { id: string; name: string; createdAt: Date }\n\n// ユースケース: APIハンドラーの戻り値型を逆算\nasync function fetchPost(id: number) {\n  return { id, title: '記事', body: '本文', tags: ['ts'] };\n}\ntype Post = AsyncReturnType<typeof fetchPost>;"
   }],
   ch7: [{
     diff: 2,
     q: "以下のtsconfig.jsonを見てください。\nnoUncheckedIndexedAccess: true のとき、arr[0] の型はどうなりますか？\nまた Project References を設定する場合、packages/core/tsconfig.json と packages/app/tsconfig.json をどのように書けばよいですか？",
-    code: `// packages/core/tsconfig.json と packages/app/tsconfig.json を書いてください
-// noUncheckedIndexedAccess の影響も説明すること`,
-    answer: `// noUncheckedIndexedAccess: true のとき
-// arr[0] の型は T | undefined になる（配列境界外アクセスを考慮）
-const arr: string[] = ['a', 'b'];
-const first = arr[0]; // string | undefined（T ではなく T | undefined）
-
-// 安全なアクセスパターン
-if (first !== undefined) {
-  console.log(first.toUpperCase()); // ここでは string
-}
-
-// packages/core/tsconfig.json
-const coreConfig = {
-  "compilerOptions": {
-    "composite": true,        // Project References に必須
-    "declaration": true,
-    "declarationMap": true,
-    "rootDir": "./src",
-    "outDir": "./dist"
-  },
-  "include": ["src/**/*"]
-};
-
-// packages/app/tsconfig.json
-const appConfig = {
-  "compilerOptions": {
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "rootDir": "./src",
-    "outDir": "./dist"
-  },
-  "references": [
-    { "path": "../core" }   // core パッケージへの参照
-  ],
-  "include": ["src/**/*"]
-};
-
-// ビルドコマンド
-// tsc --build packages/app  // 依存関係を解決して順にビルド
-// tsc --build --watch       // インクリメンタルビルド`
+    code: "// packages/core/tsconfig.json と packages/app/tsconfig.json を書いてください\n// noUncheckedIndexedAccess の影響も説明すること",
+    answer: "// noUncheckedIndexedAccess: true のとき\n// arr[0] の型は T | undefined になる（配列境界外アクセスを考慮）\nconst arr: string[] = ['a', 'b'];\nconst first = arr[0]; // string | undefined（T ではなく T | undefined）\n\n// 安全なアクセスパターン\nif (first !== undefined) {\n  console.log(first.toUpperCase()); // ここでは string\n}\n\n// packages/core/tsconfig.json\nconst coreConfig = {\n  \"compilerOptions\": {\n    \"composite\": true,        // Project References に必須\n    \"declaration\": true,\n    \"declarationMap\": true,\n    \"rootDir\": \"./src\",\n    \"outDir\": \"./dist\"\n  },\n  \"include\": [\"src/**/*\"]\n};\n\n// packages/app/tsconfig.json\nconst appConfig = {\n  \"compilerOptions\": {\n    \"strict\": true,\n    \"noUncheckedIndexedAccess\": true,\n    \"rootDir\": \"./src\",\n    \"outDir\": \"./dist\"\n  },\n  \"references\": [\n    { \"path\": \"../core\" }   // core パッケージへの参照\n  ],\n  \"include\": [\"src/**/*\"]\n};\n\n// ビルドコマンド\n// tsc --build packages/app  // 依存関係を解決して順にビルド\n// tsc --build --watch       // インクリメンタルビルド"
   }, {
     diff: 3,
     q: "型チェックのパフォーマンスを調査するコマンドと、よくある遅延の原因・対処法を説明してください。\nまた skipLibCheck: true と isolatedModules: true の違いと使いどころも述べてください。",
-    code: `// 型チェック速度の計測と改善方法を説明してください`,
-    answer: `// 型チェックの計測
-// $ tsc --diagnostics --noEmit
-// → Files: N, Lines: N, Instantiations: N, Time: NNms
-
-// よくある遅延原因と対処
-
-// 1. 巨大な node_modules を型チェックしている
-//    → skipLibCheck: true で .d.ts ファイルの型チェックをスキップ
-//    （ライブラリ側のバグには気づけなくなるがビルドは速くなる）
-
-// 2. 型の再計算が多い（複雑な条件型や再帰型）
-//    → 型エイリアスに中間型を定義してキャッシュさせる
-
-// 3. モジュール全体をまとめてチェックしている
-//    → isolatedModules: true で「各ファイルを独立してトランスパイル可能か」を検証
-//    → esbuild や swc での単体トランスパイルに必要な制約
-//    → const enum の使用が禁止されるなど制約が増える
-
-// 4. Project References を使っていない
-//    → packages間の依存を明示して増分ビルドを有効にする
-
-// skipLibCheck vs isolatedModules の違い
-// skipLibCheck: true
-//   → .d.ts ファイルの型エラーを無視（速度改善目的）
-//   → 任意のプロジェクトで使える
-
-// isolatedModules: true
-//   → 単一ファイルでトランスパイル可能かをチェック
-//   → esbuild/swcを使うビルドツールとの互換性確保が目的
-//   → const enum や declare const enum が使えなくなる
-
-// 推奨設定（Turborepoなど）
-const config = {
-  "compilerOptions": {
-    "incremental": true,
-    "tsBuildInfoFile": ".tsbuildinfo",
-    "skipLibCheck": true,
-    "isolatedModules": true
-  }
-};`
+    code: "// 型チェック速度の計測と改善方法を説明してください",
+    answer: "// 型チェックの計測\n// $ tsc --diagnostics --noEmit\n// → Files: N, Lines: N, Instantiations: N, Time: NNms\n\n// よくある遅延原因と対処\n\n// 1. 巨大な node_modules を型チェックしている\n//    → skipLibCheck: true で .d.ts ファイルの型チェックをスキップ\n//    （ライブラリ側のバグには気づけなくなるがビルドは速くなる）\n\n// 2. 型の再計算が多い（複雑な条件型や再帰型）\n//    → 型エイリアスに中間型を定義してキャッシュさせる\n\n// 3. モジュール全体をまとめてチェックしている\n//    → isolatedModules: true で「各ファイルを独立してトランスパイル可能か」を検証\n//    → esbuild や swc での単体トランスパイルに必要な制約\n//    → const enum の使用が禁止されるなど制約が増える\n\n// 4. Project References を使っていない\n//    → packages間の依存を明示して増分ビルドを有効にする\n\n// skipLibCheck vs isolatedModules の違い\n// skipLibCheck: true\n//   → .d.ts ファイルの型エラーを無視（速度改善目的）\n//   → 任意のプロジェクトで使える\n\n// isolatedModules: true\n//   → 単一ファイルでトランスパイル可能かをチェック\n//   → esbuild/swcを使うビルドツールとの互換性確保が目的\n//   → const enum や declare const enum が使えなくなる\n\n// 推奨設定（Turborepoなど）\nconst config = {\n  \"compilerOptions\": {\n    \"incremental\": true,\n    \"tsBuildInfoFile\": \".tsbuildinfo\",\n    \"skipLibCheck\": true,\n    \"isolatedModules\": true\n  }\n};"
   }],
   ch8: [{
     diff: 2,
     q: "tRPCの基本的なルーター定義を書いてください。\n・getById(id: string): Promise<User>\n・create({ name, email }): Promise<User>\n・Zodでバリデーション付き\n・クライアント側からの呼び出し例も示すこと",
-    code: `// tRPCのルーター定義とクライアント使用例を書いてください`,
-    answer: `// server/router.ts
-import { initTRPC } from '@trpc/server';
-import { z } from 'zod';
-
-const t = initTRPC.create();
-const router = t.router;
-const publicProcedure = t.procedure;
-
-interface User { id: string; name: string; email: string; }
-const users: User[] = [];
-
-export const userRouter = router({
-  getById: publicProcedure
-    .input(z.string().uuid())
-    .query(({ input: id }) => {
-      const user = users.find(u => u.id === id);
-      if (!user) throw new Error('Not found');
-      return user;
-    }),
-
-  create: publicProcedure
-    .input(z.object({
-      name: z.string().min(1),
-      email: z.string().email(),
-    }))
-    .mutation(({ input }) => {
-      const user: User = {
-        id: crypto.randomUUID(),
-        ...input,
-      };
-      users.push(user);
-      return user;
-    }),
-});
-
-export type AppRouter = typeof userRouter;
-
-// client/index.ts
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
-import type { AppRouter } from '../server/router';
-
-const client = createTRPCProxyClient<AppRouter>({
-  links: [httpBatchLink({ url: 'http://localhost:3000/trpc' })],
-});
-
-// 完全な型推論: nameはstring、emailはstringと確定
-const newUser = await client.create.mutate({
-  name: 'Alice',
-  email: 'alice@example.com',
-});
-console.log(newUser.id); // string 型が保証される`
+    code: "// tRPCのルーター定義とクライアント使用例を書いてください",
+    answer: "// server/router.ts\nimport { initTRPC } from '@trpc/server';\nimport { z } from 'zod';\n\nconst t = initTRPC.create();\nconst router = t.router;\nconst publicProcedure = t.procedure;\n\ninterface User { id: string; name: string; email: string; }\nconst users: User[] = [];\n\nexport const userRouter = router({\n  getById: publicProcedure\n    .input(z.string().uuid())\n    .query(({ input: id }) => {\n      const user = users.find(u => u.id === id);\n      if (!user) throw new Error('Not found');\n      return user;\n    }),\n\n  create: publicProcedure\n    .input(z.object({\n      name: z.string().min(1),\n      email: z.string().email(),\n    }))\n    .mutation(({ input }) => {\n      const user: User = {\n        id: crypto.randomUUID(),\n        ...input,\n      };\n      users.push(user);\n      return user;\n    }),\n});\n\nexport type AppRouter = typeof userRouter;\n\n// client/index.ts\nimport { createTRPCProxyClient, httpBatchLink } from '@trpc/client';\nimport type { AppRouter } from '../server/router';\n\nconst client = createTRPCProxyClient<AppRouter>({\n  links: [httpBatchLink({ url: 'http://localhost:3000/trpc' })],\n});\n\n// 完全な型推論: nameはstring、emailはstringと確定\nconst newUser = await client.create.mutate({\n  name: 'Alice',\n  email: 'alice@example.com',\n});\nconsole.log(newUser.id); // string 型が保証される"
   }, {
     diff: 3,
     q: "PrismaのモデルからZodスキーマを自動生成する prisma-zod-generator を想定し、生成されたスキーマを tRPC と共有する設計を示してください。\nmonorepo での packages/shared, packages/server, packages/client の依存関係も含めること。",
-    code: `// Prisma → Zod → tRPC の型共有アーキテクチャを実装してください`,
-    answer: `// packages/shared/src/schemas.ts
-// （prisma-zod-generatorが自動生成する想定）
-import { z } from 'zod';
-
-export const UserSchema = z.object({
-  id: z.string().cuid(),
-  name: z.string().min(1).max(100),
-  email: z.string().email(),
-  createdAt: z.date(),
-});
-
-export const CreateUserSchema = UserSchema.omit({ id: true, createdAt: true });
-export const UpdateUserSchema = CreateUserSchema.partial();
-
-export type User = z.infer<typeof UserSchema>;
-export type CreateUser = z.infer<typeof CreateUserSchema>;
-
-// packages/server/src/router.ts
-import { initTRPC, TRPCError } from '@trpc/server';
-import { UserSchema, CreateUserSchema } from '@myapp/shared';
-import { prisma } from './db';
-
-const t = initTRPC.create();
-
-export const appRouter = t.router({
-  user: t.router({
-    list: t.procedure
-      .output(UserSchema.array())
-      .query(() => prisma.user.findMany()),
-
-    create: t.procedure
-      .input(CreateUserSchema)
-      .output(UserSchema)
-      .mutation(({ input }) => prisma.user.create({ data: input })),
-  }),
-});
-
-export type AppRouter = typeof appRouter;
-
-// packages/client/src/api.ts
-import { createTRPCReact } from '@trpc/react-query';
-import type { AppRouter } from '@myapp/server';
-
-export const trpc = createTRPCReact<AppRouter>();
-
-// 使用例（Reactコンポーネント内）
-// const { data: users } = trpc.user.list.useQuery();
-// users は User[] 型が完全に推論される
-
-// monorepo の依存関係 (package.json)
-// shared: zod のみ依存
-// server: @myapp/shared + @trpc/server + prisma
-// client: @myapp/shared + @myapp/server(型のみ) + @trpc/react-query`
+    code: "// Prisma → Zod → tRPC の型共有アーキテクチャを実装してください",
+    answer: "// packages/shared/src/schemas.ts\n// （prisma-zod-generatorが自動生成する想定）\nimport { z } from 'zod';\n\nexport const UserSchema = z.object({\n  id: z.string().cuid(),\n  name: z.string().min(1).max(100),\n  email: z.string().email(),\n  createdAt: z.date(),\n});\n\nexport const CreateUserSchema = UserSchema.omit({ id: true, createdAt: true });\nexport const UpdateUserSchema = CreateUserSchema.partial();\n\nexport type User = z.infer<typeof UserSchema>;\nexport type CreateUser = z.infer<typeof CreateUserSchema>;\n\n// packages/server/src/router.ts\nimport { initTRPC, TRPCError } from '@trpc/server';\nimport { UserSchema, CreateUserSchema } from '@myapp/shared';\nimport { prisma } from './db';\n\nconst t = initTRPC.create();\n\nexport const appRouter = t.router({\n  user: t.router({\n    list: t.procedure\n      .output(UserSchema.array())\n      .query(() => prisma.user.findMany()),\n\n    create: t.procedure\n      .input(CreateUserSchema)\n      .output(UserSchema)\n      .mutation(({ input }) => prisma.user.create({ data: input })),\n  }),\n});\n\nexport type AppRouter = typeof appRouter;\n\n// packages/client/src/api.ts\nimport { createTRPCReact } from '@trpc/react-query';\nimport type { AppRouter } from '@myapp/server';\n\nexport const trpc = createTRPCReact<AppRouter>();\n\n// 使用例（Reactコンポーネント内）\n// const { data: users } = trpc.user.list.useQuery();\n// users は User[] 型が完全に推論される\n\n// monorepo の依存関係 (package.json)\n// shared: zod のみ依存\n// server: @myapp/shared + @trpc/server + prisma\n// client: @myapp/shared + @myapp/server(型のみ) + @trpc/react-query"
   }]
 };
 
@@ -771,28 +214,7 @@ const chapters = [{
   }, {
     title: "ReturnType / Parameters の実装原理と活用",
     body: "TypeScript の組み込みユーティリティ型の多くは、条件型（extends ? :）と infer キーワードで実装されています。ReturnType<T> の定義は T extends (...args: any) => infer R ? R : any であり、「T が関数型に一致するなら R（戻り値型）を抽出する」という仕組みです。次章で infer を詳しく扱いますが、ここでは「関数の型情報を逆算に使える」ことを把握しておいてください。\n\n実務でよく使うパターンは「既存の関数をラップしてロギングやキャッシュを追加する」ケースです。ラッパー関数の引数・戻り値の型を元関数と完全に一致させるには、Parameters<typeof original> と ReturnType<typeof original> を組み合わせます。これにより、元関数のシグネチャが変わっても型エラーで自動検知できます。\n\nHigher-Kinded Types（HKT）は TS がネイティブにはサポートしていない高度な型抽象ですが、fp-ts などのライブラリで「型コンストラクタを型パラメータとして渡す」擬似 HKT パターンが実用化されています。関数型プログラミングに進む場合は意識しておくとよいでしょう。",
-    code: `// ReturnType と Parameters の活用例
-function fetchUser(id: string, options?: { cache: boolean }) {
-  return Promise.resolve({ id, name: 'Alice' });
-}
-
-// 型を逆算
-type FetchArgs = Parameters<typeof fetchUser>;
-// [id: string, options?: { cache: boolean }]
-
-type FetchResult = ReturnType<typeof fetchUser>;
-// Promise<{ id: string; name: string }>
-
-// ラッパー関数で型を完全に継承
-function withLogging<F extends (...args: any[]) => any>(fn: F): F {
-  return ((...args: Parameters<F>): ReturnType<F> => {
-    console.log('呼び出し:', fn.name, args);
-    return fn(...args);
-  }) as F;
-}
-
-const loggedFetch = withLogging(fetchUser);
-// loggedFetch は fetchUser と全く同じ型シグネチャ`,
+    code: "// ReturnType と Parameters の活用例\nfunction fetchUser(id: string, options?: { cache: boolean }) {\n  return Promise.resolve({ id, name: 'Alice' });\n}\n\n// 型を逆算\ntype FetchArgs = Parameters<typeof fetchUser>;\n// [id: string, options?: { cache: boolean }]\n\ntype FetchResult = ReturnType<typeof fetchUser>;\n// Promise<{ id: string; name: string }>\n\n// ラッパー関数で型を完全に継承\nfunction withLogging<F extends (...args: any[]) => any>(fn: F): F {\n  return ((...args: Parameters<F>): ReturnType<F> => {\n    console.log('呼び出し:', fn.name, args);\n    return fn(...args);\n  }) as F;\n}\n\nconst loggedFetch = withLogging(fetchUser);\n// loggedFetch は fetchUser と全く同じ型シグネチャ",
     afterCode: "ポイント: as F のキャストを使うのは、TypeScript が「ラッパー関数が完全にFのサブタイプ」と推論できないためです。このパターンではキャストを使いつつも、内部実装は Parameters<F> と ReturnType<F> で型安全に書くのが慣習です。"
   }]
 }, {
@@ -809,26 +231,7 @@ const loggedFetch = withLogging(fetchUser);
   }, {
     title: "infer キーワードで型を抽出する",
     body: "infer は条件型の extends 節の中でのみ使える特殊キーワードで、「型の一部を変数として捕捉する」機能を持ちます。T extends Promise<infer U> ? U : T と書くと、T が Promise<何か> であれば「何か」の部分を U として取り出せます。Python でいえば re.match() でキャプチャグループを取り出す感覚に近いですが、これは型レベルで完全に静的に行われます。\n\ninfer の応用として、関数型の引数・戻り値の抽出（ReturnType, Parameters）、タプルの先頭要素の抽出（Head<T>）、Promise の解決値の再帰的な取り出し（Awaited<T>）などが挙げられます。TypeScript 4.7 以降では infer に extends 制約を付けることができ、infer U extends string のように「U は string のサブタイプ」という条件も同時に指定できます。\n\n自作のユーティリティ型を書くとき、infer を過度に使うとコードが難読になります。「型推論に任せられるところは任せ、本当に必要な場合だけ infer を使う」という節度が重要です。型ライブラリ（ts-toolbelt, type-fest）のソースコードを読むと、infer の実践的な使い方が多数学べます。",
-    code: `// infer の基本
-type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
-type Head<T extends any[]> = T extends [infer H, ...any[]] ? H : never;
-type Tail<T extends any[]> = T extends [any, ...infer R] ? R : never;
-
-// 関数の最初の引数だけ抽出
-type FirstArg<F> = F extends (first: infer A, ...rest: any[]) => any ? A : never;
-
-// テスト
-type F1 = FirstArg<(id: string, name: string) => void>; // string
-type F2 = FirstArg<() => void>;                          // never
-
-// infer + extends 制約（TS 4.7+）
-type StringKey<T> = T extends Record<infer K extends string, any> ? K : never;
-type S = StringKey<{ a: 1; b: 2 }>; // 'a' | 'b'
-
-// ネストした Promise を再帰的に展開
-type DeepAwaited<T> =
-  T extends Promise<infer U> ? DeepAwaited<U> : T;
-type D = DeepAwaited<Promise<Promise<string>>>; // string`,
+    code: "// infer の基本\ntype UnwrapPromise<T> = T extends Promise<infer U> ? U : T;\ntype Head<T extends any[]> = T extends [infer H, ...any[]] ? H : never;\ntype Tail<T extends any[]> = T extends [any, ...infer R] ? R : never;\n\n// 関数の最初の引数だけ抽出\ntype FirstArg<F> = F extends (first: infer A, ...rest: any[]) => any ? A : never;\n\n// テスト\ntype F1 = FirstArg<(id: string, name: string) => void>; // string\ntype F2 = FirstArg<() => void>;                          // never\n\n// infer + extends 制約（TS 4.7+）\ntype StringKey<T> = T extends Record<infer K extends string, any> ? K : never;\ntype S = StringKey<{ a: 1; b: 2 }>; // 'a' | 'b'\n\n// ネストした Promise を再帰的に展開\ntype DeepAwaited<T> =\n  T extends Promise<infer U> ? DeepAwaited<U> : T;\ntype D = DeepAwaited<Promise<Promise<string>>>; // string",
     afterCode: "ポイント: 再帰的な条件型はデフォルトで深さ制限（約100段）があります。実用上はほぼ問題ありませんが、無限再帰になるような型は Type instantiation is excessively deep エラーになります。"
   }]
 }, {
@@ -845,27 +248,7 @@ type D = DeepAwaited<Promise<Promise<string>>>; // string`,
   }, {
     title: "Template Literal Types で文字列を型レベルで操作する",
     body: "TypeScript 4.1 で導入された Template Literal Types は、バッククォートを使って型レベルで文字列を合成・変換する仕組みです。型 `on${Capitalize<string>}` は 'onClick' | 'onChange' のような「on + 大文字始まりの文字列」を表します。Mapped Types の as 句と組み合わせると、既存のオブジェクト型のキーを自動的に変換した新しい型が作れます。\n\n組み込みの文字列操作型（Uppercase<S>, Lowercase<S>, Capitalize<S>, Uncapitalize<S>）は、型レベルで文字列を変換するユーティリティです。これらをテンプレートリテラル型と組み合わせることで、プロパティ名にプレフィックスを付けたり、camelCase から snake_case に変換したりする型を定義できます。\n\nTemplate Literal Types の注意点は「型レベルの操作なので実行時には何もしない」ことです。実際のオブジェクトのキーを変換するには別途ランタイムコードが必要です。しかし「この関数が返すオブジェクトのキーは必ず get で始まる」という仕様を型で表現しておくことで、実装の誤りをコンパイル時に検出できます。",
-    code: `// Template Literal Types + Mapped Types の組み合わせ
-type EventNames<T extends string> = \`on\${Capitalize<T>}\`;
-type ClickEvents = EventNames<'click' | 'hover' | 'focus'>;
-// 'onClick' | 'onHover' | 'onFocus'
-
-// プロパティを Setter / Getter に変換
-type Setterify<T> = {
-  [K in keyof T as \`set\${Capitalize<string & K>}\`]: (v: T[K]) => void;
-};
-
-interface Config { host: string; port: number; }
-type ConfigSetters = Setterify<Config>;
-// { setHost: (v: string) => void; setPort: (v: number) => void; }
-
-// 特定キーを除外してリネーム
-type PublicProps<T> = {
-  [K in keyof T as K extends \`_\${string}\` ? never : K]: T[K];
-};
-
-interface Internal { name: string; _secret: string; }
-type Public = PublicProps<Internal>; // { name: string }`,
+    code: "// Template Literal Types + Mapped Types の組み合わせ\ntype EventNames<T extends string> = `on\${Capitalize<T>}`;\ntype ClickEvents = EventNames<'click' | 'hover' | 'focus'>;\n// 'onClick' | 'onHover' | 'onFocus'\n\n// プロパティを Setter / Getter に変換\ntype Setterify<T> = {\n  [K in keyof T as `set\${Capitalize<string & K>}`]: (v: T[K]) => void;\n};\n\ninterface Config { host: string; port: number; }\ntype ConfigSetters = Setterify<Config>;\n// { setHost: (v: string) => void; setPort: (v: number) => void; }\n\n// 特定キーを除外してリネーム\ntype PublicProps<T> = {\n  [K in keyof T as K extends `_\${string}` ? never : K]: T[K];\n};\n\ninterface Internal { name: string; _secret: string; }\ntype Public = PublicProps<Internal>; // { name: string }",
     afterCode: "ポイント: K extends string & K というパターンは、keyof T が string | number | symbol になることへの対策です。テンプレートリテラルは string のキーのみを扱えるため、string & K で number/symbol を除外します。"
   }]
 }, {
@@ -882,40 +265,7 @@ type Public = PublicProps<Internal>; // { name: string }`,
   }, {
     title: "openapi-typescript と型生成の考え方",
     body: "openapi-typescript は OpenAPI（Swagger）仕様書から TypeScript の型定義を自動生成するツールです。npx openapi-typescript openapi.yaml -o types.ts を実行すると、全エンドポイントのリクエスト・レスポンスの型が生成されます。バックエンドが Go や Python で書かれていても、OpenAPI 仕様書さえあれば型安全なフロントエンドが構築できます。\n\n生成された型は paths['/users']['get']['responses']['200']['content']['application/json'] のように階層的にアクセスします。このままでは使いにくいため、openapi-fetch というコンパニオンライブラリを使うと、paths オブジェクトからエンドポイントごとに型安全なクライアントメソッドが生成されます。\n\nZod との使い分けは「信頼できる仕様書があるか」で決まります。OpenAPI 仕様書を SSOT（Single Source of Truth）として管理しているプロジェクトでは openapi-typescript が向いています。スキーマをコードで表現したい場合（スキーマファースト開発）は Zod が向いています。どちらもランタイムバリデーションと型推論を提供しますが、アプローチが異なります。",
-    code: `// openapi-typescript の使用例（概念）
-// $ npx openapi-typescript openapi.yaml -o ./types/api.d.ts
-
-import type { paths } from './types/api';
-import createClient from 'openapi-fetch';
-
-const client = createClient<paths>({ baseUrl: 'https://api.example.com' });
-
-// GET /users/{id}
-const { data, error } = await client.GET('/users/{id}', {
-  params: { path: { id: '123' } },
-});
-// data は OpenAPI仕様から自動推論された型
-// error は APIエラーの型
-
-// Zodを使った独自スキーマ定義との比較
-import { z } from 'zod';
-
-const UserSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string().email(),
-});
-
-// z.infer でTypeScript型を自動導出（スキーマが型定義を兼ねる）
-type User = z.infer<typeof UserSchema>;
-
-// safeParse でエラーを例外でなく値として受け取る
-const result = UserSchema.safeParse(unknownData);
-if (result.success) {
-  console.log(result.data.name); // User 型が確定
-} else {
-  console.error(result.error.format());
-}`,
+    code: "// openapi-typescript の使用例（概念）\n// $ npx openapi-typescript openapi.yaml -o ./types/api.d.ts\n\nimport type { paths } from './types/api';\nimport createClient from 'openapi-fetch';\n\nconst client = createClient<paths>({ baseUrl: 'https://api.example.com' });\n\n// GET /users/{id}\nconst { data, error } = await client.GET('/users/{id}', {\n  params: { path: { id: '123' } },\n});\n// data は OpenAPI仕様から自動推論された型\n// error は APIエラーの型\n\n// Zodを使った独自スキーマ定義との比較\nimport { z } from 'zod';\n\nconst UserSchema = z.object({\n  id: z.string(),\n  name: z.string(),\n  email: z.string().email(),\n});\n\n// z.infer でTypeScript型を自動導出（スキーマが型定義を兼ねる）\ntype User = z.infer<typeof UserSchema>;\n\n// safeParse でエラーを例外でなく値として受け取る\nconst result = UserSchema.safeParse(unknownData);\nif (result.success) {\n  console.log(result.data.name); // User 型が確定\n} else {\n  console.error(result.error.format());\n}",
     afterCode: "ポイント: safeParse は例外をスローしない点が parse と異なります。予期しないデータを受け取る可能性がある箇所（API, JSON.parse, localStorage）では safeParse を使い、アプリ内で作成した確実に正しいデータには parse を使う使い分けが実用的です。"
   }]
 }, {
@@ -932,35 +282,7 @@ if (result.success) {
   }, {
     title: "メソッドデコレータとクラスデコレータの実装",
     body: "Stage 3 のメソッドデコレータは (originalMethod, context) を受け取り、置き換える新しいメソッドを返します。context には name（メソッド名）、kind（'method'）、isStatic（静的かどうか）などの情報が含まれます。これを使って「呼び出し前後にログを出す」「結果をキャッシュする」「エラーを捕捉してリトライする」といった横断的関心事を宣言的に記述できます。\n\nPython のデコレータと同様に、デコレータを組み合わせる（スタック）ことができます。@log @cached @retry(...) のように重ねると、下から順に適用されます（関数合成と同じ順序）。ただし各デコレータが this の扱いを正しくしていないと、this が undefined になるバグが起きやすいため、必ず function(this: unknown, ...) の形で元メソッドを apply 経由で呼ぶことが重要です。\n\nクラスデコレータは (Class, context) を受け取り、新しいクラスを返すか void を返します。クラス全体のメタデータ登録（DI コンテナへの登録、ORM のエンティティ登録など）に使われることが多く、NestJS の @Controller() や @Injectable() がその典型例です。",
-    code: `// Stage 3 メソッドデコレータ: メモ化
-function memoize<T extends (...args: any[]) => any>(
-  target: T,
-  context: ClassMethodDecoratorContext
-): T {
-  const cache = new Map<string, ReturnType<T>>();
-  return function (this: unknown, ...args: Parameters<T>): ReturnType<T> {
-    const key = JSON.stringify(args);
-    if (cache.has(key)) {
-      console.log(\`[\${String(context.name)}] キャッシュヒット\`);
-      return cache.get(key)!;
-    }
-    const result = target.apply(this, args) as ReturnType<T>;
-    cache.set(key, result);
-    return result;
-  } as T;
-}
-
-class MathService {
-  @memoize
-  fibonacci(n: number): number {
-    if (n <= 1) return n;
-    return this.fibonacci(n - 1) + this.fibonacci(n - 2);
-  }
-}
-
-const svc = new MathService();
-svc.fibonacci(10); // 計算
-svc.fibonacci(10); // キャッシュヒット`,
+    code: "// Stage 3 メソッドデコレータ: メモ化\nfunction memoize<T extends (...args: any[]) => any>(\n  target: T,\n  context: ClassMethodDecoratorContext\n): T {\n  const cache = new Map<string, ReturnType<T>>();\n  return function (this: unknown, ...args: Parameters<T>): ReturnType<T> {\n    const key = JSON.stringify(args);\n    if (cache.has(key)) {\n      console.log(`[\${String(context.name)}] キャッシュヒット`);\n      return cache.get(key)!;\n    }\n    const result = target.apply(this, args) as ReturnType<T>;\n    cache.set(key, result);\n    return result;\n  } as T;\n}\n\nclass MathService {\n  @memoize\n  fibonacci(n: number): number {\n    if (n <= 1) return n;\n    return this.fibonacci(n - 1) + this.fibonacci(n - 2);\n  }\n}\n\nconst svc = new MathService();\nsvc.fibonacci(10); // 計算\nsvc.fibonacci(10); // キャッシュヒット",
     afterCode: "ポイント: Stage 3 デコレータは class フィールドの初期化後（constructor の後）に適用されます。旧式デコレータはクラス定義時（constructor の前）に適用されるため、動作タイミングが異なります。"
   }]
 }, {
@@ -977,35 +299,7 @@ svc.fibonacci(10); // キャッシュヒット`,
   }, {
     title: "neverthrow で非同期エラーを型で管理する",
     body: "初級コースで自作した Result 型は、neverthrow ライブラリを使うとより体系的に扱えます。neverthrow は ok(value) / err(error) でラップし、.map() .mapErr() .andThen() .orElse() などのメソッドチェーンで Result を変換できます。Python の Optional や Either モナドに近い概念です。\n\nneverthrow の最大の利点は ResultAsync<T, E>（Promise<Result<T, E>> のラッパー）の存在です。.andThen() で非同期な変換をチェーンできるため、try/catch をネストしなくても複数の非同期操作を安全につなげられます。エラーが起きた時点でチェーンが短絡するため、Python の with contextlib.suppress(...): に似た宣言的なスタイルになります。\n\n実務での採用基準は「エラーの種類が型で重要かどうか」です。エラー内容がログに流すだけで良い場合は try/catch で十分ですが、エラーの種類によって処理を分岐する必要がある場合（NotFoundError なら 404 を返す、ValidationError なら 400 を返すなど）は Result 型のメリットが顕著です。",
-    code: `// neverthrow を使った型安全な非同期処理
-import { ok, err, ResultAsync } from 'neverthrow';
-import { z } from 'zod';
-
-class NotFoundError extends Error { constructor(id: string) { super(\`Not found: \${id}\`); } }
-class ValidationError extends Error { constructor(msg: string) { super(msg); } }
-
-const UserSchema = z.object({ id: z.string(), name: z.string() });
-type User = z.infer<typeof UserSchema>;
-
-function fetchUser(id: string): ResultAsync<User, NotFoundError | ValidationError> {
-  return ResultAsync.fromPromise(
-    fetch(\`/api/users/\${id}\`).then(r => r.json()),
-    (e) => new NotFoundError(id),
-  ).andThen((raw) => {
-    const result = UserSchema.safeParse(raw);
-    return result.success ? ok(result.data) : err(new ValidationError('Invalid user'));
-  });
-}
-
-// 使用例
-const result = await fetchUser('123');
-if (result.isOk()) {
-  console.log(result.value.name); // User 型
-} else if (result.error instanceof NotFoundError) {
-  console.log('404:', result.error.message);
-} else {
-  console.log('400:', result.error.message);
-}`,
+    code: "// neverthrow を使った型安全な非同期処理\nimport { ok, err, ResultAsync } from 'neverthrow';\nimport { z } from 'zod';\n\nclass NotFoundError extends Error { constructor(id: string) { super(`Not found: \${id}`); } }\nclass ValidationError extends Error { constructor(msg: string) { super(msg); } }\n\nconst UserSchema = z.object({ id: z.string(), name: z.string() });\ntype User = z.infer<typeof UserSchema>;\n\nfunction fetchUser(id: string): ResultAsync<User, NotFoundError | ValidationError> {\n  return ResultAsync.fromPromise(\n    fetch(`/api/users/\${id}`).then(r => r.json()),\n    (e) => new NotFoundError(id),\n  ).andThen((raw) => {\n    const result = UserSchema.safeParse(raw);\n    return result.success ? ok(result.data) : err(new ValidationError('Invalid user'));\n  });\n}\n\n// 使用例\nconst result = await fetchUser('123');\nif (result.isOk()) {\n  console.log(result.value.name); // User 型\n} else if (result.error instanceof NotFoundError) {\n  console.log('404:', result.error.message);\n} else {\n  console.log('400:', result.error.message);\n}",
     afterCode: "ポイント: ResultAsync.fromPromise の第二引数はエラーをキャプチャする関数です。Promise.reject や throw されたエラーを ResultAsync の err 側に変換します。これにより await 時の未捕捉エラーをなくせます。"
   }]
 }, {
@@ -1022,42 +316,7 @@ if (result.isOk()) {
   }, {
     title: "Project References とインクリメンタルビルド",
     body: "モノレポ（1 つのリポジトリに複数のパッケージを持つ構成）では、TypeScript の Project References が重要になります。composite: true を設定したプロジェクトは他のプロジェクトから参照でき、tsc --build が依存関係を解決して正しい順序でビルドします。Turborepo や Nx のようなモノレポツールはこの仕組みを利用して並列ビルドを実現しています。\n\nProject References の中核は .tsbuildinfo ファイルです。このファイルにはビルド時の型チェック結果がキャッシュされており、変更がないファイルは次のビルドでスキップされます。大規模プロジェクトでは型チェックが数分かかることがありますが、インクリメンタルビルドにより変更ファイルのみチェックするため、日常の開発では数秒に短縮できます。\n\nパフォーマンス改善の観点から、skipLibCheck: true で node_modules の .d.ts をスキップ、isolatedModules: true で単一ファイルのトランスパイル可能性を保証（esbuild との相性向上）、incremental: true でインクリメンタルビルドを有効にする、の 3 つが基本設定です。型チェックが遅い場合は tsc --diagnostics で Instantiations カウントを確認し、複雑な条件型の多用が原因でないか調べてください。",
-    code: `// モノレポ構成例
-// packages/
-//   shared/tsconfig.json   ← 共通型・スキーマ
-//   server/tsconfig.json   ← APIサーバー
-//   client/tsconfig.json   ← フロントエンド
-
-// packages/shared/tsconfig.json
-{
-  "compilerOptions": {
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true
-  }
-}
-
-// packages/server/tsconfig.json
-{
-  "compilerOptions": {
-    "composite": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "noUncheckedIndexedAccess": true
-  },
-  "references": [
-    { "path": "../shared" }
-  ]
-}
-
-// ビルドコマンド
-// tsc --build packages/server   ← 依存を含めてビルド
-// tsc --build --clean           ← ビルド成果物を削除
-// tsc --build --watch           ← 監視ビルド`,
+    code: "// モノレポ構成例\n// packages/\n//   shared/tsconfig.json   ← 共通型・スキーマ\n//   server/tsconfig.json   ← APIサーバー\n//   client/tsconfig.json   ← フロントエンド\n\n// packages/shared/tsconfig.json\n{\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"declaration\": true,\n    \"declarationMap\": true,\n    \"outDir\": \"./dist\",\n    \"rootDir\": \"./src\",\n    \"strict\": true\n  }\n}\n\n// packages/server/tsconfig.json\n{\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"outDir\": \"./dist\",\n    \"rootDir\": \"./src\",\n    \"strict\": true,\n    \"noUncheckedIndexedAccess\": true\n  },\n  \"references\": [\n    { \"path\": \"../shared\" }\n  ]\n}\n\n// ビルドコマンド\n// tsc --build packages/server   ← 依存を含めてビルド\n// tsc --build --clean           ← ビルド成果物を削除\n// tsc --build --watch           ← 監視ビルド",
     afterCode: "ポイント: composite: true を指定すると declaration: true, declarationMap: true, incremental: true が自動的に有効になります。また rootDir を指定しないとコンパイルエラーになるため注意してください。"
   }]
 }, {
@@ -1074,47 +333,7 @@ if (result.isOk()) {
   }, {
     title: "Prisma と Zod スキーマの型共有",
     body: "Prisma は TypeScript 向けの ORM で、schema.prisma ファイルからデータベースの CRUD 操作の型と実装を自動生成します。Python の SQLAlchemy や Django ORM に相当しますが、型安全性において圧倒的に優れており、prisma.user.findMany() の戻り値型が自動推論されます。\n\n実務では Prisma の型だけでなく、入力バリデーション（Create 時は id 不要など）に Zod スキーマが必要です。zod-prisma-types や prisma-zod-generator というツールを使うと、schema.prisma から Zod スキーマを自動生成できます。これにより「DB スキーマ → Zod スキーマ → tRPC の input バリデーション → クライアントの型」が一貫して管理されます。\n\nTurborepo モノレポを使う場合、packages/db（Prisma）、packages/shared（Zod スキーマ・共通型）、apps/server（tRPC サーバー）、apps/web（フロントエンド）という構成が定番です。型の流れは「Prisma schema → 生成された型 → Zod スキーマ → tRPC router → クライアント型推論」となり、DB の変更がフロントエンドまで型エラーとして伝播します。",
-    code: `// schema.prisma の例
-// model User {
-//   id        String   @id @default(cuid())
-//   name      String
-//   email     String   @unique
-//   createdAt DateTime @default(now())
-//   tasks     Task[]
-// }
-
-// Prisma が生成する型（自動）
-// type User = { id: string; name: string; email: string; createdAt: Date }
-
-// packages/shared/src/schemas.ts
-import { z } from 'zod';
-
-export const CreateUserInput = z.object({
-  name: z.string().min(1).max(100),
-  email: z.string().email(),
-});
-
-export const UpdateUserInput = CreateUserInput.partial();
-export type CreateUserInput = z.infer<typeof CreateUserInput>;
-
-// packages/server/src/router/user.ts
-import { TRPCError } from '@trpc/server';
-import { CreateUserInput } from '@myapp/shared';
-import { prisma } from '../db';
-import { t } from '../trpc';
-
-export const userRouter = t.router({
-  create: t.procedure
-    .input(CreateUserInput)   // Zodスキーマでバリデーション
-    .mutation(async ({ input }) => {
-      try {
-        return await prisma.user.create({ data: input });
-      } catch {
-        throw new TRPCError({ code: 'CONFLICT', message: 'Email already used' });
-      }
-    }),
-  list: t.procedure.query(() => prisma.user.findMany()),
-});`,
+    code: "// schema.prisma の例\n// model User {\n//   id        String   @id @default(cuid())\n//   name      String\n//   email     String   @unique\n//   createdAt DateTime @default(now())\n//   tasks     Task[]\n// }\n\n// Prisma が生成する型（自動）\n// type User = { id: string; name: string; email: string; createdAt: Date }\n\n// packages/shared/src/schemas.ts\nimport { z } from 'zod';\n\nexport const CreateUserInput = z.object({\n  name: z.string().min(1).max(100),\n  email: z.string().email(),\n});\n\nexport const UpdateUserInput = CreateUserInput.partial();\nexport type CreateUserInput = z.infer<typeof CreateUserInput>;\n\n// packages/server/src/router/user.ts\nimport { TRPCError } from '@trpc/server';\nimport { CreateUserInput } from '@myapp/shared';\nimport { prisma } from '../db';\nimport { t } from '../trpc';\n\nexport const userRouter = t.router({\n  create: t.procedure\n    .input(CreateUserInput)   // Zodスキーマでバリデーション\n    .mutation(async ({ input }) => {\n      try {\n        return await prisma.user.create({ data: input });\n      } catch {\n        throw new TRPCError({ code: 'CONFLICT', message: 'Email already used' });\n      }\n    }),\n  list: t.procedure.query(() => prisma.user.findMany()),\n});",
     afterCode: "コース完了後に目指す状態: DB スキーマ変更 → Prisma generate → 型エラー検出 → フロントエンド修正というサイクルを型に導かれながら行えるようになります。これが TypeScript フルスタックの最大の恩恵です。"
   }]
 }];

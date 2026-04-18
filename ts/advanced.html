@@ -111,734 +111,90 @@ const EX = {
   ch1: [{
     diff: 2,
     q: "TypeScript Compiler API を使って、指定ファイル内の全 console.log 呼び出しの行番号を出力するスクリプトを書いてください。\nts.createProgram でプログラムを作成し、ASTを再帰的に巡回すること。",
-    code: `// find-console-log.ts
-import ts from 'typescript';
-
-function findConsoleLogs(filePath: string): void {
-  // ここを実装
-}
-
-findConsoleLogs('./src/index.ts');`,
-    answer: `import ts from 'typescript';
-
-function findConsoleLogs(filePath: string): void {
-  const program = ts.createProgram([filePath], {});
-  const sourceFile = program.getSourceFile(filePath);
-  if (!sourceFile) return;
-
-  function visit(node: ts.Node): void {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      ts.isIdentifier(node.expression.expression) &&
-      node.expression.expression.text === 'console' &&
-      node.expression.name.text === 'log'
-    ) {
-      const { line } = sourceFile!.getLineAndCharacterOfPosition(
-        node.getStart()
-      );
-      console.log(\`console.log found at line \${line + 1}\`);
-    }
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-}
-
-findConsoleLogs('./src/index.ts');`
+    code: "// find-console-log.ts\nimport ts from 'typescript';\n\nfunction findConsoleLogs(filePath: string): void {\n  // ここを実装\n}\n\nfindConsoleLogs('./src/index.ts');",
+    answer: "import ts from 'typescript';\n\nfunction findConsoleLogs(filePath: string): void {\n  const program = ts.createProgram([filePath], {});\n  const sourceFile = program.getSourceFile(filePath);\n  if (!sourceFile) return;\n\n  function visit(node: ts.Node): void {\n    if (\n      ts.isCallExpression(node) &&\n      ts.isPropertyAccessExpression(node.expression) &&\n      ts.isIdentifier(node.expression.expression) &&\n      node.expression.expression.text === 'console' &&\n      node.expression.name.text === 'log'\n    ) {\n      const { line } = sourceFile!.getLineAndCharacterOfPosition(\n        node.getStart()\n      );\n      console.log(`console.log found at line \${line + 1}`);\n    }\n    ts.forEachChild(node, visit);\n  }\n\n  visit(sourceFile);\n}\n\nfindConsoleLogs('./src/index.ts');"
   }, {
     diff: 3,
     q: "カスタムトランスフォーマーを作成してください。\n全ての console.log 呼び出しを、ファイル名と行番号を先頭に付けた形に変換する transformer を実装すること。\n例: console.log('hi') → console.log('[index.ts:5]', 'hi')",
-    code: `import ts from 'typescript';
-
-function createLogTransformer(
-  program: ts.Program
-): ts.TransformerFactory<ts.SourceFile> {
-  // ここを実装
-  return context => sourceFile => sourceFile;
-}`,
-    answer: `import ts from 'typescript';
-import path from 'path';
-
-function createLogTransformer(
-  program: ts.Program
-): ts.TransformerFactory<ts.SourceFile> {
-  return (context) => (sourceFile) => {
-    function visit(node: ts.Node): ts.Node {
-      if (
-        ts.isCallExpression(node) &&
-        ts.isPropertyAccessExpression(node.expression) &&
-        ts.isIdentifier(node.expression.expression) &&
-        node.expression.expression.text === 'console' &&
-        node.expression.name.text === 'log'
-      ) {
-        const { line } = sourceFile.getLineAndCharacterOfPosition(
-          node.getStart()
-        );
-        const fileName = path.basename(sourceFile.fileName);
-        const prefix = ts.factory.createStringLiteral(
-          \`[\${fileName}:\${line + 1}]\`
-        );
-        return ts.factory.updateCallExpression(
-          node,
-          node.expression,
-          node.typeArguments,
-          [prefix, ...node.arguments]
-        );
-      }
-      return ts.visitEachChild(node, visit, context);
-    }
-    return ts.visitNode(sourceFile, visit) as ts.SourceFile;
-  };
-}
-
-// 使用例
-const program = ts.createProgram(['./src/index.ts'], { strict: true });
-const result = ts.transpileModule(
-  'console.log("hello")',
-  { transformers: { before: [createLogTransformer(program)] } }
-);
-console.log(result.outputText);`
+    code: "import ts from 'typescript';\n\nfunction createLogTransformer(\n  program: ts.Program\n): ts.TransformerFactory<ts.SourceFile> {\n  // ここを実装\n  return context => sourceFile => sourceFile;\n}",
+    answer: "import ts from 'typescript';\nimport path from 'path';\n\nfunction createLogTransformer(\n  program: ts.Program\n): ts.TransformerFactory<ts.SourceFile> {\n  return (context) => (sourceFile) => {\n    function visit(node: ts.Node): ts.Node {\n      if (\n        ts.isCallExpression(node) &&\n        ts.isPropertyAccessExpression(node.expression) &&\n        ts.isIdentifier(node.expression.expression) &&\n        node.expression.expression.text === 'console' &&\n        node.expression.name.text === 'log'\n      ) {\n        const { line } = sourceFile.getLineAndCharacterOfPosition(\n          node.getStart()\n        );\n        const fileName = path.basename(sourceFile.fileName);\n        const prefix = ts.factory.createStringLiteral(\n          `[\${fileName}:\${line + 1}]`\n        );\n        return ts.factory.updateCallExpression(\n          node,\n          node.expression,\n          node.typeArguments,\n          [prefix, ...node.arguments]\n        );\n      }\n      return ts.visitEachChild(node, visit, context);\n    }\n    return ts.visitNode(sourceFile, visit) as ts.SourceFile;\n  };\n}\n\n// 使用例\nconst program = ts.createProgram(['./src/index.ts'], { strict: true });\nconst result = ts.transpileModule(\n  'console.log(\"hello\")',\n  { transformers: { before: [createLogTransformer(program)] } }\n);\nconsole.log(result.outputText);"
   }],
   ch2: [{
     diff: 2,
     q: "再帰的条件型を使って、ネストされたオブジェクトの全プロパティを Readonly にする DeepReadonly<T> 型を定義してください。\nプリミティブ型・配列・オブジェクトを正しく処理すること。",
-    code: `// DeepReadonly<T> を定義
-type DeepReadonly<T> = // ここを実装
-
-// テスト
-type Config = DeepReadonly<{
-  server: { host: string; port: number };
-  features: string[];
-}>;
-// config.server.host = 'x' → エラーになること`,
-    answer: `type DeepReadonly<T> =
-  T extends (infer U)[]
-    ? ReadonlyArray<DeepReadonly<U>>
-    : T extends object
-    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
-    : T;
-
-// テスト
-type Config = DeepReadonly<{
-  server: { host: string; port: number };
-  features: string[];
-}>;
-
-declare const cfg: Config;
-// cfg.server.host = 'x';   // ← Error: readonly
-// cfg.features.push('x');  // ← Error: ReadonlyArray
-
-// 別の再帰型: パス文字列の型
-type Paths<T, Prefix extends string = ''> =
-  T extends object
-    ? { [K in keyof T & string]:
-        | \`\${Prefix}\${K}\`
-        | Paths<T[K], \`\${Prefix}\${K}.\`>
-      }[keyof T & string]
-    : never;
-
-type P = Paths<{ a: { b: string; c: number }; d: boolean }>;
-// 'a' | 'a.b' | 'a.c' | 'd'`
+    code: "// DeepReadonly<T> を定義\ntype DeepReadonly<T> = // ここを実装\n\n// テスト\ntype Config = DeepReadonly<{\n  server: { host: string; port: number };\n  features: string[];\n}>;\n// config.server.host = 'x' → エラーになること",
+    answer: "type DeepReadonly<T> =\n  T extends (infer U)[]\n    ? ReadonlyArray<DeepReadonly<U>>\n    : T extends object\n    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }\n    : T;\n\n// テスト\ntype Config = DeepReadonly<{\n  server: { host: string; port: number };\n  features: string[];\n}>;\n\ndeclare const cfg: Config;\n// cfg.server.host = 'x';   // ← Error: readonly\n// cfg.features.push('x');  // ← Error: ReadonlyArray\n\n// 別の再帰型: パス文字列の型\ntype Paths<T, Prefix extends string = ''> =\n  T extends object\n    ? { [K in keyof T & string]:\n        | `\${Prefix}\${K}`\n        | Paths<T[K], `\${Prefix}\${K}.`>\n      }[keyof T & string]\n    : never;\n\ntype P = Paths<{ a: { b: string; c: number }; d: boolean }>;\n// 'a' | 'a.b' | 'a.c' | 'd'"
   }, {
     diff: 3,
     q: "Variadic Tuple Types を使って、複数の Promise を受け取り、全結果をタプルで返す型安全な promiseAll<T> 関数を実装してください。\nPromise.all と同じ動作ですが、戻り値の型が正確にタプルになること。",
-    code: `// 型安全な promiseAll を実装
-type Awaited<T> = T extends Promise<infer U> ? U : T;
-type AwaitedTuple<T extends readonly unknown[]> = // ここを実装
-
-async function promiseAll<T extends readonly Promise<unknown>[]>(
-  promises: [...T]
-): Promise<AwaitedTuple<T>> {
-  // ここを実装
-}`,
-    answer: `type AwaitedAll<T extends readonly unknown[]> = {
-  [K in keyof T]: T[K] extends Promise<infer U> ? U : T[K]
-};
-
-async function promiseAll<T extends readonly Promise<unknown>[]>(
-  promises: [...T]
-): Promise<AwaitedAll<T>> {
-  return Promise.all(promises) as Promise<AwaitedAll<T>>;
-}
-
-// 使用例
-async function main() {
-  const [n, s, b] = await promiseAll([
-    Promise.resolve(42),
-    Promise.resolve('hello'),
-    Promise.resolve(true),
-  ] as const);
-  // n: number, s: string, b: boolean — 正確に推論される
-  console.log(n, s, b);
-}
-
-// Concat でタプルを結合
-type Concat<A extends unknown[], B extends unknown[]> = [...A, ...B];
-type R = Concat<[1, 2], [3, 4]>; // [1, 2, 3, 4]`
+    code: "// 型安全な promiseAll を実装\ntype Awaited<T> = T extends Promise<infer U> ? U : T;\ntype AwaitedTuple<T extends readonly unknown[]> = // ここを実装\n\nasync function promiseAll<T extends readonly Promise<unknown>[]>(\n  promises: [...T]\n): Promise<AwaitedTuple<T>> {\n  // ここを実装\n}",
+    answer: "type AwaitedAll<T extends readonly unknown[]> = {\n  [K in keyof T]: T[K] extends Promise<infer U> ? U : T[K]\n};\n\nasync function promiseAll<T extends readonly Promise<unknown>[]>(\n  promises: [...T]\n): Promise<AwaitedAll<T>> {\n  return Promise.all(promises) as Promise<AwaitedAll<T>>;\n}\n\n// 使用例\nasync function main() {\n  const [n, s, b] = await promiseAll([\n    Promise.resolve(42),\n    Promise.resolve('hello'),\n    Promise.resolve(true),\n  ] as const);\n  // n: number, s: string, b: boolean — 正確に推論される\n  console.log(n, s, b);\n}\n\n// Concat でタプルを結合\ntype Concat<A extends unknown[], B extends unknown[]> = [...A, ...B];\ntype R = Concat<[1, 2], [3, 4]>; // [1, 2, 3, 4]"
   }],
   ch3: [{
     diff: 2,
     q: "Template Literal Types を使って、CSS プロパティのような DSL 型を定義してください。\n`margin-top`, `padding-left` のような `${Side}-${Direction}` パターンを型として表現し、不正な値をコンパイルエラーにしてください。",
-    code: `type Side = 'margin' | 'padding' | 'border';
-type Direction = 'top' | 'right' | 'bottom' | 'left';
-
-// SpacingProp 型を定義
-type SpacingProp = // ここを実装
-
-function setStyle(prop: SpacingProp, value: string): void {
-  // ...
-}
-
-setStyle('margin-top', '10px');    // OK
-setStyle('padding-left', '5px');   // OK
-// setStyle('color', '10px');      // Error`,
-    answer: `type Side = 'margin' | 'padding' | 'border';
-type Direction = 'top' | 'right' | 'bottom' | 'left';
-
-type SpacingProp = \`\${Side}-\${Direction}\`;
-// 'margin-top' | 'margin-right' | ... | 'border-left' (12パターン)
-
-function setStyle(prop: SpacingProp, value: string): void {
-  document.documentElement.style.setProperty(\`--\${prop}\`, value);
-}
-
-// 型安全なイベントマップ DSL
-type EventMap = {
-  [K in string as \`on\${Capitalize<K>}\`]: (e: Event) => void
-};
-
-// SQL DSL 型の例
-type TableName = 'users' | 'posts' | 'comments';
-type SelectQuery = \`SELECT * FROM \${TableName}\`;
-
-function query(sql: SelectQuery): void {
-  console.log('Executing:', sql);
-}
-
-query('SELECT * FROM users');   // OK
-// query('SELECT * FROM hacks'); // Error`
+    code: "type Side = 'margin' | 'padding' | 'border';\ntype Direction = 'top' | 'right' | 'bottom' | 'left';\n\n// SpacingProp 型を定義\ntype SpacingProp = // ここを実装\n\nfunction setStyle(prop: SpacingProp, value: string): void {\n  // ...\n}\n\nsetStyle('margin-top', '10px');    // OK\nsetStyle('padding-left', '5px');   // OK\n// setStyle('color', '10px');      // Error",
+    answer: "type Side = 'margin' | 'padding' | 'border';\ntype Direction = 'top' | 'right' | 'bottom' | 'left';\n\ntype SpacingProp = `\${Side}-\${Direction}`;\n// 'margin-top' | 'margin-right' | ... | 'border-left' (12パターン)\n\nfunction setStyle(prop: SpacingProp, value: string): void {\n  document.documentElement.style.setProperty(`--\${prop}`, value);\n}\n\n// 型安全なイベントマップ DSL\ntype EventMap = {\n  [K in string as `on\${Capitalize<K>}`]: (e: Event) => void\n};\n\n// SQL DSL 型の例\ntype TableName = 'users' | 'posts' | 'comments';\ntype SelectQuery = `SELECT * FROM \${TableName}`;\n\nfunction query(sql: SelectQuery): void {\n  console.log('Executing:', sql);\n}\n\nquery('SELECT * FROM users');   // OK\n// query('SELECT * FROM hacks'); // Error"
   }, {
     diff: 3,
     q: "型安全なルーターを設計してください。\nパスパラメータ `:id` を自動的に型として抽出し、handler に params が型付きで渡されるようにしてください。\n例: route('/users/:id/posts/:postId', handler) の handler は { id: string; postId: string } を受け取る。",
-    code: `// パスパラメータを型で抽出
-type ExtractParams<Path extends string> = // ここを実装
-
-function route<P extends string>(
-  path: P,
-  handler: (params: ExtractParams<P>) => void
-): void {
-  // 実際のルーティングロジック（省略）
-}
-
-// 使用例
-route('/users/:id/posts/:postId', (params) => {
-  // params.id, params.postId が string 型で参照できること
-});`,
-    answer: `type ExtractParams<Path extends string> =
-  Path extends \`\${infer _Before}:\${infer Param}/\${infer Rest}\`
-    ? { [K in Param | keyof ExtractParams<\`/\${Rest}\`>]: string }
-    : Path extends \`\${infer _Before}:\${infer Param}\`
-    ? { [K in Param]: string }
-    : Record<never, never>;
-
-function route<P extends string>(
-  path: P,
-  handler: (params: ExtractParams<P>) => void
-): void {
-  // 実際のルーティングではパスパターンをパースして params を構築
-  const segments = path.split('/');
-  const params: Record<string, string> = {};
-  segments.forEach(seg => {
-    if (seg.startsWith(':')) params[seg.slice(1)] = 'demo';
-  });
-  handler(params as ExtractParams<P>);
-}
-
-// 使用例
-route('/users/:id/posts/:postId', (params) => {
-  console.log(params.id, params.postId); // 型安全
-});`
+    code: "// パスパラメータを型で抽出\ntype ExtractParams<Path extends string> = // ここを実装\n\nfunction route<P extends string>(\n  path: P,\n  handler: (params: ExtractParams<P>) => void\n): void {\n  // 実際のルーティングロジック（省略）\n}\n\n// 使用例\nroute('/users/:id/posts/:postId', (params) => {\n  // params.id, params.postId が string 型で参照できること\n});",
+    answer: "type ExtractParams<Path extends string> =\n  Path extends `\${infer _Before}:\${infer Param}/\${infer Rest}`\n    ? { [K in Param | keyof ExtractParams<`/\${Rest}`>]: string }\n    : Path extends `\${infer _Before}:\${infer Param}`\n    ? { [K in Param]: string }\n    : Record<never, never>;\n\nfunction route<P extends string>(\n  path: P,\n  handler: (params: ExtractParams<P>) => void\n): void {\n  // 実際のルーティングではパスパターンをパースして params を構築\n  const segments = path.split('/');\n  const params: Record<string, string> = {};\n  segments.forEach(seg => {\n    if (seg.startsWith(':')) params[seg.slice(1)] = 'demo';\n  });\n  handler(params as ExtractParams<P>);\n}\n\n// 使用例\nroute('/users/:id/posts/:postId', (params) => {\n  console.log(params.id, params.postId); // 型安全\n});"
   }],
   ch4: [{
     diff: 2,
     q: "ライブラリの型定義ファイル (.d.ts) を手動で書いてください。\n以下の JavaScript ライブラリ `simple-cache` の型定義を作成してください:\n- `createCache(options?)` 関数: ttl?: number を受け取り Cache オブジェクトを返す\n- Cache: `get<T>(key: string): T | undefined`, `set(key: string, value: unknown): void`, `clear(): void`",
-    code: `// @types/simple-cache/index.d.ts を作成してください
-// declare module 'simple-cache' { ... }`,
-    answer: `// @types/simple-cache/index.d.ts
-declare module 'simple-cache' {
-  interface CacheOptions {
-    ttl?: number;        // milliseconds
-    maxSize?: number;
-  }
-
-  interface Cache {
-    get<T>(key: string): T | undefined;
-    set(key: string, value: unknown, ttl?: number): void;
-    has(key: string): boolean;
-    delete(key: string): boolean;
-    clear(): void;
-    readonly size: number;
-  }
-
-  function createCache(options?: CacheOptions): Cache;
-
-  export { createCache, Cache, CacheOptions };
-  export default createCache;
-}
-
-// tsconfig.json での設定
-// {
-//   "compilerOptions": {
-//     "typeRoots": ["./node_modules/@types", "./@types"]
-//   }
-// }
-
-// 使用例
-import createCache from 'simple-cache';
-const cache = createCache({ ttl: 60000 });
-cache.set('key', { value: 42 });
-const v = cache.get<{ value: number }>('key'); // v: { value: number } | undefined`
+    code: "// @types/simple-cache/index.d.ts を作成してください\n// declare module 'simple-cache' { ... }",
+    answer: "// @types/simple-cache/index.d.ts\ndeclare module 'simple-cache' {\n  interface CacheOptions {\n    ttl?: number;        // milliseconds\n    maxSize?: number;\n  }\n\n  interface Cache {\n    get<T>(key: string): T | undefined;\n    set(key: string, value: unknown, ttl?: number): void;\n    has(key: string): boolean;\n    delete(key: string): boolean;\n    clear(): void;\n    readonly size: number;\n  }\n\n  function createCache(options?: CacheOptions): Cache;\n\n  export { createCache, Cache, CacheOptions };\n  export default createCache;\n}\n\n// tsconfig.json での設定\n// {\n//   \"compilerOptions\": {\n//     \"typeRoots\": [\"./node_modules/@types\", \"./@types\"]\n//   }\n// }\n\n// 使用例\nimport createCache from 'simple-cache';\nconst cache = createCache({ ttl: 60000 });\ncache.set('key', { value: 42 });\nconst v = cache.get<{ value: number }>('key'); // v: { value: number } | undefined"
   }, {
     diff: 3,
     q: "ESM/CJS dual package を tsup で設定し、package.json の exports フィールドを完全に設定してください。\nさらに、サブパス exports (`import { util } from 'mylib/utils'`) も対応すること。",
-    code: `// tsup.config.ts と package.json を書いてください
-// エントリ: src/index.ts, src/utils.ts`,
-    answer: `// tsup.config.ts
-import { defineConfig } from 'tsup';
-
-export default defineConfig([
-  {
-    entry: { index: 'src/index.ts', utils: 'src/utils.ts' },
-    format: ['cjs', 'esm'],
-    dts: true,
-    clean: true,
-    splitting: false,
-    sourcemap: true,
-  }
-]);
-
-// package.json
-{
-  "name": "mylib",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
-    },
-    "./utils": {
-      "import": { "types": "./dist/utils.d.ts", "default": "./dist/utils.js" },
-      "require": { "types": "./dist/utils.d.cts", "default": "./dist/utils.cjs" }
-    }
-  },
-  "files": ["dist"]
-}`
+    code: "// tsup.config.ts と package.json を書いてください\n// エントリ: src/index.ts, src/utils.ts",
+    answer: "// tsup.config.ts\nimport { defineConfig } from 'tsup';\n\nexport default defineConfig([\n  {\n    entry: { index: 'src/index.ts', utils: 'src/utils.ts' },\n    format: ['cjs', 'esm'],\n    dts: true,\n    clean: true,\n    splitting: false,\n    sourcemap: true,\n  }\n]);\n\n// package.json\n{\n  \"name\": \"mylib\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"main\": \"./dist/index.cjs\",\n  \"module\": \"./dist/index.js\",\n  \"types\": \"./dist/index.d.ts\",\n  \"exports\": {\n    \".\": {\n      \"import\": { \"types\": \"./dist/index.d.ts\", \"default\": \"./dist/index.js\" },\n      \"require\": { \"types\": \"./dist/index.d.cts\", \"default\": \"./dist/index.cjs\" }\n    },\n    \"./utils\": {\n      \"import\": { \"types\": \"./dist/utils.d.ts\", \"default\": \"./dist/utils.js\" },\n      \"require\": { \"types\": \"./dist/utils.d.cts\", \"default\": \"./dist/utils.cjs\" }\n    }\n  },\n  \"files\": [\"dist\"]\n}"
   }],
   ch5: [{
     diff: 2,
     q: "fp-ts の pipe と Option を使って、ユーザーIDからユーザー名を取得し、大文字に変換する処理をモナディックスタイルで書いてください。\nユーザーが存在しない場合は None を返すこと。",
-    code: `import { pipe } from 'fp-ts/function';
-import * as O from 'fp-ts/Option';
-
-const users: Record<string, { name: string }> = {
-  '1': { name: 'alice' },
-  '2': { name: 'bob' },
-};
-
-function getUserName(id: string): O.Option<string> {
-  // pipe と O.fromNullable, O.map を使って実装
-}`,
-    answer: `import { pipe } from 'fp-ts/function';
-import * as O from 'fp-ts/Option';
-
-const users: Record<string, { name: string }> = {
-  '1': { name: 'alice' },
-  '2': { name: 'bob' },
-};
-
-function getUserName(id: string): O.Option<string> {
-  return pipe(
-    O.fromNullable(users[id]),           // Record にあれば Some、なければ None
-    O.map(user => user.name),            // Some の中の値を変換
-    O.map(name => name.toUpperCase())    // さらに変換
-  );
-}
-
-// 使用例
-const result1 = getUserName('1');
-// O.some('ALICE')
-
-const result2 = getUserName('99');
-// O.none
-
-// Either でエラー情報を保持
-import * as E from 'fp-ts/Either';
-
-function getUserEither(id: string): E.Either<string, string> {
-  return pipe(
-    O.fromNullable(users[id]),
-    O.map(u => u.name.toUpperCase()),
-    O.match(
-      () => E.left(\`User \${id} not found\`),
-      (name) => E.right(name)
-    )
-  );
-}
-
-console.log(getUserEither('1'));  // Right('ALICE')
-console.log(getUserEither('x'));  // Left('User x not found')`
+    code: "import { pipe } from 'fp-ts/function';\nimport * as O from 'fp-ts/Option';\n\nconst users: Record<string, { name: string }> = {\n  '1': { name: 'alice' },\n  '2': { name: 'bob' },\n};\n\nfunction getUserName(id: string): O.Option<string> {\n  // pipe と O.fromNullable, O.map を使って実装\n}",
+    answer: "import { pipe } from 'fp-ts/function';\nimport * as O from 'fp-ts/Option';\n\nconst users: Record<string, { name: string }> = {\n  '1': { name: 'alice' },\n  '2': { name: 'bob' },\n};\n\nfunction getUserName(id: string): O.Option<string> {\n  return pipe(\n    O.fromNullable(users[id]),           // Record にあれば Some、なければ None\n    O.map(user => user.name),            // Some の中の値を変換\n    O.map(name => name.toUpperCase())    // さらに変換\n  );\n}\n\n// 使用例\nconst result1 = getUserName('1');\n// O.some('ALICE')\n\nconst result2 = getUserName('99');\n// O.none\n\n// Either でエラー情報を保持\nimport * as E from 'fp-ts/Either';\n\nfunction getUserEither(id: string): E.Either<string, string> {\n  return pipe(\n    O.fromNullable(users[id]),\n    O.map(u => u.name.toUpperCase()),\n    O.match(\n      () => E.left(`User \${id} not found`),\n      (name) => E.right(name)\n    )\n  );\n}\n\nconsole.log(getUserEither('1'));  // Right('ALICE')\nconsole.log(getUserEither('x'));  // Left('User x not found')"
   }, {
     diff: 3,
     q: "TaskEither を使って、非同期でユーザーをAPIから取得し、データを変換してDBに保存するパイプラインを書いてください。\nエラーは文字列の Left として返し、全体を pipe で合成すること。",
-    code: `import { pipe } from 'fp-ts/function';
-import * as TE from 'fp-ts/TaskEither';
-
-interface User { id: string; name: string; email: string; }
-interface UserRecord { userId: string; displayName: string; }
-
-// fetchUser, transformUser, saveUser を TE で定義し、pipe で合成`,
-    answer: `import { pipe } from 'fp-ts/function';
-import * as TE from 'fp-ts/TaskEither';
-
-interface User { id: string; name: string; email: string; }
-interface UserRecord { userId: string; displayName: string; }
-
-const fetchUser = (id: string): TE.TaskEither<string, User> =>
-  TE.tryCatch(
-    async () => {
-      const res = await fetch(\`https://api.example.com/users/\${id}\`);
-      if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
-      return res.json() as Promise<User>;
-    },
-    (e) => \`Fetch failed: \${e instanceof Error ? e.message : String(e)}\`
-  );
-
-const transformUser = (user: User): TE.TaskEither<string, UserRecord> =>
-  TE.right({
-    userId: user.id,
-    displayName: user.name.trim(),
-  });
-
-const saveUser = (record: UserRecord): TE.TaskEither<string, void> =>
-  TE.tryCatch(
-    async () => {
-      // DB保存処理
-      console.log('Saved:', record);
-    },
-    (e) => \`Save failed: \${e instanceof Error ? e.message : String(e)}\`
-  );
-
-// パイプライン合成
-const processUser = (id: string): TE.TaskEither<string, void> =>
-  pipe(
-    fetchUser(id),
-    TE.chain(transformUser),
-    TE.chain(saveUser)
-  );
-
-// 実行
-processUser('123')().then(result => {
-  if (result._tag === 'Left') console.error('Error:', result.left);
-  else console.log('Done');
-});`
+    code: "import { pipe } from 'fp-ts/function';\nimport * as TE from 'fp-ts/TaskEither';\n\ninterface User { id: string; name: string; email: string; }\ninterface UserRecord { userId: string; displayName: string; }\n\n// fetchUser, transformUser, saveUser を TE で定義し、pipe で合成",
+    answer: "import { pipe } from 'fp-ts/function';\nimport * as TE from 'fp-ts/TaskEither';\n\ninterface User { id: string; name: string; email: string; }\ninterface UserRecord { userId: string; displayName: string; }\n\nconst fetchUser = (id: string): TE.TaskEither<string, User> =>\n  TE.tryCatch(\n    async () => {\n      const res = await fetch(`https://api.example.com/users/\${id}`);\n      if (!res.ok) throw new Error(`HTTP \${res.status}`);\n      return res.json() as Promise<User>;\n    },\n    (e) => `Fetch failed: \${e instanceof Error ? e.message : String(e)}`\n  );\n\nconst transformUser = (user: User): TE.TaskEither<string, UserRecord> =>\n  TE.right({\n    userId: user.id,\n    displayName: user.name.trim(),\n  });\n\nconst saveUser = (record: UserRecord): TE.TaskEither<string, void> =>\n  TE.tryCatch(\n    async () => {\n      // DB保存処理\n      console.log('Saved:', record);\n    },\n    (e) => `Save failed: \${e instanceof Error ? e.message : String(e)}`\n  );\n\n// パイプライン合成\nconst processUser = (id: string): TE.TaskEither<string, void> =>\n  pipe(\n    fetchUser(id),\n    TE.chain(transformUser),\n    TE.chain(saveUser)\n  );\n\n// 実行\nprocessUser('123')().then(result => {\n  if (result._tag === 'Left') console.error('Error:', result.left);\n  else console.log('Done');\n});"
   }],
   ch6: [{
     diff: 2,
     q: "pnpm workspaces を使ったモノレポを設計してください。\n`packages/ui`, `packages/utils`, `apps/web` の3パッケージ構成で、ui と utils が web から参照できるように設定してください。",
-    code: `# pnpm-workspace.yaml と各 package.json を書いてください`,
-    answer: `# pnpm-workspace.yaml
-packages:
-  - 'packages/*'
-  - 'apps/*'
-
-# packages/utils/package.json
-{
-  "name": "@myorg/utils",
-  "version": "1.0.0",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "scripts": { "typecheck": "tsc --noEmit" }
-}
-
-# packages/ui/package.json
-{
-  "name": "@myorg/ui",
-  "version": "1.0.0",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "dependencies": { "@myorg/utils": "workspace:*" }
-}
-
-# apps/web/package.json
-{
-  "name": "web",
-  "dependencies": {
-    "@myorg/ui": "workspace:*",
-    "@myorg/utils": "workspace:*"
-  }
-}
-
-# apps/web/tsconfig.json
-{
-  "compilerOptions": {
-    "paths": {
-      "@myorg/ui": ["../../packages/ui/src/index.ts"],
-      "@myorg/utils": ["../../packages/utils/src/index.ts"]
-    }
-  }
-}
-
-# インストール・実行
-# pnpm install
-# pnpm --filter web dev`
+    code: "# pnpm-workspace.yaml と各 package.json を書いてください",
+    answer: "# pnpm-workspace.yaml\npackages:\n  - 'packages/*'\n  - 'apps/*'\n\n# packages/utils/package.json\n{\n  \"name\": \"@myorg/utils\",\n  \"version\": \"1.0.0\",\n  \"main\": \"./src/index.ts\",\n  \"types\": \"./src/index.ts\",\n  \"scripts\": { \"typecheck\": \"tsc --noEmit\" }\n}\n\n# packages/ui/package.json\n{\n  \"name\": \"@myorg/ui\",\n  \"version\": \"1.0.0\",\n  \"main\": \"./src/index.ts\",\n  \"types\": \"./src/index.ts\",\n  \"dependencies\": { \"@myorg/utils\": \"workspace:*\" }\n}\n\n# apps/web/package.json\n{\n  \"name\": \"web\",\n  \"dependencies\": {\n    \"@myorg/ui\": \"workspace:*\",\n    \"@myorg/utils\": \"workspace:*\"\n  }\n}\n\n# apps/web/tsconfig.json\n{\n  \"compilerOptions\": {\n    \"paths\": {\n      \"@myorg/ui\": [\"../../packages/ui/src/index.ts\"],\n      \"@myorg/utils\": [\"../../packages/utils/src/index.ts\"]\n    }\n  }\n}\n\n# インストール・実行\n# pnpm install\n# pnpm --filter web dev"
   }, {
     diff: 3,
     q: "Turborepo の turbo.json を設定してください。\nbuild タスクは utils → ui → web の順に実行され、test は並列実行、lint はキャッシュを無効にして常に再実行されるようにしてください。",
-    code: `// turbo.json を設計`,
-    answer: `// turbo.json
-{
-  "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["tsconfig.json"],
-  "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["src/**", "tsconfig.json"],
-      "outputs": ["dist/**"]
-    },
-    "test": {
-      "dependsOn": ["^build"],
-      "inputs": ["src/**", "tests/**"],
-      "outputs": ["coverage/**"]
-    },
-    "lint": {
-      "dependsOn": [],
-      "cache": false
-    },
-    "typecheck": {
-      "dependsOn": ["^build"],
-      "inputs": ["src/**", "tsconfig.json"]
-    },
-    "dev": {
-      "dependsOn": ["^build"],
-      "persistent": true,
-      "cache": false
-    }
-  }
-}
-
-// 実行例
-// pnpm turbo build           ← 依存順にビルド（キャッシュあり）
-// pnpm turbo test --parallel ← 並列テスト
-// pnpm turbo lint            ← キャッシュなし lint
-// pnpm turbo build --filter=web... ← web と依存パッケージだけビルド`
+    code: "// turbo.json を設計",
+    answer: "// turbo.json\n{\n  \"$schema\": \"https://turbo.build/schema.json\",\n  \"globalDependencies\": [\"tsconfig.json\"],\n  \"tasks\": {\n    \"build\": {\n      \"dependsOn\": [\"^build\"],\n      \"inputs\": [\"src/**\", \"tsconfig.json\"],\n      \"outputs\": [\"dist/**\"]\n    },\n    \"test\": {\n      \"dependsOn\": [\"^build\"],\n      \"inputs\": [\"src/**\", \"tests/**\"],\n      \"outputs\": [\"coverage/**\"]\n    },\n    \"lint\": {\n      \"dependsOn\": [],\n      \"cache\": false\n    },\n    \"typecheck\": {\n      \"dependsOn\": [\"^build\"],\n      \"inputs\": [\"src/**\", \"tsconfig.json\"]\n    },\n    \"dev\": {\n      \"dependsOn\": [\"^build\"],\n      \"persistent\": true,\n      \"cache\": false\n    }\n  }\n}\n\n// 実行例\n// pnpm turbo build           ← 依存順にビルド（キャッシュあり）\n// pnpm turbo test --parallel ← 並列テスト\n// pnpm turbo lint            ← キャッシュなし lint\n// pnpm turbo build --filter=web... ← web と依存パッケージだけビルド"
   }],
   ch7: [{
     diff: 2,
     q: "Zod のカスタムバリデーターを作って、日本の郵便番号（〒000-0000形式）と電話番号（ハイフン区切り）を検証するスキーマを定義してください。\nエラーメッセージも日本語で設定すること。",
-    code: `import { z } from 'zod';
-
-const ContactSchema = z.object({
-  zipCode: z.string(),    // 〒000-0000 形式
-  phone: z.string(),      // 000-0000-0000 形式
-  email: z.string().email(),
-});`,
-    answer: `import { z } from 'zod';
-
-const zipCodeSchema = z.string()
-  .regex(/^\d{3}-\d{4}$/, '郵便番号は 000-0000 形式で入力してください');
-
-const phoneSchema = z.string()
-  .regex(
-    /^(0\d{1,4})-(\d{1,4})-(\d{4})$/,
-    '電話番号は 00-0000-0000 形式で入力してください'
-  );
-
-const ContactSchema = z.object({
-  zipCode: zipCodeSchema,
-  phone: phoneSchema,
-  email: z.string().email('有効なメールアドレスを入力してください'),
-  // ブランド型でIDを区別
-  userId: z.string().uuid().brand<'UserId'>(),
-});
-
-type Contact = z.infer<typeof ContactSchema>;
-type UserId = z.infer<typeof ContactSchema.shape.userId>;
-
-// superRefine で相関バリデーション
-const PasswordSchema = z.object({
-  password: z.string().min(8),
-  confirm: z.string(),
-}).superRefine(({ password, confirm }, ctx) => {
-  if (password !== confirm) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'パスワードが一致しません',
-      path: ['confirm'],
-    });
-  }
-});`
+    code: "import { z } from 'zod';\n\nconst ContactSchema = z.object({\n  zipCode: z.string(),    // 〒000-0000 形式\n  phone: z.string(),      // 000-0000-0000 形式\n  email: z.string().email(),\n});",
+    answer: "import { z } from 'zod';\n\nconst zipCodeSchema = z.string()\n  .regex(/^\d{3}-\d{4}$/, '郵便番号は 000-0000 形式で入力してください');\n\nconst phoneSchema = z.string()\n  .regex(\n    /^(0\d{1,4})-(\d{1,4})-(\d{4})$/,\n    '電話番号は 00-0000-0000 形式で入力してください'\n  );\n\nconst ContactSchema = z.object({\n  zipCode: zipCodeSchema,\n  phone: phoneSchema,\n  email: z.string().email('有効なメールアドレスを入力してください'),\n  // ブランド型でIDを区別\n  userId: z.string().uuid().brand<'UserId'>(),\n});\n\ntype Contact = z.infer<typeof ContactSchema>;\ntype UserId = z.infer<typeof ContactSchema.shape.userId>;\n\n// superRefine で相関バリデーション\nconst PasswordSchema = z.object({\n  password: z.string().min(8),\n  confirm: z.string(),\n}).superRefine(({ password, confirm }, ctx) => {\n  if (password !== confirm) {\n    ctx.addIssue({\n      code: z.ZodIssueCode.custom,\n      message: 'パスワードが一致しません',\n      path: ['confirm'],\n    });\n  }\n});"
   }, {
     diff: 3,
     q: "zod-to-openapi (または @asteasolutions/zod-to-openapi) を使って、User スキーマから OpenAPI 3.0 の定義を自動生成するコードを書いてください。\nGET /users/:id のエンドポイント定義も含めること。",
-    code: `import { z } from 'zod';
-// zod-to-openapi を使って OpenAPI 定義を生成`,
-    answer: `import { z } from 'zod';
-import {
-  OpenAPIRegistry,
-  OpenApiGeneratorV3,
-  extendZodWithOpenApi,
-} from '@asteasolutions/zod-to-openapi';
-
-extendZodWithOpenApi(z);
-
-const registry = new OpenAPIRegistry();
-
-// スキーマ定義（OpenAPI メタデータ付き）
-const UserSchema = registry.register(
-  'User',
-  z.object({
-    id: z.string().uuid().openapi({ description: 'ユーザーID', example: 'abc-123' }),
-    name: z.string().min(1).openapi({ description: '表示名', example: '田中 太郎' }),
-    email: z.string().email().openapi({ example: 'taro@example.com' }),
-    role: z.enum(['admin', 'user']).openapi({ default: 'user' }),
-    createdAt: z.string().datetime().openapi({ description: '作成日時' }),
-  })
-);
-
-// エンドポイント定義
-registry.registerPath({
-  method: 'get',
-  path: '/users/{id}',
-  summary: 'ユーザーを取得',
-  request: {
-    params: z.object({ id: z.string().uuid() }),
-  },
-  responses: {
-    200: { description: '取得成功', content: { 'application/json': { schema: UserSchema } } },
-    404: { description: 'ユーザーが見つからない' },
-  },
-});
-
-// OpenAPI ドキュメントを生成
-const generator = new OpenApiGeneratorV3(registry.definitions);
-const doc = generator.generateDocument({
-  openapi: '3.0.0',
-  info: { title: 'My API', version: '1.0.0' },
-});
-
-console.log(JSON.stringify(doc, null, 2));`
+    code: "import { z } from 'zod';\n// zod-to-openapi を使って OpenAPI 定義を生成",
+    answer: "import { z } from 'zod';\nimport {\n  OpenAPIRegistry,\n  OpenApiGeneratorV3,\n  extendZodWithOpenApi,\n} from '@asteasolutions/zod-to-openapi';\n\nextendZodWithOpenApi(z);\n\nconst registry = new OpenAPIRegistry();\n\n// スキーマ定義（OpenAPI メタデータ付き）\nconst UserSchema = registry.register(\n  'User',\n  z.object({\n    id: z.string().uuid().openapi({ description: 'ユーザーID', example: 'abc-123' }),\n    name: z.string().min(1).openapi({ description: '表示名', example: '田中 太郎' }),\n    email: z.string().email().openapi({ example: 'taro@example.com' }),\n    role: z.enum(['admin', 'user']).openapi({ default: 'user' }),\n    createdAt: z.string().datetime().openapi({ description: '作成日時' }),\n  })\n);\n\n// エンドポイント定義\nregistry.registerPath({\n  method: 'get',\n  path: '/users/{id}',\n  summary: 'ユーザーを取得',\n  request: {\n    params: z.object({ id: z.string().uuid() }),\n  },\n  responses: {\n    200: { description: '取得成功', content: { 'application/json': { schema: UserSchema } } },\n    404: { description: 'ユーザーが見つからない' },\n  },\n});\n\n// OpenAPI ドキュメントを生成\nconst generator = new OpenApiGeneratorV3(registry.definitions);\nconst doc = generator.generateDocument({\n  openapi: '3.0.0',\n  info: { title: 'My API', version: '1.0.0' },\n});\n\nconsole.log(JSON.stringify(doc, null, 2));"
   }],
   ch8: [{
     diff: 2,
     q: "tsc の型チェックが遅い場合のパフォーマンス改善手順を実施してください。\n--diagnostics フラグで計測し、Project References を設定して差分ビルドを有効にしてください。\n3パッケージ構成（utils, lib, app）を想定して tsconfig を設計すること。",
-    code: `# 計測コマンドと各 tsconfig.json の設計を示してください`,
-    answer: `# 1. 現状計測
-npx tsc --noEmit --diagnostics 2>&1 | grep -E "Check time|Files"
-
-# 2. Project References の設定
-
-# packages/utils/tsconfig.json
-{
-  "compilerOptions": {
-    "composite": true,
-    "declaration": true,
-    "outDir": "./dist"
-  },
-  "include": ["src"]
-}
-
-# packages/lib/tsconfig.json
-{
-  "compilerOptions": { "composite": true, "outDir": "./dist" },
-  "references": [{ "path": "../utils" }],
-  "include": ["src"]
-}
-
-# apps/app/tsconfig.json
-{
-  "compilerOptions": { "incremental": true, "outDir": "./dist" },
-  "references": [
-    { "path": "../../packages/utils" },
-    { "path": "../../packages/lib" }
-  ],
-  "include": ["src"]
-}
-
-# ルート tsconfig.json
-{
-  "references": [
-    { "path": "packages/utils" },
-    { "path": "packages/lib" },
-    { "path": "apps/app" }
-  ],
-  "files": []
-}
-
-# 3. ビルド（差分のみ再チェック）
-npx tsc --build --incremental
-# 2回目以降は大幅に高速化される`
+    code: "# 計測コマンドと各 tsconfig.json の設計を示してください",
+    answer: "# 1. 現状計測\nnpx tsc --noEmit --diagnostics 2>&1 | grep -E \"Check time|Files\"\n\n# 2. Project References の設定\n\n# packages/utils/tsconfig.json\n{\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"declaration\": true,\n    \"outDir\": \"./dist\"\n  },\n  \"include\": [\"src\"]\n}\n\n# packages/lib/tsconfig.json\n{\n  \"compilerOptions\": { \"composite\": true, \"outDir\": \"./dist\" },\n  \"references\": [{ \"path\": \"../utils\" }],\n  \"include\": [\"src\"]\n}\n\n# apps/app/tsconfig.json\n{\n  \"compilerOptions\": { \"incremental\": true, \"outDir\": \"./dist\" },\n  \"references\": [\n    { \"path\": \"../../packages/utils\" },\n    { \"path\": \"../../packages/lib\" }\n  ],\n  \"include\": [\"src\"]\n}\n\n# ルート tsconfig.json\n{\n  \"references\": [\n    { \"path\": \"packages/utils\" },\n    { \"path\": \"packages/lib\" },\n    { \"path\": \"apps/app\" }\n  ],\n  \"files\": []\n}\n\n# 3. ビルド（差分のみ再チェック）\nnpx tsc --build --incremental\n# 2回目以降は大幅に高速化される"
   }, {
     diff: 3,
     q: "SWC を使って TypeScript をトランスパイルするカスタムビルドスクリプトを書いてください。\n型チェックは tsc --noEmit で別途実行し、ビルドは @swc/core を使うことで両工程を並列化してください。",
-    code: `// build.ts — tsc 型チェック + SWC トランスパイルを並列実行`,
-    answer: `// build.ts
-import { transform } from '@swc/core';
-import { execFile } from 'child_process';
-import { readdir, readFile, writeFile, mkdir } from 'fs/promises';
-import { promisify } from 'util';
-import path from 'path';
-
-const exec = promisify(execFile);
-
-async function typecheck(): Promise<void> {
-  console.log('[typecheck] 開始...');
-  try {
-    await exec('npx', ['tsc', '--noEmit']);
-    console.log('[typecheck] OK');
-  } catch (e: any) {
-    console.error('[typecheck] エラー:');
-    console.error(e.stdout);
-    process.exit(1);
-  }
-}
-
-async function transpileFile(src: string, out: string): Promise<void> {
-  const code = await readFile(src, 'utf-8');
-  const result = await transform(code, {
-    filename: src,
-    sourceMaps: true,
-    jsc: {
-      parser: { syntax: 'typescript', decorators: true },
-      target: 'es2022',
-    },
-    module: { type: 'es6' },
-  });
-  await mkdir(path.dirname(out), { recursive: true });
-  await writeFile(out, result.code, 'utf-8');
-}
-
-async function build(): Promise<void> {
-  console.log('[build] SWCトランスパイル開始...');
-  const files = await readdir('./src', { recursive: true });
-  const tsFiles = files.filter((f): f is string =>
-    typeof f === 'string' && f.endsWith('.ts')
-  );
-  await Promise.all(
-    tsFiles.map(f =>
-      transpileFile(\`./src/\${f}\`, \`./dist/\${f.replace(/\\.ts$/, '.js')}\`)
-    )
-  );
-  console.log(\`[build] \${tsFiles.length}ファイル完了\`);
-}
-
-// 型チェックとビルドを並列実行
-await Promise.all([typecheck(), build()]);
-console.log('完了');`
+    code: "// build.ts — tsc 型チェック + SWC トランスパイルを並列実行",
+    answer: "// build.ts\nimport { transform } from '@swc/core';\nimport { execFile } from 'child_process';\nimport { readdir, readFile, writeFile, mkdir } from 'fs/promises';\nimport { promisify } from 'util';\nimport path from 'path';\n\nconst exec = promisify(execFile);\n\nasync function typecheck(): Promise<void> {\n  console.log('[typecheck] 開始...');\n  try {\n    await exec('npx', ['tsc', '--noEmit']);\n    console.log('[typecheck] OK');\n  } catch (e: any) {\n    console.error('[typecheck] エラー:');\n    console.error(e.stdout);\n    process.exit(1);\n  }\n}\n\nasync function transpileFile(src: string, out: string): Promise<void> {\n  const code = await readFile(src, 'utf-8');\n  const result = await transform(code, {\n    filename: src,\n    sourceMaps: true,\n    jsc: {\n      parser: { syntax: 'typescript', decorators: true },\n      target: 'es2022',\n    },\n    module: { type: 'es6' },\n  });\n  await mkdir(path.dirname(out), { recursive: true });\n  await writeFile(out, result.code, 'utf-8');\n}\n\nasync function build(): Promise<void> {\n  console.log('[build] SWCトランスパイル開始...');\n  const files = await readdir('./src', { recursive: true });\n  const tsFiles = files.filter((f): f is string =>\n    typeof f === 'string' && f.endsWith('.ts')\n  );\n  await Promise.all(\n    tsFiles.map(f =>\n      transpileFile(`./src/\${f}`, `./dist/\${f.replace(/\\.ts$/, '.js')}`)\n    )\n  );\n  console.log(`[build] \${tsFiles.length}ファイル完了`);\n}\n\n// 型チェックとビルドを並列実行\nawait Promise.all([typecheck(), build()]);\nconsole.log('完了');"
   }]
 };
 
@@ -857,66 +213,12 @@ const chapters = [{
   }, {
     title: "ASTトラバーサルと型情報の取得",
     body: "AST トラバーサルの基本は `ts.forEachChild(node, callback)` か `ts.visitEachChild(node, visitor, context)` を再帰的に呼ぶことです。前者はシンプルな探索向き、後者はトランスフォーマー（ノード変換）向きです。Python の `ast.NodeVisitor` パターンと同様ですが、TS では各ノード型に対応する is 関数で型を絞り込んでから安全にプロパティを参照します。\n\n型情報を取得するには `program.getTypeChecker()` で得た TypeChecker を使います。`checker.getTypeAtLocation(node)` はノードの型を返し、`checker.typeToString(type)` で人間が読める文字列に変換できます。これにより「この変数の型が string かどうか」といったチェックや、「この関数の戻り値型」を実行時に取得して、それに基づいたコード変換が可能になります。",
-    code: `import ts from 'typescript';
-
-const fileName = './src/index.ts';
-const program = ts.createProgram([fileName], {
-  target: ts.ScriptTarget.ES2022,
-  strict: true,
-});
-const checker = program.getTypeChecker();
-const sourceFile = program.getSourceFile(fileName)!;
-
-// 全ての識別子の型を出力
-function printIdentifierTypes(node: ts.Node): void {
-  if (ts.isIdentifier(node)) {
-    const symbol = checker.getSymbolAtLocation(node);
-    if (symbol) {
-      const type = checker.getTypeOfSymbolAtLocation(
-        symbol, node
-      );
-      console.log(node.text, ':', checker.typeToString(type));
-    }
-  }
-  ts.forEachChild(node, printIdentifierTypes);
-}
-
-printIdentifierTypes(sourceFile);`,
+    code: "import ts from 'typescript';\n\nconst fileName = './src/index.ts';\nconst program = ts.createProgram([fileName], {\n  target: ts.ScriptTarget.ES2022,\n  strict: true,\n});\nconst checker = program.getTypeChecker();\nconst sourceFile = program.getSourceFile(fileName)!;\n\n// 全ての識別子の型を出力\nfunction printIdentifierTypes(node: ts.Node): void {\n  if (ts.isIdentifier(node)) {\n    const symbol = checker.getSymbolAtLocation(node);\n    if (symbol) {\n      const type = checker.getTypeOfSymbolAtLocation(\n        symbol, node\n      );\n      console.log(node.text, ':', checker.typeToString(type));\n    }\n  }\n  ts.forEachChild(node, printIdentifierTypes);\n}\n\nprintIdentifierTypes(sourceFile);",
     afterCode: "ポイント: checker.getSymbolAtLocation() は宣言元のシンボルを返します。シンボルから型を取得することで、参照側ではなく宣言元の型情報が得られます。型推論結果ではなく宣言型が必要な場合はこちらを使います。"
   }, {
     title: "カスタムトランスフォーマー",
     body: "トランスフォーマーは「ASTノードを受け取り、変換後のノードを返す関数」です。TypeScript では `ts.TransformerFactory<ts.SourceFile>` 型で表現され、`ts.transpileModule()` や `ts.transform()` に渡すことでコード変換を行えます。Babel のプラグインや Python の ast.NodeTransformer と同じ発想です。\n\n変換のポイントは「必ず ts.factory.createXxx() か ts.factory.updateXxx() で新しいノードを生成し、元のノードを直接変更しない」ことです。AST は不変（イミュータブル）で扱い、ts.visitEachChild() に変換関数を渡すことで、変更したノードだけを差し替えた新しいツリーを得られます。この「変更箇所以外はそのまま通す」設計がトランスフォーマーの核心です。",
-    code: `import ts from 'typescript';
-
-// 全 string リテラルを大文字に変換するトランスフォーマー
-function upperCaseStringTransformer(
-  ctx: ts.TransformationContext
-): ts.Transformer<ts.SourceFile> {
-  return (sourceFile) => {
-    function visit(node: ts.Node): ts.Node {
-      if (ts.isStringLiteral(node)) {
-        return ts.factory.createStringLiteral(
-          node.text.toUpperCase()
-        );
-      }
-      // 変更なしのノードはそのまま子を巡回
-      return ts.visitEachChild(node, visit, ctx);
-    }
-    return ts.visitNode(sourceFile, visit) as ts.SourceFile;
-  };
-}
-
-// 使用例
-const code = \`const msg = "hello world";\`;
-const result = ts.transpileModule(code, {
-  transformers: {
-    before: [
-      (ctx) => upperCaseStringTransformer(ctx)
-    ]
-  }
-});
-console.log(result.outputText);
-// → const msg = "HELLO WORLD";`,
+    code: "import ts from 'typescript';\n\n// 全 string リテラルを大文字に変換するトランスフォーマー\nfunction upperCaseStringTransformer(\n  ctx: ts.TransformationContext\n): ts.Transformer<ts.SourceFile> {\n  return (sourceFile) => {\n    function visit(node: ts.Node): ts.Node {\n      if (ts.isStringLiteral(node)) {\n        return ts.factory.createStringLiteral(\n          node.text.toUpperCase()\n        );\n      }\n      // 変更なしのノードはそのまま子を巡回\n      return ts.visitEachChild(node, visit, ctx);\n    }\n    return ts.visitNode(sourceFile, visit) as ts.SourceFile;\n  };\n}\n\n// 使用例\nconst code = `const msg = \"hello world\";`;\nconst result = ts.transpileModule(code, {\n  transformers: {\n    before: [\n      (ctx) => upperCaseStringTransformer(ctx)\n    ]\n  }\n});\nconsole.log(result.outputText);\n// → const msg = \"HELLO WORLD\";",
     afterCode: "ポイント: ts.transpileModule() は単一ファイルを変換する手軽な API です。型チェックは行わないため高速ですが、型情報が必要なトランスフォーマーでは ts.createProgram() からの本格的なパイプラインを使う必要があります。"
   }]
 }, {
@@ -933,57 +235,12 @@ console.log(result.outputText);
   }, {
     title: "Variadic Tuple Types と型推論",
     body: "TypeScript 4.0 で導入された Variadic Tuple Types（可変長タプル型）は、`[...A, ...B]` という構文でタプル型を連結したり、先頭・末尾の要素を取り出したりできます。Python の `*args` に型を付けたような概念ですが、型レベルで長さと各要素の型が保持される点が異なります。\n\nこの機能の最大の恩恵は「関数合成の型推論」です。`pipe(a, f, g, h)` のような左から右に値を渡す関数合成において、各関数の入力・出力型が連鎖して正確に推論されるようになりました。fp-ts や Effect-TS の pipe 実装はこれを活用しています。Variadic Tuple と infer を組み合わせると、可変個の型パラメータを持つジェネリック関数を正確に型付けできます。",
-    code: `// 先頭・末尾の取り出し
-type Head<T extends unknown[]> =
-  T extends [infer H, ...unknown[]] ? H : never;
-
-type Tail<T extends unknown[]> =
-  T extends [unknown, ...infer T] ? T : never;
-
-type H = Head<[string, number, boolean]>; // string
-type T = Tail<[string, number, boolean]>; // [number, boolean]
-
-// 関数のパラメータ型を反転
-type Reverse<T extends unknown[]> =
-  T extends [...infer Init, infer Last]
-    ? [Last, ...Reverse<Init>]
-    : T;
-
-type Rev = Reverse<[1, 2, 3]>; // [3, 2, 1]
-
-// Promise.all の型を自前で実装
-type AwaitAll<T extends Promise<unknown>[]> = {
-  [K in keyof T]: T[K] extends Promise<infer U> ? U : never
-};`,
+    code: "// 先頭・末尾の取り出し\ntype Head<T extends unknown[]> =\n  T extends [infer H, ...unknown[]] ? H : never;\n\ntype Tail<T extends unknown[]> =\n  T extends [unknown, ...infer T] ? T : never;\n\ntype H = Head<[string, number, boolean]>; // string\ntype T = Tail<[string, number, boolean]>; // [number, boolean]\n\n// 関数のパラメータ型を反転\ntype Reverse<T extends unknown[]> =\n  T extends [...infer Init, infer Last]\n    ? [Last, ...Reverse<Init>]\n    : T;\n\ntype Rev = Reverse<[1, 2, 3]>; // [3, 2, 1]\n\n// Promise.all の型を自前で実装\ntype AwaitAll<T extends Promise<unknown>[]> = {\n  [K in keyof T]: T[K] extends Promise<infer U> ? U : never\n};",
     afterCode: "ポイント: [infer H, ...unknown[]] のように rest が unknown[] なら後続の型は無視されます。[infer H, ...infer Rest] にすれば Rest に残りの型が入ります。この違いが Head と再帰的Tail実装の鍵です。"
   }, {
     title: "型の停止問題と実用上の限界",
     body: "TypeScript の型システムはチューリング完全です。つまり、型レベルで任意の計算を表現できる反面、「型チェックが終わらない（型が発散する）」問題が理論上存在します。実際には TypeScript コンパイラが再帰深度の上限を設けているため無限ループにはなりませんが、複雑な再帰型はコンパイル時間を著しく増加させます。\n\n実務では「型の複雑さと開発体験のトレードオフ」を常に意識する必要があります。型で全てを表現しようとすると IDE のホバー表示が巨大になり、エラーメッセージが読めなくなります。ライブラリ設計では「内部実装は複雑でも、公開 API の型はシンプルに見せる」ことが重要です。`type` エイリアスに適切な名前を付け、`// @internal` で内部型を隠す設計が求められます。",
-    code: `// 過剰な型計算の例（避けるべき）
-type DeepPath<T> =
-  T extends object
-    ? { [K in keyof T & string]:
-        K | \`\${K}.\${DeepPath<T[K]>}\`
-      }[keyof T & string]
-    : never;
-// 深いオブジェクトでは型チェックが数秒かかる
-
-// 実用的な折衷案: 深さを制限
-type DeepPath2<T, Depth extends number[] = []> =
-  Depth['length'] extends 3  // 3階層まで
-    ? never
-    : T extends object
-    ? { [K in keyof T & string]:
-        K | \`\${K}.\${DeepPath2<T[K], [0, ...Depth]>}\`
-      }[keyof T & string]
-    : never;
-
-// 型エイリアスで公開APIをシンプルに見せる
-type UserPath = DeepPath2<{
-  name: string;
-  address: { city: string; zip: string };
-}>;
-// 'name' | 'address' | 'address.city' | 'address.zip'`,
+    code: "// 過剰な型計算の例（避けるべき）\ntype DeepPath<T> =\n  T extends object\n    ? { [K in keyof T & string]:\n        K | `\${K}.\${DeepPath<T[K]>}`\n      }[keyof T & string]\n    : never;\n// 深いオブジェクトでは型チェックが数秒かかる\n\n// 実用的な折衷案: 深さを制限\ntype DeepPath2<T, Depth extends number[] = []> =\n  Depth['length'] extends 3  // 3階層まで\n    ? never\n    : T extends object\n    ? { [K in keyof T & string]:\n        K | `\${K}.\${DeepPath2<T[K], [0, ...Depth]>}`\n      }[keyof T & string]\n    : never;\n\n// 型エイリアスで公開APIをシンプルに見せる\ntype UserPath = DeepPath2<{\n  name: string;\n  address: { city: string; zip: string };\n}>;\n// 'name' | 'address' | 'address.city' | 'address.zip'",
     afterCode: "ポイント: 型パラメータに depth カウンタ（Depth extends number[] で長さを制限）を追加するパターンは再帰型の深さ制限に広く使われるテクニックです。Depth['length'] extends N で打ち切ります。"
   }]
 }, {
@@ -1000,45 +257,7 @@ type UserPath = DeepPath2<{
   }, {
     title: "型安全なSQL/GraphQL DSL",
     body: "Template Literal Types と条件型・infer を組み合わせると、文字列を「型レベルでパース」できます。例えば `` `SELECT ${infer Cols} FROM ${infer Table}` `` というパターンマッチで、SELECT クエリから列名とテーブル名を型として抽出できます。これが Kysely や Prisma Raw Query などが採用するアプローチの基礎です。\n\n実際のライブラリほど完全ではありませんが、型レベルパーサーのコアロジックは「infer で文字列を分割し、分割した部分を再帰的に処理する」ことです。Python で正規表現のグループを使って文字列を分解するイメージですが、TS では型レベルで行うため実行時コストはゼロです。コンパイル時だけに存在する型情報として、間違ったクエリ文字列を書いたらビルド前にエラーにできます。",
-    code: `// 型レベルの CSV パーサー（カンマ区切りを分割）
-type SplitCSV<S extends string> =
-  S extends \`\${infer Col},\${infer Rest}\`
-    ? [Col, ...SplitCSV<Rest>]
-    : [S];
-
-type Cols = SplitCSV<'id,name,email'>;
-// ['id', 'name', 'email']
-
-// SELECT 文から列を抽出
-type ParseSelect<Q extends string> =
-  Q extends \`SELECT \${infer Cols} FROM \${string}\`
-    ? SplitCSV<Cols>
-    : never;
-
-type Selected = ParseSelect<'SELECT id,name FROM users'>;
-// ['id', 'name']
-
-// 型安全なクエリビルダー
-type TableSchema = {
-  users: { id: number; name: string; email: string };
-  posts: { id: number; title: string; body: string };
-};
-
-type SelectFrom<
-  T extends keyof TableSchema,
-  K extends keyof TableSchema[T]
-> = Pick<TableSchema[T], K>;
-
-function select<
-  T extends keyof TableSchema,
-  K extends keyof TableSchema[T]
->(table: T, cols: K[]): SelectFrom<T, K>[] {
-  // 実装は省略
-  return [] as SelectFrom<T, K>[];
-}
-
-const rows = select('users', ['id', 'name']);
-// rows: { id: number; name: string }[]`,
+    code: "// 型レベルの CSV パーサー（カンマ区切りを分割）\ntype SplitCSV<S extends string> =\n  S extends `\${infer Col},\${infer Rest}`\n    ? [Col, ...SplitCSV<Rest>]\n    : [S];\n\ntype Cols = SplitCSV<'id,name,email'>;\n// ['id', 'name', 'email']\n\n// SELECT 文から列を抽出\ntype ParseSelect<Q extends string> =\n  Q extends `SELECT \${infer Cols} FROM \${string}`\n    ? SplitCSV<Cols>\n    : never;\n\ntype Selected = ParseSelect<'SELECT id,name FROM users'>;\n// ['id', 'name']\n\n// 型安全なクエリビルダー\ntype TableSchema = {\n  users: { id: number; name: string; email: string };\n  posts: { id: number; title: string; body: string };\n};\n\ntype SelectFrom<\n  T extends keyof TableSchema,\n  K extends keyof TableSchema[T]\n> = Pick<TableSchema[T], K>;\n\nfunction select<\n  T extends keyof TableSchema,\n  K extends keyof TableSchema[T]\n>(table: T, cols: K[]): SelectFrom<T, K>[] {\n  // 実装は省略\n  return [] as SelectFrom<T, K>[];\n}\n\nconst rows = select('users', ['id', 'name']);\n// rows: { id: number; name: string }[]",
     afterCode: "ポイント: 型レベルパーサーはコンパイル時間に影響します。複雑な DSL を型で表現する場合、実際の開発では Prisma や Kysely など実績あるライブラリを使い、そのソースコードを参考にするのが現実的です。"
   }]
 }, {
@@ -1055,38 +274,7 @@ const rows = select('users', ['id', 'name']);
   }, {
     title: "API Surface の設計",
     body: "ライブラリを公開する際、「何を外部に公開し、何を内部実装として隠蔽するか」を明確にすることが重要です。これを API Surface と呼びます。TypeScript では `export` したものが全て公開 API になるため、内部で使うユーティリティ型や実装詳細は `export` しないか、`@internal` JSDoc タグで明示します。\n\n優れたライブラリ型設計のポイントは三つです。第一に「型推論が自然に働くようにする」こと。呼び出し側が型引数を明示しなくても正しく推論されるよう、関数のシグネチャを設計します。第二に「エラーメッセージが読みやすい型を選ぶ」こと。型が複雑でもエラー時には具体的なメッセージが出るよう、`type` エイリアスで中間型に名前を付けます。第三に「将来の拡張を妨げない」こと。現在のバージョンで全ての型パラメータを固定しすぎると、後方互換性を破らずに新機能を追加できなくなります。",
-    code: `// 良い API Surface の例
-
-// ❌ 内部実装の詳細が漏れている
-export type InternalNode<T> = {
-  _ref: WeakRef<T>;
-  _generation: number;
-};
-
-// ✅ 公開APIはシンプルに見せる
-export interface NodeHandle<T> {
-  readonly id: string;
-  getValue(): T | undefined;
-}
-
-// ❌ 型引数を明示しないと使えない
-function create<T extends object>(
-  factory: () => T,
-  options: CacheOptions<T>
-): Cache<T> { /* ... */ }
-
-// ✅ 引数から型が推論される
-function createCache<T extends object>(
-  factory: () => T,
-  options?: { ttl?: number }
-): Cache<T> { /* ... */ }
-
-// const c = createCache(() => ({ id: '1' }));
-// c の型は Cache<{ id: string }> と推論される
-
-// @internal で隠蔽（APIExtractorが除外する）
-/** @internal */
-export function _internalHelper(): void { /* ... */ }`,
+    code: "// 良い API Surface の例\n\n// ❌ 内部実装の詳細が漏れている\nexport type InternalNode<T> = {\n  _ref: WeakRef<T>;\n  _generation: number;\n};\n\n// ✅ 公開APIはシンプルに見せる\nexport interface NodeHandle<T> {\n  readonly id: string;\n  getValue(): T | undefined;\n}\n\n// ❌ 型引数を明示しないと使えない\nfunction create<T extends object>(\n  factory: () => T,\n  options: CacheOptions<T>\n): Cache<T> { /* ... */ }\n\n// ✅ 引数から型が推論される\nfunction createCache<T extends object>(\n  factory: () => T,\n  options?: { ttl?: number }\n): Cache<T> { /* ... */ }\n\n// const c = createCache(() => ({ id: '1' }));\n// c の型は Cache<{ id: string }> と推論される\n\n// @internal で隠蔽（APIExtractorが除外する）\n/** @internal */\nexport function _internalHelper(): void { /* ... */ }",
     afterCode: "ポイント: Microsoft の API Extractor ツールを使うと、@internal タグの付いたものを自動除外した公開用 d.ts を生成できます。大規模ライブラリでは必須のツールです。"
   }]
 }, {
@@ -1103,36 +291,7 @@ export function _internalHelper(): void { /* ... */ }`,
   }, {
     title: "pipe によるパイプライン設計",
     body: "fp-ts の `pipe(value, f1, f2, f3)` は Python の `functools.reduce(lambda v,f: f(v), [f1,f2,f3], value)` と同じ動作ですが、TypeScript の型推論が各ステップの型を追跡するため、パイプラインのどこかで型が合わない場合に正確なエラーが出ます。\n\nパイプライン設計の核心は「副作用（外部APIの呼び出し・DB書き込み）を端に追い出し、中間の変換ロジックを純粋関数で表現する」ことです。Python でも同じ設計は可能ですが、fp-ts + TaskEither では「非同期処理かつ型安全なエラー処理」を `pipe` で一直線に書けます。失敗パスと成功パスを `TE.chain`（成功時のみ次へ）と `TE.mapLeft`（失敗側の変換）で制御することで、try/catch のネストを避けたフラットな処理フローが実現できます。",
-    code: `import { pipe } from 'fp-ts/function';
-import * as O from 'fp-ts/Option';
-import * as E from 'fp-ts/Either';
-
-// Option の連鎖
-const result = pipe(
-  O.fromNullable(process.env['PORT']),   // string | undefined → Option<string>
-  O.map(s => parseInt(s, 10)),           // Option<string> → Option<number>
-  O.filter(n => !isNaN(n) && n > 0),    // 不正値をNoneに
-  O.getOrElse(() => 3000)               // None のデフォルト値
-);
-// result: number (3000 or parsed PORT)
-
-// Either の連鎖
-function parseJson(s: string): E.Either<Error, unknown> {
-  return E.tryCatch(() => JSON.parse(s), e => e as Error);
-}
-
-function validateUser(data: unknown): E.Either<string, { name: string }> {
-  if (typeof data === 'object' && data !== null && 'name' in data) {
-    return E.right(data as { name: string });
-  }
-  return E.left('Invalid user data');
-}
-
-const user = pipe(
-  parseJson('{"name":"alice"}'),
-  E.mapLeft(e => e.message),  // Error → string
-  E.chain(validateUser)       // 成功時のみ次へ
-);`,
+    code: "import { pipe } from 'fp-ts/function';\nimport * as O from 'fp-ts/Option';\nimport * as E from 'fp-ts/Either';\n\n// Option の連鎖\nconst result = pipe(\n  O.fromNullable(process.env['PORT']),   // string | undefined → Option<string>\n  O.map(s => parseInt(s, 10)),           // Option<string> → Option<number>\n  O.filter(n => !isNaN(n) && n > 0),    // 不正値をNoneに\n  O.getOrElse(() => 3000)               // None のデフォルト値\n);\n// result: number (3000 or parsed PORT)\n\n// Either の連鎖\nfunction parseJson(s: string): E.Either<Error, unknown> {\n  return E.tryCatch(() => JSON.parse(s), e => e as Error);\n}\n\nfunction validateUser(data: unknown): E.Either<string, { name: string }> {\n  if (typeof data === 'object' && data !== null && 'name' in data) {\n    return E.right(data as { name: string });\n  }\n  return E.left('Invalid user data');\n}\n\nconst user = pipe(\n  parseJson('{\"name\":\"alice\"}'),\n  E.mapLeft(e => e.message),  // Error → string\n  E.chain(validateUser)       // 成功時のみ次へ\n);",
     afterCode: "ポイント: E.chain は「前のステップが Right のときだけ次の関数を呼ぶ」モナディックバインドです。Left が出た時点でパイプラインは短絡し、以降のステップは全てスキップされます。Python の例外 re-raise と同等の効果を型安全に実現します。"
   }]
 }, {
@@ -1149,41 +308,7 @@ const user = pipe(
   }, {
     title: "型定義の共有とProject References",
     body: "モノレポで最も注意が必要なのが「型定義の共有方法」です。パッケージ間で型を共有するには二つのアプローチがあります。第一は「パッケージを workspace:* で参照し、`paths` 設定でソースを直接見る」方法です。ビルド前でも型チェックが動き、開発体験が良い反面、本番ビルドでのパス解決に別途設定が必要です。\n\n第二は TypeScript の Project References（`composite: true`）を使う方法です。各パッケージが .d.ts を生成し、依存パッケージはその .d.ts を参照します。ビルド順が明示的で、`tsc --build` コマンドが依存順を自動解決します。初回ビルドが必要ですが、差分ビルドが効き大規模プロジェクトで有利です。小規模モノレポでは paths アプローチ、CI/大規模では Project References が向いています。",
-    code: `// パッケージ間の型共有 — paths アプローチ
-// apps/web/tsconfig.json
-{
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@myorg/*": ["../../packages/*/src/index.ts"]
-    }
-  }
-}
-
-// packages/utils/src/index.ts
-export function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0]!;
-}
-
-// apps/web/src/page.ts — 型付きで参照できる
-import { formatDate } from '@myorg/utils';
-const s: string = formatDate(new Date()); // 型チェック OK
-
-// Project References アプローチ
-// packages/utils/tsconfig.json
-{
-  "compilerOptions": {
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
-    "outDir": "./dist"
-  }
-}
-
-// apps/web/tsconfig.json
-{
-  "references": [{ "path": "../../packages/utils" }]
-}`,
+    code: "// パッケージ間の型共有 — paths アプローチ\n// apps/web/tsconfig.json\n{\n  \"compilerOptions\": {\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@myorg/*\": [\"../../packages/*/src/index.ts\"]\n    }\n  }\n}\n\n// packages/utils/src/index.ts\nexport function formatDate(d: Date): string {\n  return d.toISOString().split('T')[0]!;\n}\n\n// apps/web/src/page.ts — 型付きで参照できる\nimport { formatDate } from '@myorg/utils';\nconst s: string = formatDate(new Date()); // 型チェック OK\n\n// Project References アプローチ\n// packages/utils/tsconfig.json\n{\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"declaration\": true,\n    \"declarationMap\": true,\n    \"outDir\": \"./dist\"\n  }\n}\n\n// apps/web/tsconfig.json\n{\n  \"references\": [{ \"path\": \"../../packages/utils\" }]\n}",
     afterCode: "ポイント: declarationMap: true を設定すると、.d.ts から元のソース .ts へのソースマップが生成されます。IDE で「定義に移動」したとき、dist/ の .d.ts ではなく src/ の実装ファイルに飛べるようになり開発体験が向上します。"
   }]
 }, {
@@ -1200,40 +325,7 @@ const s: string = formatDate(new Date()); // 型チェック OK
   }, {
     title: "スキーマ合成とカスタムバリデーター",
     body: "実務では単純なフィールドバリデーションだけでなく「パスワードと確認パスワードが一致する」「開始日が終了日より前」のような相関バリデーションが必要です。Zod の `.superRefine()` は複数のエラーを同時に返せる高機能バリデーター追加メソッドで、このような複雑なビジネスルールを表現します。\n\nスキーマの合成も重要なパターンです。`z.union([A, B])` でユニオン、`z.intersection(A, B)` で交差型（両方のバリデーションを通過）を作れます。`z.discriminatedUnion('type', [A, B])` を使うと判別フィールドで分岐するバリデーションが高速になります。Python の pydantic では `model_validator` や `field_validator` に相当する機能ですが、Zod はこれらをスキーマチェーンとして構成できるため、バリデーションロジックが再利用しやすくなっています。",
-    code: `import { z } from 'zod';
-
-// 相関バリデーション
-const DateRangeSchema = z.object({
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
-}).superRefine((data, ctx) => {
-  if (new Date(data.startDate) >= new Date(data.endDate)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: '開始日は終了日より前でなければなりません',
-      path: ['startDate'],
-    });
-  }
-});
-
-// スキーマの変換と合成
-const RawUserSchema = z.object({
-  id: z.string(),
-  age: z.string().transform(s => parseInt(s, 10)),
-  tags: z.string().transform(s => s.split(',').map(t => t.trim())),
-});
-
-type User = z.infer<typeof RawUserSchema>;
-// { id: string; age: number; tags: string[] }
-
-// Discriminated union バリデーション
-const EventSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('click'), x: z.number(), y: z.number() }),
-  z.object({ type: z.literal('keydown'), key: z.string() }),
-  z.object({ type: z.literal('scroll'), delta: z.number() }),
-]);
-
-type Event = z.infer<typeof EventSchema>;`,
+    code: "import { z } from 'zod';\n\n// 相関バリデーション\nconst DateRangeSchema = z.object({\n  startDate: z.string().datetime(),\n  endDate: z.string().datetime(),\n}).superRefine((data, ctx) => {\n  if (new Date(data.startDate) >= new Date(data.endDate)) {\n    ctx.addIssue({\n      code: z.ZodIssueCode.custom,\n      message: '開始日は終了日より前でなければなりません',\n      path: ['startDate'],\n    });\n  }\n});\n\n// スキーマの変換と合成\nconst RawUserSchema = z.object({\n  id: z.string(),\n  age: z.string().transform(s => parseInt(s, 10)),\n  tags: z.string().transform(s => s.split(',').map(t => t.trim())),\n});\n\ntype User = z.infer<typeof RawUserSchema>;\n// { id: string; age: number; tags: string[] }\n\n// Discriminated union バリデーション\nconst EventSchema = z.discriminatedUnion('type', [\n  z.object({ type: z.literal('click'), x: z.number(), y: z.number() }),\n  z.object({ type: z.literal('keydown'), key: z.string() }),\n  z.object({ type: z.literal('scroll'), delta: z.number() }),\n]);\n\ntype Event = z.infer<typeof EventSchema>;",
     afterCode: "ポイント: `.transform()` は `_input` と `_output` の型を変えます。変換後の型は `.parse()` の戻り値に反映されますが、`.safeParse()` の input 側には変換前の型が使われます。フォームの raw 値を受け取って変換するパターンで特に有効です。"
   }]
 }, {
@@ -1250,72 +342,12 @@ type Event = z.infer<typeof EventSchema>;`,
   }, {
     title: "型チェックパフォーマンスの最適化",
     body: "大規模プロジェクトでは tsc の型チェックが数十秒〜数分かかることがあります。最適化の第一歩は計測です。`tsc --noEmit --diagnostics` で「チェック時間」「ファイル数」「型計算の負荷」が確認できます。`--generateTrace` フラグを使うと Chrome DevTools で型チェックのフレームグラフが表示され、どの型計算がボトルネックかを特定できます。\n\n改善策は主に三つです。第一は Project References による差分ビルドです。前章で解説したように `composite: true` を設定すると、変更のあったパッケージだけを再チェックします。第二は `skipLibCheck: true` で node_modules の .d.ts 検査を省略することです。第三は型の複雑さを下げることです。`--generateTrace` で特定した重い型に対して、中間の型エイリアスを増やして計算を分割したり、条件型の深さを制限したりします。",
-    code: `// 型チェック計測
-// npx tsc --noEmit --diagnostics
-// Files:     120
-// Lines of Library:   45823
-// Check time:         8.32s  ← ここが遅い
-
-// プロファイリング
-// npx tsc --generateTrace trace_output
-// → Chrome で chrome://tracing を開いてtrace_output/trace.json をロード
-
-// 改善1: skipLibCheck
-// tsconfig.json
-{ "compilerOptions": { "skipLibCheck": true } }
-
-// 改善2: isolatedDeclarations (TS 5.5+)
-// 各ファイルの型を独立して推論可能にする（並列化の鍵）
-{ "compilerOptions": { "isolatedDeclarations": true } }
-
-// 改善3: 重い型を単純化
-// ❌ 遅い: 深い再帰型
-type DeepPaths<T> = T extends object
-  ? { [K in keyof T & string]: K | \`\${K}.\${DeepPaths<T[K]>}\` }[keyof T & string]
-  : never;
-
-// ✅ 速い: 深さを制限 + 中間型に名前を付ける
-type Level1<T> = keyof T & string;
-type Level2<T> = {
-  [K in keyof T & string]: \`\${K}.\${keyof T[K] & string}\`
-}[keyof T & string];
-type ShallowPaths<T> = Level1<T> | Level2<T>;`,
+    code: "// 型チェック計測\n// npx tsc --noEmit --diagnostics\n// Files:     120\n// Lines of Library:   45823\n// Check time:         8.32s  ← ここが遅い\n\n// プロファイリング\n// npx tsc --generateTrace trace_output\n// → Chrome で chrome://tracing を開いてtrace_output/trace.json をロード\n\n// 改善1: skipLibCheck\n// tsconfig.json\n{ \"compilerOptions\": { \"skipLibCheck\": true } }\n\n// 改善2: isolatedDeclarations (TS 5.5+)\n// 各ファイルの型を独立して推論可能にする（並列化の鍵）\n{ \"compilerOptions\": { \"isolatedDeclarations\": true } }\n\n// 改善3: 重い型を単純化\n// ❌ 遅い: 深い再帰型\ntype DeepPaths<T> = T extends object\n  ? { [K in keyof T & string]: K | `\${K}.\${DeepPaths<T[K]>}` }[keyof T & string]\n  : never;\n\n// ✅ 速い: 深さを制限 + 中間型に名前を付ける\ntype Level1<T> = keyof T & string;\ntype Level2<T> = {\n  [K in keyof T & string]: `\${K}.\${keyof T[K] & string}`\n}[keyof T & string];\ntype ShallowPaths<T> = Level1<T> | Level2<T>;",
     afterCode: "ポイント: TypeScript 5.5 で導入された `isolatedDeclarations` は、各ファイルの型を他のファイルの型推論に依存させず、独立して .d.ts を生成できることを強制するモードです。これにより並列型チェックが可能になり、将来の Language Server 高速化の布石になっています。"
   }, {
     title: "TC39 Type Annotations と将来の TypeScript",
     body: "TC39（JavaScript の標準化委員会）では「Type Annotations」提案が進行中です。これは JavaScript エンジンが型注釈をコメント扱い（パース可能だが無視する）にすることで、tsc によるトランスパイルなしに型注釈付き JS を実行できるようにするものです。Python の型ヒントが実行時に `__annotations__` として存在するのに似た発想ですが、より軽量です。\n\n2026年現在、この提案は Stage 1 から前進が緩やかですが、Node.js 23+ が `--experimental-strip-types` フラグで TypeScript ファイルを直接実行できるようになっており、実用化の流れは着実に進んでいます。Deno は当初から TypeScript をネイティブ実行し、Bun も同様です。「TypeScript のトランスパイルが不要になる世界」は近づいており、その準備として型チェックと実行のさらなる分離が重要性を増しています。コードを書く際は「型情報は消える前提」を意識し、実行時の型チェックには引き続き Zod 等を使う設計を維持することが現実的です。",
-    code: `// TC39 Type Annotations 提案のイメージ
-// (2026年時点では実験的機能)
-
-// 将来こう書けるかもしれない
-function greet(name: string): string {
-  return \`Hello, \${name}\`;
-}
-// → Node.js / ブラウザが型注釈を無視して直接実行
-
-// 現時点で使える: Node.js --experimental-strip-types
-// node --experimental-strip-types ./src/index.ts
-
-// Bun / Deno は既にトランスパイル不要
-// bun run ./src/index.ts
-// deno run ./src/index.ts
-
-// 現実的な準備: 型と実行時バリデーションの分離を徹底
-// 型は消えても zod が守る
-import { z } from 'zod';
-
-const ConfigSchema = z.object({
-  host: z.string(),
-  port: z.number().int().positive(),
-});
-
-// TS型: コンパイル時のみ存在
-type Config = z.infer<typeof ConfigSchema>;
-
-// 実行時バリデーション: 型がなくても機能する
-export function loadConfig(raw: unknown): Config {
-  return ConfigSchema.parse(raw);
-}`,
+    code: "// TC39 Type Annotations 提案のイメージ\n// (2026年時点では実験的機能)\n\n// 将来こう書けるかもしれない\nfunction greet(name: string): string {\n  return `Hello, \${name}`;\n}\n// → Node.js / ブラウザが型注釈を無視して直接実行\n\n// 現時点で使える: Node.js --experimental-strip-types\n// node --experimental-strip-types ./src/index.ts\n\n// Bun / Deno は既にトランスパイル不要\n// bun run ./src/index.ts\n// deno run ./src/index.ts\n\n// 現実的な準備: 型と実行時バリデーションの分離を徹底\n// 型は消えても zod が守る\nimport { z } from 'zod';\n\nconst ConfigSchema = z.object({\n  host: z.string(),\n  port: z.number().int().positive(),\n});\n\n// TS型: コンパイル時のみ存在\ntype Config = z.infer<typeof ConfigSchema>;\n\n// 実行時バリデーション: 型がなくても機能する\nexport function loadConfig(raw: unknown): Config {\n  return ConfigSchema.parse(raw);\n}",
     afterCode: "ポイント: `isolatedDeclarations` と `--experimental-strip-types` はどちらも「型チェックを別工程に切り出す」方向性です。今後の TypeScript エコシステムは「型チェック（型の安全性）」と「実行（トランスパイル・ランタイム）」の分離がさらに明確になっていきます。設計時にこの軸を意識しておくことが、将来のツール移行に備えることになります。"
   }]
 }];
