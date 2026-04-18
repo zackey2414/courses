@@ -208,7 +208,7 @@ const chapters = [
     goal:"C++の基本型を列挙し、auto型推論と const/constexpr を使いこなせる。参照と値渡しの違いを説明し、関数引数に応じて使い分けられる。",
     sections:[
       {title:"基本型とauto型推論",body:"C++の型システムはPythonより厳格です。変数は宣言時に型が決まり、後で変更できません。ただし `auto` キーワードを使うとコンパイラが右辺から型を推論してくれます。これはPythonの動的型付けとは異なり、あくまでコンパイル時に型が確定します。\n\n数値リテラルのサフィックスに注意が必要です。`3.14` は `double`、`3.14f` は `float`、`42L` は `long`、`42LL` は `long long` です。整数除算では切り捨てが起きるため、`10/3` は `3` になります。Python3の `//` 演算子と同じ挙動です。\n\nC++17からは構造化束縛(structured bindings)が使えます。`auto& [key, val] = pair;` のように複数の変数を一度に束縛できます。Pythonのタプルアンパックに相当します。",table:T.types,code:"#include <iostream>\n#include <string>\nint main() {\n    auto i = 42;           // int\n    auto d = 3.14;         // double\n    auto f = 3.14f;        // float\n    auto s = std::string(\"hello\"); // std::string\n    auto b = true;         // bool\n\n    // 整数演算の注意\n    std::cout << 10 / 3 << std::endl;  // 3 (切り捨て)\n    std::cout << 10.0 / 3 << std::endl; // 3.333...\n\n    // 型変換\n    int x = static_cast<int>(3.9); // 3 (切り捨て)\n    std::cout << x << std::endl;\n    return 0;\n}"},
-      {title:"const・constexpr・参照",body:\`C++の \`const\` はPythonにない概念で、「変更できない変数」を宣言します。関数引数に \`const T&\` を使うと、コピーを避けつつ変更を禁止できるため、大きなオブジェクトの受け渡しに最適です。\n\n\`constexpr\` はコンパイル時定数を宣言します。\`const\` は実行時に値が確定すれば良いのに対し、\`constexpr\` はコンパイル時に確定する必要があります。配列サイズや \`switch\` のケース値に使えます。\n\n参照（\`T&\`）はC++独自の概念で、既存の変数の別名を作ります。Pythonの変数はすべて参照ですが、C++では値型が基本で、参照は明示的に \`&\` で宣言します。これにより、「コピーするか参照するか」を明確に制御できます。`,table:T.refVsPtr,code:"#include <iostream>\n#include <string>\n\nconstexpr int MAX_SIZE = 100; // コンパイル時定数\n\nvoid modify(int& x) { x *= 2; } // 参照で受け取り変更\nvoid read_only(const std::string& s) { // const参照: コピーなし・変更不可\n    std::cout << s.size() << std::endl;\n}\n\nint main() {\n    int a = 5;\n    int& ref = a; // ref は a の別名\n    ref = 10;     // a も 10 になる\n    std::cout << a << std::endl; // 10\n\n    modify(a);\n    std::cout << a << std::endl; // 20\n\n    std::string msg = \"Hello, World!\";\n    read_only(msg); // コピーなしで渡せる\n    return 0;\n}",afterCode:"大きな struct や string を関数に渡すときは `const T&` がデフォルト選択肢。変更が必要なら `T&`、小さな型(int, double等)は値渡しで十分です。"},
+      {title:"const・constexpr・参照",body:"C++の `const` はPythonにない概念で、「変更できない変数」を宣言します。関数引数に `const T&` を使うと、コピーを避けつつ変更を禁止できるため、大きなオブジェクトの受け渡しに最適です。\n\n`constexpr` はコンパイル時定数を宣言します。`const` は実行時に値が確定すれば良いのに対し、`constexpr` はコンパイル時に確定する必要があります。配列サイズや `switch` のケース値に使えます。\n\n参照（`T&`）はC++独自の概念で、既存の変数の別名を作ります。Pythonの変数はすべて参照ですが、C++では値型が基本で、参照は明示的に `&` で宣言します。これにより、「コピーするか参照するか」を明確に制御できます。",table:T.refVsPtr,code:"#include <iostream>\n#include <string>\n\nconstexpr int MAX_SIZE = 100; // コンパイル時定数\n\nvoid modify(int& x) { x *= 2; } // 参照で受け取り変更\nvoid read_only(const std::string& s) { // const参照: コピーなし・変更不可\n    std::cout << s.size() << std::endl;\n}\n\nint main() {\n    int a = 5;\n    int& ref = a; // ref は a の別名\n    ref = 10;     // a も 10 になる\n    std::cout << a << std::endl; // 10\n\n    modify(a);\n    std::cout << a << std::endl; // 20\n\n    std::string msg = \"Hello, World!\";\n    read_only(msg); // コピーなしで渡せる\n    return 0;\n}",afterCode:"大きな struct や string を関数に渡すときは `const T&` がデフォルト選択肢。変更が必要なら `T&`、小さな型(int, double等)は値渡しで十分です。"},
     ]
   },
   {
@@ -216,37 +216,7 @@ const chapters = [
     goal:"クラスのアクセス修飾子・コンストラクタ・デストラクタを理解し、コピーコンストラクタ・コピー代入演算子を実装できる。Rule of Threeを説明できる。",
     sections:[
       {title:"classとstructの設計",body:"C++の `class` と `struct` の違いはデフォルトのアクセス修飾子だけです。`class` は `private` がデフォルト、`struct` は `public` がデフォルトです。Pythonのクラスはすべてのメンバーが公開ですが、C++では `private` でカプセル化できます。\n\nコンストラクタは初期化リスト(`: member(value)`)を使って初期化するのが効率的です。これはボディ内での代入より速く、`const` メンバーや参照メンバーの初期化に必須です。\n\nデストラクタ(`~ClassName()`)はオブジェクトが破棄される際に自動呼び出されます。動的確保したメモリを解放する場所として使います。Pythonの `__del__` に相当しますが、C++のデストラクタはスコープを抜けた時点で即座に呼ばれる点が異なります（RAII）。",table:T.accessControl,code:"#include <iostream>\n#include <string>\n\nclass Person {\n    std::string name; // private\n    int age;          // private\npublic:\n    // コンストラクタ (初期化リスト)\n    Person(const std::string& n, int a) : name(n), age(a) {\n        std::cout << name << \" created\" << std::endl;\n    }\n    // デストラクタ\n    ~Person() {\n        std::cout << name << \" destroyed\" << std::endl;\n    }\n    // getter (const メンバ関数)\n    std::string get_name() const { return name; }\n    int get_age() const { return age; }\n    void birthday() { ++age; }\n};\n\nint main() {\n    Person p(\"Alice\", 30);\n    p.birthday();\n    std::cout << p.get_name() << \": \" << p.get_age() << std::endl;\n    return 0; // ここで ~Person() が呼ばれる\n}"},
-      {title:"Rule of Three / Five / Zero",body:"C++には「特殊メンバ関数」と呼ばれる6つの関数（デフォルトコンストラクタ・デストラクタ・コピーコンストラクタ・コピー代入演算子・ムーブコンストラクタ・ムーブ代入演算子）があります。コンパイラが自動生成しますが、手動リソース管理をするクラスでは自分で定義が必要です。\n\nRule of Three（C++11以前）: デストラクタ・コピーコンストラクタ・コピー代入演算子のどれかを定義したら、3つすべて定義すること。\n\nRule of Five（C++11以降）: 上記3つに加えてムーブコンストラクタとムーブ代入演算子も定義すること。ムーブは所有権を別オブジェクトに移す操作で、コピーより高速です。\n\nRule of Zero: できれば特殊メンバ関数を一切定義せず、`std::string`, `std::vector`, スマートポインタなど自動管理するクラスのみを使うこと。これが最もシンプルで安全な設計です。",code:\`#include <iostream>
-#include <cstring>
-
-class MyArray {
-    int* data;
-    size_t size;
-public:
-    MyArray(size_t n) : size(n), data(new int[n]{}) {}
-
-    // コピーコンストラクタ (deep copy)
-    MyArray(const MyArray& other) : size(other.size), data(new int[other.size]) {
-        std::copy(other.data, other.data + size, data);
-    }
-
-    // コピー代入演算子
-    MyArray& operator=(const MyArray& other) {
-        if (this != &other) {
-            delete[] data;
-            size = other.size;
-            data = new int[size];
-            std::copy(other.data, other.data + size, data);
-        }
-        return *this;
-    }
-
-    // デストラクタ
-    ~MyArray() { delete[] data; }
-
-    int& operator[](size_t i) { return data[i]; }
-    size_t get_size() const { return size; }
-};`,afterCode:"Rule of Zero が推奨される理由は、スマートポインタとSTLを使えばほぼすべてのリソース管理を自動化できるからです。手動 new/delete は最小限にしましょう。"},
+      {title:"Rule of Three / Five / Zero",body:"C++には「特殊メンバ関数」と呼ばれる6つの関数（デフォルトコンストラクタ・デストラクタ・コピーコンストラクタ・コピー代入演算子・ムーブコンストラクタ・ムーブ代入演算子）があります。コンパイラが自動生成しますが、手動リソース管理をするクラスでは自分で定義が必要です。\n\nRule of Three（C++11以前）: デストラクタ・コピーコンストラクタ・コピー代入演算子のどれかを定義したら、3つすべて定義すること。\n\nRule of Five（C++11以降）: 上記3つに加えてムーブコンストラクタとムーブ代入演算子も定義すること。ムーブは所有権を別オブジェクトに移す操作で、コピーより高速です。\n\nRule of Zero: できれば特殊メンバ関数を一切定義せず、`std::string`, `std::vector`, スマートポインタなど自動管理するクラスのみを使うこと。これが最もシンプルで安全な設計です。",code:"#include <iostream>\n#include <cstring>\n\nclass MyArray {\n    int* data;\n    size_t size;\npublic:\n    MyArray(size_t n) : size(n), data(new int[n]{}) {}\n\n    // コピーコンストラクタ (deep copy)\n    MyArray(const MyArray& other) : size(other.size), data(new int[other.size]) {\n        std::copy(other.data, other.data + size, data);\n    }\n\n    // コピー代入演算子\n    MyArray& operator=(const MyArray& other) {\n        if (this != &other) {\n            delete[] data;\n            size = other.size;\n            data = new int[size];\n            std::copy(other.data, other.data + size, data);\n        }\n        return *this;\n    }\n\n    // デストラクタ\n    ~MyArray() { delete[] data; }\n\n    int& operator[](size_t i) { return data[i]; }\n    size_t get_size() const { return size; }\n};",afterCode:"Rule of Zero が推奨される理由は、スマートポインタとSTLを使えばほぼすべてのリソース管理を自動化できるからです。手動 new/delete は最小限にしましょう。"},
     ]
   },
   {

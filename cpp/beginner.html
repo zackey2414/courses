@@ -162,23 +162,7 @@ const chapters = [
    goal:"Todoアプリのプロジェクト構成を設計し、Todo構造体とoperator<<を実装できる。emplace_backとpush_backの違いを説明できる。",
    sections:[
      {title:"アプリ設計とプロジェクト構成",body:"本コースでは10章を通して「コマンドラインTodoマネージャー」を段階的に実装します。最終的には ./todo add \"タスク名\" / ./todo list / ./todo done 1 のようなCLIコマンドで動作するアプリを完成させます。\n\nまず設計から始めます。Pythonであれば辞書やリストで素早くデータを扱えますが、C++では型安全性のために構造体(struct)でデータモデルを定義します。これはPythonの dataclass に相当しますが、コンパイル時に型チェックされる点が異なります。\n\nプロジェクトはヘッダーファイル(.h)と実装ファイル(.cpp)に分割します。ヘッダーには宣言のみ、実装ファイルには定義を書く、という分離原則はC++の基本です。今は1ファイルで始めて後章で分割します。",table:T.projectStructure,code:"// main.cpp (初期版: 1ファイル構成)\n#include <iostream>\n#include <vector>\n#include <string>\n#include <algorithm>\n#include <optional>\n\nstruct Todo {\n    int id;\n    std::string title;\n    bool done;\n    int priority; // 1=高, 2=中, 3=低\n\n    Todo(int id, std::string title, int priority = 2)\n        : id(id), title(std::move(title)), done(false), priority(priority) {}\n};\n\nstd::ostream& operator<<(std::ostream& os, const Todo& t) {\n    os << \"[\" << t.id << \"] \" << t.title\n       << \" [P\" << t.priority << \"]\"\n       << \" [\" << (t.done ? \"DONE\" : \"PENDING\") << \"]\";\n    return os;\n}\n\nint main() {\n    std::vector<Todo> todos;\n    todos.emplace_back(1, \"Buy milk\", 1);\n    todos.emplace_back(2, \"Write report\", 2);\n    for (const auto& t : todos) std::cout << t << std::endl;\n    return 0;\n}",afterCode:"`emplace_back` は引数を直接構造体のコンストラクタに転送します（インプレース構築）。`push_back` が一度Todoを構築してからコピー/ムーブするのに対し、emplace_backは余分なコピーを避けられます。"},
-     {title:"TodoManagerクラスの骨格",body:"構造体とロジックを分離するためにTodoManagerクラスを作ります。データ(todos配列)とそれを操作するメソッドをひとつのクラスにカプセル化することで、main関数はコマンド振り分けだけに集中できます。これはPythonの「クラスにデータとメソッドをまとめる」設計と同じですが、C++ではアクセス制御が強制されます。\n\n`next_id` を private に持つことで、IDの自動インクリメントをクラス内部に隠蔽します。外部からIDを設定できなくすることで、重複IDの問題を防ぎます。\n\nC++のメンバ変数初期化には初期化子リスト(`: member(value)`)を使うのが効率的です。特に const メンバや参照メンバは初期化子リストでしか初期化できません。クラス内での直接初期化(`int next_id = 1;`)はC++11以降で使えるメンバ初期化子(member initializer)です。",code:\`class TodoManager {
-    std::vector<Todo> todos;
-    int next_id = 1; // メンバ初期化子 (C++11)
-
-public:
-    void add(const std::string& title, int priority = 2) {
-        todos.emplace_back(next_id++, title, priority);
-        std::cout << "Added [" << (next_id-1) << "] " << title << std::endl;
-    }
-
-    void list() const {
-        if (todos.empty()) { std::cout << "No todos." << std::endl; return; }
-        for (const auto& t : todos) std::cout << t << std::endl;
-    }
-
-    size_t count() const { return todos.size(); }
-};`},
+     {title:"TodoManagerクラスの骨格",body:"構造体とロジックを分離するためにTodoManagerクラスを作ります。データ(todos配列)とそれを操作するメソッドをひとつのクラスにカプセル化することで、main関数はコマンド振り分けだけに集中できます。これはPythonの「クラスにデータとメソッドをまとめる」設計と同じですが、C++ではアクセス制御が強制されます。\n\n`next_id` を private に持つことで、IDの自動インクリメントをクラス内部に隠蔽します。外部からIDを設定できなくすることで、重複IDの問題を防ぎます。\n\nC++のメンバ変数初期化には初期化子リスト(`: member(value)`)を使うのが効率的です。特に const メンバや参照メンバは初期化子リストでしか初期化できません。クラス内での直接初期化(`int next_id = 1;`)はC++11以降で使えるメンバ初期化子(member initializer)です。",code:"class TodoManager {\n    std::vector<Todo> todos;\n    int next_id = 1; // メンバ初期化子 (C++11)\n\npublic:\n    void add(const std::string& title, int priority = 2) {\n        todos.emplace_back(next_id++, title, priority);\n        std::cout << \"Added [\" << (next_id-1) << \"] \" << title << std::endl;\n    }\n\n    void list() const {\n        if (todos.empty()) { std::cout << \"No todos.\" << std::endl; return; }\n        for (const auto& t : todos) std::cout << t << std::endl;\n    }\n\n    size_t count() const { return todos.size(); }\n};"},
    ]},
   {id:"ch2",num:2,title:"検索・削除・フィルタリング",est:"55分",
    goal:"find_if, remove_if, copy_if を使った検索・削除・フィルタリングを実装できる。erase-removeイディオムを説明し、正しく使える。",
