@@ -43,13 +43,18 @@ def _is_field_boundary(content, pos):
         k = j + 1
         while k < n and content[k] in ' \t\n':
             k += 1
-        # Read identifier
+        if k >= n:
+            return True
+        # ,} or ,] = end of last element in object/array
+        if content[k] in '}]':
+            return True
+        # ,identifier: = next field in same object
         word_start = k
         while k < n and (content[k].isalpha() or content[k] == '_'):
             k += 1
         if k > word_start and k < n and content[k] == ':':
             return True
-        # Also: ,\n followed by { or [ (next array/object element)
+        # ,{ or ,[ = next element in array
         if k < n and content[k] in '{[':
             return True
     # newline then } or ] (multi-line object)
