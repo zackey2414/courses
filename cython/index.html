@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../assets/course.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cython 入門コース — Python開発者向け</title>
+  <meta name="description" content="Python開発者のためのCython入門コース。全10章・30問の演習付き。">
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="../assets/course-ui.js"></script>
+  <script>
+const { useState } = React;
+
+/* ── Table definitions ── */
+const T = {
+  compileFlow: {
+    h: ["ステップ", "入力", "出力", "説明"],
+    r: [["1. cythonize", ".pyx / .py", ".c / .cpp", "CythonトランスパイラがPython風コードをC言語に変換"], ["2. Cコンパイル", ".c", ".o", "gcc/clangなどのCコンパイラがオブジェクトファイルを生成"], ["3. リンク", ".o", ".so / .pyd", "共有ライブラリとしてリンクし、Pythonからimport可能にする"]]
+  },
+  funcTypes: {
+    h: ["キーワード", "Pythonから呼べる", "Cから呼べる", "オーバーヘッド", "用途"],
+    r: [["def", "はい", "いいえ", "大（Python呼び出し規約）", "通常のPython関数。外部APIとして公開"], ["cdef", "いいえ", "はい", "極小（C呼び出し規約）", "内部の高速ヘルパー関数"], ["cpdef", "はい", "はい", "中（両方の呼び出し規約を生成）", "Python/C両方から使いたい関数"]]
+  },
+  pureDecorators: {
+    h: ["デコレータ / 型", "対応する.pyx構文", "説明"],
+    r: [["@cython.cfunc", "cdef 関数", "C専用関数を定義。Pythonからは呼べない"], ["@cython.ccall", "cpdef 関数", "Python/C両方から呼べるハイブリッド関数"], ["@cython.cclass", "cdef class", "拡張型（C構造体ベースのクラス）を定義"], ["cython.int", "cdef int", "C言語のint型を宣言"], ["cython.double", "cdef double", "C言語のdouble型を宣言"], ["cython.declare()", "cdef 変数宣言", "変数のC型を宣言する関数"], ["@cython.boundscheck(False)", "# cython: boundscheck=False", "配列の境界チェックを無効化"], ["@cython.wraparound(False)", "# cython: wraparound=False", "負のインデックスチェックを無効化"]]
+  },
+  directives: {
+    h: ["ディレクティブ", "デフォルト", "効果"],
+    r: [["boundscheck", "True", "配列アクセス時の境界チェック。Falseで高速化"], ["wraparound", "True", "負のインデックス（a[-1]）のサポート。Falseで高速化"], ["cdivision", "False", "C言語式の除算（ゼロ除算チェックなし）。Trueで高速化"], ["nonecheck", "False", "None参照チェック。Trueで安全性向上"], ["initializedcheck", "True", "memoryviewの初期化チェック。Falseで高速化"]]
+  },
+  memoryviewFormats: {
+    h: ["宣言", "意味", "メモリレイアウト"],
+    r: [["int[:] mv", "1次元int配列", "ストライド自由"], ["double[:, :] mv", "2次元double配列", "ストライド自由"], ["int[::1] mv", "1次元int配列（C連続）", "C連続（行優先）"], ["double[:, ::1] mv", "2次元double配列（C連続）", "C連続（行優先）"], ["double[::1, :] mv", "2次元double配列（Fortran連続）", "Fortran連続（列優先）"]]
+  },
+  strTypes: {
+    h: ["Cython型", "Python型", "エンコーディング", "用途"],
+    r: [["str", "str", "Unicode", "一般的なテキスト処理"], ["bytes", "bytes", "バイト列", "バイナリデータ、Cライブラリとの連携"], ["unicode", "str (Python 3)", "Unicode", "明示的にUnicode文字列を扱う場合"], ["char*", "bytes", "バイト列", "C関数との受け渡し"]]
+  },
+  cdefClassVsClass: {
+    h: ["機能", "通常のclass", "cdef class（拡張型）"],
+    r: [["メモリ配置", "Pythonオブジェクト（辞書ベース）", "C構造体（固定レイアウト）"], ["属性アクセス速度", "辞書検索（遅い）", "直接オフセット参照（速い）"], ["動的属性追加", "可能", "不可能（宣言済み属性のみ）"], ["Python継承", "自由", "他のcdef classのみ"], ["型チェック", "isinstance()で可能", "isinstance()で可能（高速）"], ["メモリ効率", "辞書+ポインタ分のオーバーヘッド", "必要最小限"]]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [{
+    diff: 1,
+    q: "Cythonの3つの関数定義キーワード（def / cdef / cpdef）を、それぞれどのような場面で使うべきか説明してください。",
+    code: "# それぞれの特徴を書き出してみましょう",
+    answer: "# def: Pythonから呼び出す外部API向け。オーバーヘッドが大きい。\n#   例: Pythonスクリプトからimportして使う関数\n#\n# cdef: Cython内部でのみ使う高速関数。Pythonからは呼べない。\n#   例: ループ内で頻繁に呼ばれるヘルパー関数\n#\n# cpdef: Python/C両方から呼べるハイブリッド関数。\n#   例: テスト時はPythonから呼び、本番ではCから呼びたい関数"
+  }, {
+    diff: 1,
+    q: "以下のPython関数をCython（.pyx）形式に書き換え、引数と戻り値にC型を宣言してください。",
+    code: "# Python版\ndef add(a, b):\n    return a + b\n\nresult = add(3, 5)\nprint(result)",
+    answer: "# Cython版（.pyx）\ncpdef int add(int a, int b):\n    return a + b\n\n# Pythonから呼ぶ場合\n# result = add(3, 5)\n# print(result)  # → 8"
+  }, {
+    diff: 2,
+    q: "Cythonのコンパイルフローを3ステップで説明し、各ステップで生成されるファイルの拡張子を答えてください。",
+    code: "# ステップ1: ??? → ???\n# ステップ2: ??? → ???\n# ステップ3: ??? → ???",
+    answer: "# ステップ1: .pyx → .c\n#   CythonトランスパイラがPython風コードをC言語ソースに変換\n#\n# ステップ2: .c → .o\n#   Cコンパイラ（gcc/clang）がオブジェクトファイルを生成\n#\n# ステップ3: .o → .so（Linux/Mac）/ .pyd（Windows）\n#   共有ライブラリとしてリンクし、Pythonからimportできる形にする"
+  }],
+  ch2: [{
+    diff: 1,
+    q: "以下の内容でsetup.pyを作成し、example.pyxをコンパイルするコマンドを書いてください。",
+    code: "# example.pyx の内容:\ndef say_hello():\n    print(\"Hello from Cython!\")\n\n# setup.py を書いてください",
+    answer: "# setup.py\nfrom setuptools import setup\nfrom Cython.Build import cythonize\n\nsetup(\n    ext_modules=cythonize(\"example.pyx\")\n)\n\n# コンパイルコマンド:\n# python setup.py build_ext --inplace\n#\n# または pyproject.toml + cythonize コマンド:\n# cythonize -i example.pyx"
+  }, {
+    diff: 2,
+    q: "pyproject.tomlを使ってCythonプロジェクトのビルド設定を書いてください。numpy依存も含めること。",
+    code: "# pyproject.toml を書いてください",
+    answer: "# pyproject.toml\n# [build-system]\n# requires = [\"setuptools>=68.0\", \"cython>=3.0\", \"numpy>=1.24\"]\n# build-backend = \"setuptools.build_meta\"\n#\n# [project]\n# name = \"my-cython-project\"\n# version = \"0.1.0\"\n# requires-python = \">=3.9\"\n# dependencies = [\"numpy>=1.24\"]\n#\n# setup.py（併用）:\nfrom setuptools import setup, Extension\nfrom Cython.Build import cythonize\nimport numpy as np\n\nextensions = [\n    Extension(\"my_module\", [\"my_module.pyx\"],\n              include_dirs=[np.get_include()])\n]\n\nsetup(ext_modules=cythonize(extensions))"
+  }, {
+    diff: 2,
+    q: "cythonize コマンドのオプション -a と -i の意味を説明し、それぞれを使ったコマンド例を書いてください。",
+    code: "# cythonize のオプションを調べて書いてください",
+    answer: "# -i (--inplace): コンパイル結果をソースと同じディレクトリに配置\n# cythonize -i my_module.pyx\n# → my_module.cpython-312-x86_64-linux-gnu.so が同じ場所に生成\n#\n# -a (--annotate): HTMLアノテーションファイルを生成\n# cythonize -a my_module.pyx\n# → my_module.html が生成され、黄色い行がPythonオーバーヘッドの多い箇所\n#\n# 両方組み合わせ:\n# cythonize -a -i my_module.pyx"
+  }],
+  ch3: [{
+    diff: 1,
+    q: "以下のPython関数にcdef型宣言を追加して高速化してください。",
+    code: "# Python版\ndef sum_range(n):\n    total = 0\n    for i in range(n):\n        total += i\n    return total\n\nprint(sum_range(1000000))",
+    answer: "# Cython版（.pyx）\ndef sum_range(int n):\n    cdef long long total = 0\n    cdef int i\n    for i in range(n):\n        total += i\n    return total\n\n# print(sum_range(1000000))  # → 499999500000"
+  }, {
+    diff: 2,
+    q: "各C型のサイズと範囲を意識して、適切な型を選んでください。大きな整数の階乗計算と、浮動小数点の平均計算です。",
+    code: "# 1. 20の階乗を計算する関数（結果が非常に大きい）\ndef factorial(n):\n    result = 1\n    for i in range(1, n + 1):\n        result *= i\n    return result\n\n# 2. 浮動小数点リストの平均を計算する関数\ndef average(values):\n    total = 0.0\n    for v in values:\n        total += v\n    return total / len(values)",
+    answer: "# 1. 階乗: long longでも20!は収まるがギリギリ\ncpdef long long factorial(int n):\n    cdef long long result = 1\n    cdef int i\n    for i in range(1, n + 1):\n        result *= i\n    return result\n\n# 2. 平均: doubleで十分な精度\ncpdef double average(list values):\n    cdef double total = 0.0\n    cdef double v\n    cdef int n = len(values)\n    for item in values:\n        v = <double>item\n        total += v\n    return total / n"
+  }, {
+    diff: 3,
+    q: "typed memoryviewを使って、1次元配列の各要素を2乗する関数を書いてください。NumPy配列を受け取り、結果もNumPy配列で返すこと。",
+    code: "# NumPy配列 [1, 2, 3, 4, 5] を受け取り\n# [1, 4, 9, 16, 25] を返す関数を書いてください",
+    answer: "import numpy as np\ncimport numpy as cnp\n\ndef square_array(double[:] arr):\n    cdef int n = arr.shape[0]\n    cdef double[:] result = np.empty(n, dtype=np.float64)\n    cdef int i\n    for i in range(n):\n        result[i] = arr[i] * arr[i]\n    return np.asarray(result)\n\n# 使い方:\n# import numpy as np\n# a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n# print(square_array(a))  # → [ 1.  4.  9. 16. 25.]"
+  }],
+  ch4: [{
+    diff: 1,
+    q: "以下の3つの関数を、それぞれ def / cdef / cpdef で書き分けてください。理由もコメントで説明すること。",
+    code: "# 1. Pythonから呼ぶAPIとしての挨拶関数\n# 2. 内部で何度も呼ばれるユーティリティ（2つの整数の最大値）\n# 3. テストでも本番でも使いたい距離計算関数",
+    answer: "from libc.math cimport sqrt\n\n# 1. def: Pythonから呼ぶAPI\ndef greet(str name):\n    \"\"\"Pythonから呼ぶ公開関数\"\"\"\n    return f\"Hello, {name}!\"\n\n# 2. cdef: 内部専用の高速ヘルパー\ncdef int max_val(int a, int b):\n    \"\"\"Cython内部でのみ使う。Pythonからは呼べない\"\"\"\n    if a > b:\n        return a\n    return b\n\n# 3. cpdef: Python/C両方から呼べる\ncpdef double distance(double x1, double y1, double x2, double y2):\n    \"\"\"テスト時はPythonから、本番ではCから呼ぶ\"\"\"\n    cdef double dx = x2 - x1\n    cdef double dy = y2 - y1\n    return sqrt(dx * dx + dy * dy)"
+  }, {
+    diff: 2,
+    q: "インライン化を使って、ベクトルの内積を高速に計算する関数を書いてください。要素ごとの乗算をインライン関数にすること。",
+    code: "# 2つの配列 a, b の内積を計算\n# a = [1.0, 2.0, 3.0]\n# b = [4.0, 5.0, 6.0]\n# 内積 = 1*4 + 2*5 + 3*6 = 32.0",
+    answer: "cimport cython\n\ncdef inline double mul(double a, double b):\n    return a * b\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ncpdef double dot_product(double[:] a, double[:] b):\n    cdef int n = a.shape[0]\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):\n        total += mul(a[i], b[i])\n    return total\n\n# 使い方:\n# import numpy as np\n# a = np.array([1.0, 2.0, 3.0])\n# b = np.array([4.0, 5.0, 6.0])\n# print(dot_product(a, b))  # → 32.0"
+  }, {
+    diff: 3,
+    q: "再帰的なフィボナッチ関数を def / cdef / cpdef の3通りで書き、速度差を実感できるようコメントで説明してください。",
+    code: "# fib(30) を3通りの方法で計算してください",
+    answer: "# 1. def版: Pythonオーバーヘッドが毎回発生（最も遅い）\ndef fib_def(int n):\n    if n <= 1:\n        return n\n    return fib_def(n - 1) + fib_def(n - 2)\n\n# 2. cdef版: C呼び出し規約で再帰（最も速い）\ncdef long long fib_cdef(int n):\n    if n <= 1:\n        return n\n    return fib_cdef(n - 1) + fib_cdef(n - 2)\n\n# 3. cpdef版: 最初の呼び出しはPython経由、再帰はC経由\ncpdef long long fib_cpdef(int n):\n    if n <= 1:\n        return n\n    return fib_cpdef(n - 1) + fib_cpdef(n - 2)\n\n# Python用ラッパー（cdefを外部公開するため）\ndef fib_fast(int n):\n    return fib_cdef(n)\n\n# 速度の目安（fib(30)）:\n# def版: 約500ms\n# cpdef版: 約10ms\n# cdef版: 約8ms\n# → 再帰のように関数呼び出しが多い処理ではcdefの効果が絶大"
+  }],
+  ch5: [{
+    diff: 1,
+    q: "以下のPythonループにcdef型宣言とコンパイラディレクティブを追加して高速化してください。",
+    code: "# Python版: 配列の要素の合計を計算\nimport numpy as np\n\ndef array_sum(arr):\n    total = 0.0\n    for i in range(len(arr)):\n        total += arr[i]\n    return total\n\na = np.arange(1000000, dtype=np.float64)\nprint(array_sum(a))",
+    answer: "cimport cython\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef array_sum(double[:] arr):\n    cdef double total = 0.0\n    cdef int i\n    cdef int n = arr.shape[0]\n    for i in range(n):\n        total += arr[i]\n    return total\n\n# a = np.arange(1000000, dtype=np.float64)\n# print(array_sum(a))"
+  }, {
+    diff: 2,
+    q: "boundscheck と wraparound の ON/OFF による速度差を確認するため、行列の各要素を2倍にする関数を4パターンで書いてください。",
+    code: "# パターン1: boundscheck=True, wraparound=True（デフォルト）\n# パターン2: boundscheck=False のみ\n# パターン3: wraparound=False のみ\n# パターン4: 両方False",
+    answer: "cimport cython\nimport numpy as np\n\n# パターン1: デフォルト（最も安全、最も遅い）\ndef double_elements_safe(double[:, :] arr):\n    cdef int i, j\n    for i in range(arr.shape[0]):\n        for j in range(arr.shape[1]):\n            arr[i, j] *= 2.0\n\n# パターン2: boundscheck=False\n@cython.boundscheck(False)\ndef double_elements_nobc(double[:, :] arr):\n    cdef int i, j\n    for i in range(arr.shape[0]):\n        for j in range(arr.shape[1]):\n            arr[i, j] *= 2.0\n\n# パターン3: wraparound=False\n@cython.wraparound(False)\ndef double_elements_nowa(double[:, :] arr):\n    cdef int i, j\n    for i in range(arr.shape[0]):\n        for j in range(arr.shape[1]):\n            arr[i, j] *= 2.0\n\n# パターン4: 両方False（最も速い）\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef double_elements_fast(double[:, :] arr):\n    cdef int i, j\n    for i in range(arr.shape[0]):\n        for j in range(arr.shape[1]):\n            arr[i, j] *= 2.0\n\n# 速度比較（1000x1000行列）:\n# パターン1 > パターン2 ≈ パターン3 > パターン4\n# パターン4はパターン1の約2-5倍速くなることが多い"
+  }, {
+    diff: 3,
+    q: "cdivisionディレクティブを使って、整数除算の挙動がPythonとCで異なることを示すコードを書いてください。負の数の除算に注意すること。",
+    code: "# Pythonでは -7 // 2 = -4（床除算）\n# Cでは -7 / 2 = -3（ゼロ方向への切り捨て）\n# この違いを示すコードを書いてください",
+    answer: "cimport cython\n\n# デフォルト（cdivision=False）: Python式の床除算\ndef python_division(int a, int b):\n    cdef int result = a // b\n    cdef int remainder = a % b\n    return result, remainder\n\n# cdivision=True: C式の切り捨て除算\n@cython.cdivision(True)\ndef c_division(int a, int b):\n    cdef int result = a // b\n    cdef int remainder = a % b\n    return result, remainder\n\n# 確認:\n# python_division(-7, 2)  → (-4, 1)  ... Python式\n# c_division(-7, 2)       → (-3, -1) ... C式\n#\n# 注意: cdivision=Trueではゼロ除算チェックも無効になるため、\n# b=0 の場合にクラッシュする。安全性と速度のトレードオフ。"
+  }],
+  ch6: [{
+    diff: 1,
+    q: "以下の.pyx版のコードをPure Pythonモード（.pyファイル）に書き換えてください。",
+    code: "# .pyx版\ncdef int square(int x):\n    return x * x\n\ndef compute_sum_of_squares(int n):\n    cdef int total = 0\n    cdef int i\n    for i in range(n):\n        total += square(i)\n    return total",
+    answer: "import cython\n\n@cython.cfunc\ndef square(x: cython.int) -> cython.int:\n    return x * x\n\ndef compute_sum_of_squares(n: cython.int) -> cython.int:\n    total: cython.int = 0\n    i: cython.int\n    for i in range(n):\n        total += square(i)\n    return total"
+  }, {
+    diff: 2,
+    q: "Pure Pythonモードで、boundscheck/wraparoundを無効化した配列処理関数を書いてください。型アノテーションも全て Pure Python 形式で書くこと。",
+    code: "# .pyx版を Pure Python モードに変換してください\n# @cython.boundscheck(False)\n# @cython.wraparound(False)\n# def normalize(double[:] arr):\n#     cdef int n = arr.shape[0]\n#     cdef double total = 0.0\n#     cdef int i\n#     for i in range(n):\n#         total += arr[i]\n#     cdef double mean = total / n\n#     for i in range(n):\n#         arr[i] -= mean",
+    answer: "import cython\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef normalize(arr: cython.double[:]):\n    n: cython.int = arr.shape[0]\n    total: cython.double = 0.0\n    i: cython.int\n    for i in range(n):\n        total += arr[i]\n    mean: cython.double = total / n\n    for i in range(n):\n        arr[i] -= mean\n\n# 使い方（Cythonコンパイル時もPython実行時も同じ）:\n# a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n# normalize(a)\n# print(a)  # → [-2. -1.  0.  1.  2.]"
+  }, {
+    diff: 3,
+    q: "Pure Pythonモードで @cython.cclass を使った拡張型を定義してください。点（Point）クラスで、距離計算メソッドをcfuncにすること。",
+    code: "# Pure Python モードで cdef class 相当のPointクラスを書いてください\n# - x, y 属性（double）\n# - distance_to メソッド（cfunc）\n# - __repr__ メソッド（def）",
+    answer: "import cython\nfrom cython.cimports.libc.math import sqrt\n\n@cython.cclass\nclass Point:\n    x: cython.double\n    y: cython.double\n\n    def __init__(self, x: cython.double, y: cython.double):\n        self.x = x\n        self.y = y\n\n    @cython.cfunc\n    def distance_to(self, other: Point) -> cython.double:\n        dx: cython.double = self.x - other.x\n        dy: cython.double = self.y - other.y\n        return sqrt(dx * dx + dy * dy)\n\n    def __repr__(self) -> str:\n        return f\"Point({self.x}, {self.y})\"\n\n    def get_distance(self, other: Point) -> float:\n        return self.distance_to(other)\n\n# p1 = Point(0.0, 0.0)\n# p2 = Point(3.0, 4.0)\n# print(p1.get_distance(p2))  # → 5.0"
+  }],
+  ch7: [{
+    diff: 1,
+    q: "NumPy配列をtyped memoryviewで受け取り、全要素の合計を返す関数を書いてください。1次元double配列を想定すること。",
+    code: "# NumPy配列 [1.0, 2.0, 3.0, 4.0, 5.0] の合計を返す",
+    answer: "import numpy as np\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef array_sum(double[:] arr):\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):\n        total += arr[i]\n    return total\n\n# a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n# print(array_sum(a))  # → 15.0"
+  }, {
+    diff: 2,
+    q: "2次元のtyped memoryviewを使って、行列の転置を行う関数を書いてください。C連続メモリレイアウトを指定すること。",
+    code: "# 入力: [[1, 2, 3], [4, 5, 6]] (2x3)\n# 出力: [[1, 4], [2, 5], [3, 6]] (3x2)",
+    answer: "import numpy as np\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef transpose(double[:, ::1] matrix):\n    cdef int rows = matrix.shape[0]\n    cdef int cols = matrix.shape[1]\n    cdef double[:, ::1] result = np.empty((cols, rows), dtype=np.float64)\n    cdef int i, j\n    for i in range(rows):\n        for j in range(cols):\n            result[j, i] = matrix[i, j]\n    return np.asarray(result)\n\n# m = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])\n# print(transpose(m))\n# → [[1. 4.]\n#    [2. 5.]\n#    [3. 6.]]"
+  }, {
+    diff: 3,
+    q: "typed memoryviewとNumPyを使って、2つの行列の積を計算する関数を書いてください。C連続メモリを指定し、boundscheck/wraparoundを無効化すること。",
+    code: "# A (m x k) @ B (k x n) → C (m x n)\n# A = [[1, 2], [3, 4]]  B = [[5, 6], [7, 8]]\n# C = [[19, 22], [43, 50]]",
+    answer: "import numpy as np\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef matmul(double[:, ::1] A, double[:, ::1] B):\n    cdef int m = A.shape[0]\n    cdef int k = A.shape[1]\n    cdef int n = B.shape[1]\n    cdef double[:, ::1] C = np.zeros((m, n), dtype=np.float64)\n    cdef int i, j, p\n    cdef double total\n    for i in range(m):\n        for j in range(n):\n            total = 0.0\n            for p in range(k):\n                total += A[i, p] * B[p, j]\n            C[i, j] = total\n    return np.asarray(C)\n\n# A = np.array([[1.0, 2.0], [3.0, 4.0]])\n# B = np.array([[5.0, 6.0], [7.0, 8.0]])\n# print(matmul(A, B))\n# → [[19. 22.]\n#    [43. 50.]]"
+  }],
+  ch8: [{
+    diff: 1,
+    q: "bytes型の文字列をCythonで受け取り、各バイトの値を出力する関数を書いてください。",
+    code: "# 入力: b\"Hello\"\n# 出力: 72 101 108 108 111（各文字のASCIIコード）",
+    answer: "def print_bytes(bytes data):\n    cdef int i\n    cdef int n = len(data)\n    cdef unsigned char byte_val\n    for i in range(n):\n        byte_val = data[i]\n        print(byte_val, end=\" \")\n    print()\n\n# print_bytes(b\"Hello\")\n# → 72 101 108 108 111"
+  }, {
+    diff: 2,
+    q: "str型の文字列を受け取り、各文字の出現回数を数える関数をCythonで書いてください。結果はPythonのdictで返すこと。",
+    code: "# 入力: \"hello world\"\n# 出力: {'h': 1, 'e': 1, 'l': 3, 'o': 2, ' ': 1, 'w': 1, 'r': 1, 'd': 1}",
+    answer: "def char_count(str text):\n    cdef dict result = {}\n    cdef str ch\n    for ch in text:\n        if ch in result:\n            result[ch] += 1\n        else:\n            result[ch] = 1\n    return result\n\n# print(char_count(\"hello world\"))\n# → {'h': 1, 'e': 1, 'l': 3, 'o': 2, ' ': 1, 'w': 1, 'r': 1, 'd': 1}"
+  }, {
+    diff: 3,
+    q: "C文字列（char*）とPython文字列（str/bytes）の相互変換を行う関数を書いてください。エンコーディングの扱いに注意すること。",
+    code: "# 1. Python str → bytes → char* → bytes → Python str\n# の変換チェーンを示してください",
+    answer: "from libc.string cimport strlen, strcpy\nfrom libc.stdlib cimport malloc, free\n\ndef roundtrip_string(str py_str):\n    # str → bytes（UTF-8エンコード）\n    cdef bytes encoded = py_str.encode(\"utf-8\")\n\n    # bytes → char*\n    cdef const char* c_str = encoded\n    cdef int length = strlen(c_str)\n    print(f\"C文字列の長さ: {length} バイト\")\n\n    # char* → bytes（コピーを作成）\n    cdef char* buf = <char*>malloc(length + 1)\n    strcpy(buf, c_str)\n    cdef bytes copied = buf[:length]\n    free(buf)\n\n    # bytes → str（UTF-8デコード）\n    cdef str result = copied.decode(\"utf-8\")\n    print(f\"元の文字列: {py_str}\")\n    print(f\"復元した文字列: {result}\")\n    print(f\"一致: {py_str == result}\")\n    return result\n\n# roundtrip_string(\"こんにちは\")\n# → C文字列の長さ: 15 バイト\n# → 元の文字列: こんにちは\n# → 復元した文字列: こんにちは\n# → 一致: True"
+  }],
+  ch9: [{
+    diff: 1,
+    q: "cdef classで簡単なカウンターを実装してください。increment / get_count / reset メソッドを持つこと。",
+    code: "# Counter の使い方:\n# c = Counter()\n# c.increment()\n# c.increment()\n# print(c.get_count())  # → 2\n# c.reset()\n# print(c.get_count())  # → 0",
+    answer: "cdef class Counter:\n    cdef int _count\n\n    def __cinit__(self):\n        self._count = 0\n\n    def increment(self):\n        self._count += 1\n\n    def get_count(self):\n        return self._count\n\n    def reset(self):\n        self._count = 0\n\n    def __repr__(self):\n        return f\"Counter({self._count})\"\n\n# c = Counter()\n# c.increment(); c.increment()\n# print(c.get_count())  # → 2\n# c.reset()\n# print(c.get_count())  # → 0"
+  }, {
+    diff: 2,
+    q: "cdef classで動的配列（簡易版ArrayList）を実装してください。Cのmallocで内部バッファを管理し、__dealloc__で解放すること。",
+    code: "# arr = DynamicArray(10)  # 初期容量10\n# arr.append(3.14)\n# arr.append(2.71)\n# print(arr.get(0))  # → 3.14\n# print(arr.size())  # → 2",
+    answer: "from libc.stdlib cimport malloc, free, realloc\n\ncdef class DynamicArray:\n    cdef double* _data\n    cdef int _size\n    cdef int _capacity\n\n    def __cinit__(self, int capacity=10):\n        self._data = <double*>malloc(capacity * sizeof(double))\n        if self._data == NULL:\n            raise MemoryError(\"メモリ確保に失敗\")\n        self._size = 0\n        self._capacity = capacity\n\n    def __dealloc__(self):\n        if self._data != NULL:\n            free(self._data)\n\n    def append(self, double value):\n        if self._size >= self._capacity:\n            self._capacity *= 2\n            self._data = <double*>realloc(\n                self._data, self._capacity * sizeof(double))\n            if self._data == NULL:\n                raise MemoryError(\"リサイズに失敗\")\n        self._data[self._size] = value\n        self._size += 1\n\n    def get(self, int index):\n        if index < 0 or index >= self._size:\n            raise IndexError(\"インデックス範囲外\")\n        return self._data[index]\n\n    def size(self):\n        return self._size"
+  }, {
+    diff: 3,
+    q: "cdef classの継承を使って、Shapeの基底クラスとCircle/Rectangleの派生クラスを実装してください。area()メソッドをオーバーライドすること。",
+    code: "# s1 = Circle(5.0)\n# s2 = Rectangle(3.0, 4.0)\n# print(s1.area())  # → 78.539...\n# print(s2.area())  # → 12.0\n# print(s1.describe())  # → \"Circle: area=78.54\"",
+    answer: "from libc.math cimport M_PI\n\ncdef class Shape:\n    cpdef double area(self):\n        return 0.0\n\n    def describe(self):\n        return f\"{type(self).__name__}: area={self.area():.2f}\"\n\ncdef class Circle(Shape):\n    cdef double _radius\n\n    def __cinit__(self, double radius):\n        self._radius = radius\n\n    cpdef double area(self):\n        return M_PI * self._radius * self._radius\n\n    @property\n    def radius(self):\n        return self._radius\n\ncdef class Rectangle(Shape):\n    cdef double _width\n    cdef double _height\n\n    def __cinit__(self, double width, double height):\n        self._width = width\n        self._height = height\n\n    cpdef double area(self):\n        return self._width * self._height\n\n# s1 = Circle(5.0)\n# s2 = Rectangle(3.0, 4.0)\n# print(s1.area())      # → 78.5398...\n# print(s2.area())      # → 12.0\n# print(s1.describe())  # → Circle: area=78.54\n# print(s2.describe())  # → Rectangle: area=12.00"
+  }],
+  ch10: [{
+    diff: 1,
+    q: "cython -a コマンドで生成されるHTMLレポートの読み方を説明し、以下のコードのどの行が黄色くなるか予測してください。",
+    code: "def process(list data):\n    result = []\n    for item in data:\n        if item > 0:\n            result.append(item * 2)\n    return result",
+    answer: "# cython -a process.pyx で生成される HTML レポートの読み方:\n# - 白い行: 純粋なCコードに変換済み（高速）\n# - 黄色い行: Pythonオブジェクト操作が残っている（遅い）\n# - 濃い黄色ほどPythonとの相互作用が多い\n# - 行をクリックすると生成されたCコードが表示される\n#\n# 上記コードで黄色くなる行:\n# 1行目: list data → Python listの受け取り\n# 2行目: result = [] → Pythonリストの生成\n# 3行目: for item in data → Python iteratorの使用\n# 4行目: if item > 0 → Pythonオブジェクトの比較\n# 5行目: result.append(item * 2) → Pythonメソッド呼び出し\n# 6行目: return result → Pythonオブジェクトの返却\n# → ほぼ全行が黄色になる（型宣言がないため）"
+  }, {
+    diff: 2,
+    q: "上の演習のprocess関数を型宣言とmemoryviewで最適化し、黄色い行を最小限にしてください。",
+    code: "# 元のコード（ほぼ全行が黄色）:\ndef process(list data):\n    result = []\n    for item in data:\n        if item > 0:\n            result.append(item * 2)\n    return result\n\n# → typed memoryview + cdef で書き換えてください",
+    answer: "import numpy as np\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef process(double[:] data):\n    cdef int n = data.shape[0]\n    cdef double[:] result = np.empty(n, dtype=np.float64)\n    cdef int i\n    cdef int count = 0\n    cdef double val\n    for i in range(n):\n        val = data[i]\n        if val > 0.0:\n            result[count] = val * 2.0\n            count += 1\n    return np.asarray(result[:count])\n\n# アノテーション結果:\n# cdef宣言の行 → 白（C変数の宣言のみ）\n# forループ内 → 白（C型のみで演算）\n# np.empty / np.asarray の行 → 黄色（Python呼び出し）\n# → ループ本体は完全にC化され、最初と最後だけPython操作が残る"
+  }, {
+    diff: 3,
+    q: "以下のPure Python + Cythonのコードをプロファイリングし、ボトルネックを特定する手順をコードとコメントで示してください。line_profilerとcython -aの両方を使うこと。",
+    code: "# プロファイリング対象の関数群:\n# 1. データ生成（NumPy）\n# 2. フィルタリング\n# 3. 集計計算\n# 4. 結果のフォーマット",
+    answer: "# === ステップ1: cython -a でアノテーション確認 ===\n# cythonize -a pipeline.pyx\n# → pipeline.html を開いて黄色い行を確認\n\nimport cython\nimport numpy as np\n\n# === ステップ2: プロファイリング可能にする ===\n# ファイル先頭に: # cython: profile=True\n\ndef generate_data(int n) -> np.ndarray:\n    return np.random.randn(n)\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef filter_positive(double[:] data):\n    cdef int n = data.shape[0]\n    cdef double[:] buf = np.empty(n, dtype=np.float64)\n    cdef int count = 0\n    cdef int i\n    for i in range(n):\n        if data[i] > 0.0:\n            buf[count] = data[i]\n            count += 1\n    return np.asarray(buf[:count])\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef compute_stats(double[:] data):\n    cdef int n = data.shape[0]\n    cdef double total = 0.0\n    cdef double sq_total = 0.0\n    cdef int i\n    for i in range(n):\n        total += data[i]\n        sq_total += data[i] * data[i]\n    cdef double mean = total / n\n    cdef double variance = sq_total / n - mean * mean\n    return mean, variance\n\ndef format_result(tuple stats) -> str:\n    return f\"Mean: {stats[0]:.4f}, Var: {stats[1]:.4f}\"\n\n# === ステップ3: cProfile で全体確認 ===\n# python -m cProfile -s cumtime run_pipeline.py\n#\n# === ステップ4: line_profiler で行単位確認 ===\n# pip install line_profiler\n# @profile をターゲット関数に付けて:\n# kernprof -l -v run_pipeline.py\n#\n# === ステップ5: 結果の見方 ===\n# %Time: 各行の実行時間の割合\n# Hits: 呼び出し回数\n# → format_result等のPython操作がボトルネックなら型付けを検討\n# → ループ内のPython呼び出しが残っていればcdef化を検討"
+  }]
+};
+
+/* ── Chapter data ── */
+const chapters = [{
+  id: "ch1",
+  num: 1,
+  title: "Cythonとは何か — なぜPythonを高速化したいのか",
+  est: "45分",
+  goal: "Cythonがどのような技術であり、なぜPythonの高速化手段として有力なのかを理解する。コンパイルフロー（.pyx → .c → .so）の全体像を把握し、def/cdef/cpdefの3種類の関数定義の違いを説明できる状態を目指す。また、Cython 3.xで導入されたPure Pythonモードの存在を知り、伝統的な.pyx形式との関係を掴む。",
+  sections: [{
+    title: "Pythonの速度問題とCythonの位置づけ",
+    body: "Pythonは世界で最も広く使われているプログラミング言語の一つですが、実行速度に関しては大きな弱点を抱えています。Pythonはインタプリタ言語であり、コードを一行ずつ解釈しながら実行します。さらに、全ての値がPythonオブジェクトとして扱われるため、単純な整数の加算でさえオブジェクトの生成・型チェック・参照カウントの更新といったオーバーヘッドが発生します。C言語では「メモリ上の数バイトを直接加算する」だけで済む処理が、Pythonでは何十倍もの手順を踏むのです。\n\nこの問題を解決するために生まれたのがCythonです。CythonはPythonのスーパーセットであり、Pythonの文法をほぼそのまま使いつつ、C言語の型宣言を追加できるトランスパイラです。型が宣言された変数や関数は、Cythonコンパイラによって効率的なC言語コードに変換され、最終的にPythonから直接importできる共有ライブラリ（.soファイル）になります。つまり、Pythonコードの一部だけをCythonで書き換えることで、プロジェクト全体をC言語に移行することなく、ボトルネックだけを劇的に高速化できるのです。\n\nCythonは2007年にPyrexの後継として誕生し、現在はCython 3.x系が最新安定版です。NumPy, scikit-learn, pandas, lxmlなど、多くの著名なPythonライブラリが内部でCythonを使用しています。「Pythonの生産性を保ちながらCの速度を得る」というCythonの設計思想は、17年以上の歴史を経て実証されてきました。",
+    table: T.compileFlow,
+    afterTable: "ポイント: Cythonはソースコードレベルのトランスパイラです。.pyxファイル（または.pyファイル）をC言語のソースコードに変換し、それをgccやclangでコンパイルします。最終成果物はPythonのC拡張モジュール（.so/.pyd）であり、通常のimport文でPythonから透過的に利用できます。"
+  }, {
+    title: "def / cdef / cpdef — 3種類の関数定義",
+    body: "Cythonには関数を定義するキーワードが3つあります。defはPythonの通常の関数定義と同じで、Pythonから呼び出すことができます。cdefはC言語の関数として定義され、Pythonから直接呼ぶことはできませんが、関数呼び出しのオーバーヘッドが極めて小さくなります。cpdefはその両方の性質を持ち、PythonからもCからも呼べるハイブリッド関数です。\n\nなぜこのような区別が必要なのでしょうか。Pythonの関数呼び出しは、引数のパッキング・アンパッキング、キーワード引数の処理、型チェックなど多くの処理を伴います。ループの内側で何百万回も呼ばれるヘルパー関数にこのオーバーヘッドがあると、せっかく型宣言で高速化しても関数呼び出しがボトルネックになってしまいます。cdefで定義すればこれらのオーバーヘッドが全て省かれ、C言語の関数呼び出しと同等の速度になります。\n\n実務での使い分けは明快です。Pythonスクリプトから呼び出すAPIにはdefを使い、Cython内部でのみ使う高速なヘルパー関数にはcdefを使います。テスト時にはPythonから呼びたいが本番ではC速度も欲しい、という場合にはcpdefが便利です。ただしcpdefはPythonとCの両方のコードを生成するためバイナリサイズが若干増える点に留意してください。",
+    table: T.funcTypes,
+    code: "# .pyx ファイル（伝統的なCython記法）\n\n# def: Pythonから呼べる通常の関数\ndef greet(name):\n    return f\"Hello, {name}!\"\n\n# cdef: Cython内部専用の高速関数\ncdef int _add(int a, int b):\n    return a + b\n\n# cpdef: Python/C両方から呼べるハイブリッド\ncpdef int multiply(int a, int b):\n    return a * b\n\n# def の中から cdef を呼ぶ\ndef compute(int x, int y):\n    cdef int s = _add(x, y)\n    cdef int p = multiply(x, y)\n    return s, p",
+    afterCode: "ポイント: cdef関数はPythonから直接呼べないため、テストやデバッグ時にはcpdefを使うか、defのラッパー関数を用意するのが一般的です。パフォーマンスが最重要の場面ではcdefを選び、利便性が重要な場面ではcpdefを選びましょう。"
+  }, {
+    title: "Pure Pythonモードの紹介",
+    body: "Cython 3.0で大幅に強化された機能が「Pure Pythonモード」です。従来のCythonでは.pyxという独自拡張子のファイルにcdefなどの独自構文を書く必要があり、IDEの補完やリンター、型チェッカーとの相性が悪いという問題がありました。Pure Pythonモードでは、通常の.pyファイルのまま、import cythonとデコレータ・型アノテーションを使ってCythonの型情報を記述できます。\n\nPure Pythonモードの最大の利点は、コンパイルしなくても通常のPythonとして実行できることです。開発中はpython my_module.pyでそのまま動かしてデバッグし、本番ではcythonizeでコンパイルして高速化する、という二刀流のワークフローが実現します。また、mypyやpyrightなどの型チェッカーとも互換性があるため、既存のPython開発ツールチェーンをそのまま活用できます。\n\nこの入門コースでは、伝統的な.pyx記法を中心に基礎を学びつつ、第6章でPure Pythonモードを詳しく扱います。最終的には、プロジェクトの性質に応じてどちらの記法を選ぶべきか判断できるようになることを目指します。",
+    code: "# === 伝統的な .pyx 記法 ===\n# (example.pyx)\ncdef int square(int x):\n    return x * x\n\ndef compute(int n):\n    cdef int total = 0\n    cdef int i\n    for i in range(n):\n        total += square(i)\n    return total\n\n# === Pure Python モード ===\n# (example.py — 通常の .py ファイル)\nimport cython\n\n@cython.cfunc\ndef square(x: cython.int) -> cython.int:\n    return x * x\n\ndef compute(n: cython.int) -> cython.int:\n    total: cython.int = 0\n    i: cython.int\n    for i in range(n):\n        total += square(i)\n    return total",
+    afterCode: "ポイント: Pure Pythonモードでは @cython.cfunc が cdef に、@cython.ccall が cpdef に対応します。型宣言は cython.int, cython.double などの型アノテーションで行います。.pyx記法と Pure Pythonモードは機能的にほぼ等価であり、どちらを選んでもコンパイル後の性能は同じです。"
+  }]
+}, {
+  id: "ch2",
+  num: 2,
+  title: "環境構築とコンパイル",
+  est: "40分",
+  goal: "Cythonの開発環境をゼロからセットアップし、.pyxファイルをコンパイルしてPythonからimportできるようになる。setup.py方式・pyproject.toml方式・cythonizeコマンドの3つのビルド方法を理解し、プロジェクトの規模に応じて適切な方法を選べる状態がゴール。",
+  sections: [{
+    title: "インストールと前提条件",
+    body: "Cythonのインストール自体は pip install cython の一行で完了しますが、実際にコンパイルを行うにはCコンパイラが必要です。LinuxではGCC（sudo apt install build-essential）、macOSではXcode Command Line Tools（xcode-select --install）、WindowsではVisual Studio Build Toolsをインストールしておく必要があります。Cコンパイラが無い状態でcythonizeを実行すると、C言語ソースの生成までは成功しますが、共有ライブラリのビルドでエラーになります。\n\nPythonのバージョンについては、Cython 3.2.xはPython 3.8以上をサポートしています。ただし実務ではPython 3.10以上を推奨します。Python 3.10以降では型アノテーションの構文が改善されており、Pure Pythonモードとの相性が良くなっています。仮想環境（venvやconda）を使うことで、システムのPythonとは独立した環境でCythonを試せます。\n\nインストール後はcython --versionでバージョンを確認しましょう。本コースはCython 3.2.x（2026年1月リリース）を前提に解説しています。Cython 2.x以前とは一部の構文や挙動が異なるため、古いバージョンを使っている場合はアップグレードをお勧めします。",
+    code: "# 1. Cythonのインストール\npip install cython\n\n# 2. バージョン確認\ncython --version\n# → Cython version 3.2.4\n\n# 3. NumPy（配列処理で頻繁に使う）\npip install numpy\n\n# 4. Cコンパイラの確認\n# Linux:\n#   gcc --version\n# macOS:\n#   xcode-select --install  # 未インストールの場合\n#   clang --version\n# Windows:\n#   Visual Studio Build Tools をインストール",
+    afterCode: "ポイント: Cython自体はPure Pythonパッケージなので、pipだけでインストールできます。しかしCythonが生成するCコードをコンパイルするためにはCコンパイラが必須です。「pip install cythonは成功したのにコンパイルできない」という場合は、Cコンパイラの有無を最初に確認してください。"
+  }, {
+    title: "初めてのコンパイル — cythonize コマンド",
+    body: "最も手軽なコンパイル方法はcythonizeコマンドです。cythonize -i hello.pyxと打つだけで、.pyxファイルのCython変換・Cコンパイル・共有ライブラリ生成がワンステップで完了します。-iオプション（--inplace）は、生成された.soファイルをソースと同じディレクトリに配置するという意味です。\n\nもう一つ覚えておきたいのが-aオプション（--annotate）です。cythonize -a hello.pyxを実行すると、hello.htmlというアノテーションファイルが生成されます。このHTMLをブラウザで開くと、ソースコードの各行が白から黄色のグラデーションで色分けされており、黄色が濃い行ほどPythonとの相互作用（オーバーヘッド）が多いことを示しています。最適化の際にどの行を改善すべきかを一目で把握できる、非常に強力なツールです。\n\n小規模なプロジェクトや学習時にはcythonizeコマンドで十分ですが、複数のモジュールやNumPyとの連携が必要になるとsetup.pyやpyproject.tomlを使ったビルドが必要になります。次のセクションでそれらの方法を見ていきましょう。",
+    code: "# === hello.pyx ===\ndef say_hello(str name):\n    \"\"\"Pythonから呼べる挨拶関数\"\"\"\n    print(f\"Hello, {name}! (from Cython)\")\n\ncdef int _fast_add(int a, int b):\n    \"\"\"内部専用の高速加算\"\"\"\n    return a + b\n\ndef compute(int a, int b):\n    \"\"\"Pythonから呼べる計算関数\"\"\"\n    return _fast_add(a, b)\n\n# === コンパイル ===\n# cythonize -i hello.pyx\n#\n# === Pythonから使う ===\n# python -c \"import hello; hello.say_hello('World'); print(hello.compute(3, 5))\"",
+    afterCode: "ミニ演習: 上のhello.pyxを作成し、cythonize -i -a hello.pyxでコンパイルしてみましょう。生成されたhello.htmlをブラウザで開き、各行の色を確認してください。say_hello関数内のprint行が黄色く、_fast_addの内部は白に近いことが分かるはずです。"
+  }, {
+    title: "setup.pyとpyproject.tomlによるビルド",
+    body: "実際のプロジェクトでは、複数の.pyxファイルやNumPyへの依存、コンパイラオプションの指定など、cythonizeコマンドだけでは対応しきれない場面が出てきます。その場合はsetup.pyまたはpyproject.tomlを使ったビルド設定が必要です。setup.pyではsetuptoolsのExtensionクラスとCython.Build.cythonize関数を組み合わせて、ビルド対象のファイルやインクルードパスを細かく指定できます。\n\n近年のPythonエコシステムではpyproject.tomlが標準的なビルド設定ファイルとして定着しつつあります。pyproject.tomlの[build-system]セクションでCythonを依存に含め、setup.pyではExtensionの定義だけを行うのが現代的な構成です。pip install .やpython -m buildでビルドすると、pyproject.tomlの設定に従ってCythonのコンパイルが自動的に行われます。\n\nNumPyの配列をCythonで扱う場合は、numpy.get_include()をinclude_dirsに追加する必要があります。これはNumPyのCヘッダファイルの場所をCコンパイラに教えるためです。この設定を忘れると「numpy/arrayobject.h: No such file or directory」というエラーが出るので、NumPyを使う際は必ず追加しましょう。",
+    code: "# === setup.py ===\nfrom setuptools import setup, Extension\nfrom Cython.Build import cythonize\nimport numpy as np\n\n# 単一モジュール\nextensions = [\n    Extension(\n        \"my_module\",\n        sources=[\"my_module.pyx\"],\n        include_dirs=[np.get_include()],  # NumPy使用時に必要\n    )\n]\n\n# 複数モジュールの場合はリストに追加\n# extensions.append(Extension(\"another\", [\"another.pyx\"]))\n\nsetup(\n    name=\"my-project\",\n    ext_modules=cythonize(\n        extensions,\n        compiler_directives={\"language_level\": \"3\"},  # Python 3構文\n    ),\n)\n\n# === ビルドコマンド ===\n# python setup.py build_ext --inplace\n#\n# === pyproject.toml（併用推奨） ===\n# [build-system]\n# requires = [\"setuptools>=68.0\", \"cython>=3.0\", \"numpy>=1.24\"]\n# build-backend = \"setuptools.build_meta\"",
+    afterCode: "ポイント: language_levelは必ず\"3\"を指定してください。デフォルトではCython 3.xでもPython 2互換モードになる場合があり、print文やinteger divisionの挙動が変わることがあります。compiler_directivesはプロジェクト全体に適用するデフォルトのディレクティブを設定でき、boundscheck=Falseなどもここで一括指定できます。"
+  }]
+}, {
+  id: "ch3",
+  num: 3,
+  title: "型宣言の基礎",
+  est: "50分",
+  goal: "cdef による変数の型宣言を使いこなし、int/long/double/float などのC型とPython型の違いを理解する。型宣言の有無がパフォーマンスにどれほど影響するかを体感し、typed memoryview の基本構文を覚える。型推論がどこまで効くか、どこから明示的な宣言が必要かを判断できるようになる。",
+  sections: [{
+    title: "cdef によるC型変数の宣言",
+    body: "Cythonで最も基本的かつ重要な概念がcdefによるC型変数の宣言です。Pythonでは全ての値がオブジェクトとして存在し、整数1つにもオブジェクトヘッダや参照カウントが付随します。cdef int xと宣言すると、xは純粋なC言語のint（通常4バイト）としてスタック上に確保され、Pythonオブジェクトとしてのオーバーヘッドが完全に排除されます。\n\nこの差は数値計算で劇的に現れます。例えばfor文で100万回の整数加算を行う場合、Pythonでは各ステップでintオブジェクトの生成・加算・参照カウント更新が発生しますが、cdef intならCPUの加算命令一つで済みます。結果として10倍から100倍以上の速度差が出ることも珍しくありません。\n\nCythonで使えるC型にはint, long, long long, float, double, unsigned int, char などがあります。Pythonのintは任意精度（桁数制限なし）ですが、Cのintは通常32ビット（約21億まで）、long longでも64ビット（約9.2×10^18まで）という制限があります。扱う数値の範囲に応じて適切な型を選ぶ必要がある点は、Pythonにはない考慮事項です。",
+    code: "# Pythonの変数（オブジェクト）\ndef python_sum(n):\n    total = 0\n    for i in range(n):\n        total += i\n    return total\n\n# Cythonの型宣言あり（C変数）\ndef cython_sum(int n):\n    cdef long long total = 0\n    cdef int i\n    for i in range(n):\n        total += i\n    return total\n\n# 速度差の目安（n=10,000,000）:\n# python_sum: 約600ms\n# cython_sum: 約10ms  → 60倍高速",
+    afterCode: "ポイント: cdef宣言した変数はPythonオブジェクトではなくなるため、Noneを代入したり、type()で型を調べたりすることはできません。あくまで関数内のローカル変数として使い、Pythonの世界に返す際は自動的にPythonオブジェクトに変換（ボクシング）されます。"
+  }, {
+    title: "主要なC型とPython型の対応",
+    body: "Cythonでは C言語の型をそのまま使えますが、Pythonの型との対応を把握しておくことが重要です。整数型ではint（32ビット）、long（64ビット）、long long（64ビット以上）が主に使われます。浮動小数点ではfloat（32ビット単精度）とdouble（64ビット倍精度）があり、科学計算ではdoubleを使うのが一般的です。Pythonのfloatは内部的にCのdoubleなので、double型で受け渡しすれば精度の損失はありません。\n\nPythonの型もCythonの中で使えます。list, dict, tuple, str, bytes, set などはPythonオブジェクトのまま扱われるため、C型のような高速化は期待できませんが、型を明示することでCythonコンパイラが一部の最適化を行える場合があります。例えばcdef list my_listと書くと、my_listがlist型であることが保証されるため、型チェックのオーバーヘッドが省かれます。\n\n型変換（キャスト）はCython独自の構文<型>値で行います。例えば<double>my_intでintをdoubleに変換できます。Python式のfloat(x)やint(x)も使えますが、Pythonオブジェクト経由になるためC型同士のキャストよりオーバーヘッドがあります。ループ内で頻繁に型変換が必要な場合は<型>構文を使いましょう。",
+    code: "def type_examples():\n    # C整数型\n    cdef int a = 42                  # 32ビット整数\n    cdef long b = 1000000000         # 64ビット整数\n    cdef long long c = 9999999999    # 64ビット以上\n    cdef unsigned int d = 0          # 符号なし整数\n\n    # C浮動小数点型\n    cdef float f = 3.14              # 32ビット単精度\n    cdef double g = 3.141592653589   # 64ビット倍精度\n\n    # Python型（オブジェクトのまま）\n    cdef list my_list = [1, 2, 3]\n    cdef dict my_dict = {\"a\": 1}\n    cdef str my_str = \"hello\"\n\n    # Cythonキャスト\n    cdef double result = <double>a / <double>b\n\n    # bint型（Cのint、Pythonではbool相当）\n    cdef bint flag = True\n    if flag:\n        print(\"True\")",
+    afterCode: "ポイント: bint型はCythonの真偽値型です。CではTrueは1、Falseは0のintとして扱われますが、Python側に返すときは自動的にTrue/Falseに変換されます。条件分岐やフラグ変数にはbintを使うとオーバーヘッドが減ります。"
+  }, {
+    title: "typed memoryview 入門",
+    body: "typed memoryviewはCythonで配列データを高速に扱うための仕組みです。NumPy配列やPythonのarrayモジュールなど、バッファプロトコルに対応したオブジェクトを、Cレベルのポインタアクセスとほぼ同じ速度で操作できます。構文はdouble[:] arrのように「型 + コロン + 変数名」で宣言します。\n\nPythonでNumPy配列の要素にアクセスする場合、毎回Pythonのインデックス操作（__getitem__）が呼ばれ、Pythonオブジェクトとしての整数が生成されます。memoryviewでは配列の先頭ポインタとストライド情報だけを保持し、arr[i]はC言語のポインタ演算で直接メモリにアクセスします。ループ内で配列要素に大量にアクセスする処理では、この差が10倍から100倍の速度差として現れます。\n\n1次元配列はdouble[:] arr、2次元配列はdouble[:, :] arrのように宣言します。C連続メモリ（行優先）を指定するにはdouble[:, ::1] arr、Fortran連続（列優先）にはdouble[::1, :] arrと書きます。NumPy配列はデフォルトでC連続なので、::1を使うことでコンパイラがより積極的な最適化を行えます。",
+    code: "import numpy as np\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef fast_sum(double[:] arr):\n    \"\"\"typed memoryviewで高速に合計を計算\"\"\"\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):\n        total += arr[i]  # Cレベルの直接メモリアクセス\n    return total\n\n# 使い方:\n# a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n# print(fast_sum(a))  # → 15.0\n\n# 2次元の例（C連続メモリ）\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef matrix_sum(double[:, ::1] mat):\n    cdef int rows = mat.shape[0]\n    cdef int cols = mat.shape[1]\n    cdef double total = 0.0\n    cdef int i, j\n    for i in range(rows):\n        for j in range(cols):\n            total += mat[i, j]\n    return total",
+    afterCode: "ポイント: @cython.boundscheck(False)は配列の境界チェックを無効化し、@cython.wraparound(False)は負のインデックス（arr[-1]のような）のサポートを無効化します。これらを無効にするとさらに高速になりますが、範囲外アクセスでクラッシュするリスクがあります。デバッグ中はTrueにしておき、動作確認が済んだらFalseにするのが安全です。"
+  }]
+}, {
+  id: "ch4",
+  num: 4,
+  title: "関数の種類",
+  est: "50分",
+  goal: "def/cdef/cpdefの使い分けを実践的に判断できるようになる。型付き引数と戻り値の宣言方法を完全に理解し、inline関数やオーバーロード的な書き方も把握する。関数呼び出しのオーバーヘッドがパフォーマンスにどう影響するかを具体的な数値で理解する。",
+  sections: [{
+    title: "def関数 — Pythonとの互換性を保つ",
+    body: "def関数はPythonの通常の関数定義と完全に互換性があります。Pythonから呼び出すことができ、Pythonオブジェクトを引数に取り、Pythonオブジェクトを返します。ただしCythonのdef関数ではC型の引数宣言を追加できる点がPythonとは異なります。def add(int a, int b):のように書くと、Python側からはadd(3, 5)と呼べますが、Cython内部ではa, bがC intとして扱われるため、関数本体の演算は高速になります。\n\n引数にC型を宣言した場合、Python側から渡された値は自動的にC型に変換されます。例えばint型の引数にPythonのfloat（3.14）を渡すと3に切り捨てられますし、intの範囲を超える大きな整数を渡すとOverflowErrorが発生します。この自動変換と検証のコストは関数呼び出しごとに発生するため、ループ内で何百万回も呼ぶ関数にはdef関数は向きません。\n\nPythonとのインターフェース（API）として公開する関数にはdefを使い、その内部で重い処理を行う部分はcdef関数に委譲するのが典型的なパターンです。これにより、Python側からはシンプルなAPIを使いつつ、内部のホットパスはCの速度で動作します。",
+    code: "# def関数: Pythonから呼べる。引数にC型宣言可能。\ndef compute_stats(double[:] data):\n    \"\"\"Pythonから呼ぶAPI関数\"\"\"\n    cdef int n = data.shape[0]\n    cdef double mean = _compute_mean(data, n)\n    cdef double var = _compute_variance(data, n, mean)\n    return {\"mean\": mean, \"variance\": var}\n\n# 内部のヘルパーはcdefで高速化（後述）\ncdef double _compute_mean(double[:] data, int n):\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):\n        total += data[i]\n    return total / n\n\ncdef double _compute_variance(double[:] data, int n, double mean):\n    cdef double total = 0.0\n    cdef double diff\n    cdef int i\n    for i in range(n):\n        diff = data[i] - mean\n        total += diff * diff\n    return total / n",
+    afterCode: "ポイント: def関数はPythonの呼び出し規約に従うため、引数の型変換やキーワード引数の処理などのオーバーヘッドがあります。「外部API = def、内部ヘルパー = cdef」の組み合わせが最も効率的なパターンです。"
+  }, {
+    title: "cdef関数とcpdef関数 — C速度の関数定義",
+    body: "cdef関数はCの呼び出し規約で定義される関数で、関数呼び出しのオーバーヘッドがほぼゼロです。Pythonの関数呼び出しでは引数のタプルパッキング、辞書キーワード処理、型チェックなどが発生しますが、cdef関数ではこれらが全て省かれます。再帰関数やループ内で頻繁に呼ばれるヘルパー関数にcdefを使うと劇的な高速化が得られます。\n\ncdef関数の制約は、Pythonから直接呼べないことです。import my_moduleした後にmy_module.my_cdef_func()と書くとAttributeErrorになります。これはcdef関数がPythonの名前空間に登録されないためです。外部に公開する必要がある場合はdefのラッパーを用意するか、cpdefを使います。\n\ncpdef関数はdefとcdefの両方のコードを生成するハイブリッド関数です。Pythonから呼ぶとdefの呼び出し規約が使われ、Cython内部から呼ぶとcdefの呼び出し規約が使われます。テスト時にPythonから直接呼んで動作確認できるのが便利ですが、バイナリサイズが増えるトレードオフがあります。パフォーマンスが最重要の場面ではcdef + defラッパーの方が若干有利です。",
+    code: "from libc.math cimport sqrt\n\n# cdef: 内部専用の高速関数\ncdef double euclidean_distance(double x1, double y1,\n                                double x2, double y2):\n    cdef double dx = x2 - x1\n    cdef double dy = y2 - y1\n    return sqrt(dx * dx + dy * dy)\n\n# cpdef: Python/C両方から呼べるハイブリッド\ncpdef double manhattan_distance(double x1, double y1,\n                                 double x2, double y2):\n    cdef double dx = x2 - x1\n    cdef double dy = y2 - y1\n    if dx < 0: dx = -dx\n    if dy < 0: dy = -dy\n    return dx + dy\n\n# def: Python APIとして公開（内部でcdefを呼ぶ）\ndef nearest_point(double px, double py, list points):\n    \"\"\"最も近い点のインデックスを返す\"\"\"\n    cdef double min_dist = 1e18\n    cdef double dist\n    cdef int best = 0\n    cdef int i\n    cdef double x, y\n    for i in range(len(points)):\n        x, y = points[i]\n        dist = euclidean_distance(px, py, x, y)\n        if dist < min_dist:\n            min_dist = dist\n            best = i\n    return best",
+    afterCode: "ポイント: from libc.math cimport sqrtはCの標準ライブラリからsqrt関数を直接インポートしています。Pythonのmath.sqrtと違い、Pythonオブジェクト経由ではなくCの関数を直接呼ぶため高速です。libc.math, libc.stdlib, libc.string など、C標準ライブラリの多くの関数がcimportで使えます。"
+  }, {
+    title: "インライン関数と型付き引数の最適化",
+    body: "小さなヘルパー関数は、関数呼び出し自体のコストが処理本体より大きくなることがあります。cdef inline修飾子を使うと、コンパイラが関数の本体を呼び出し元に直接埋め込む（インライン展開する）ことができます。これにより関数呼び出しのオーバーヘッドが完全に消え、さらにコンパイラが前後の文脈を含めた最適化を行えるようになります。\n\nインライン化は小さな関数（1〜5行程度）に適しています。大きな関数をインライン化すると、コードが膨張してキャッシュ効率が悪化し、かえって遅くなることがあります。コンパイラは最終的にインライン化するかどうかを自分で判断するため、inlineは「ヒント」であって強制ではない点に注意してください。\n\n引数のデフォルト値もdef関数と同様に使えます。また、Cython 3.xでは例外処理の宣言方法が改善され、cdef関数やcpdef関数でも except * を省略できるケースが増えました。戻り値がPythonオブジェクト以外の場合で例外を発生させる可能性があるときは、except -1（エラー時の戻り値）やexcept *（常にチェック）を明記するのが安全です。",
+    code: "# インライン関数: 呼び出しオーバーヘッドを排除\ncdef inline double square(double x):\n    return x * x\n\ncdef inline int max_int(int a, int b):\n    return a if a > b else b\n\ncdef inline int min_int(int a, int b):\n    return a if a < b else b\n\n# 例外処理の宣言\n# except -1: 戻り値が-1の場合に例外チェック\ncdef int safe_divide(int a, int b) except -1:\n    if b == 0:\n        raise ZeroDivisionError(\"ゼロ除算\")\n    return a // b\n\n# except *: 常に例外チェック（やや遅いが安全）\ncdef double compute(double x) except *:\n    if x < 0:\n        raise ValueError(\"負の値\")\n    return square(x)\n\n# デフォルト引数\ncdef double power(double base, int exp=2):\n    cdef double result = 1.0\n    cdef int i\n    for i in range(exp):\n        result *= base\n    return result",
+    afterCode: "ポイント: cdef関数の例外処理宣言を省略すると、関数内で発生した例外がPython側に伝播せず、静かに無視される場合があります。特にcdef関数がdefから呼ばれる経路がある場合は、except -1やexcept *を必ず付けてください。Cython 3.xではexcept?（疑問符）も使え、戻り値が指定値と一致した場合のみ例外チェックを行うという省エネ的な書き方もできます。"
+  }]
+}, {
+  id: "ch5",
+  num: 5,
+  title: "制御構文と型の効果",
+  est: "45分",
+  goal: "for/whileループにおけるC型宣言の効果を具体的な速度比較で理解する。boundscheck, wraparound, cdivision などのコンパイラディレクティブの意味と効果を把握し、安全性と速度のトレードオフを自分で判断できるようになる。",
+  sections: [{
+    title: "ループの高速化 — 型宣言が生む劇的な差",
+    body: "Pythonのforループが遅い主な理由は、ループ変数が毎回Pythonオブジェクトとして生成されることにあります。range(1000000)のループでは、0から999999までの整数オブジェクトが順次生成・破棄され、各ステップでインクリメント・比較・参照カウント操作が発生します。cdef int iと宣言するだけで、ループ変数はCPUレジスタ上のC整数になり、これらのオーバーヘッドが全て消えます。\n\nforループだけでなく、whileループも同様に高速化できます。ループ条件にC型変数を使えば、条件判定もCレベルの整数比較で済みます。ネストしたループ（二重・三重ループ）では効果がさらに顕著で、内側のループ変数をC型にするだけで行列演算が100倍以上速くなることも珍しくありません。\n\n注意点として、range()にC型の引数を渡す場合はオーバーフローに気をつけてください。cdef int nを使ってrange(n)と書く場合、nがintの最大値（約21億）を超えているとオーバーフローします。大きな範囲を扱う場合はlong longを使いましょう。",
+    code: "import cython\n\n# === Python的なループ（遅い） ===\ndef slow_sum(n):\n    total = 0\n    for i in range(n):\n        total += i * i\n    return total\n\n# === Cython型宣言付きループ（速い） ===\ndef fast_sum(int n):\n    cdef long long total = 0\n    cdef int i\n    for i in range(n):\n        total += i * i\n    return total\n\n# === whileループの例 ===\ndef collatz_steps(int n):\n    \"\"\"コラッツ予想: nが1になるまでのステップ数\"\"\"\n    cdef int steps = 0\n    while n != 1:\n        if n % 2 == 0:\n            n = n // 2\n        else:\n            n = 3 * n + 1\n        steps += 1\n    return steps\n\n# 速度比較（n=10,000,000）:\n# slow_sum: 約1.2秒\n# fast_sum: 約0.02秒  → 60倍高速",
+    afterCode: "ポイント: ループ変数だけでなく、ループ内で使う全ての変数にC型を宣言することが重要です。ループ変数がC型でも、ループ本体でPythonオブジェクトを操作していると、そこがボトルネックになります。cython -aで生成されるアノテーションHTMLで黄色い行を確認しましょう。"
+  }, {
+    title: "コンパイラディレクティブ — boundscheck / wraparound / cdivision",
+    body: "Cythonにはコンパイラディレクティブという仕組みがあり、安全性チェックの有効/無効を細かく制御できます。最も頻繁に使うのはboundscheck（配列の境界チェック）とwraparound（負のインデックスサポート）です。デフォルトではどちらもTrueで、arr[i]にアクセスするたびに「iが配列の範囲内か」「iが負の値でないか」がチェックされます。\n\nboundscheck=Falseにすると、配列アクセスごとの範囲チェックが省かれます。wraparound=Falseにすると、arr[-1]のような負のインデックスのサポートが無効化されます。これらを無効にするとループが大幅に速くなりますが、範囲外アクセスやバッファオーバーフローによるクラッシュ（セグメンテーション違反）のリスクがあります。\n\ncdivision=Trueは整数除算の挙動をC言語式に変更します。Pythonでは-7 // 2 = -4（床除算）ですが、Cでは-7 / 2 = -3（ゼロ方向への切り捨て）です。また、cdivision=TrueではZeroDivisionErrorのチェックも無効化されるため、ゼロ除算でクラッシュします。負の数の除算を使わないことが確実な場合にのみ有効にしましょう。",
+    table: T.directives,
+    code: "cimport cython\nimport numpy as np\n\n# ディレクティブの適用方法\n\n# 方法1: デコレータ（関数単位で適用）\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef fast_normalize(double[:] arr):\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):\n        total += arr[i]\n    cdef double mean = total / n\n    for i in range(n):\n        arr[i] -= mean\n\n# 方法2: ファイル先頭のコメント（ファイル全体に適用）\n# cython: boundscheck=False, wraparound=False\n\n# 方法3: with文（ブロック単位で適用）\ndef mixed_function(double[:] arr):\n    # ここは安全なチェック付き\n    print(f\"配列の長さ: {arr.shape[0]}\")\n\n    # この中だけチェックを無効化\n    with cython.boundscheck(False), cython.wraparound(False):\n        cdef int i\n        for i in range(arr.shape[0]):\n            arr[i] *= 2.0",
+    afterCode: "ポイント: ディレクティブの適用範囲は「デコレータ > ファイル先頭コメント > with文」の順に柔軟性が異なります。プロジェクト全体をFalseにするよりも、十分にテストされた関数だけにデコレータで適用するのが安全な運用です。開発中はTrueのままにしておき、パフォーマンス測定時にFalseに切り替えましょう。"
+  }, {
+    title: "整数演算と浮動小数点演算の最適化",
+    body: "C型の整数演算はCPUの命令で直接実行されるため、Pythonのint演算と比べて桁違いに速くなります。特に乗算・除算・剰余演算の差は大きく、ループ内でこれらの演算を多用する場合（素数判定、暗号計算など）にはC型宣言の効果が最大限に発揮されます。\n\n浮動小数点演算でも同様の高速化が得られますが、精度の問題に注意が必要です。Pythonのfloatは常にdouble（64ビット）ですが、Cythonではfloat（32ビット）も使えます。32ビットfloatは精度が低い代わりにメモリ効率が良く、SIMD（ベクトル演算）との相性も良いため、精度が十分な場面では有利です。しかし科学計算では一般的にdoubleを使うべきです。\n\nオーバーフローについても注意が必要です。Pythonのintは任意精度なので桁あふれは起きませんが、Cのint（32ビット）では約21億を超えるとオーバーフローし、予期しない負の値になります。大きな値を扱う可能性がある場合はlong long（64ビット）を使い、それでも足りない場合はPythonのintに戻す（C型宣言を外す）という判断が必要です。",
+    code: "cimport cython\n\n# 整数演算の高速化: 素数判定\ncdef bint is_prime(int n):\n    if n < 2:\n        return False\n    if n < 4:\n        return True\n    if n % 2 == 0 or n % 3 == 0:\n        return False\n    cdef int i = 5\n    while i * i <= n:\n        if n % i == 0 or n % (i + 2) == 0:\n            return False\n        i += 6\n    return True\n\ndef count_primes(int limit):\n    \"\"\"limit以下の素数の個数を返す\"\"\"\n    cdef int count = 0\n    cdef int i\n    for i in range(2, limit + 1):\n        if is_prime(i):\n            count += 1\n    return count\n\n# 浮動小数点: テイラー展開で e^x を近似\n@cython.cdivision(True)\ncdef double approx_exp(double x, int terms=20):\n    cdef double result = 1.0\n    cdef double term = 1.0\n    cdef int i\n    for i in range(1, terms):\n        term *= x / i\n        result += term\n    return result\n\n# Python API\ndef py_exp(double x):\n    return approx_exp(x)",
+    afterCode: "ポイント: count_primes(1000000)はPure Pythonでは数十秒かかりますが、上記のCython版では0.1秒以下で完了します。is_primeがcdef関数であるため、count_primesのループ内での関数呼び出しオーバーヘッドがほぼゼロになっていることが速さの秘訣です。"
+  }]
+}, {
+  id: "ch6",
+  num: 6,
+  title: "Pure Python モード",
+  est: "50分",
+  goal: "Pure Pythonモード（.pyファイルのままCythonの型情報を記述する方法）を完全に理解し、@cython.cfunc, @cython.ccall, @cython.cclass, cython.declare()などのデコレータ・関数を使いこなせるようになる。.pyx記法とPure Pythonモードの対応関係を把握し、プロジェクトに応じてどちらを選ぶべきか判断できる状態がゴール。",
+  sections: [{
+    title: "Pure Pythonモードとは — .pyファイルのままCython化",
+    body: "Pure Pythonモードは、Cython 3.0で大幅に強化された機能であり、現代のCython開発における推奨アプローチです。従来の.pyx記法ではcdefやcpdefなどCython独自のキーワードを使うため、ファイルの拡張子が.pyxになり、通常のPythonインタプリタでは実行できませんでした。Pure PythonモードではPython標準の型アノテーションとデコレータを使ってC型情報を記述するため、.pyファイルのまま、コンパイルしなくても通常のPythonとして動作します。\n\nこの二刀流の利点は実務で非常に大きいです。開発中はpython my_module.pyでデバッグし、本番ではcythonize -i my_module.pyでコンパイルして高速化できます。IDEの補完やリンター（flake8, ruff）、型チェッカー（mypy, pyright）もそのまま使えるため、開発体験がPure Pythonと変わりません。また、CIパイプラインでCythonがインストールされていない環境でもテストを回せるという運用上の利点もあります。\n\nPure Pythonモードを使うにはimport cythonを書き、型アノテーションやデコレータで型情報を付与します。Cythonコンパイラはこれらの情報を解釈して最適なCコードを生成しますが、通常のPythonインタプリタはcythonモジュールをただのライブラリとして読み込み、デコレータは何もしないパススルーとして動作します。",
+    table: T.pureDecorators,
+    code: "# === Pure Python モード（.py ファイル） ===\nimport cython\n\n# cdef関数 → @cython.cfunc\n@cython.cfunc\ndef _fast_add(x: cython.int, y: cython.int) -> cython.int:\n    return x + y\n\n# cpdef関数 → @cython.ccall\n@cython.ccall\ndef multiply(x: cython.int, y: cython.int) -> cython.int:\n    return x * y\n\n# def関数はそのまま（型アノテーションだけ追加可能）\ndef compute(a: cython.int, b: cython.int) -> tuple:\n    s: cython.int = _fast_add(a, b)\n    p: cython.int = multiply(a, b)\n    return (s, p)\n\n# 変数のC型宣言\ndef sum_range(n: cython.int) -> cython.longlong:\n    total: cython.longlong = 0\n    i: cython.int\n    for i in range(n):\n        total += i\n    return total",
+    afterCode: "ポイント: Pure Pythonモードでは、cython.intやcython.doubleなどの型を型アノテーションとして使います。これらはCythonがコンパイルする際にはC型として解釈されますが、通常のPythonではただのオブジェクトとして無視されるため、コードの互換性が保たれます。"
+  }, {
+    title: "デコレータとディレクティブの書き方",
+    body: "Pure Pythonモードでは、.pyxのコンパイラディレクティブに対応するデコレータが用意されています。@cython.boundscheck(False)や@cython.wraparound(False)は.pyx版のデコレータと全く同じ構文で使えます。これらはPythonとして実行する際は何もしないデコレータになるため、互換性に問題はありません。\n\n@cython.cfuncは.pyxのcdefに対応し、Pythonから呼べないC専用関数を定義します。@cython.ccallは.pyxのcpdefに対応し、Python/C両方から呼べるハイブリッド関数を定義します。通常のdefには特別なデコレータは不要で、型アノテーションを付けるだけでCythonが型情報を認識します。\n\nCの標準ライブラリ関数をインポートする際は、.pyxではfrom libc.math cimport sqrtと書きますが、Pure Pythonモードではfrom cython.cimports.libc.math import sqrtと書きます。cython.cimportsという名前空間を経由することで、Cythonコンパイラはこれをcimportとして扱い、通常のPythonでは無視されます。",
+    code: "import cython\n# Cライブラリのインポート（Pure Pythonモード）\nfrom cython.cimports.libc.math import sqrt, pow as c_pow\n\n# ディレクティブの適用\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef fast_norm(arr: cython.double[:]) -> cython.double:\n    \"\"\"ベクトルのL2ノルムを計算\"\"\"\n    n: cython.int = arr.shape[0]\n    total: cython.double = 0.0\n    i: cython.int\n    for i in range(n):\n        total += arr[i] * arr[i]\n    return sqrt(total)\n\n# cfunc + inline（Pure Pythonモード）\n@cython.cfunc\n@cython.inline\ndef _clamp(val: cython.double,\n          lo: cython.double,\n          hi: cython.double) -> cython.double:\n    if val < lo:\n        return lo\n    if val > hi:\n        return hi\n    return val\n\n# Python APIとして公開\ndef clamp_array(arr: cython.double[:],\n                lo: cython.double,\n                hi: cython.double) -> None:\n    i: cython.int\n    for i in range(arr.shape[0]):\n        arr[i] = _clamp(arr[i], lo, hi)",
+    afterCode: "ポイント: @cython.inlineはPure Pythonモード専用のデコレータで、.pyxのcdef inlineに対応します。Pythonとして実行する際はただの関数呼び出しになりますが、Cythonコンパイル時はインライン展開のヒントとして使われます。"
+  }, {
+    title: ".pyx記法との対応と選択基準",
+    body: "Pure Pythonモードと.pyx記法は機能的にほぼ等価であり、コンパイル後の性能にも差はありません。しかしプロジェクトの性質によって適切な選択が異なります。Pure Pythonモードが特に向いているのは、既存のPythonプロジェクトに段階的にCythonを導入したい場合です。.pyファイルのまま型アノテーションを追加していけるため、プロジェクト構造を変える必要がなく、Cythonをやめたくなった場合もデコレータを外すだけで元に戻せます。\n\n一方、.pyx記法が有利な場面もあります。Cのポインタ操作、構造体の直接定義、extern宣言など低レベルなCとの連携が必要な場合は.pyx記法の方が自然に書けます。また、.pxd（宣言ファイル）を使った大規模なCythonモジュール間の相互参照も.pyx形式の方が整理しやすいです。\n\n新規プロジェクトで迷った場合は、まずPure Pythonモードで始めることをお勧めします。開発ツールとの互換性が高く、チームメンバーがCython固有の構文を知らなくてもコードを読めるからです。低レベルな操作が必要になった段階で、その部分だけを.pyxに切り出すハイブリッドアプローチが最も実用的です。",
+    code: "# === .pyx記法 と Pure Pythonモードの対応表（コード版） ===\n\n# --- 変数宣言 ---\n# .pyx:  cdef int x = 10\n# Pure:  x: cython.int = 10\n\n# --- cdef関数 ---\n# .pyx:  cdef double func(double x): return x * x\n# Pure:  @cython.cfunc\n#        def func(x: cython.double) -> cython.double: return x * x\n\n# --- cpdef関数 ---\n# .pyx:  cpdef double func(double x): return x * x\n# Pure:  @cython.ccall\n#        def func(x: cython.double) -> cython.double: return x * x\n\n# --- cdef class ---\n# .pyx:  cdef class MyClass:\n#            cdef int value\n# Pure:  @cython.cclass\n#        class MyClass:\n#            value: cython.int\n\n# --- cimport ---\n# .pyx:  from libc.math cimport sqrt\n# Pure:  from cython.cimports.libc.math import sqrt\n\n# --- ポインタ（.pyxのみ） ---\n# .pyx:  cdef int* ptr = &x\n# Pure:  ptr = cython.declare(cython.p_int, cython.address(x))",
+    afterCode: "ポイント: ポインタ操作はPure Pythonモードでもcython.declare()とcython.p_int（int*に対応）で可能ですが、可読性はやや劣ります。ポインタを多用する場面では.pyx記法の方が直感的です。プロジェクトの大部分はPure Pythonモードで書き、ポインタ操作が必要な低レベル部分だけ.pyxに分離するのが実用的なアプローチです。"
+  }]
+}, {
+  id: "ch7",
+  num: 7,
+  title: "配列とmemoryview",
+  est: "55分",
+  goal: "typed memoryviewの詳細な構文と使い方を習得し、NumPy配列との連携方法を完全に理解する。C連続メモリ・Fortran連続メモリの違いを把握し、メモリレイアウトを意識した高速な配列処理を書けるようになる。",
+  sections: [{
+    title: "typed memoryview の詳細構文",
+    body: "第3章で入門したtyped memoryviewをここで詳しく掘り下げます。memoryviewはNumPy配列やPython標準のarray.arrayなど、バッファプロトコルに対応した任意のオブジェクトを受け取れる汎用的なインターフェースです。NumPyに直接依存しないため、cimport numpy が不要であり、コンパイル時にNumPyがインストールされていなくても.pyx自体のコンパイルは通ります。\n\nmemoryviewの型宣言では次元数とメモリレイアウトを指定できます。double[:]は1次元、double[:, :]は2次元、double[:, :, :]は3次元です。::1を使うとその次元が連続メモリであることをコンパイラに伝えます。double[:, ::1]は「最後の次元が連続」つまりC言語式の行優先（row-major）レイアウトを意味し、NumPyのデフォルトと一致します。double[::1, :]はFortran式の列優先（column-major）です。\n\nメモリレイアウトの指定が重要な理由はCPUのキャッシュ効率です。連続メモリ上のデータは一度キャッシュラインに乗れば隣接要素へのアクセスが極めて高速ですが、非連続なアクセスパターンではキャッシュミスが頻発し速度が大幅に低下します。行方向に走査するならC連続、列方向に走査するならFortran連続を選ぶことで、キャッシュ効率を最大化できます。",
+    table: T.memoryviewFormats,
+    code: "cimport cython\nimport numpy as np\n\n# 1次元: ストライド自由（あらゆる配列を受け取れる）\ndef sum_1d(double[:] arr):\n    cdef double total = 0.0\n    cdef int i\n    for i in range(arr.shape[0]):\n        total += arr[i]\n    return total\n\n# 2次元C連続: NumPyのデフォルトレイアウト\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef row_sums(double[:, ::1] matrix):\n    \"\"\"各行の合計を返す\"\"\"\n    cdef int rows = matrix.shape[0]\n    cdef int cols = matrix.shape[1]\n    result = np.empty(rows, dtype=np.float64)\n    cdef double[:] out = result\n    cdef int i, j\n    cdef double total\n    for i in range(rows):\n        total = 0.0\n        for j in range(cols):\n            total += matrix[i, j]  # 行方向の走査 → C連続で高速\n        out[i] = total\n    return result\n\n# スライスもサポート\ndef process_subarray(double[:, ::1] matrix):\n    cdef double[:, :] sub = matrix[1:3, 2:5]  # スライスもmemoryview\n    return np.asarray(sub).copy()",
+    afterCode: "ポイント: memoryviewのスライス操作（matrix[1:3, :]）は新しいメモリを確保せず、元のバッファの一部分を指すビューを返します。データのコピーが不要なためスライス自体は高速ですが、元の配列が解放されるとビューも無効になる点に注意してください。独立したコピーが必要な場合はnp.asarray(sub).copy()を使います。"
+  }, {
+    title: "NumPy配列との連携",
+    body: "typed memoryviewはNumPy配列を最も効率的に受け渡す方法です。NumPy配列をmemoryview引数に渡すと、バッファプロトコルを通じてポインタとメタデータ（形状・ストライド）が直接共有され、データのコピーは発生しません。関数内での配列要素のアクセスはCのポインタ演算で行われるため、NumPy配列のfancyインデックスングやブロードキャストのオーバーヘッドなしに高速アクセスが可能です。\n\nCythonの処理結果をNumPy配列として返す場合は、np.emptyで出力用配列を事前に確保し、そのmemoryviewを通じて書き込むパターンが一般的です。np.asarray(memoryview)で memoryviewをNumPy配列に変換できますが、これもコピーなしのビュー変換です。\n\n一つ注意すべき点は、NumPy配列のdtype（データ型）とmemoryviewの型宣言が一致している必要があることです。double[:]で宣言した引数にnp.float32の配列を渡すとValueErrorが発生します。呼び出し側でastype(np.float64)するか、memoryview側の型をfloat[:]に変更してください。",
+    code: "cimport cython\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef moving_average(double[:] data, int window):\n    \"\"\"移動平均を計算して新しいNumPy配列で返す\"\"\"\n    cdef int n = data.shape[0]\n    cdef int out_len = n - window + 1\n    # 出力用NumPy配列を確保\n    result = np.empty(out_len, dtype=np.float64)\n    cdef double[:] out = result  # memoryviewで高速書き込み\n    cdef double total\n    cdef int i, j\n\n    # 最初のウィンドウの合計\n    total = 0.0\n    for j in range(window):\n        total += data[j]\n    out[0] = total / window\n\n    # スライディングウィンドウ\n    for i in range(1, out_len):\n        total += data[i + window - 1] - data[i - 1]\n        out[i] = total / window\n\n    return result\n\n# 使い方:\n# data = np.random.randn(1000000)\n# ma = moving_average(data, 20)",
+    afterCode: "ポイント: np.emptyは配列を初期化せずにメモリだけ確保するため、np.zerosより高速です。全要素を上書きすることが確実な場合はemptyを使いましょう。配列のdtypeは明示的にnp.float64を指定しておくと、memoryviewのdouble型との不一致を防げます。"
+  }, {
+    title: "メモリレイアウトとパフォーマンス",
+    body: "配列のメモリレイアウトがパフォーマンスに与える影響は想像以上に大きいです。現代のCPUはメモリを小さな単位（キャッシュライン、通常64バイト）でキャッシュに読み込みます。連続メモリ上のデータにアクセスすると、1回のキャッシュフィルで複数の要素がキャッシュに載り、後続のアクセスがL1/L2キャッシュから高速に行われます。非連続なアクセスパターンでは毎回メインメモリにアクセスすることになり、桁違いに遅くなります。\n\n2次元配列を例にすると、C連続（行優先）レイアウトでは同じ行の要素が連続メモリに配置されます。for i in range(rows): for j in range(cols): の順で走査すれば連続アクセスになりますが、内外のループを入れ替えてfor j: for i: にすると飛び飛びのアクセスになり遅くなります。逆にFortran連続（列優先）では同じ列の要素が連続しているため、列方向の走査が高速です。\n\nNumPyでnp.ascontiguousarray()を使うとC連続に、np.asfortranarray()でFortran連続に変換できます。CythonのmemoryviewでC連続を要求する（double[:, ::1]）ことにより、渡された配列が非連続の場合にはTypeErrorが発生し、問題を早期に検出できます。",
+    code: "cimport cython\nimport numpy as np\n\n# 行方向の走査 → C連続が最適\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef sum_rows_c_order(double[:, ::1] matrix):\n    \"\"\"C連続配列の行合計（キャッシュフレンドリー）\"\"\"\n    cdef int rows = matrix.shape[0]\n    cdef int cols = matrix.shape[1]\n    cdef double total = 0.0\n    cdef int i, j\n    for i in range(rows):\n        for j in range(cols):      # 連続方向に走査 → 高速\n            total += matrix[i, j]\n    return total\n\n# 列方向の走査 → Fortran連続が最適\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef sum_cols_f_order(double[::1, :] matrix):\n    \"\"\"Fortran連続配列の列合計（キャッシュフレンドリー）\"\"\"\n    cdef int rows = matrix.shape[0]\n    cdef int cols = matrix.shape[1]\n    cdef double total = 0.0\n    cdef int i, j\n    for j in range(cols):\n        for i in range(rows):      # 連続方向に走査 → 高速\n            total += matrix[i, j]\n    return total\n\n# 呼び出し側:\n# c_arr = np.ascontiguousarray(data)   # C連続を保証\n# f_arr = np.asfortranarray(data)      # Fortran連続を保証",
+    afterCode: "ポイント: 1000x1000の行列に対するベンチマークでは、メモリレイアウトと走査方向が一致している場合と不一致の場合で2〜10倍の速度差が出ます。行列積やフィルタリングなど、配列全体を走査する処理ではレイアウトの選択がクリティカルです。"
+  }]
+}, {
+  id: "ch8",
+  num: 8,
+  title: "文字列とオブジェクト",
+  est: "45分",
+  goal: "Cythonにおけるstr/bytes/char*の扱い方を理解し、Pythonオブジェクトとの相互運用の注意点を把握する。文字列処理のパフォーマンス特性を理解し、適切な型選択ができるようになる。",
+  sections: [{
+    title: "str, bytes, unicode の扱い",
+    body: "Cythonでの文字列処理は、Pythonの文字列型（str, bytes）とCの文字列（char*）の間の変換が中心的なテーマになります。Python 3ではstrはUnicode文字列であり、内部的にはUTF-8やUCS-2/UCS-4でエンコードされた可変長のデータです。bytesはエンコーディングを持たない生のバイト列です。Cのchar*はバイト列へのポインタで、Python のbytesに近い概念です。\n\nCythonではstr, bytes, unicode を型宣言に使えます。例えばdef process(str text):と書くと、textがstr型であることがコンパイル時に保証されます。しかし文字列のC型化には限界があります。Unicode文字列は可変長でエンコーディング依存なため、Cの固定長型にマッピングできないからです。そのため、文字列処理の高速化は整数演算ほど劇的にはなりません。\n\n実務で最も注意が必要なのは、Pythonの文字列をC関数に渡す場面です。C関数はchar*を期待しますが、Pythonのstrを直接渡すことはできません。一度bytes にエンコード（str.encode(\"utf-8\")）してからchar*に変換する必要があります。逆にC関数が返したchar*をPythonで使うには、bytes.decode(\"utf-8\")で str に変換します。",
+    table: T.strTypes,
+    code: "# 文字列型の使い分け\ndef process_text(str text):\n    \"\"\"str型（Unicode）を受け取る関数\"\"\"\n    cdef str upper = text.upper()\n    cdef int length = len(text)\n    return f\"{upper} (長さ: {length})\"\n\ndef process_bytes(bytes data):\n    \"\"\"bytes型を受け取る関数\"\"\"\n    cdef int size = len(data)\n    cdef unsigned char first_byte = data[0]\n    return f\"サイズ: {size}, 先頭バイト: {first_byte}\"\n\n# str → bytes → char* の変換チェーン\ndef str_to_c_string(str text):\n    # str → bytes（UTF-8エンコード）\n    cdef bytes encoded = text.encode(\"utf-8\")\n    # bytes → char*（暗黙の変換）\n    cdef const char* c_str = encoded\n    # ※ encodedが生きている間だけc_strは有効\n    print(f\"Cポインタ取得成功: {len(encoded)}バイト\")\n    return encoded",
+    afterCode: "ポイント: bytes → char* の変換は暗黙的に行われますが、bytesオブジェクトが解放されるとchar*ポインタが無効になります（ダングリングポインタ）。char*を使う間はbytesオブジェクトへの参照を維持しておく必要があります。上の例ではencodedがスコープ内にある限りc_strは安全です。"
+  }, {
+    title: "Pythonオブジェクトとの相互運用",
+    body: "Cythonのコード内では、C型の変数とPythonオブジェクトが混在します。cdef int xはC変数、y = [1, 2, 3]はPythonオブジェクト（list）です。Cythonコンパイラはこの混在を許容し、必要に応じて自動的にボクシング（C→Python変換）やアンボクシング（Python→C変換）を行います。\n\nただし、自動変換にはコストがあります。C intをreturnすると、Python intオブジェクトが生成されます（ボクシング）。Pythonのlist要素をcdef intに代入すると、型チェックと変換が発生します（アンボクシング）。ループ内でこれらの変換が頻繁に起きると、せっかくのC型宣言の効果が薄れます。\n\nPythonオブジェクトをCythonで効率的に扱うポイントは、Python操作をループの外に出すことです。例えばlist内の全要素を処理する場合、ループの前にlistの長さを取得してcdef int nに保存し、各要素をcdef型に変換してからC型の演算を行い、結果はC型の配列に蓄積して、最後にまとめてPythonオブジェクトに変換する、というパターンが効果的です。",
+    code: "# Python list → C型で処理 → Python list に戻す\ndef process_list(list data):\n    \"\"\"Python listの全要素を2乗して返す\"\"\"\n    cdef int n = len(data)\n    cdef list result = []\n    cdef double val\n    cdef int i\n\n    for i in range(n):\n        # アンボクシング: Python object → C double\n        val = <double>data[i]\n        # C型で高速演算\n        val = val * val\n        # ボクシング: C double → Python object\n        result.append(val)\n    return result\n\n# より高速なアプローチ: NumPy + memoryview を使う\nimport numpy as np\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef process_array(double[:] data):\n    \"\"\"memoryviewでPython操作を排除\"\"\"\n    cdef int n = data.shape[0]\n    result = np.empty(n, dtype=np.float64)\n    cdef double[:] out = result\n    cdef int i\n    for i in range(n):\n        out[i] = data[i] * data[i]  # 全てC操作\n    return result\n\n# Pythonの辞書もCython内で使える\ndef count_items(list items):\n    cdef dict counts = {}\n    cdef str item\n    for item in items:\n        if item in counts:\n            counts[item] += 1\n        else:\n            counts[item] = 1\n    return counts",
+    afterCode: "ポイント: 文字列やリストなどPythonオブジェクトを多用する処理では、Cythonによる高速化は限定的です。Cythonが最も力を発揮するのは数値計算（整数・浮動小数点のループ）です。文字列処理の高速化が必要な場合は、正規表現のre（内部がCで書かれている）やbytes操作でアプローチする方が効果的なことがあります。"
+  }, {
+    title: "型チェックとNoneの扱い",
+    body: "Cythonの型宣言付き引数にNoneが渡された場合の挙動は、型によって異なります。cdef list my_list にNoneを代入することは許可されます（list型のオブジェクトにNoneはPythonの型システム上は合法だからです）。しかしその後にmy_list.append(...)を呼ぶとAttributeError（またはセグメンテーション違反）が発生します。\n\nnonecheck=Trueディレクティブを使うと、Noneに対するメソッド呼び出しやアトリビュートアクセス時にPython的なTypeErrorが発生するようになります。デフォルトではFalse（チェックなし）なので、安全なコードを書く際には明示的にTrueにするか、関数の冒頭で引数のNoneチェックを入れるのが良い習慣です。\n\ntyped memoryviewの引数にNoneを渡すとTypeErrorが発生します（バッファプロトコルをサポートしていないため）。これはmemoryviewの方がlist/dict等よりNone安全であることを意味します。API関数の引数にはなるべくmemoryviewを使い、Python listは内部でNumPy配列に変換してからmemoryviewに渡すパターンが安全かつ高速です。",
+    code: "cimport cython\n\n# nonecheckディレクティブの効果\n@cython.nonecheck(True)\ndef safe_function(list data):\n    \"\"\"Noneチェック有効: TypeError になる\"\"\"\n    return len(data)\n\n@cython.nonecheck(False)\ndef unsafe_function(list data):\n    \"\"\"Noneチェック無効: セグフォの可能性\"\"\"\n    return len(data)\n\n# 推奨パターン: 明示的にNoneチェック\ndef robust_function(data):\n    \"\"\"引数の型とNoneを明示的にチェック\"\"\"\n    if data is None:\n        raise ValueError(\"dataにNoneは渡せません\")\n    if not isinstance(data, list):\n        raise TypeError(f\"list型が必要です: {type(data)}\")\n\n    cdef list typed_data = <list>data\n    cdef int n = len(typed_data)\n    # 安全に処理を続行\n    return n\n\n# memoryviewはNoneを自然に拒否する\ndef array_func(double[:] arr):\n    \"\"\"Noneを渡すとTypeError（バッファプロトコル非対応）\"\"\"\n    return arr.shape[0]",
+    afterCode: "ポイント: 防御的プログラミングの観点では、公開API（def関数）の冒頭で引数のNoneチェックとisinstanceチェックを行うのがベストプラクティスです。内部のcdef関数では呼び出し元が保証しているためチェックを省略でき、オーバーヘッドを最小限に抑えられます。"
+  }]
+}, {
+  id: "ch9",
+  num: 9,
+  title: "クラスとcdef class",
+  est: "55分",
+  goal: "cdef class（拡張型）の定義方法を習得し、通常のPythonクラスとの性能差・制約の違いを理解する。__cinit__/__dealloc__によるリソース管理、属性の型宣言、継承の仕組みを把握し、実用的な拡張型を設計できるようになる。",
+  sections: [{
+    title: "cdef class の基礎 — 拡張型とは",
+    body: "cdef classはCythonの拡張型（extension type）を定義するためのキーワードです。通常のPythonクラスはインスタンスの属性を内部の__dict__（辞書）に格納しますが、cdef classの属性はC構造体のフィールドとして固定レイアウトで配置されます。辞書検索の代わりにメモリオフセットで直接アクセスするため、属性のread/writeが桁違いに速くなります。\n\nPythonのクラスでは動的に属性を追加できます（obj.new_attr = 42のように）。cdef classではこれができません。全ての属性は事前にcdef宣言する必要があり、宣言されていない属性への代入はAttributeErrorになります。この制約があるからこそ、コンパイラは各属性のメモリ上の位置を静的に決定でき、高速なアクセスが可能になります。\n\ncdef classの属性はデフォルトではPythonからアクセスできません（private）。Pythonからアクセス可能にするにはpropertyを使うか、属性宣言にpublic/readonlyを付けます。これはカプセル化の観点で有用です。内部ではC速度で直接アクセスし、外部にはpropertyを通じて安全なインターフェースを提供するというパターンが一般的です。",
+    table: T.cdefClassVsClass,
+    code: "# cdef class の基本構造\ncdef class Vector2D:\n    # 属性の型宣言（C構造体のフィールドになる）\n    cdef double x\n    cdef double y\n\n    def __init__(self, double x, double y):\n        self.x = x\n        self.y = y\n\n    # メソッドはdef/cdef/cpdefのいずれも使える\n    cpdef double magnitude(self):\n        return (self.x ** 2 + self.y ** 2) ** 0.5\n\n    cdef double dot(self, Vector2D other):\n        return self.x * other.x + self.y * other.y\n\n    def __repr__(self):\n        return f\"Vector2D({self.x}, {self.y})\"\n\n    # Pythonからアクセスするためのproperty\n    @property\n    def length(self):\n        return self.magnitude()\n\n# 属性のアクセス制御\ncdef class Config:\n    cdef public str name         # Python から読み書き可能\n    cdef readonly int version    # Python から読み取り専用\n    cdef double _internal        # Python からアクセス不可\n\n    def __init__(self, str name, int version):\n        self.name = name\n        self.version = version\n        self._internal = 0.0",
+    afterCode: "ポイント: cdef classのインスタンスもPythonオブジェクトの一種であり、isinstance()で型判定でき、Pythonの変数に代入でき、リストに入れられます。外から見ればPythonクラスのように振る舞いますが、内部はC構造体なので高速、というのがcdef classの本質です。"
+  }, {
+    title: "__cinit__ と __dealloc__ — リソースのライフサイクル",
+    body: "cdef classには__init__に加えて__cinit__と__dealloc__という特殊メソッドがあります。__cinit__はオブジェクト生成時にメモリ確保直後に呼ばれるメソッドで、C型属性の初期化に使います。__init__より前に実行されることが保証されており、サブクラスの__cinit__も必ず呼ばれます（__init__はサブクラスでオーバーライドすると親の__init__が自動的に呼ばれなくなる場合があるのとは対照的です）。\n\n__dealloc__はオブジェクトがガベージコレクションされる際に呼ばれます。Cのmalloc/freeで確保したメモリやファイルハンドルなど、Python以外のリソースを解放するために使います。Pythonの__del__に似ていますが、__dealloc__の方が呼ばれるタイミングが確実です。__dealloc__内ではPythonオブジェクトへのアクセスを最小限にすべきです（GC中に他のオブジェクトが既に破棄されている可能性があるため）。\n\n__cinit__と__init__の使い分けは、C型の属性（cdef int, cdef double*など）の初期化を__cinit__で行い、Pythonオブジェクト属性の初期化やバリデーションは__init__で行う、というのが基本パターンです。簡単なクラスでは__init__だけで十分ですが、mallocを使う場合は__cinit__/__dealloc__のペアが必須です。",
+    code: "from libc.stdlib cimport malloc, free\n\ncdef class IntArray:\n    \"\"\"C配列をラップする拡張型\"\"\"\n    cdef int* _data\n    cdef int _size\n\n    def __cinit__(self, int size):\n        \"\"\"メモリ確保（__init__より前に呼ばれる）\"\"\"\n        self._size = size\n        self._data = <int*>malloc(size * sizeof(int))\n        if self._data == NULL:\n            raise MemoryError(f\"{size}要素の確保に失敗\")\n        # ゼロ初期化\n        cdef int i\n        for i in range(size):\n            self._data[i] = 0\n\n    def __dealloc__(self):\n        \"\"\"メモリ解放（GC時に自動的に呼ばれる）\"\"\"\n        if self._data != NULL:\n            free(self._data)\n\n    def __getitem__(self, int index):\n        if index < 0 or index >= self._size:\n            raise IndexError(f\"インデックス {index} は範囲外\")\n        return self._data[index]\n\n    def __setitem__(self, int index, int value):\n        if index < 0 or index >= self._size:\n            raise IndexError(f\"インデックス {index} は範囲外\")\n        self._data[index] = value\n\n    def __len__(self):\n        return self._size\n\n    def __repr__(self):\n        items = [str(self._data[i]) for i in range(min(self._size, 5))]\n        if self._size > 5:\n            items.append(\"...\")\n        return f\"IntArray([{', '.join(items)}])\"",
+    afterCode: "ポイント: __cinit__でmallocしたメモリは必ず__dealloc__でfreeしてください。__cinit__内で例外が発生した場合でも__dealloc__は呼ばれるため、NULLポインタのチェック（if self._data != NULL）を入れておくことが重要です。mallocの戻り値がNULLの場合はMemoryErrorを送出するのがPythonの慣習です。"
+  }, {
+    title: "継承とポリモーフィズム",
+    body: "cdef classは他のcdef classを継承できます。通常のPython classを継承することはできませんが、逆にPython classがcdef classを継承することは可能です。cdef class同士の継承ではC構造体レベルでフィールドが追加されるため、属性アクセスの速度は維持されます。\n\nメソッドのオーバーライドにはcpdefメソッドを使います。cdefメソッドはオーバーライドできません（Cのテーブル呼び出しで直接解決されるため）。def メソッドはPython側のオーバーライドのみ可能です。cpdefメソッドを使えば、Python的なポリモーフィズム（基底クラスの参照で派生クラスのメソッドを呼ぶ）が正しく動作しつつ、Cython内部からの呼び出しも高速に行えます。\n\n多重継承はサポートされていません。複数のcdef classを同時に継承しようとするとコンパイルエラーになります。これはC構造体のメモリレイアウトが単一継承を前提としているためです。インターフェースの多重実装が必要な場合は、Pythonのプロトコル（__len__, __iter__など）を使うか、ミックスインパターンをPython class側で実装するアプローチを取ります。",
+    code: "from libc.math cimport sqrt, M_PI\n\n# 基底クラス\ncdef class Shape:\n    cdef public str name\n\n    def __init__(self, str name=\"Shape\"):\n        self.name = name\n\n    cpdef double area(self):\n        \"\"\"cpdefなのでオーバーライド可能\"\"\"\n        return 0.0\n\n    cpdef double perimeter(self):\n        return 0.0\n\n    def describe(self):\n        return f\"{self.name}: 面積={self.area():.2f}, 周長={self.perimeter():.2f}\"\n\n# 派生クラス\ncdef class Circle(Shape):\n    cdef double _radius\n\n    def __init__(self, double radius):\n        super().__init__(\"Circle\")\n        self._radius = radius\n\n    cpdef double area(self):\n        return M_PI * self._radius * self._radius\n\n    cpdef double perimeter(self):\n        return 2.0 * M_PI * self._radius\n\ncdef class Rectangle(Shape):\n    cdef double _width\n    cdef double _height\n\n    def __init__(self, double width, double height):\n        super().__init__(\"Rectangle\")\n        self._width = width\n        self._height = height\n\n    cpdef double area(self):\n        return self._width * self._height\n\n    cpdef double perimeter(self):\n        return 2.0 * (self._width + self._height)\n\n# ポリモーフィズム: 基底クラス型で扱える\ndef total_area(list shapes):\n    cdef double total = 0.0\n    cdef Shape s\n    for s in shapes:\n        total += s.area()  # 各派生クラスのarea()が呼ばれる\n    return total",
+    afterCode: "ポイント: total_area関数でcdef Shape sと型宣言することで、ループ内のs.area()呼び出しがCythonの最適化されたディスパッチで行われます。型宣言がなければPythonの汎用的なメソッド呼び出しになり、より遅くなります。基底クラスの型でローカル変数を宣言することが、cdef classのポリモーフィズムを活かすコツです。"
+  }]
+}, {
+  id: "ch10",
+  num: 10,
+  title: "プロファイリングと最適化",
+  est: "50分",
+  goal: "cython -aアノテーション、cProfile、line_profilerを使ったプロファイリング手法を習得し、Cythonコードのボトルネックを体系的に特定・改善できるようになる。最適化の優先順位の付け方と、安全性とのトレードオフの判断基準を自分で説明できる状態がゴール。",
+  sections: [{
+    title: "cython -a アノテーション — 黄色い行を減らす",
+    body: "Cythonの最適化において最も強力なツールがcython -a（アノテーション）です。cythonize -a my_module.pyxを実行すると、ソースコードの各行をPythonとの相互作用の度合いに応じて白〜黄色で色分けしたHTMLファイルが生成されます。白い行は純粋なCコードに変換済みで高速、黄色い行はPythonオブジェクト操作が残っており遅い、という意味です。\n\nアノテーションの読み方にはコツがあります。各行をクリックすると、その行に対して生成されたC言語コードが展開表示されます。Py_INCREF, Py_DECREF（参照カウント操作）やPyObject_Call（Python関数呼び出し）が多い行はオーバーヘッドが大きいことを意味します。逆に、単純な代入や算術演算だけのCコードが表示される行は最適化が効いています。\n\n最適化のワークフローは「アノテーション → 黄色い行を特定 → 型宣言の追加 → 再アノテーション」の繰り返しです。全ての行を白にする必要はなく、ループの内側（最も実行回数が多い部分）を優先的に白くすることが重要です。ループの外側の黄色い行（初期化やPythonオブジェクトの返却）は実行回数が少ないため、影響は限定的です。",
+    code: "# === 最適化前（ほぼ全行が黄色） ===\ndef naive_sum(data):\n    total = 0\n    for i in range(len(data)):\n        total += data[i]\n    return total\n\n# === 最適化後（ループ内が白） ===\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef optimized_sum(double[:] data):\n    cdef int n = data.shape[0]\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):       # ← 白: Cの整数ループ\n        total += data[i]     # ← 白: Cの直接メモリアクセス\n    return total             # ← 黄: Python floatへのボクシング（1回だけ）\n\n# === アノテーション生成コマンド ===\n# cythonize -a my_module.pyx\n# → my_module.html が生成される\n# ブラウザで開いて黄色い行を確認する",
+    afterCode: "ポイント: return文が黄色になるのは、C doubleをPython floatに変換（ボクシング）するためです。これは関数の呼び出しごとに1回だけ発生するオーバーヘッドであり、通常は問題になりません。ループ本体が白であれば、その関数は十分に最適化されていると判断できます。"
+  }, {
+    title: "cProfile と line_profiler によるボトルネック特定",
+    body: "cython -aはCythonレベルでの最適化を導きますが、プログラム全体のどの関数がボトルネックなのかを特定するにはPythonのプロファイリングツールが必要です。cProfileは関数単位の実行時間を計測する標準ライブラリで、python -m cProfile -s cumtime my_script.pyで最も時間がかかっている関数を特定できます。\n\nCythonの関数をcProfileで計測するには、ファイル先頭に# cython: profile=Trueディレクティブを追加するか、setup.pyのcompiler_directivesで指定します。このディレクティブが無いと、Cython関数はcProfileの出力に表示されません（Cレベルで直接呼ばれるため、Pythonのプロファイリングフックが介入できないからです）。\n\nline_profiler（pip install line_profiler）は行単位の実行時間を計測するツールで、関数内のどの行が遅いかをピンポイントで特定できます。@profileデコレータを計測対象の関数に付け、kernprof -l -v script.pyで実行します。Cythonの関数もprofile=Trueが有効であれば計測対象にできます。cython -aとline_profilerを組み合わせることで、「なぜ遅いか（Python操作が残っている）」と「どこが遅いか（実行時間）」の両面からボトルネックを分析できます。",
+    code: "# === ファイル先頭でプロファイリング有効化 ===\n# cython: profile=True\n\nimport numpy as np\ncimport cython\n\n# cProfileで計測される\ndef pipeline(data):\n    \"\"\"データ処理パイプライン\"\"\"\n    arr = np.asarray(data, dtype=np.float64)\n    filtered = filter_positive(arr)\n    result = compute_stats(filtered)\n    return result\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef filter_positive(double[:] arr):\n    cdef int n = arr.shape[0]\n    cdef int count = 0\n    cdef int i\n    # まず正の値の数をカウント\n    for i in range(n):\n        if arr[i] > 0.0:\n            count += 1\n    # 結果配列を確保して格納\n    result = np.empty(count, dtype=np.float64)\n    cdef double[:] out = result\n    cdef int j = 0\n    for i in range(n):\n        if arr[i] > 0.0:\n            out[j] = arr[i]\n            j += 1\n    return result\n\ndef compute_stats(double[:] arr):\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    cdef double sq_total = 0.0\n    cdef int i\n    for i in range(n):\n        total += arr[i]\n        sq_total += arr[i] * arr[i]\n    cdef double mean = total / n\n    cdef double var = sq_total / n - mean * mean\n    return {\"mean\": mean, \"variance\": var, \"count\": n}\n\n# === プロファイリング実行 ===\n# python -m cProfile -s cumtime script.py\n# kernprof -l -v script.py  # line_profiler",
+    afterCode: "ポイント: profile=Trueは若干のオーバーヘッドを追加するため、本番ビルドでは無効にしてください。setup.pyのcompiler_directivesで開発用ビルドと本番ビルドを切り替えるのが良い運用です。"
+  }, {
+    title: "最適化の優先順位と実践ガイド",
+    body: "Cythonで最適化を行う際の鉄則は「計測してから最適化する」です。直感的に遅そうな箇所と実際のボトルネックは一致しないことが多く、プロファイリングなしの最適化は無駄な労力になりがちです。最適化の手順は (1) cProfile で遅い関数を特定、(2) cython -a でその関数の黄色い行を確認、(3) 型宣言・ディレクティブを追加、(4) 再計測 の繰り返しです。\n\n最適化の効果が大きい順に並べると、第一に「ループ変数と配列のC型化」です。これだけで10〜100倍の速度向上が得られることが多いです。第二に「cdef関数への切り出し」で、ループ内で呼ばれるヘルパー関数をcdefにすることで関数呼び出しオーバーヘッドを排除します。第三に「boundscheck/wraparound の無効化」で、配列アクセスのチェックコストを削減します。第四に「メモリレイアウトの最適化」で、C連続を指定してキャッシュ効率を高めます。\n\n最後に重要な注意点として、Cythonの最適化は安全性とのトレードオフです。boundscheck=Falseはバッファオーバーフローを引き起こす可能性があり、cdivision=Trueはゼロ除算でクラッシュします。テストスイートを充実させ、安全なコードが確認できた段階でのみ安全性チェックを外すことを強く推奨します。速度は重要ですが、クラッシュするプログラムは速くても意味がありません。",
+    code: "# === 最適化チェックリスト ===\n#\n# ステップ1: まずPure Pythonで書いて正しく動くことを確認\n# ステップ2: cythonizeしてアノテーションを確認\n# ステップ3: 以下を順番に適用\n\ncimport cython\nimport numpy as np\n\n# [優先度1] ループ変数と演算のC型化\ndef step1_type_declarations(double[:] arr):\n    cdef int n = arr.shape[0]      # int化\n    cdef double total = 0.0        # double化\n    cdef int i                     # ループ変数のint化\n    for i in range(n):\n        total += arr[i]\n    return total\n\n# [優先度2] ヘルパー関数のcdef化\ncdef inline double _square(double x):\n    return x * x\n\ndef step2_cdef_helpers(double[:] arr):\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):\n        total += _square(arr[i])   # cdef関数呼び出し\n    return total\n\n# [優先度3] ディレクティブの適用\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef step3_directives(double[:] arr):\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):\n        total += _square(arr[i])\n    return total\n\n# [優先度4] メモリレイアウトの最適化\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef step4_memory_layout(double[::1] arr):  # C連続を明示\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):\n        total += _square(arr[i])\n    return total",
+    afterCode: "コース完了後に習得できる状態: Cythonの基本的な型宣言・関数定義・コンパイル方法を理解し、Pythonコードのボトルネックを特定してCythonで高速化できる。Pure Pythonモードと.pyx記法の使い分けができ、cdef class による拡張型の設計もできる。プロファイリングに基づいた体系的な最適化が行える。"
+  }]
+}];
+
+/* ─── UI Components ─── */
+
+var root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(CourseApp, {
+  title: "Cython 入門コース",
+  icon: "\uD83D\uDC0D",
+  level: "入門",
+  description: "PythonコードをC拡張モジュールにコンパイルして劇的に高速化する方法を学びます。cdef型宣言・memoryview・Pure Pythonモードを基礎から習得し、既存のPythonプロジェクトに段階的にCythonを導入できるようになります。",
+  footerText: "cython.readthedocs.io \u00B7 Cython 3.2.x \u00B7 2026\u5E744\u6708\u6642\u70B9",
+  chapters: chapters,
+  EX: EX
+}));
+  </script>
+</body>
+</html>
