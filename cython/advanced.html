@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../assets/course.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cython 上級コース — CPython内部・SIMD・プロダクション品質設計</title>
+  <meta name="description" content="Cython上級コース。全10章・演習付き。CPython C API、SIMD統合、fused types、プロダクション品質拡張モジュール設計。">
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="../assets/course-ui.js"></script>
+  <script>
+const { useState } = React;
+
+/* ── Table definitions ── */
+const T = {
+  pyObjectFields: {
+    h: ["フィールド", "型", "説明"],
+    r: [
+      ["ob_refcnt", "Py_ssize_t", "参照カウント。0になるとオブジェクトが解放される"],
+      ["ob_type", "PyTypeObject*", "オブジェクトの型情報へのポインタ"],
+      ["ob_size", "Py_ssize_t", "可変長オブジェクト（list等）の要素数（PyVarObject）"]
+    ]
+  },
+  refCountAPI: {
+    h: ["関数/マクロ", "動作", "使用場面"],
+    r: [
+      ["Py_INCREF(op)", "参照カウントを+1", "新しい参照を保持する時"],
+      ["Py_DECREF(op)", "参照カウントを-1（0で解放）", "参照を手放す時"],
+      ["Py_XINCREF(op)", "NULLチェック付きINCREF", "NULLかもしれないポインタ"],
+      ["Py_XDECREF(op)", "NULLチェック付きDECREF", "NULLかもしれないポインタ"],
+      ["Py_NewRef(op)", "INCREFして返す（3.10+）", "関数の返り値として渡す時"],
+      ["Py_CLEAR(op)", "DECREFしてNULLを代入", "循環参照の安全な解放"]
+    ]
+  },
+  bufferFlags: {
+    h: ["フラグ", "定数", "意味"],
+    r: [
+      ["PyBUF_SIMPLE", "0", "1次元・連続・読み取り専用"],
+      ["PyBUF_WRITABLE", "0x0001", "書き込み可能なバッファ"],
+      ["PyBUF_FORMAT", "0x0004", "format文字列を要求"],
+      ["PyBUF_ND", "0x0008", "shape情報を含む"],
+      ["PyBUF_STRIDES", "0x0010", "stridesを含む"],
+      ["PyBUF_C_CONTIGUOUS", "0x0020", "C順序で連続"],
+      ["PyBUF_F_CONTIGUOUS", "0x0040", "Fortran順序で連続"],
+      ["PyBUF_FULL", "0x007F", "全情報を要求"]
+    ]
+  },
+  bufferFields: {
+    h: ["フィールド", "型", "説明"],
+    r: [
+      ["buf", "void*", "メモリバッファの先頭ポインタ"],
+      ["len", "Py_ssize_t", "バッファの総バイト数"],
+      ["itemsize", "Py_ssize_t", "1要素のバイト数"],
+      ["format", "char*", "struct形式のフォーマット文字列（例: \"d\" = float64）"],
+      ["ndim", "int", "次元数"],
+      ["shape", "Py_ssize_t*", "各次元の要素数"],
+      ["strides", "Py_ssize_t*", "各次元のバイトストライド"],
+      ["readonly", "int", "読み取り専用なら1"]
+    ]
+  },
+  fusedDispatch: {
+    h: ["ディスパッチ方法", "構文", "用途"],
+    r: [
+      ["自動ディスパッチ", "func(arg)", "引数の型から自動的に特殊化を選択"],
+      ["明示的指定", "func[double](arg)", "特定の特殊化を直接呼び出し"],
+      ["型チェック分岐", "if numeric_t is int:", "fused type内で型ごとの処理を分岐"],
+      ["isinstance分岐", "if isinstance(val, int):", "実行時の型に基づく分岐"]
+    ]
+  },
+  simdIntrinsics: {
+    h: ["命令セット", "ヘッダ", "代表的な関数", "幅"],
+    r: [
+      ["SSE2", "emmintrin.h", "_mm_add_pd, _mm_mul_pd", "128bit"],
+      ["AVX", "immintrin.h", "_mm256_add_ps, _mm256_mul_ps", "256bit"],
+      ["AVX2", "immintrin.h", "_mm256_add_epi32", "256bit整数"],
+      ["AVX-512", "immintrin.h", "_mm512_add_ps", "512bit"],
+      ["NEON", "arm_neon.h", "vaddq_f32, vmulq_f32", "128bit"]
+    ]
+  },
+  tempitaSyntax: {
+    h: ["構文", "説明", "例"],
+    r: [
+      ["{{expr}}", "式の評価と埋め込み", "{{dtype}}"],
+      ["{{for x in list}}", "ループ展開", "{{for dt in dtypes}}"],
+      ["{{endfor}}", "ループ終了", ""],
+      ["{{if cond}}", "条件分岐", "{{if dtype == 'float64'}}"],
+      ["{{elif cond}}", "else if分岐", ""],
+      ["{{else}}", "else分岐", ""],
+      ["{{endif}}", "条件終了", ""],
+      ["DEF", "コンパイル時定数", "DEF MAX_SIZE = 1024"],
+      ["IF/ELIF/ELSE", "コンパイル時条件", "IF UNAME_SYSNAME == 'Windows':"]
+    ]
+  },
+  ufuncTypes: {
+    h: ["NumPy型コード", "C型", "説明"],
+    r: [
+      ["NPY_FLOAT32", "npy_float32", "単精度浮動小数点"],
+      ["NPY_FLOAT64", "npy_float64", "倍精度浮動小数点"],
+      ["NPY_INT32", "npy_int32", "32ビット整数"],
+      ["NPY_INT64", "npy_int64", "64ビット整数"],
+      ["NPY_COMPLEX128", "npy_cdouble", "複素数（倍精度）"],
+      ["NPY_OBJECT", "PyObject*", "任意のPythonオブジェクト"]
+    ]
+  },
+  gilStates: {
+    h: ["状態", "説明", "Cython構文"],
+    r: [
+      ["GIL保持", "Pythonオブジェクト操作が可能", "通常のdef/cpdef関数"],
+      ["GIL解放", "Pythonオブジェクト操作不可・並列実行可", "with nogil: / nogil関数"],
+      ["GIL再取得", "nogil領域内でPython操作が必要な時", "with gil:"],
+      ["条件付き解放", "フラグで動的に切り替え", "with nogil(flag):"]
+    ]
+  },
+  testTools: {
+    h: ["ツール", "用途", "特徴"],
+    r: [
+      ["doctest", "簡易テスト", "docstring内にテストを記述。cython.test_assert_path_existsも利用可"],
+      ["pytest", "単体テスト", "Python側からCython関数を呼び出してテスト"],
+      ["pytest-benchmark", "ベンチマーク", "関数単位の実行時間計測"],
+      ["hypothesis", "プロパティテスト", "ランダム入力で不変条件を検証"],
+      ["ASV (airspeed velocity)", "回帰ベンチマーク", "コミットごとのパフォーマンス追跡"]
+    ]
+  },
+  ciTools: {
+    h: ["ツール", "用途", "特徴"],
+    r: [
+      ["cibuildwheel", "ホイールビルド", "全OS・全Python版のwheelを自動ビルド"],
+      ["meson-python", "ビルドバックエンド", "Mesonベースの高速ビルド"],
+      ["setuptools + Cython.Build", "従来のビルド", "setup.pyベースのビルド"],
+      ["conda-forge", "conda配布", "conda向けパッケージ配布"],
+      ["GitHub Actions", "CI/CD", "ビルド・テスト・リリースの自動化"]
+    ]
+  }
+};
+
+/* ── Chapters ── */
+const chapters = [
+{
+  id: "ch1", num: 1,
+  title: "CPython C API基礎",
+  est: "5時間",
+  goal: "PyObject* の構造と参照カウントの仕組みを理解し、Cython から CPython C API を直接操作して安全にオブジェクトを生成・操作・解放できるようになる。メモリリークや二重解放を防ぐための原則を身につける。",
+  sections: [
+    {
+      title: "PyObject* とCPythonオブジェクトモデル",
+      body: "CPython の全オブジェクトは内部的に PyObject 構造体（またはその拡張である PyVarObject）として表現されます。Cython の上級者がこの内部構造を理解することは、パフォーマンスチューニングや C ライブラリとの統合において不可欠です。\n\nPyObject には最低限 ob_refcnt（参照カウント）と ob_type（型ポインタ）の2つのフィールドがあります。Python で x = 42 と書くとき、実際には PyLongObject 構造体がヒープ上に確保され、ob_type は &PyLong_Type を指しています。Cython では cdef PyObject* を使ってこの低レベル表現に直接アクセスできますが、通常は object 型や型付き変数を通じて安全に扱います。\n\n上級コースで C API を直接操作する理由は、サードパーティの C ライブラリとの統合や、Cython が自動生成するコードの最適化限界を超えたい場合があるためです。たとえば、NumPy の内部バッファに直接アクセスしたり、独自の型オブジェクトを C レベルで構築したりする場面で必要になります。",
+      table: T.pyObjectFields,
+      afterTable: "PyVarObject は PyObject に ob_size フィールドを追加した構造体で、list や tuple のような可変長オブジェクトに使われます。Cython の cdef extern from \"Python.h\" を使えば、これらの構造体定義を直接インポートできます。",
+      code: "# CPython C API を Cython から直接利用する\ncimport cpython\nfrom cpython.object cimport PyObject\nfrom cpython.ref cimport Py_INCREF, Py_DECREF\nfrom libc.stdio cimport printf\n\ndef inspect_object(obj):\n    \"\"\"オブジェクトの内部情報を表示する\"\"\"\n    cdef PyObject* ptr = <PyObject*>obj\n    # 参照カウントの確認\n    print(f\"型: {type(obj).__name__}\")\n    print(f\"参照カウント: {(<object>ptr).__class__}\")\n    print(f\"id: {id(obj)}\")\n    # sys.getrefcount は呼び出し時に+1されることに注意\n    import sys\n    print(f\"refcount (sys): {sys.getrefcount(obj)}\")\n\ndef manual_refcount_demo():\n    \"\"\"参照カウントの手動操作デモ\"\"\"\n    cdef object lst = [1, 2, 3]\n    cdef PyObject* raw = <PyObject*>lst\n    import sys\n    print(f\"初期refcount: {sys.getrefcount(lst)}\")\n    # 手動で参照カウントを増やす\n    Py_INCREF(raw)\n    print(f\"INCREF後: {sys.getrefcount(lst)}\")\n    # 手動で参照カウントを減らす\n    Py_DECREF(raw)\n    print(f\"DECREF後: {sys.getrefcount(lst)}\")",
+      afterCode: "Cython が通常のコードで自動的に参照カウントを管理してくれるため、手動で Py_INCREF/Py_DECREF を呼ぶ必要があるのは、C API を直接操作する場合か、cdef PyObject* を明示的に扱う場合に限られます。手動操作を誤るとメモリリークやセグメンテーションフォールトの原因になるため、十分な注意が必要です。"
+    },
+    {
+      title: "参照カウントと所有権規約",
+      body: "CPython C API の関数は「新しい参照（new reference）」を返すものと「借用参照（borrowed reference）」を返すものに大別されます。この区別は Cython で C API を直接呼び出す際に極めて重要です。新しい参照を返す関数（PyList_New など）の戻り値は呼び出し側が所有権を持つため、不要になったら Py_DECREF する責任があります。\n\n一方、借用参照を返す関数（PyList_GetItem など）は、コンテナが所有権を保持しているため、呼び出し側で DECREF してはいけません。借用参照を長期間保持したい場合は Py_INCREF で新しい参照に昇格させる必要があります。Cython は通常この管理を自動的に行いますが、<PyObject*> キャストを使って型システムを迂回すると、手動管理が必要になります。\n\nPython と C の境界をまたぐ関数（いわゆるコールバックや tp_* スロット）を実装する際は、参照カウントの規約を厳密に守ることが不可欠です。特に例外パス（エラー時のクリーンアップ）では、途中で確保した参照を全て正しく解放する必要があり、goto cleanup パターンが C では一般的です。",
+      table: T.refCountAPI,
+      afterTable: "Py_CLEAR は循環参照を安全に解放するためのマクロで、tp_clear スロットの実装で特に重要です。先に変数を NULL に設定してから DECREF するため、デストラクタが再帰的に呼ばれた場合のダングリングポインタを防げます。",
+      code: "# 新しい参照と借用参照の使い分け\nfrom cpython.list cimport PyList_New, PyList_SetItem, PyList_GetItem\nfrom cpython.long cimport PyLong_FromLong\nfrom cpython.ref cimport Py_INCREF, Py_DECREF\nfrom cpython.object cimport PyObject\n\ndef build_list_lowlevel(int n):\n    \"\"\"C APIでリストを構築する（低レベル版）\"\"\"\n    # PyList_New は新しい参照を返す\n    cdef object result = PyList_New(n)\n    cdef int i\n    for i in range(n):\n        # PyLong_FromLong は新しい参照を返す\n        # PyList_SetItem は参照を「盗む」ため DECREF 不要\n        val = PyLong_FromLong(i * i)\n        PyList_SetItem(result, i, val)  # 参照を盗む\n    return result\n\ndef access_list_lowlevel(list lst, int idx):\n    \"\"\"借用参照でリスト要素にアクセス\"\"\"\n    # PyList_GetItem は借用参照を返す\n    cdef PyObject* item = PyList_GetItem(lst, idx)\n    if item is NULL:\n        raise IndexError(f\"index {idx} out of range\")\n    # 借用参照を安全にPythonオブジェクトとして返す\n    # Cython が自動的に INCREF してくれる\n    return <object>item\n\ndef demonstrate_steal_reference():\n    \"\"\"PyList_SetItem の参照盗み取りの動作確認\"\"\"\n    import sys\n    val = 999\n    print(f\"SetItem前のrefcount: {sys.getrefcount(val)}\")\n    lst = [None]\n    # 通常のPython代入（Cythonが自動管理）\n    lst[0] = val\n    print(f\"代入後のrefcount: {sys.getrefcount(val)}\")",
+      afterCode: "PyList_SetItem は特殊な関数で、渡された参照の所有権を「盗む（steal）」ため、呼び出し側で DECREF する必要がありません。一方、PyList_SET_ITEM マクロはさらに低レベルで境界チェックを行いません。新しい参照と借用参照の区別はCPython公式ドキュメントの各関数の説明に明記されているため、必ず確認しましょう。"
+    },
+    {
+      title: "カスタム型オブジェクトの構築",
+      body: "Cython の cdef class（拡張型）は内部的に PyTypeObject 構造体として実装されます。通常は Cython が自動生成してくれますが、tp_* スロットをカスタマイズしたい場合や、既存の C 型を Python オブジェクトとしてラップする場合には、C API レベルでの理解が必要です。\n\nたとえば、__hash__ や __richcmp__ のような特殊メソッドは、内部的にそれぞれ tp_hash や tp_richcompare スロットにマッピングされます。Cython ではこれらを Python 風の構文で記述できますが、生成される C コードがどのスロットにどう配置されるかを知っていると、デバッグやパフォーマンス分析が格段に楽になります。\n\n上級テクニックとして、Cython で定義した cdef class に対して追加の tp_* スロットを C レベルで注入することも可能です。これは Cython が直接サポートしていない CPython の機能（たとえば tp_vectorcall やバッファプロトコル）を利用したい場合に有用です。",
+      code: "# cdef class による拡張型定義\n# Cython が PyTypeObject を自動生成する\ncdef class Vector3:\n    \"\"\"3次元ベクトル（CPython拡張型）\"\"\"\n    cdef public double x, y, z\n\n    def __init__(self, double x=0, double y=0, double z=0):\n        self.x = x\n        self.y = y\n        self.z = z\n\n    # tp_repr スロットにマッピング\n    def __repr__(self):\n        return f\"Vector3({self.x}, {self.y}, {self.z})\"\n\n    # tp_hash スロット\n    def __hash__(self):\n        return hash((self.x, self.y, self.z))\n\n    # tp_richcompare スロット\n    def __richcmp__(Vector3 self, Vector3 other, int op):\n        if op == 2:  # ==\n            return (self.x == other.x and\n                    self.y == other.y and\n                    self.z == other.z)\n        elif op == 3:  # !=\n            return not (self == other)\n        return NotImplemented\n\n    # tp_as_number スロット群\n    def __add__(Vector3 self, Vector3 other):\n        return Vector3(self.x + other.x,\n                       self.y + other.y,\n                       self.z + other.z)\n\n    def __sub__(Vector3 self, Vector3 other):\n        return Vector3(self.x - other.x,\n                       self.y - other.y,\n                       self.z - other.z)\n\n    # cpdef でCレベル・Pythonレベル両方から呼べるメソッド\n    cpdef double dot(self, Vector3 other):\n        return self.x * other.x + self.y * other.y + self.z * other.z\n\n    cpdef Vector3 cross(self, Vector3 other):\n        return Vector3(\n            self.y * other.z - self.z * other.y,\n            self.z * other.x - self.x * other.z,\n            self.x * other.y - self.y * other.x\n        )\n\n    cpdef double length(self):\n        from libc.math cimport sqrt\n        return sqrt(self.dot(self))",
+      afterCode: "Cython の cdef class で定義した属性に cdef public をつけると Python 側からもアクセス可能になりますが、C レベルのダイレクトアクセスの速度は維持されます。cdef readonly は読み取り専用として公開します。cpdef メソッドは C レベルの直接呼び出しと Python のメソッドディスパッチの両方をサポートするため、ライブラリの内部では高速に、外部からは通常の Python メソッドとして使えます。"
+    }
+  ]
+},
+{
+  id: "ch2", num: 2,
+  title: "バッファプロトコル",
+  est: "5時間",
+  goal: "PEP 3118 バッファプロトコルの仕様を理解し、Cython で __getbuffer__/__releasebuffer__ を実装してカスタム型をメモリビューや NumPy 配列と相互運用できるようになる。メモリレイアウト（C連続・Fortran連続・ストライド）の違いを把握する。",
+  sections: [
+    {
+      title: "PEP 3118 バッファプロトコルの仕組み",
+      body: "PEP 3118 バッファプロトコルは、Python オブジェクト間でメモリバッファを効率的に共有するための低レベルインターフェースです。NumPy 配列、bytes、bytearray、array.array などがこのプロトコルを実装しており、コピーなしでデータを相互にやり取りできます。Cython の型付きメモリビュー（例: double[:, :]）もこのプロトコルの上に構築されています。\n\nバッファプロトコルの中核は Py_buffer 構造体で、バッファの先頭ポインタ、サイズ、要素のフォーマット、次元数、各次元の形状とストライドなどのメタデータを保持します。バッファを要求する側は PyObject_GetBuffer を呼び、使い終わったら PyBuffer_Release で解放します。この取得・解放のペアを正しく管理しないと、メモリリークやデータ破損の原因になります。\n\nCython でカスタム型にバッファプロトコルを実装すると、その型のインスタンスを NumPy 配列に変換したり、他の C 拡張モジュールと直接メモリを共有したりできます。これは数値計算ライブラリやデータ処理フレームワークを設計する上で必須のスキルです。",
+      table: T.bufferFields,
+      afterTable: "format フィールドは Python の struct モジュールと同じ記法を使います。\"d\" は float64、\"f\" は float32、\"i\" は int32 です。ndim が 0 の場合はスカラーバッファ、1 以上の場合は shape と strides が有効になります。"
+    },
+    {
+      title: "__getbuffer__ と __releasebuffer__ の実装",
+      body: "Cython で cdef class にバッファプロトコルを実装するには、__getbuffer__ と __releasebuffer__ の2つの特殊メソッドを定義します。__getbuffer__ はバッファを要求された時に呼ばれ、Py_buffer 構造体にメモリの情報を書き込みます。__releasebuffer__ はバッファが不要になった時に呼ばれ、リソースのクリーンアップを行います。\n\n__getbuffer__ では、要求されたフラグ（flags パラメータ）に応じて適切な情報を提供する必要があります。たとえば PyBUF_WRITABLE が要求された場合は書き込み可能なバッファを提供し、読み取り専用しかサポートしない場合は BufferError を発生させます。PyBUF_FORMAT が要求された場合は format 文字列を設定する必要があります。\n\nバッファプロトコルの実装で最も注意すべき点は、バッファが有効な間はメモリが解放されないことを保証することです。内部バッファのリサイズや再確保はバッファがエクスポートされている間は禁止されるべきで、これを管理するために通常はエクスポートカウンタを使います。",
+      table: T.bufferFlags,
+      afterTable: "フラグはビットマスクとして組み合わされます。たとえば PyBUF_WRITABLE | PyBUF_FORMAT | PyBUF_ND は「書き込み可能で、フォーマット情報と形状情報を含む」バッファを要求します。",
+      code: "# cdef class にバッファプロトコルを実装\nfrom cpython.buffer cimport (\n    PyBUF_SIMPLE, PyBUF_WRITABLE, PyBUF_FORMAT,\n    PyBUF_ND, PyBUF_STRIDES\n)\nfrom libc.stdlib cimport malloc, free\nfrom libc.string cimport memcpy\n\ncdef class DoubleArray:\n    \"\"\"float64の1次元配列。バッファプロトコル対応。\"\"\"\n    cdef double* data\n    cdef Py_ssize_t n\n    cdef Py_ssize_t shape[1]\n    cdef Py_ssize_t strides[1]\n    cdef int _export_count  # エクスポートカウンタ\n\n    def __cinit__(self, Py_ssize_t n):\n        self.n = n\n        self.data = <double*>malloc(n * sizeof(double))\n        if not self.data:\n            raise MemoryError(\"メモリ確保に失敗\")\n        self.shape[0] = n\n        self.strides[0] = sizeof(double)\n        self._export_count = 0\n        # ゼロ初期化\n        cdef Py_ssize_t i\n        for i in range(n):\n            self.data[i] = 0.0\n\n    def __dealloc__(self):\n        if self.data:\n            free(self.data)\n\n    def __getbuffer__(self, Py_buffer *buffer, int flags):\n        # 書き込み可能バッファ\n        buffer.buf = <void*>self.data\n        buffer.len = self.n * sizeof(double)\n        buffer.itemsize = sizeof(double)\n        buffer.readonly = 0\n        buffer.ndim = 1\n        buffer.format = \"d\"  # float64\n        buffer.shape = self.shape\n        buffer.strides = self.strides\n        buffer.suboffsets = NULL\n        buffer.obj = self\n        self._export_count += 1\n\n    def __releasebuffer__(self, Py_buffer *buffer):\n        self._export_count -= 1\n\n    def __len__(self):\n        return self.n\n\n    def __getitem__(self, Py_ssize_t idx):\n        if idx < 0 or idx >= self.n:\n            raise IndexError(\"範囲外\")\n        return self.data[idx]\n\n    def __setitem__(self, Py_ssize_t idx, double val):\n        if self._export_count > 0:\n            raise BufferError(\"バッファエクスポート中は変更不可\")\n        if idx < 0 or idx >= self.n:\n            raise IndexError(\"範囲外\")\n        self.data[idx] = val",
+      afterCode: "この DoubleArray は NumPy と直接相互運用できます。np.asarray(arr) とするだけでコピーなしで NumPy 配列としてアクセスでき、逆に NumPy の配列を DoubleArray のメモリビューとして扱うことも可能です。_export_count でエクスポート中の変更を防いでいる点に注目してください。"
+    },
+    {
+      title: "多次元バッファとメモリレイアウト",
+      body: "多次元配列のバッファプロトコル実装では、C連続（行優先）とFortran連続（列優先）のメモリレイアウトを正しく扱う必要があります。C連続の場合、最後の次元のストライドが itemsize に等しく、Fortran連続の場合は最初の次元のストライドが itemsize になります。Cython のメモリビュー構文では double[:, ::1] がC連続、double[::1, :] がFortran連続を表します。\n\nストライドは各次元を1つ進むのに必要なバイト数を表し、非連続なメモリレイアウト（スライスされた配列など）もサポートできます。たとえば、100x100の配列から偶数行だけを取り出したビューは、行方向のストライドが通常の2倍になります。このような非連続バッファを正しく処理することが、汎用的なバッファプロトコル実装の鍵です。\n\n実務では、NumPy 配列を受け取る関数で連続性を要求するかどうかを慎重に判断する必要があります。連続性を要求すると SIMD 最適化が容易になりますが、非連続な入力に対してコピーが発生します。パフォーマンスと柔軟性のトレードオフを理解した上で設計しましょう。",
+      code: "# 多次元バッファ（2次元行列）の実装\nfrom libc.stdlib cimport malloc, free\n\ncdef class Matrix:\n    \"\"\"float64の2次元行列。C連続メモリレイアウト。\"\"\"\n    cdef double* data\n    cdef Py_ssize_t rows, cols\n    cdef Py_ssize_t shape[2]\n    cdef Py_ssize_t strides[2]\n    cdef int _export_count\n\n    def __cinit__(self, Py_ssize_t rows, Py_ssize_t cols):\n        self.rows = rows\n        self.cols = cols\n        self.data = <double*>malloc(rows * cols * sizeof(double))\n        if not self.data:\n            raise MemoryError()\n        # C連続レイアウト: 行優先\n        self.shape[0] = rows\n        self.shape[1] = cols\n        self.strides[0] = cols * sizeof(double)  # 行間のバイト数\n        self.strides[1] = sizeof(double)          # 列間のバイト数\n        self._export_count = 0\n        # ゼロ初期化\n        cdef Py_ssize_t i\n        for i in range(rows * cols):\n            self.data[i] = 0.0\n\n    def __dealloc__(self):\n        if self.data:\n            free(self.data)\n\n    def __getbuffer__(self, Py_buffer *buffer, int flags):\n        buffer.buf = <void*>self.data\n        buffer.len = self.rows * self.cols * sizeof(double)\n        buffer.itemsize = sizeof(double)\n        buffer.readonly = 0\n        buffer.ndim = 2\n        buffer.format = \"d\"\n        buffer.shape = self.shape\n        buffer.strides = self.strides\n        buffer.suboffsets = NULL\n        buffer.obj = self\n        self._export_count += 1\n\n    def __releasebuffer__(self, Py_buffer *buffer):\n        self._export_count -= 1\n\n    cpdef double get(self, Py_ssize_t i, Py_ssize_t j):\n        \"\"\"要素アクセス（C連続前提）\"\"\"\n        return self.data[i * self.cols + j]\n\n    cpdef void set(self, Py_ssize_t i, Py_ssize_t j, double val):\n        \"\"\"要素設定\"\"\"\n        self.data[i * self.cols + j] = val\n\n# 利用例\n# import numpy as np\n# m = Matrix(3, 4)\n# m.set(0, 0, 1.0)\n# arr = np.asarray(m)  # コピーなし\n# print(arr.shape)     # (3, 4)\n# print(arr.strides)   # (32, 8)  ← C連続",
+      afterCode: "Matrix クラスは np.asarray() でゼロコピーで NumPy 配列に変換できます。strides[0] = cols * sizeof(double) がC連続の特徴です。Fortran連続にする場合は strides[0] = sizeof(double)、strides[1] = rows * sizeof(double) とし、メモリの並び順も変更する必要があります。"
+    }
+  ]
+},
+{
+  id: "ch3", num: 3,
+  title: "fused types応用",
+  est: "5時間",
+  goal: "Cython の fused types を使ってジェネリックな関数・クラスを設計し、型ごとの特殊化と実行時ディスパッチを自在に使い分けられるようになる。NumPy の dtype に対応する汎用的な数値処理コードを書けるようにする。",
+  sections: [
+    {
+      title: "fused types の基本と型定義",
+      body: "Cython の fused types は C++ のテンプレートに似たジェネリックプログラミング機能です。ctypedef fused を使って複数の型をまとめた「融合型」を定義し、その融合型を引数に取る関数は各型に対して個別にコンパイル（特殊化）されます。これにより、型ごとにコードを重複して書くことなく、C レベルの速度を維持できます。\n\nfused types は Python のジェネリクスや C++ のテンプレートとは異なり、コンパイル時に全ての特殊化が生成される点が特徴です。たとえば numeric_t を int、long、float、double の融合型として定義すると、その型を使う関数は4つのバージョンが生成されます。呼び出し時には引数の型に基づいて適切なバージョンが自動的に選択されます。\n\nfused types は数値計算ライブラリで特に威力を発揮します。NumPy の異なる dtype（float32、float64、int32 など）に対応する関数を1つの定義で書け、Python からは通常の関数呼び出しで利用できます。SciPy の内部実装でも広く使われている手法です。",
+      code: "# fused type の定義と基本的な使い方\n\n# 数値型の融合型を定義\nctypedef fused numeric_t:\n    int\n    long\n    float\n    double\n\n# 浮動小数点の融合型\nctypedef fused floating_t:\n    float\n    double\n\n# NumPy互換の融合型\ncimport numpy as cnp\nctypedef fused np_numeric_t:\n    cnp.int32_t\n    cnp.int64_t\n    cnp.float32_t\n    cnp.float64_t\n\n# 融合型を使ったジェネリック関数\ndef generic_sum(numeric_t[:] arr):\n    \"\"\"任意の数値型の配列を合計する\"\"\"\n    cdef numeric_t total = 0\n    cdef Py_ssize_t i, n = arr.shape[0]\n    for i in range(n):\n        total += arr[i]\n    return total\n\ndef generic_scale(numeric_t[:] arr, numeric_t factor):\n    \"\"\"配列の全要素をスケーリングする\"\"\"\n    cdef Py_ssize_t i, n = arr.shape[0]\n    for i in range(n):\n        arr[i] *= factor\n\n# Python側での使い方:\n# import numpy as np\n# a = np.array([1.0, 2.0, 3.0], dtype=np.float64)\n# print(generic_sum(a))  # → 6.0\n# b = np.array([1, 2, 3], dtype=np.int32)\n# print(generic_sum(b))  # → 6  （int32版が呼ばれる）",
+      afterCode: "fused type の関数に渡される引数の型がコンパイル時に解決できない場合（Pythonオブジェクトの場合）、Cython は実行時にディスパッチを行います。これにより、Python から透過的に呼び出せますが、C/Cython コード内で具体的な型が判明している場合はコンパイル時に最適なバージョンが選択されます。"
+    },
+    {
+      title: "型ディスパッチと条件分岐",
+      body: "fused type 関数の内部では、is 演算子を使って現在の特殊化がどの型かを判定できます。この条件分岐はコンパイル時に解決されるため、実行時のオーバーヘッドはありません。型ごとに異なるアルゴリズムや最適化を適用する場合に不可欠な手法です。\n\n典型的な用途として、整数型と浮動小数点型で異なる処理を行うケースがあります。たとえば、配列の正規化関数を書く場合、浮動小数点型ではそのまま除算できますが、整数型では結果の型を浮動小数点に変換する必要があります。fused type の is 分岐を使えば、この違いを1つの関数定義内でエレガントに処理できます。\n\nまた、特定の型に対してSIMD命令やハードウェア固有の最適化を適用する分岐も可能です。たとえば float 型の場合は SSE 命令を使い、double 型の場合は AVX 命令を使うといった最適化を、fused type の is 分岐でクリーンに記述できます。",
+      table: T.fusedDispatch,
+      afterTable: "型チェック分岐（if numeric_t is int:）はコンパイル時に解決されるため、選択されなかった分岐のコードは生成されません。これは C++ の if constexpr に相当する機能です。",
+      code: "# 型ディスパッチの実践的な例\n\nctypedef fused real_t:\n    float\n    double\n\nctypedef fused numeric_t:\n    int\n    long\n    float\n    double\n\ndef typed_abs(numeric_t x):\n    \"\"\"型に応じた絶対値関数\"\"\"\n    if numeric_t is int or numeric_t is long:\n        # 整数型: 条件分岐で絶対値\n        return -x if x < 0 else x\n    else:\n        # 浮動小数点型: libcのfabs/fabsfを使用\n        from libc.math cimport fabs, fabsf\n        if numeric_t is float:\n            return fabsf(x)\n        else:\n            return fabs(x)\n\ndef normalize_array(numeric_t[:] arr):\n    \"\"\"配列を[0,1]範囲に正規化\"\"\"\n    cdef Py_ssize_t i, n = arr.shape[0]\n    if n == 0:\n        return\n    # 最小値・最大値を求める\n    cdef numeric_t min_val = arr[0]\n    cdef numeric_t max_val = arr[0]\n    for i in range(1, n):\n        if arr[i] < min_val:\n            min_val = arr[i]\n        if arr[i] > max_val:\n            max_val = arr[i]\n    # 型に応じた正規化\n    if numeric_t is int or numeric_t is long:\n        # 整数型: 浮動小数点への変換は呼び出し側で行う\n        cdef numeric_t range_val = max_val - min_val\n        if range_val == 0:\n            return\n        for i in range(n):\n            arr[i] = (arr[i] - min_val) * 100 // range_val\n    else:\n        # 浮動小数点型: 直接正規化\n        cdef numeric_t range_val = max_val - min_val\n        if range_val == 0.0:\n            return\n        for i in range(n):\n            arr[i] = (arr[i] - min_val) / range_val\n\n# 明示的な型指定での呼び出し\n# typed_abs[int](-5)     # → 5\n# typed_abs[double](-3.14)  # → 3.14",
+      afterCode: "fused type の is 分岐は、SciPy のような大規模プロジェクトで広く使われるパターンです。各型に最適化されたコードパスを1つのソースファイルで管理でき、保守性と性能を両立できます。ただし、融合型に含まれる型が多すぎると生成コード量が爆発するため、必要な型のみを含めるようにしましょう。"
+    },
+    {
+      title: "fused types と cdef class の組み合わせ",
+      body: "fused types を cdef class と組み合わせることで、型パラメータ付きのコンテナやデータ構造を実装できます。ただし、Cython 3.x の時点では cdef class 自体を fused type でパラメータ化することはできないため、工夫が必要です。一般的なアプローチは、fused type を引数に取るファクトリ関数やユーティリティ関数を提供し、内部でメモリビューを活用する方法です。\n\n別のアプローチとして、Tempita テンプレートエンジン（第5章で詳述）と fused types を組み合わせる方法があります。テンプレートで型ごとの cdef class を生成し、fused type で統一的なインターフェースを提供するパターンは、pandas の内部実装でも使われています。\n\n実務では、fused types の限界を理解した上で、最適な設計パターンを選択することが重要です。単純な関数レベルのジェネリクスは fused types で十分ですが、複雑なジェネリックデータ構造が必要な場合は、テンプレート生成やコード生成パイプラインを組み合わせることを検討しましょう。",
+      code: "# fused types とメモリビューを使ったジェネリック操作\nimport numpy as np\ncimport numpy as cnp\n\nctypedef fused np_real_t:\n    cnp.float32_t\n    cnp.float64_t\n\ndef pairwise_distance(np_real_t[:, :] X):\n    \"\"\"N個のD次元点間のペアワイズ距離行列を計算\"\"\"\n    cdef Py_ssize_t N = X.shape[0]\n    cdef Py_ssize_t D = X.shape[1]\n    cdef Py_ssize_t i, j, k\n    cdef np_real_t diff, dist_sq\n\n    # 出力配列の型を入力に合わせる\n    if np_real_t is cnp.float32_t:\n        result = np.zeros((N, N), dtype=np.float32)\n    else:\n        result = np.zeros((N, N), dtype=np.float64)\n\n    cdef np_real_t[:, :] out = result\n\n    for i in range(N):\n        for j in range(i + 1, N):\n            dist_sq = 0\n            for k in range(D):\n                diff = X[i, k] - X[j, k]\n                dist_sq += diff * diff\n            # sqrtは型に応じて選択\n            if np_real_t is cnp.float32_t:\n                from libc.math cimport sqrtf\n                out[i, j] = sqrtf(dist_sq)\n            else:\n                from libc.math cimport sqrt\n                out[i, j] = sqrt(dist_sq)\n            out[j, i] = out[i, j]  # 対称行列\n\n    return result\n\n# 利用例:\n# X32 = np.random.randn(100, 3).astype(np.float32)\n# D32 = pairwise_distance(X32)  # float32版が呼ばれる\n# X64 = np.random.randn(100, 3)  # デフォルトfloat64\n# D64 = pairwise_distance(X64)  # float64版が呼ばれる",
+      afterCode: "pairwise_distance 関数は入力の dtype に応じて自動的に適切な特殊化が選択されます。float32 入力には sqrtf が、float64 入力には sqrt が使われ、出力の dtype も入力に合わせられます。このパターンは scikit-learn の距離計算など、実際のライブラリで広く採用されています。"
+    }
+  ]
+},
+{
+  id: "ch4", num: 4,
+  title: "SIMD統合",
+  est: "5時間",
+  goal: "C の SIMD intrinsics（SSE/AVX/NEON）を Cython からラップして利用する方法を習得し、NumPy ufunc を C レベルで作成してベクトル演算を高速化できるようになる。",
+  sections: [
+    {
+      title: "C SIMD intrinsics のラッピング",
+      body: "現代の CPU は SIMD（Single Instruction, Multiple Data）命令セットを備えており、1つの命令で複数のデータを並列処理できます。x86系では SSE（128bit）、AVX（256bit）、AVX-512（512bit）、ARM では NEON（128bit）が主要な命令セットです。Cython から C の SIMD intrinsics を直接呼び出すことで、NumPy よりもさらに高速な数値処理が実現できます。\n\nSIMD intrinsics は通常 C のヘッダファイル（immintrin.h 等）で定義されており、Cython の cdef extern from を使ってインポートします。__m128d（SSE の double×2）や __m256（AVX の float×8）といった SIMD レジスタ型と、それらを操作する関数（_mm_add_pd、_mm256_mul_ps 等）を宣言します。\n\nSIMD 最適化は万能ではなく、データのアライメント（16バイト/32バイト境界への配置）や、配列長が SIMD 幅の倍数でない場合のテール処理を正しく実装する必要があります。また、コンパイル時に対象の命令セットをサポートするフラグ（-mavx2 等）を渡す必要があります。",
+      table: T.simdIntrinsics,
+      afterTable: "実際のプロジェクトでは、実行環境の CPU が対応する命令セットを検出し、最適な実装を動的に選択する「ランタイムディスパッチ」が重要です。NumPy や SciPy はこの仕組みを内部で実装しています。",
+      code: "# SSE2 intrinsics を Cython からラッピング\ncdef extern from \"emmintrin.h\":\n    # SSE2 の 128bit double×2 型\n    ctypedef struct __m128d:\n        pass\n    # ロード・ストア\n    __m128d _mm_loadu_pd(double* mem_addr) nogil\n    __m128d _mm_load_pd(double* mem_addr) nogil  # 16byte aligned\n    void _mm_storeu_pd(double* mem_addr, __m128d a) nogil\n    void _mm_store_pd(double* mem_addr, __m128d a) nogil\n    # 算術演算\n    __m128d _mm_add_pd(__m128d a, __m128d b) nogil\n    __m128d _mm_mul_pd(__m128d a, __m128d b) nogil\n    __m128d _mm_sub_pd(__m128d a, __m128d b) nogil\n    __m128d _mm_div_pd(__m128d a, __m128d b) nogil\n    # 定数生成\n    __m128d _mm_set1_pd(double a) nogil\n    __m128d _mm_setzero_pd() nogil\n\ndef sse_vector_add(double[:] a, double[:] b, double[:] out):\n    \"\"\"SSE2を使った倍精度ベクトル加算\"\"\"\n    cdef Py_ssize_t n = a.shape[0]\n    cdef Py_ssize_t i\n    cdef __m128d va, vb, vc\n    # SSE2: 2つのdoubleを同時に処理\n    with nogil:\n        for i in range(0, n - 1, 2):\n            va = _mm_loadu_pd(&a[i])\n            vb = _mm_loadu_pd(&b[i])\n            vc = _mm_add_pd(va, vb)\n            _mm_storeu_pd(&out[i], vc)\n        # テール処理（残り1要素）\n        if n % 2 != 0:\n            out[n - 1] = a[n - 1] + b[n - 1]\n\ndef sse_dot_product(double[:] a, double[:] b):\n    \"\"\"SSE2を使った内積計算\"\"\"\n    cdef Py_ssize_t n = a.shape[0]\n    cdef Py_ssize_t i\n    cdef __m128d va, vb, vsum\n    cdef double result[2]\n    vsum = _mm_setzero_pd()\n    with nogil:\n        for i in range(0, n - 1, 2):\n            va = _mm_loadu_pd(&a[i])\n            vb = _mm_loadu_pd(&b[i])\n            vsum = _mm_add_pd(vsum, _mm_mul_pd(va, vb))\n        _mm_storeu_pd(result, vsum)\n    cdef double total = result[0] + result[1]\n    # テール処理\n    if n % 2 != 0:\n        total += a[n - 1] * b[n - 1]\n    return total",
+      afterCode: "_mm_loadu_pd はアライメント不要のロード、_mm_load_pd は 16 バイト境界へのアライメントが必要です。アラインドロードの方が高速ですが、入力データのアライメントを保証できない場合は loadu を使います。コンパイル時に -msse2 フラグが必要です（多くの x86_64 環境ではデフォルトで有効）。"
+    },
+    {
+      title: "AVX による高速化とランタイムディスパッチ",
+      body: "AVX（Advanced Vector Extensions）は SSE の倍の 256 ビット幅を持ち、float×8 または double×4 を同時に処理できます。理論上は SSE の2倍のスループットが得られますが、実際にはメモリ帯域幅やキャッシュの制約があるため、効果はアルゴリズムに依存します。\n\nプロダクション品質のコードでは、実行時に CPU の対応命令セットを検出し、最適な実装を選択するランタイムディスパッチが重要です。AVX-512 対応 CPU では 512 ビット版を、AVX2 のみの場合は 256 ビット版を、SSE2 のみの場合は 128 ビット版を使うといった切り替えです。Python の cpuid ライブラリや os モジュールを使って検出できます。\n\n注意点として、AVX 命令の使用後は _mm256_zeroupper() を呼ぶか、ゼロ化命令でクリーンアップしないと、SSE 命令に戻った際にパフォーマンスペナルティ（VEX 遷移ペナルティ）が発生する場合があります。これは古い CPU（Sandy Bridge 世代など）で特に問題になります。",
+      code: "# AVX intrinsics のラッピングとランタイムディスパッチ\ncdef extern from \"immintrin.h\":\n    ctypedef struct __m256d:\n        pass\n    __m256d _mm256_loadu_pd(double* mem_addr) nogil\n    void _mm256_storeu_pd(double* mem_addr, __m256d a) nogil\n    __m256d _mm256_add_pd(__m256d a, __m256d b) nogil\n    __m256d _mm256_mul_pd(__m256d a, __m256d b) nogil\n    __m256d _mm256_setzero_pd() nogil\n    __m256d _mm256_set1_pd(double a) nogil\n\ndef avx_vector_scale(double[:] arr, double factor, double[:] out):\n    \"\"\"AVXを使った配列のスカラー倍\"\"\"\n    cdef Py_ssize_t n = arr.shape[0]\n    cdef Py_ssize_t i\n    cdef __m256d va, vf, vr\n    vf = _mm256_set1_pd(factor)\n    with nogil:\n        # AVX: 4つのdoubleを同時処理\n        for i in range(0, n - 3, 4):\n            va = _mm256_loadu_pd(&arr[i])\n            vr = _mm256_mul_pd(va, vf)\n            _mm256_storeu_pd(&out[i], vr)\n        # テール処理\n        for i in range(n - n % 4, n):\n            out[i] = arr[i] * factor\n\n# ランタイムディスパッチの実装パターン\nimport os\n\ndef _detect_simd_level():\n    \"\"\"利用可能なSIMD命令セットを検出\"\"\"\n    try:\n        import cpuid\n        info = cpuid.cpu_info()\n        if 'avx512f' in info.get('flags', []):\n            return 'avx512'\n        elif 'avx2' in info.get('flags', []):\n            return 'avx2'\n        elif 'sse2' in info.get('flags', []):\n            return 'sse2'\n    except ImportError:\n        pass\n    return 'scalar'\n\n# ディスパッチテーブル\ncdef dict _dispatch = {}\n\ndef vector_add(double[:] a, double[:] b, double[:] out):\n    \"\"\"最適なSIMD実装を自動選択\"\"\"\n    level = _detect_simd_level()\n    if level in ('avx2', 'avx512'):\n        avx_vector_add(a, b, out)\n    elif level == 'sse2':\n        sse_vector_add(a, b, out)\n    else:\n        # スカラーフォールバック\n        cdef Py_ssize_t i, n = a.shape[0]\n        for i in range(n):\n            out[i] = a[i] + b[i]",
+      afterCode: "ランタイムディスパッチは関数ポインタのテーブルで実装するのが効率的です。初回呼び出し時に CPU を検出して関数ポインタを設定し、2回目以降は直接ジャンプします。NumPy はこのパターンを universal intrinsics フレームワークで実装しています。"
+    },
+    {
+      title: "NumPy ufunc の高速化",
+      body: "NumPy の ufunc（universal function）は要素ごとの演算をブロードキャスト対応で提供する仕組みです。Cython から NumPy ufunc を高速化するには、内部ループ関数を C レベルで記述し、SIMD を適用する方法があります。@cython.boundscheck(False) と @cython.wraparound(False) のデコレータも併用して境界チェックを除去します。\n\nufunc の内部実装は次章で C API を使った完全な実装を扱いますが、ここでは Cython のメモリビューと SIMD を組み合わせて NumPy 演算を高速化する実践的なパターンを紹介します。ポイントは、NumPy の配列を連続なメモリビューとして受け取り、GIL を解放してから SIMD ループを実行することです。\n\nSIMD を使った ufunc 相当の関数は、NumPy の組み込み ufunc と比較して数倍の高速化が見込めます。特に、複数の演算を融合（fuse）して中間配列の生成を省略する「ループ融合」は、NumPy 単体では実現できない最適化であり、Cython + SIMD の大きな利点です。",
+      code: "# Cython + SIMD による高速な要素ごと演算\nimport numpy as np\ncimport numpy as cnp\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef fast_sigmoid(double[:] x, double[:] out):\n    \"\"\"SIMD最適化されたシグモイド関数\"\"\"\n    cdef Py_ssize_t n = x.shape[0]\n    cdef Py_ssize_t i\n    cdef double val\n    from libc.math cimport exp\n    # GILを解放して並列実行可能にする\n    with nogil:\n        for i in range(n):\n            val = x[i]\n            # オーバーフロー防止\n            if val > 20.0:\n                out[i] = 1.0\n            elif val < -20.0:\n                out[i] = 0.0\n            else:\n                out[i] = 1.0 / (1.0 + exp(-val))\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef fused_multiply_add(double[:] a, double[:] b,\n                       double[:] c, double[:] out):\n    \"\"\"ループ融合: out = a * b + c を1パスで計算\n    NumPyだと np.multiply(a,b) + c で中間配列が生成されるが\n    これは中間配列なしで直接計算する\"\"\"\n    cdef Py_ssize_t n = a.shape[0]\n    cdef Py_ssize_t i\n    with nogil:\n        for i in range(n):\n            out[i] = a[i] * b[i] + c[i]\n\n# ベンチマーク例:\n# import numpy as np\n# x = np.random.randn(1_000_000)\n# out = np.empty_like(x)\n# %timeit fast_sigmoid(x, out)\n# %timeit 1 / (1 + np.exp(-x))  # NumPy版と比較",
+      afterCode: "ループ融合（fused_multiply_add）は NumPy の a * b + c と比較して、メモリアクセスが半分になるため大幅に高速化できます。Cython コンパイラに -O3 フラグを渡すと、GCC/Clang が自動的にSIMD命令を生成してくれる場合もあります（自動ベクトル化）。明示的な SIMD intrinsics と自動ベクトル化を状況に応じて使い分けましょう。"
+    }
+  ]
+},
+{
+  id: "ch5", num: 5,
+  title: "コード生成パターン",
+  est: "5時間",
+  goal: "Tempita テンプレートエンジンによるコード生成、コンパイル時定数（DEF）、コンパイル時条件分岐（IF/ELIF/ELSE）を使いこなし、型や構成ごとに特殊化されたCythonコードを自動生成できるようになる。",
+  sections: [
+    {
+      title: "Tempita テンプレートエンジン",
+      body: "Tempita は Cython エコシステムで広く使われる軽量テンプレートエンジンです。.pyx.in や .pxd.in というテンプレートファイルから、複数の型やパラメータに対して特殊化された .pyx ファイルを生成します。SciPy、pandas、scikit-learn などの主要プロジェクトが Tempita を採用しています。\n\nfused types が関数レベルのジェネリクスを提供するのに対し、Tempita はソースコード全体のレベルでコード生成を行います。cdef class の型パラメータ化（fused types では不可能）や、C の型名に依存するコード（SIMD intrinsics の型名など）の生成に特に有用です。テンプレートは Python の文法に似た構文を持ち、{{for ...}} / {{endfor}} でループ、{{if ...}} / {{endif}} で条件分岐を記述します。\n\nTempita の欠点は、生成されたコードのデバッグが元のテンプレートとの対応関係を追いにくい点です。そのため、テンプレートはできるだけシンプルに保ち、複雑なロジックはテンプレートではなく生成されるCythonコード側に持たせることが推奨されます。",
+      table: T.tempitaSyntax,
+      afterTable: "Tempita テンプレートファイルは通常 .pyx.in という拡張子で保存し、setup.py や Meson のビルドスクリプトで事前処理します。Cython.Tempita モジュールを使ってプログラム的に処理することもできます。",
+      code: "# === Tempita テンプレートの例（fast_ops.pyx.in）===\n#\n# {{py:\n# dtypes = [\n#     ('float32', 'float', 'f', 'NPY_FLOAT32'),\n#     ('float64', 'double', 'd', 'NPY_FLOAT64'),\n#     ('int32', 'int', 'i', 'NPY_INT32'),\n#     ('int64', 'long long', 'q', 'NPY_INT64'),\n# ]\n# }}\n#\n# cimport numpy as cnp\n# import numpy as np\n#\n# {{for np_type, c_type, fmt, npy_enum in dtypes}}\n# def sum_{{np_type}}(cnp.ndarray[{{c_type}}, ndim=1] arr):\n#     \"\"\"{{np_type}}配列の合計を計算\"\"\"\n#     cdef Py_ssize_t i, n = arr.shape[0]\n#     cdef {{c_type}} total = 0\n#     for i in range(n):\n#         total += arr[i]\n#     return total\n# {{endfor}}\n#\n# === 生成結果（fast_ops.pyx）===\n\ncimport numpy as cnp\nimport numpy as np\n\ndef sum_float32(cnp.ndarray[float, ndim=1] arr):\n    \"\"\"float32配列の合計を計算\"\"\"\n    cdef Py_ssize_t i, n = arr.shape[0]\n    cdef float total = 0\n    for i in range(n):\n        total += arr[i]\n    return total\n\ndef sum_float64(cnp.ndarray[double, ndim=1] arr):\n    \"\"\"float64配列の合計を計算\"\"\"\n    cdef Py_ssize_t i, n = arr.shape[0]\n    cdef double total = 0\n    for i in range(n):\n        total += arr[i]\n    return total\n\ndef sum_int32(cnp.ndarray[int, ndim=1] arr):\n    \"\"\"int32配列の合計を計算\"\"\"\n    cdef Py_ssize_t i, n = arr.shape[0]\n    cdef int total = 0\n    for i in range(n):\n        total += arr[i]\n    return total\n\ndef sum_int64(cnp.ndarray[long long, ndim=1] arr):\n    \"\"\"int64配列の合計を計算\"\"\"\n    cdef Py_ssize_t i, n = arr.shape[0]\n    cdef long long total = 0\n    for i in range(n):\n        total += arr[i]\n    return total",
+      afterCode: "テンプレートの {{py: ... }} ブロックで Python の変数を定義し、それを {{for}} ループで展開しています。生成されたコードは通常のCythonファイルとして扱われ、cython コマンドでC言語にコンパイルされます。"
+    },
+    {
+      title: "DEF と IF によるコンパイル時制御",
+      body: "Cython は DEF でコンパイル時定数を定義し、IF / ELIF / ELSE でコンパイル時条件分岐を行う機能を備えています。これは C のプリプロセッサ（#define、#if）に相当する機能で、Tempita よりも軽量で、.pyx ファイル内に直接記述できます。\n\nDEF で定義した定数はコンパイル時に評価され、生成される C コードに埋め込まれます。数値定数、文字列定数、ブール値を定義でき、IF 文の条件として使用できます。環境情報として UNAME_SYSNAME（OS名）、UNAME_MACHINE（アーキテクチャ）なども利用可能です。\n\n実務では、OS やアーキテクチャに応じた条件付きコンパイルに DEF/IF を使います。たとえば、Windows と Linux で異なるシステムコールを使う場合や、32ビットと64ビットで異なる型サイズを定義する場合に有用です。Tempita がソースファイル全体の生成に向いているのに対し、DEF/IF は局所的な条件分岐に向いています。",
+      code: "# DEF/IF によるコンパイル時制御\n\n# コンパイル時定数の定義\nDEF VERSION_MAJOR = 3\nDEF VERSION_MINOR = 1\nDEF MAX_BUFFER_SIZE = 1024 * 1024  # 1MB\nDEF DEBUG_MODE = False\nDEF LIBRARY_NAME = \"mylib\"\n\n# OS固有の処理分岐\nIF UNAME_SYSNAME == \"Windows\":\n    # Windows固有のコード\n    cdef extern from \"windows.h\":\n        ctypedef unsigned long DWORD\n        int QueryPerformanceCounter(long long*)\n        int QueryPerformanceFrequency(long long*)\n\n    cdef double get_time() nogil:\n        cdef long long count, freq\n        QueryPerformanceCounter(&count)\n        QueryPerformanceFrequency(&freq)\n        return <double>count / <double>freq\n\nELIF UNAME_SYSNAME == \"Darwin\" or UNAME_SYSNAME == \"Linux\":\n    # POSIX環境\n    from posix.time cimport clock_gettime, timespec, CLOCK_MONOTONIC\n\n    cdef double get_time() nogil:\n        cdef timespec ts\n        clock_gettime(CLOCK_MONOTONIC, &ts)\n        return ts.tv_sec + ts.tv_nsec * 1e-9\n\nELSE:\n    from libc.time cimport clock, CLOCKS_PER_SEC\n    cdef double get_time() nogil:\n        return <double>clock() / CLOCKS_PER_SEC\n\n# アーキテクチャ固有の最適化\nIF UNAME_MACHINE == \"x86_64\" or UNAME_MACHINE == \"AMD64\":\n    DEF SIMD_WIDTH = 4  # AVX: double x 4\n    DEF CACHE_LINE = 64\nELIF UNAME_MACHINE == \"aarch64\" or UNAME_MACHINE == \"arm64\":\n    DEF SIMD_WIDTH = 2  # NEON: double x 2\n    DEF CACHE_LINE = 64\nELSE:\n    DEF SIMD_WIDTH = 1  # スカラーフォールバック\n    DEF CACHE_LINE = 64\n\n# DEBUGモードでのみ有効なコード\nIF DEBUG_MODE:\n    def debug_print(str msg):\n        import sys\n        sys.stderr.write(f\"[{LIBRARY_NAME} DEBUG] {msg}\\n\")\nELSE:\n    # リリースビルドではデバッグ出力を完全に除去\n    cdef inline void debug_print(str msg) noexcept:\n        pass  # コンパイル後にゼロコスト",
+      afterCode: "DEF/IF はコンパイル時に評価されるため、選択されなかった分岐のコードは C に変換されません。これにより、デバッグコードのゼロコスト除去や、プラットフォーム固有の最適化が実現できます。DEF で定義した値は通常の変数とは異なり、実行時に変更することはできません。"
+    },
+    {
+      title: "ビルドスクリプトとの統合",
+      body: "Tempita テンプレートの処理はビルドプロセスに組み込む必要があります。伝統的な setup.py ベースのビルドでは、Cython.Tempita モジュールを使って .pyx.in ファイルを .pyx に変換してから Cython コンパイルを実行します。最新のプロジェクトでは meson-python を使った Meson ビルドシステムが推奨されています。\n\nビルドスクリプトでは、テンプレートの処理順序と依存関係を正しく管理することが重要です。.pxd.in ファイル（ヘッダテンプレート）は .pyx.in ファイルより先に処理する必要があり、複数のテンプレートが共通の型定義を参照する場合は、共有の .pxd ファイルにまとめると管理が楽になります。\n\nCI/CD パイプラインでは、テンプレートから生成された .pyx ファイルをリポジトリにコミットするかどうかの判断が必要です。コミットすると Cython がインストールされていない環境でもビルドできますが、テンプレートと生成ファイルの同期が課題になります。SciPy は生成ファイルをコミットしない方針を採っており、ビルド時に Cython と Tempita を要求します。",
+      code: "# === setup.py でのTempita統合 ===\n# setup.py\nfrom setuptools import setup, Extension\nfrom Cython.Build import cythonize\nfrom Cython.Tempita import sub as tempita_sub\nimport os\nimport glob\n\ndef process_tempita(src_dir):\n    \"\"\"*.pyx.in ファイルを *.pyx に変換\"\"\"\n    templates = glob.glob(os.path.join(src_dir, '**', '*.pyx.in'),\n                         recursive=True)\n    for tmpl_path in templates:\n        out_path = tmpl_path[:-3]  # .in を除去\n        with open(tmpl_path, 'r') as f:\n            tmpl = f.read()\n        result = tempita_sub(tmpl)\n        # 変更がある場合のみ書き出し（不要な再コンパイルを防ぐ）\n        if os.path.exists(out_path):\n            with open(out_path, 'r') as f:\n                if f.read() == result:\n                    continue\n        with open(out_path, 'w') as f:\n            f.write(result)\n        print(f\"Tempita: {tmpl_path} -> {out_path}\")\n\n# テンプレート処理を実行\nprocess_tempita('src')\n\n# Cython拡張のセットアップ\nextensions = cythonize(\n    [Extension('mylib.*', ['src/mylib/*.pyx'])],\n    compiler_directives={\n        'boundscheck': False,\n        'wraparound': False,\n        'language_level': '3',\n    },\n)\n\nsetup(\n    name='mylib',\n    ext_modules=extensions,\n)\n\n# === meson.build での統合 ===\n# project('mylib', 'cython', 'c')\n# py = import('python').find_installation()\n# cython = find_program('cython')\n#\n# # Tempita処理はカスタムターゲットで\n# tempita = find_program('scripts/tempita_process.py')\n# generated = custom_target(\n#   'generate_pyx',\n#   input: 'src/fast_ops.pyx.in',\n#   output: 'fast_ops.pyx',\n#   command: [tempita, '@INPUT@', '@OUTPUT@'],\n# )\n#\n# py.extension_module('fast_ops',\n#   generated,\n#   dependencies: [py.dependency()],\n# )",
+      afterCode: "Meson ビルドシステムは依存関係を自動追跡するため、テンプレートが変更された場合のみ再生成・再コンパイルが実行されます。大規模プロジェクトでは setup.py から meson-python への移行が進んでおり、SciPy は Meson を採用しています。テンプレートの変更差分チェック（内容が同じなら書き出さない）は、不要な再コンパイルを防ぐ重要な最適化です。"
+    }
+  ]
+},
+{
+  id: "ch6", num: 6,
+  title: "カスタムufunc/gufunc",
+  est: "5時間",
+  goal: "NumPy C API の PyUFunc_FromFuncAndData を使って、完全にカスタムな ufunc と gufunc（generalized ufunc）を C レベルで実装できるようになる。ブロードキャストやキャスティング規則との統合方法を把握する。",
+  sections: [
+    {
+      title: "NumPy ufunc の内部構造",
+      body: "NumPy の ufunc は内部的に PyUFuncObject 構造体として実装されています。各 ufunc は「内部ループ関数」の配列を持ち、入力の dtype に応じて適切なループ関数が選択されます。たとえば np.add は float32、float64、int32 など多数の型に対応するループ関数を持っており、入力の型に最もマッチするものが実行時に選ばれます。\n\nカスタム ufunc を作成するには、PyUFunc_FromFuncAndData 関数に「ループ関数の配列」「型シグネチャの配列」「データポインタの配列」を渡します。ループ関数は numpy の内部規約に従い、入力・出力のポインタ配列、要素数、ステップ（stride）の配列を受け取ります。この規約を正しく実装すれば、ブロードキャスト、型キャスト、out パラメータなどの NumPy 機能が自動的に利用可能になります。\n\nCython で ufunc を作成する利点は、内部ループ関数を C レベルの速度で記述できる点です。さらに、前章で学んだ SIMD 最適化やループ融合を内部ループ関数に適用することで、NumPy の組み込み ufunc を超える性能を実現できます。",
+      table: T.ufuncTypes,
+      afterTable: "型コードは numpy/ndarraytypes.h で定義されています。ufunc の型シグネチャは入力型と出力型をフラット配列で指定します。たとえば float64 の二項演算なら [NPY_FLOAT64, NPY_FLOAT64, NPY_FLOAT64]（入力2つ + 出力1つ）です。"
+    },
+    {
+      title: "PyUFunc_FromFuncAndData による ufunc 作成",
+      body: "PyUFunc_FromFuncAndData は NumPy の C API で最も重要な関数の1つで、カスタム ufunc オブジェクトを生成します。この関数は5つの配列パラメータと、入出力の数、関数名、docstring を受け取ります。正しく設定すると、通常の NumPy ufunc と同じブロードキャスト、型推論、out パラメータの機能が自動的に動作します。\n\nループ関数のシグネチャは void (*)(char **args, npy_intp *dimensions, npy_intp *strides, void *data) です。args は入力・出力バッファへのポインタ配列、dimensions[0] は処理する要素数、strides は各入出力のバイトストライドです。ストライドが itemsize と等しい場合は連続メモリですが、ブロードキャストやスライスにより異なる場合もあるため、ストライドを正しく使ってメモリアクセスする必要があります。\n\nCython でこの API を使う場合、cnumpy の cimport と extern from の組み合わせで必要な型と関数を宣言します。ループ関数は cdef で定義し、nogil で GIL なしで実行可能にします。",
+      code: "# カスタム ufunc の完全な実装例\nimport numpy as np\ncimport numpy as cnp\nfrom numpy cimport PyUFuncGenericFunction\nfrom libc.math cimport exp, expf\n\n# NumPy の初期化（必須）\ncnp.import_array()\ncnp.import_ufunc()\n\n# --- float64版のsigmoidループ関数 ---\ncdef void sigmoid_double_loop(\n    char **args,\n    cnp.npy_intp *dimensions,\n    cnp.npy_intp *strides,\n    void *data\n) noexcept nogil:\n    cdef cnp.npy_intp i, n = dimensions[0]\n    cdef char *ip = args[0]  # 入力ポインタ\n    cdef char *op = args[1]  # 出力ポインタ\n    cdef double x, result\n    for i in range(n):\n        x = (<double*>(ip + i * strides[0]))[0]\n        if x > 20.0:\n            result = 1.0\n        elif x < -20.0:\n            result = 0.0\n        else:\n            result = 1.0 / (1.0 + exp(-x))\n        (<double*>(op + i * strides[1]))[0] = result\n\n# --- float32版のsigmoidループ関数 ---\ncdef void sigmoid_float_loop(\n    char **args,\n    cnp.npy_intp *dimensions,\n    cnp.npy_intp *strides,\n    void *data\n) noexcept nogil:\n    cdef cnp.npy_intp i, n = dimensions[0]\n    cdef char *ip = args[0]\n    cdef char *op = args[1]\n    cdef float x, result\n    for i in range(n):\n        x = (<float*>(ip + i * strides[0]))[0]\n        if x > 20.0:\n            result = 1.0\n        elif x < -20.0:\n            result = 0.0\n        else:\n            result = 1.0 / (1.0 + expf(-x))\n        (<float*>(op + i * strides[1]))[0] = result\n\n# --- ufunc オブジェクトの構築 ---\ncdef PyUFuncGenericFunction funcs[2]\nfuncs[0] = <PyUFuncGenericFunction>sigmoid_float_loop\nfuncs[1] = <PyUFuncGenericFunction>sigmoid_double_loop\n\n# 型シグネチャ: [入力型, 出力型] × 2バリアント\ncdef char types[4]\ntypes[0] = cnp.NPY_FLOAT32  # float32入力\ntypes[1] = cnp.NPY_FLOAT32  # float32出力\ntypes[2] = cnp.NPY_FLOAT64  # float64入力\ntypes[3] = cnp.NPY_FLOAT64  # float64出力\n\ncdef void* null_data[2]\nnull_data[0] = NULL\nnull_data[1] = NULL\n\n# ufunc オブジェクトを生成\nsigmoid = cnp.PyUFunc_FromFuncAndData(\n    funcs,              # ループ関数配列\n    null_data,          # 追加データ（不要ならNULL）\n    types,              # 型シグネチャ配列\n    2,                  # バリアント数\n    1,                  # 入力の数\n    1,                  # 出力の数\n    0,                  # identity要素（PyUFunc_Zero等）\n    \"sigmoid\",          # 関数名\n    \"シグモイド関数 1/(1+exp(-x))\",  # docstring\n    0                   # unused\n)\n\n# 利用例:\n# x = np.array([-2, -1, 0, 1, 2], dtype=np.float64)\n# y = sigmoid(x)  # ブロードキャスト対応\n# sigmoid(x, out=y)  # out パラメータ対応",
+      afterCode: "このsigmoid ufuncは np.sigmoid のように使えます。ブロードキャスト、out パラメータ、dtype 自動変換がすべて NumPy のフレームワークにより自動的に提供されます。float32 と float64 の2つのバリアントを登録しているため、入力の dtype に応じて最適な実装が選択されます。"
+    },
+    {
+      title: "gufunc（Generalized Universal Function）の実装",
+      body: "gufunc は ufunc を一般化したもので、スカラーだけでなくサブ配列（ベクトルや行列）を入出力として扱えます。たとえば行列の内積（シグネチャ: \"(m,k),(k,n)->(m,n)\"）や、ベクトルの外積（\"(n),(n)->()\"）のような演算を定義できます。gufunc のシグネチャはコアの次元構造を文字列で記述し、ブロードキャストは残りの次元（ループ次元）に対して適用されます。\n\nCython で gufunc を作成するには、PyUFunc_FromFuncAndDataAndSignature 関数を使います。ufunc との主な違いは、ループ関数が dimensions 配列から追加のコア次元情報を受け取る点と、strides 配列がコア次元分も含む点です。dimensions[0] はループ次元の要素数、dimensions[1] 以降はコア次元のサイズです。\n\ngufunc は NumPy の np.linalg.det やカスタムの batch 処理関数など、ベクトル・行列を扱う演算で威力を発揮します。N 個のデータに対して同じ行列演算を適用する「バッチ処理」は、gufunc の最も典型的な用途です。",
+      code: "# gufunc の実装: バッチ行列ベクトル積\n# シグネチャ: \"(m,n),(n)->(m)\"\nimport numpy as np\ncimport numpy as cnp\nfrom numpy cimport PyUFuncGenericFunction\n\ncnp.import_array()\ncnp.import_ufunc()\n\ncdef void matvec_double_loop(\n    char **args,\n    cnp.npy_intp *dimensions,\n    cnp.npy_intp *strides,\n    void *data\n) noexcept nogil:\n    # dimensions[0] = ループ回数（バッチサイズ）\n    # dimensions[1] = m（行列の行数）\n    # dimensions[2] = n（行列の列数 = ベクトルの長さ）\n    cdef cnp.npy_intp batch = dimensions[0]\n    cdef cnp.npy_intp m = dimensions[1]\n    cdef cnp.npy_intp n = dimensions[2]\n\n    # ストライド情報\n    cdef cnp.npy_intp stride_batch_A = strides[0]  # 行列のバッチストライド\n    cdef cnp.npy_intp stride_batch_x = strides[1]  # ベクトルのバッチストライド\n    cdef cnp.npy_intp stride_batch_y = strides[2]  # 出力のバッチストライド\n    cdef cnp.npy_intp stride_A_row = strides[3]     # 行列の行ストライド\n    cdef cnp.npy_intp stride_A_col = strides[4]     # 行列の列ストライド\n    cdef cnp.npy_intp stride_x = strides[5]         # ベクトルのストライド\n    cdef cnp.npy_intp stride_y = strides[6]         # 出力のストライド\n\n    cdef char *pA = args[0]\n    cdef char *px = args[1]\n    cdef char *py = args[2]\n    cdef cnp.npy_intp b, i, j\n    cdef double s\n\n    for b in range(batch):\n        for i in range(m):\n            s = 0.0\n            for j in range(n):\n                s += (<double*>(pA + b*stride_batch_A\n                      + i*stride_A_row + j*stride_A_col))[0] \\\n                   * (<double*>(px + b*stride_batch_x\n                      + j*stride_x))[0]\n            (<double*>(py + b*stride_batch_y + i*stride_y))[0] = s\n\ncdef PyUFuncGenericFunction gufuncs[1]\ngufuncs[0] = <PyUFuncGenericFunction>matvec_double_loop\n\ncdef char gtypes[3]\ngtypes[0] = cnp.NPY_FLOAT64  # A\ngtypes[1] = cnp.NPY_FLOAT64  # x\ngtypes[2] = cnp.NPY_FLOAT64  # y\n\ncdef void* gnull[1]\ngnull[0] = NULL\n\nmatvec = cnp.PyUFunc_FromFuncAndDataAndSignature(\n    gufuncs, gnull, gtypes,\n    1,   # バリアント数\n    2,   # 入力数\n    1,   # 出力数\n    0,   # identity\n    \"matvec\",\n    \"バッチ行列ベクトル積 (m,n),(n)->(m)\",\n    0,\n    \"(m,n),(n)->(m)\"  # gufuncシグネチャ\n)\n\n# 利用例:\n# A = np.random.randn(100, 3, 4)  # 100個の3x4行列\n# x = np.random.randn(100, 4)     # 100個の4次元ベクトル\n# y = matvec(A, x)                # 100個の3次元ベクトル\n# assert y.shape == (100, 3)",
+      afterCode: "gufunc のシグネチャ \"(m,n),(n)->(m)\" は、最初の入力が m×n 行列、2番目が n 次元ベクトル、出力が m 次元ベクトルであることを宣言しています。NumPy はこのシグネチャに基づいて自動的にブロードキャストとメモリ管理を行います。バッチ処理（100個の行列×100個のベクトル）も自動的にサポートされます。"
+    }
+  ]
+},
+{
+  id: "ch7", num: 7,
+  title: "GIL内部とスレッドセーフティ",
+  est: "5時間",
+  goal: "CPython GIL の内部メカニズムを理解し、Cython の nogil ブロック設計、マルチスレッド並列化、競合状態の回避手法を身につけて、安全かつ高速な並列数値計算コードを書けるようになる。",
+  sections: [
+    {
+      title: "GILの内部メカニズム",
+      body: "GIL（Global Interpreter Lock）は CPython の中核にあるミューテックスで、Python バイトコードの実行を同時に1スレッドに限定します。CPython 3.12 以降では GIL の仕組みが改善され、5 ミリ秒ごとにスレッド切り替えの評価が行われます（以前は 100 バイトコード命令ごと）。GIL は Python オブジェクトの参照カウント操作をスレッドセーフにするために存在します。\n\nCython の上級者にとって重要なのは、GIL を解放して純粋な C/数値計算を並列実行する方法です。nogil ブロック内では Python オブジェクトの操作は一切できませんが、C のポインタ操作、数値演算、C ライブラリの呼び出しは自由に行えます。これにより、計算集約的な処理をマルチスレッドで並列実行できます。\n\nCPython 3.13 では、実験的な free-threaded モード（GIL 無効化）が導入されました。Cython 3.1 はこのモードを実験的にサポートしていますが、既存のコードが GIL に依存している場合は注意が必要です。将来的に GIL が完全にオプションになる可能性を見据えて、nogil セーフなコードを書く習慣をつけておくことが重要です。",
+      table: T.gilStates,
+      afterTable: "with nogil(flag): の構文を使うと、実行時にフラグの値に応じて GIL を解放するかどうかを動的に制御できます。デバッグ時は GIL を保持してエラーを捕捉しやすくし、リリース時は解放してパフォーマンスを得るといった使い分けが可能です。"
+    },
+    {
+      title: "nogil 関数設計パターン",
+      body: "Cython で nogil を効果的に活用するには、関数設計の段階から GIL の必要性を意識する必要があります。cpdef 関数は Python からも呼べるため GIL を必要としますが、cdef 関数に nogil 修飾をつけると GIL なしで呼び出せます。計算のコア部分を cdef nogil 関数として切り出し、Python インターフェースとなる def/cpdef 関数から with nogil: ブロック内で呼び出すのが基本パターンです。\n\nnogil 関数内では Python オブジェクトを一切使えないため、メモリビュー（double[:] など）の代わりに C のポインタ（double*）を使います。メモリビューは GIL 保持領域でポインタに変換し（&arr[0]）、そのポインタを nogil 関数に渡します。エラー処理は戻り値のエラーコードで行い、Python 例外は GIL を再取得してから発生させます。\n\nもう一つの重要なパターンは「GIL の一時的な再取得」です。nogil ブロック内で Python のコールバック関数を呼ぶ必要がある場合、with gil: ブロックで GIL を再取得します。ただし、GIL の取得・解放にはオーバーヘッドがあるため、ループの内側で頻繁に行うとパフォーマンスが大幅に低下します。",
+      code: "# nogil 関数設計の実践パターン\nfrom libc.math cimport sqrt, exp\nfrom libc.stdlib cimport malloc, free\nfrom cython.parallel cimport prange, parallel\n\n# --- cdef nogil 関数: 計算コア ---\ncdef double _euclidean_distance(\n    double* a, double* b, int n\n) noexcept nogil:\n    \"\"\"ユークリッド距離（nogil安全）\"\"\"\n    cdef double diff, total = 0.0\n    cdef int i\n    for i in range(n):\n        diff = a[i] - b[i]\n        total += diff * diff\n    return sqrt(total)\n\ncdef int _gaussian_kernel(\n    double* X, double* K,\n    int n, int d, double sigma\n) noexcept nogil:\n    \"\"\"ガウスカーネル行列の計算\"\"\"\n    cdef double dist, factor = -0.5 / (sigma * sigma)\n    cdef int i, j\n    for i in range(n):\n        for j in range(i, n):\n            dist = _euclidean_distance(\n                &X[i * d], &X[j * d], d\n            )\n            K[i * n + j] = exp(factor * dist * dist)\n            K[j * n + i] = K[i * n + j]  # 対称\n    return 0  # 成功\n\n# --- Python インターフェース ---\nimport numpy as np\n\ndef gaussian_kernel_matrix(\n    double[:, :] X not None,\n    double sigma=1.0\n):\n    \"\"\"ガウスカーネル行列を計算（Python API）\"\"\"\n    cdef int n = X.shape[0]\n    cdef int d = X.shape[1]\n    K = np.empty((n, n), dtype=np.float64)\n    cdef double[:, :] K_view = K\n    cdef int ret\n    # GIL解放して計算実行\n    with nogil:\n        ret = _gaussian_kernel(\n            &X[0, 0], &K_view[0, 0], n, d, sigma\n        )\n    if ret != 0:\n        raise RuntimeError(\"カーネル計算に失敗\")\n    return K\n\n# --- GIL 一時再取得パターン ---\ncdef void _process_with_callback(\n    double* data, int n, object callback\n) except *:\n    cdef int i\n    cdef double val\n    with nogil:\n        for i in range(n):\n            data[i] = data[i] * data[i]\n            # 100要素ごとに進捗報告（GIL再取得）\n            if i % 100 == 0:\n                with gil:\n                    callback(i, n)",
+      afterCode: "noexcept nogil の組み合わせにより、関数が C++ 例外も Python 例外も送出しないことを宣言できます。これにより Cython が例外チェックコードを省略でき、わずかながらパフォーマンスが向上します。ただし、本当に例外が発生しないことが保証できる場合にのみ使用してください。"
+    },
+    {
+      title: "prange による並列ループとスレッドセーフティ",
+      body: "Cython の prange（parallel range）は OpenMP を利用したスレッド並列ループで、nogil ブロック内で使用します。通常の range と同じ構文ですが、ループの各イテレーションが複数のスレッドに分散されます。prange を使うには、コンパイル時に OpenMP のフラグ（-fopenmp）を渡す必要があります。\n\n並列ループで最も注意すべきはスレッドセーフティです。各スレッドが同じメモリ位置に書き込むと競合状態（race condition）が発生し、結果が非決定的になります。prange では、ループ変数とループ内で最初に代入される変数は自動的にスレッドプライベートになりますが、配列への書き込みはプログラマが競合しないことを保証する必要があります。\n\nリダクション（合計、最大値など）は prange が直接サポートしていないため、スレッドローカルな変数で部分結果を計算し、ループ外で集約するパターンを使います。Cython 3.x ではリダクション変数を += で代入すると自動的にスレッドセーフなリダクションが生成されますが、複雑なリダクションには手動の実装が必要です。",
+      code: "# prange を使った並列ループ\nfrom cython.parallel cimport prange, parallel\nfrom libc.math cimport sqrt, exp\nimport numpy as np\n\ndef parallel_pairwise_distance(\n    double[:, :] X not None\n):\n    \"\"\"並列ペアワイズ距離計算\"\"\"\n    cdef int n = X.shape[0]\n    cdef int d = X.shape[1]\n    D = np.zeros((n, n), dtype=np.float64)\n    cdef double[:, :] D_view = D\n    cdef int i, j, k\n    cdef double diff, dist_sq\n\n    # 各行は独立しているため安全に並列化できる\n    with nogil:\n        for i in prange(n, schedule='dynamic', num_threads=4):\n            for j in range(i + 1, n):\n                dist_sq = 0.0\n                for k in range(d):\n                    diff = X[i, k] - X[j, k]\n                    dist_sq += diff * diff\n                D_view[i, j] = sqrt(dist_sq)\n                D_view[j, i] = D_view[i, j]\n    return D\n\ndef parallel_reduction(double[:] arr not None):\n    \"\"\"並列リダクション（合計）\"\"\"\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    cdef int i\n    # += によるリダクション: Cythonが自動的にスレッドセーフにする\n    with nogil:\n        for i in prange(n):\n            total += arr[i]\n    return total\n\ndef parallel_transform(\n    double[:] inp not None,\n    double[:] out not None,\n    double sigma=1.0\n):\n    \"\"\"並列ガウス変換（各要素独立なので安全）\"\"\"\n    cdef int n = inp.shape[0]\n    cdef int i\n    cdef double factor = -0.5 / (sigma * sigma)\n    with nogil:\n        for i in prange(n, schedule='static'):\n            out[i] = exp(factor * inp[i] * inp[i])\n\n# コンパイル設定（setup.py）:\n# Extension('module',\n#   sources=['module.pyx'],\n#   extra_compile_args=['-fopenmp'],\n#   extra_link_args=['-fopenmp'],\n# )",
+      afterCode: "prange の schedule パラメータは負荷分散方式を制御します。'static' は均等分割（要素あたりの計算量が均一な場合に最適）、'dynamic' は動的分割（計算量が不均一な場合に最適）、'guided' は徐々にチャンクサイズを小さくする方式です。ペアワイズ距離のように内部ループの長さが i に依存する場合は 'dynamic' が適しています。"
+    }
+  ]
+},
+{
+  id: "ch8", num: 8,
+  title: "Cython拡張のテスト戦略",
+  est: "5時間",
+  goal: "Cython 拡張モジュールに対する doctest、pytest、hypothesis によるプロパティテスト、ASV によるベンチマーク回帰テストを組み合わせた包括的なテスト戦略を設計・実装できるようになる。",
+  sections: [
+    {
+      title: "doctestとpytestによる基本テスト",
+      body: "Cython 拡張のテストは、通常の Python モジュールのテストよりも注意が必要です。Cython で定義した def 関数や cpdef 関数は Python から直接テストできますが、cdef 関数は Python から見えないため、テスト用のラッパー関数を用意するか、cpdef に変更する必要があります。開発時は cpdef で定義し、リリースビルドでは cdef に切り替えるという戦略も有効です。\n\ndoctest は Cython の .pyx ファイル内にも記述できますが、Cython のコンパイルが必要なため、通常の Python doctest よりもセットアップが複雑です。pytest と pytest-cython プラグインを使うと、コンパイル済みの拡張モジュールに対して通常の pytest テストが実行できます。conftest.py でビルドステップを自動化しておくと、テスト実行がスムーズになります。\n\nCython 特有のテストポイントとして、型変換の境界値（オーバーフロー、精度損失）、メモリ管理（参照カウントのリーク検出）、nogil 関数のスレッドセーフティがあります。sys.getrefcount() を使った参照カウントテストは、Cython の参照管理が正しいことを確認する重要な手法です。",
+      table: T.testTools,
+      afterTable: "テストの種類ごとに適切なツールを選択しましょう。基本的な動作確認は pytest、エッジケースの探索は hypothesis、パフォーマンス回帰の検出は ASV が最適です。",
+      code: "# === tests/test_vector.py ===\nimport numpy as np\nimport pytest\nfrom numpy.testing import assert_allclose\n\n# Cython拡張をインポート（ビルド済み前提）\n# from mylib._vector import Vector3, pairwise_distance\n\nclass TestVector3:\n    \"\"\"Vector3 cdef class のテスト\"\"\"\n\n    def test_creation(self):\n        v = Vector3(1.0, 2.0, 3.0)\n        assert v.x == 1.0\n        assert v.y == 2.0\n        assert v.z == 3.0\n\n    def test_add(self):\n        a = Vector3(1, 2, 3)\n        b = Vector3(4, 5, 6)\n        c = a + b\n        assert c.x == 5.0\n        assert c.y == 7.0\n        assert c.z == 9.0\n\n    def test_dot_product(self):\n        a = Vector3(1, 0, 0)\n        b = Vector3(0, 1, 0)\n        assert a.dot(b) == 0.0  # 直交\n        assert a.dot(a) == 1.0  # 単位ベクトル\n\n    def test_length(self):\n        v = Vector3(3, 4, 0)\n        assert_allclose(v.length(), 5.0, rtol=1e-12)\n\n    def test_cross_product(self):\n        x = Vector3(1, 0, 0)\n        y = Vector3(0, 1, 0)\n        z = x.cross(y)\n        assert z.x == 0.0\n        assert z.y == 0.0\n        assert z.z == 1.0\n\n    @pytest.mark.parametrize(\"x,y,z\", [\n        (0, 0, 0),\n        (1e-300, 1e-300, 1e-300),  # 極小値\n        (1e300, 1e300, 1e300),      # 極大値\n        (-1, -2, -3),               # 負の値\n    ])\n    def test_edge_cases(self, x, y, z):\n        v = Vector3(x, y, z)\n        assert v.x == x\n\nclass TestPairwiseDistance:\n    \"\"\"pairwise_distance 関数のテスト\"\"\"\n\n    def test_identity(self):\n        \"\"\"同じ点同士の距離は0\"\"\"\n        X = np.array([[1, 2, 3]], dtype=np.float64)\n        D = pairwise_distance(X)\n        assert D[0, 0] == 0.0\n\n    def test_symmetry(self):\n        \"\"\"距離行列は対称\"\"\"\n        X = np.random.randn(10, 3)\n        D = pairwise_distance(X)\n        assert_allclose(D, D.T)\n\n    def test_refcount(self):\n        \"\"\"参照カウントリークの検出\"\"\"\n        import sys\n        X = np.random.randn(5, 3)\n        rc_before = sys.getrefcount(X)\n        D = pairwise_distance(X)\n        rc_after = sys.getrefcount(X)\n        assert rc_after == rc_before",
+      afterCode: "assert_allclose は浮動小数点の比較に不可欠です。rtol（相対許容誤差）と atol（絶対許容誤差）を適切に設定しましょう。参照カウントテストは、Cython が内部で適切に Py_INCREF/Py_DECREF しているかを検証する重要なテストです。"
+    },
+    {
+      title: "hypothesis によるプロパティテスト",
+      body: "hypothesis は「プロパティベーステスト」フレームワークで、テスト入力をランダムに生成して不変条件（プロパティ）を検証します。Cython 拡張のテストでは、数値演算の数学的性質（交換法則、結合法則、三角不等式など）をプロパティとして記述し、hypothesis にエッジケースの探索を任せることで、手動では見つけにくいバグを検出できます。\n\nhypothesis は入力を「シュリンキング」する機能を持ち、バグを再現する最小の入力を自動的に見つけてくれます。これは Cython 拡張のデバッグで特に有用で、セグメンテーションフォールトを引き起こす境界値や、浮動小数点の精度問題が発生する入力を効率的に特定できます。\n\nNumPy 配列を入力とするテストでは、hypothesis.extra.numpy モジュールが提供する配列生成ストラテジーが便利です。dtype、shape、要素の範囲を指定してランダムな配列を生成でき、C連続/Fortran連続/非連続の配列も自動的にテストされます。",
+      code: "# hypothesis によるプロパティテスト\nimport numpy as np\nfrom hypothesis import given, settings, assume\nfrom hypothesis import strategies as st\nfrom hypothesis.extra.numpy import arrays, array_shapes\nfrom numpy.testing import assert_allclose\n\n# from mylib._vector import Vector3, generic_sum, pairwise_distance\n\n# Vector3 のプロパティテスト\nfinite_floats = st.floats(\n    min_value=-1e10, max_value=1e10,\n    allow_nan=False, allow_infinity=False\n)\n\n@given(\n    x=finite_floats, y=finite_floats, z=finite_floats,\n    a=finite_floats, b=finite_floats, c=finite_floats\n)\ndef test_dot_commutative(x, y, z, a, b, c):\n    \"\"\"内積は交換法則を満たす\"\"\"\n    v1 = Vector3(x, y, z)\n    v2 = Vector3(a, b, c)\n    assert_allclose(v1.dot(v2), v2.dot(v1), rtol=1e-10)\n\n@given(\n    x=finite_floats, y=finite_floats, z=finite_floats\n)\ndef test_length_non_negative(x, y, z):\n    \"\"\"ベクトルの長さは非負\"\"\"\n    v = Vector3(x, y, z)\n    assert v.length() >= 0.0\n\n@given(\n    x=finite_floats, y=finite_floats, z=finite_floats,\n    a=finite_floats, b=finite_floats, c=finite_floats\n)\ndef test_triangle_inequality(x, y, z, a, b, c):\n    \"\"\"三角不等式: |v1 + v2| <= |v1| + |v2|\"\"\"\n    v1 = Vector3(x, y, z)\n    v2 = Vector3(a, b, c)\n    v_sum = v1 + v2\n    # 浮動小数点誤差を考慮\n    assert v_sum.length() <= v1.length() + v2.length() + 1e-10\n\n# NumPy 配列のプロパティテスト\n@given(\n    arr=arrays(\n        dtype=np.float64,\n        shape=array_shapes(min_dims=1, max_dims=1, min_side=1, max_side=1000),\n        elements=st.floats(-1e6, 1e6, allow_nan=False, allow_infinity=False)\n    )\n)\ndef test_sum_matches_numpy(arr):\n    \"\"\"generic_sum と np.sum の結果が一致\"\"\"\n    result = generic_sum(arr)\n    expected = np.sum(arr)\n    assert_allclose(result, expected, rtol=1e-10)\n\n@given(\n    X=arrays(\n        dtype=np.float64,\n        shape=st.tuples(\n            st.integers(2, 50),\n            st.integers(1, 10)\n        ),\n        elements=st.floats(-100, 100, allow_nan=False, allow_infinity=False)\n    )\n)\n@settings(max_examples=50)\ndef test_distance_non_negative(X):\n    \"\"\"距離は非負\"\"\"\n    D = pairwise_distance(X)\n    assert np.all(D >= -1e-10)",
+      afterCode: "hypothesis のデフォルトでは200例のテストが実行されますが、@settings(max_examples=50) で削減できます。CI では max_examples を増やし、ローカル開発では少なく設定するのが一般的です。hypothesis は発見した反例を内部データベースに保存するため、次回実行時に同じ反例が再テストされます。"
+    },
+    {
+      title: "ASV によるベンチマーク回帰テスト",
+      body: "ASV（airspeed velocity）はコミットごとのパフォーマンスを追跡するベンチマークフレームワークです。Cython 拡張のパフォーマンスがリファクタリングや依存ライブラリの更新で悪化していないかを自動的に検出できます。SciPy、NumPy、pandas などの主要プロジェクトが ASV を採用しています。\n\nASV のベンチマーク関数は time_ プレフィックスで命名し、setup メソッドでデータを準備します。各ベンチマークは自動的に複数回実行され、統計的に安定した結果が記録されます。結果はJSON形式で保存され、HTML レポートで可視化できます。CI でベンチマークを実行し、前回のコミットと比較して一定以上の性能低下があれば警告を出すことも可能です。\n\nCython 拡張のベンチマークでは、データサイズ（N）や型（dtype）をパラメータ化して、スケーリング特性も検証することが重要です。O(n) のアルゴリズムが O(n^2) に退化していないか、SIMD最適化が正しく効いているかといった問題を、ベンチマーク回帰テストで早期に発見できます。",
+      code: "# === benchmarks/bench_vector.py ===\nimport numpy as np\n\n# ASV ベンチマーククラス\nclass VectorBenchmarks:\n    \"\"\"ベクトル演算のベンチマーク\"\"\"\n    params = [\n        [100, 1000, 10000, 100000],\n        ['float32', 'float64'],\n    ]\n    param_names = ['n', 'dtype']\n\n    def setup(self, n, dtype):\n        \"\"\"ベンチマーク実行前のデータ準備\"\"\"\n        self.X = np.random.randn(n, 3).astype(dtype)\n        self.a = np.random.randn(n).astype(dtype)\n        self.b = np.random.randn(n).astype(dtype)\n        self.out = np.empty(n, dtype=dtype)\n\n    def time_pairwise_distance(self, n, dtype):\n        \"\"\"ペアワイズ距離の実行時間\"\"\"\n        if n > 10000:\n            return  # 大きすぎるサイズはスキップ\n        from mylib import pairwise_distance\n        pairwise_distance(self.X)\n\n    def time_generic_sum(self, n, dtype):\n        \"\"\"合計関数の実行時間\"\"\"\n        from mylib import generic_sum\n        generic_sum(self.a)\n\n    def time_numpy_sum_comparison(self, n, dtype):\n        \"\"\"比較用: NumPy の sum\"\"\"\n        np.sum(self.a)\n\n    def time_fused_multiply_add(self, n, dtype):\n        \"\"\"ループ融合演算の実行時間\"\"\"\n        from mylib import fused_multiply_add\n        c = np.random.randn(n).astype(dtype)\n        fused_multiply_add(self.a, self.b, c, self.out)\n\n    def time_numpy_multiply_add(self, n, dtype):\n        \"\"\"比較用: NumPy の a*b+c\"\"\"\n        np.multiply(self.a, self.b, out=self.out)\n        np.add(self.out, self.a, out=self.out)\n\n# === asv.conf.json（設定ファイル）===\n# {\n#     \"version\": 1,\n#     \"project\": \"mylib\",\n#     \"project_url\": \"https://github.com/user/mylib\",\n#     \"repo\": \".\",\n#     \"branches\": [\"main\"],\n#     \"environment_type\": \"virtualenv\",\n#     \"install_command\": [\n#         \"python -m pip install {wheel_file}\"\n#     ],\n#     \"build_command\": [\n#         \"python -m pip wheel --no-deps -w {build_cache_dir} {build_dir}\"\n#     ],\n#     \"benchmark_dir\": \"benchmarks\",\n#     \"results_dir\": \"benchmarks/results\",\n#     \"html_dir\": \"benchmarks/html\"\n# }\n#\n# 実行コマンド:\n# asv run            # 現在のコミットでベンチマーク実行\n# asv continuous main HEAD  # mainと比較\n# asv publish        # HTMLレポート生成\n# asv preview        # ブラウザで確認",
+      afterCode: "asv continuous は2つのコミット間でベンチマークを比較し、統計的に有意な性能変化を報告します。CI に組み込む場合は asv continuous main HEAD --factor 1.1 のように閾値を設定し、10% 以上の性能低下で失敗にするのが一般的です。ASV は各コミットを個別の仮想環境でビルド・テストするため、依存関係の変化による影響も正確に捕捉できます。"
+    }
+  ]
+},
+{
+  id: "ch9", num: 9,
+  title: "CI/CDとクロスプラットフォームビルド",
+  est: "5時間",
+  goal: "cibuildwheel を使った全プラットフォーム向けホイールの自動ビルド、GitHub Actions でのCI/CDパイプライン構築、conda-forge へのパッケージ公開を実践できるようになる。",
+  sections: [
+    {
+      title: "cibuildwheel によるホイールビルド",
+      body: "cibuildwheel は Python パッケージのホイール（.whl）をすべての主要プラットフォーム（Linux、macOS、Windows）とPythonバージョン向けに自動ビルドするツールです。Cython 拡張を含むパッケージの配布では、エンドユーザーが Cython やCコンパイラをインストールしなくても pip install できるように、事前ビルドされたホイールを提供することが重要です。\n\ncibuildwheel は Linux では manylinux Docker コンテナ、macOS では複数バージョンの Python.framework、Windows では Visual Studio ビルドツールを使ってビルドします。各プラットフォームのビルド環境の違い（コンパイラ、リンカフラグ、ABI互換性）は cibuildwheel が自動的に処理してくれるため、開発者はビルド設定に集中できます。\n\nARM64（Apple Silicon、Graviton）向けのクロスコンパイルもサポートされています。macOS では universal2 ホイール（x86_64 + arm64）を生成でき、Linux では QEMU エミュレーションを使って aarch64 向けホイールをビルドできます。",
+      table: T.ciTools,
+      afterTable: "meson-python は従来の setup.py + setuptools を置き換える新しいビルドバックエンドです。ビルドの高速化と依存関係管理の改善が利点で、SciPy が採用しています。新規プロジェクトでは meson-python の採用を推奨します。"
+    },
+    {
+      title: "GitHub Actions によるCI/CDパイプライン",
+      body: "GitHub Actions を使って、プルリクエストごとのテスト実行、リリースタグでのホイールビルドと PyPI へのアップロードを自動化します。Cython プロジェクトの CI では、Cython のコンパイル、C コンパイラの設定、NumPy 等の依存ライブラリのインストールが必要で、通常の Pure Python プロジェクトよりもワークフロー設定が複雑になります。\n\nテストジョブでは、複数の Python バージョンと OS の組み合わせ（マトリクスビルド）でテストを実行します。Cython のコンパイル結果はプラットフォームとPythonバージョンに依存するため、すべての組み合わせでテストすることが重要です。キャッシュ（actions/cache）を活用してビルド時間を短縮することも推奨されます。\n\nリリースワークフローでは、タグのプッシュをトリガーにして cibuildwheel でホイールをビルドし、sdist（ソース配布物）と合わせて PyPI にアップロードします。PyPI へのアップロードには Trusted Publishing（OIDC ベースの認証）を使うのが現在のベストプラクティスで、APIトークンの管理が不要になります。",
+      code: "# === .github/workflows/ci.yml ===\n# name: CI\n# on:\n#   push:\n#     branches: [main]\n#   pull_request:\n#     branches: [main]\n#\n# jobs:\n#   test:\n#     strategy:\n#       matrix:\n#         os: [ubuntu-latest, macos-latest, windows-latest]\n#         python-version: ['3.10', '3.11', '3.12', '3.13']\n#     runs-on: ${{ matrix.os }}\n#     steps:\n#       - uses: actions/checkout@v4\n#       - uses: actions/setup-python@v5\n#         with:\n#           python-version: ${{ matrix.python-version }}\n#       - name: Install dependencies\n#         run: |\n#           pip install cython numpy pytest hypothesis\n#           pip install -e .\n#       - name: Run tests\n#         run: pytest tests/ -v --tb=short\n#\n# === .github/workflows/release.yml ===\n# name: Release\n# on:\n#   push:\n#     tags: ['v*']\n#\n# jobs:\n#   build_wheels:\n#     strategy:\n#       matrix:\n#         os: [ubuntu-latest, macos-latest, windows-latest]\n#     runs-on: ${{ matrix.os }}\n#     steps:\n#       - uses: actions/checkout@v4\n#       - uses: actions/setup-python@v5\n#         with:\n#           python-version: '3.12'\n#       - name: Build wheels\n#         uses: pypa/cibuildwheel@v2.21\n#         env:\n#           CIBW_BUILD: 'cp310-* cp311-* cp312-* cp313-*'\n#           CIBW_SKIP: '*-musllinux_i686'\n#           CIBW_ARCHS_MACOS: 'x86_64 arm64'\n#           CIBW_ARCHS_LINUX: 'x86_64 aarch64'\n#           CIBW_TEST_COMMAND: 'pytest {project}/tests'\n#           CIBW_TEST_REQUIRES: 'pytest numpy'\n#           CIBW_BEFORE_BUILD: 'pip install cython numpy'\n#       - uses: actions/upload-artifact@v4\n#         with:\n#           name: wheels-${{ matrix.os }}\n#           path: wheelhouse/*.whl\n#\n#   build_sdist:\n#     runs-on: ubuntu-latest\n#     steps:\n#       - uses: actions/checkout@v4\n#       - run: pip install build && python -m build --sdist\n#       - uses: actions/upload-artifact@v4\n#         with:\n#           name: sdist\n#           path: dist/*.tar.gz\n#\n#   publish:\n#     needs: [build_wheels, build_sdist]\n#     runs-on: ubuntu-latest\n#     permissions:\n#       id-token: write  # Trusted Publishing\n#     steps:\n#       - uses: actions/download-artifact@v4\n#         with:\n#           path: dist/\n#           merge-multiple: true\n#       - uses: pypa/gh-action-pypi-publish@release/v1\n\n# pyproject.toml の設定\npyproject_toml = \"\"\"\n[build-system]\nrequires = [\"setuptools>=68\", \"cython>=3.0\", \"numpy>=1.25\"]\nbuild-backend = \"setuptools.build_meta\"\n\n[project]\nname = \"mylib\"\nversion = \"1.0.0\"\nrequires-python = \">=3.10\"\ndependencies = [\"numpy>=1.25\"]\n\n[tool.cibuildwheel]\nbuild = \"cp310-* cp311-* cp312-* cp313-*\"\nskip = \"*-musllinux_i686 pp*\"\ntest-command = \"pytest {project}/tests -x\"\ntest-requires = [\"pytest\", \"hypothesis\"]\n\n[tool.cibuildwheel.linux]\narchs = [\"x86_64\", \"aarch64\"]\nbefore-build = \"pip install cython numpy\"\n\n[tool.cibuildwheel.macos]\narchs = [\"x86_64\", \"arm64\"]\n\n[tool.cibuildwheel.windows]\narchs = [\"AMD64\"]\n\"\"\"",
+      afterCode: "CIBW_ARCHS_LINUX に aarch64 を含める場合、GitHub Actions のランナーで QEMU エミュレーションを設定する必要があります。docker/setup-qemu-action を使うと簡単に設定できます。Trusted Publishing を使うと、GitHub Actions から直接 PyPI にアップロードでき、APIトークンの管理が不要になります。"
+    },
+    {
+      title: "conda-forge への配布",
+      body: "conda-forge は conda パッケージの最大のコミュニティリポジトリで、科学計算コミュニティでは pip と並んで広く使われています。Cython 拡張パッケージを conda-forge で配布するには、レシピファイル（meta.yaml）を作成して staged-recipes リポジトリにプルリクエストを送ります。\n\nconda のビルドシステムは pip/wheel とは異なる独自の仕組みを持っています。meta.yaml でビルド依存関係（host requirements）と実行時依存関係（run requirements）を分けて宣言し、build.sh（Unix）/ bld.bat（Windows）にビルドスクリプトを記述します。conda-forge の CI インフラ（conda-smithy）が各プラットフォーム向けのパッケージを自動ビルドします。\n\nconda-forge の利点は、C/C++ ライブラリの依存関係を正確に管理できる点です。pip では C ライブラリの依存関係をシステムに事前インストールする必要がありますが、conda ではすべての依存関係を conda パッケージとして管理するため、再現性のある環境構築が可能です。特に BLAS/LAPACK、HDF5、MPI などの外部 C ライブラリに依存する Cython 拡張では、conda-forge での配布が推奨されます。",
+      code: "# === conda-forge レシピ ===\n# recipe/meta.yaml\n#\n# {% set name = \"mylib\" %}\n# {% set version = \"1.0.0\" %}\n#\n# package:\n#   name: {{ name }}\n#   version: {{ version }}\n#\n# source:\n#   url: https://pypi.io/packages/source/m/{{ name }}/{{ name }}-{{ version }}.tar.gz\n#   sha256: <ハッシュ値>\n#\n# build:\n#   number: 0\n#   script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation\n#\n# requirements:\n#   build:\n#     - {{ compiler('c') }}\n#     - python\n#     - cross-python_{{ target_platform }}  # [build_platform != target_platform]\n#   host:\n#     - python\n#     - pip\n#     - setuptools >=68\n#     - cython >=3.0\n#     - numpy\n#   run:\n#     - python\n#     - numpy\n#\n# test:\n#   imports:\n#     - mylib\n#   requires:\n#     - pytest\n#   commands:\n#     - pytest --pyargs mylib.tests\n#\n# about:\n#   home: https://github.com/user/mylib\n#   license: MIT\n#   license_file: LICENSE\n#   summary: 高速数値計算ライブラリ\n\n# === recipe/build.sh ===\n# #!/bin/bash\n# set -ex\n# ${PYTHON} -m pip install . -vv --no-deps --no-build-isolation\n\n# === conda-smithy の設定 ===\n# conda_build_config.yaml\n# python:\n#   - \"3.10\"\n#   - \"3.11\"\n#   - \"3.12\"\n#   - \"3.13\"\n# numpy:\n#   - \"1.25\"\n#   - \"2.0\"\n\n# conda-forge への貢献手順:\n# 1. https://github.com/conda-forge/staged-recipes をフォーク\n# 2. recipes/mylib/ にレシピファイルを作成\n# 3. プルリクエストを送信\n# 4. レビュー後にマージ → feedstock リポジトリが自動作成\n# 5. 以降はfeedstock のPRでバージョン更新\n\nprint(\"パッケージ配布の基本設定完了\")",
+      afterCode: "conda-forge のレシピが承認されると、専用の feedstock リポジトリ（mylib-feedstock）が自動作成されます。以降のバージョン更新は、feedstock の meta.yaml を更新するプルリクエストで行います。conda-forge-bot が自動的に新バージョンの検出と PR 作成も行ってくれます。"
+    }
+  ]
+},
+{
+  id: "ch10", num: 10,
+  title: "実践: プロダクション品質ライブラリ設計",
+  est: "5時間",
+  goal: "API設計の原則、後方互換性の維持、ドキュメント生成、リリース管理を含む、プロダクション品質の Cython 拡張ライブラリを設計・公開するための総合的なスキルを身につける。",
+  sections: [
+    {
+      title: "API設計の原則",
+      body: "プロダクション品質のライブラリでは、API の設計がコードの品質と同じくらい重要です。Cython 拡張のAPI設計では、Python ユーザーにとって自然なインターフェースを提供しつつ、内部ではC レベルの性能を活用するという二層構造が基本パターンになります。公開APIは def 関数と通常のクラスで構成し、内部実装は cdef/cpdef で高速化します。\n\n良いAPI設計の原則として、「最小驚きの原則」（ユーザーの期待に沿った動作）、「単一責任の原則」（各関数は1つのことをうまくやる）、「明示は暗黙に勝る」（デフォルト動作が予測可能）が挙げられます。特に Cython 拡張では、NumPy 配列の dtype やメモリレイアウトの要件を明確にドキュメント化し、不適切な入力に対しては早期にわかりやすいエラーメッセージを出すことが重要です。\n\nCython 拡張では __init__.py（または __init__.pxd）で公開APIを明示的に制御します。内部モジュール（_internal.pyx）と公開モジュール（api.py）を分離し、公開モジュールから必要な関数・クラスのみをインポートして再公開します。これにより、内部実装を変更してもAPIが安定します。",
+      code: "# === プロダクション品質のAPI設計例 ===\n\n# --- mylib/__init__.py ---\n# 公開APIの定義\n# from mylib._core import (\n#     pairwise_distance,\n#     gaussian_kernel,\n#     sigmoid,\n# )\n# from mylib._vector import Vector3\n# from mylib._version import __version__\n#\n# __all__ = [\n#     'pairwise_distance',\n#     'gaussian_kernel',\n#     'sigmoid',\n#     'Vector3',\n#     '__version__',\n# ]\n\n# --- mylib/_core.pyx ---\nimport numpy as np\ncimport numpy as cnp\ncimport cython\n\ndef pairwise_distance(X, metric='euclidean', n_jobs=1):\n    \"\"\"ペアワイズ距離行列を計算する。\n\n    Parameters\n    ----------\n    X : array-like, shape (n_samples, n_features)\n        入力データ。float32 または float64。\n    metric : str, default='euclidean'\n        距離メトリック。'euclidean' のみサポート。\n    n_jobs : int, default=1\n        並列ジョブ数。-1 で全コア使用。\n\n    Returns\n    -------\n    D : ndarray, shape (n_samples, n_samples)\n        距離行列。入力と同じ dtype。\n\n    Raises\n    ------\n    ValueError\n        入力が2次元でない場合。\n    TypeError\n        dtype が float32/float64 でない場合。\n\n    Examples\n    --------\n    >>> import numpy as np\n    >>> X = np.array([[0, 0], [1, 0], [0, 1]], dtype=np.float64)\n    >>> D = pairwise_distance(X)\n    >>> D[0, 1]  # 距離 1.0\n    1.0\n    \"\"\"\n    # 入力バリデーション\n    X = np.asarray(X)\n    if X.ndim != 2:\n        raise ValueError(\n            f\"Xは2次元配列である必要があります。\"\n            f\"受け取った次元数: {X.ndim}\"\n        )\n    if X.dtype not in (np.float32, np.float64):\n        # 自動変換（警告付き）\n        import warnings\n        warnings.warn(\n            f\"dtype {X.dtype} を float64 に変換します。\"\n            f\"明示的にdtypeを指定してください。\",\n            UserWarning, stacklevel=2\n        )\n        X = X.astype(np.float64)\n    if not X.flags['C_CONTIGUOUS']:\n        X = np.ascontiguousarray(X)\n\n    # 内部実装にディスパッチ\n    if X.dtype == np.float32:\n        return _pairwise_distance_float32(X, n_jobs)\n    else:\n        return _pairwise_distance_float64(X, n_jobs)\n\n# 内部実装（非公開）\n@cython.boundscheck(False)\n@cython.wraparound(False)\ncdef _pairwise_distance_float64(double[:, :] X, int n_jobs):\n    # ... 最適化された実装 ...\n    pass",
+      afterCode: "公開関数では入力バリデーション、dtype の自動変換、詳細なエラーメッセージを提供し、内部の cdef 関数に処理を委譲します。docstring は NumPy スタイルで記述し、Parameters、Returns、Raises、Examples セクションを含めます。これにより Sphinx でのドキュメント自動生成が容易になります。"
+    },
+    {
+      title: "後方互換性とバージョニング",
+      body: "ライブラリを公開した後は、後方互換性の維持が最も重要な課題の1つになります。セマンティックバージョニング（SemVer: MAJOR.MINOR.PATCH）に従い、パッチバージョンではバグ修正のみ、マイナーバージョンでは後方互換性のある機能追加、メジャーバージョンでは破壊的変更を行うのが原則です。\n\nAPIの非推奨化（deprecation）は、ユーザーに移行の猶予を与える重要なプロセスです。関数名の変更やパラメータの廃止を行う場合、まず旧APIにDeprecationWarningを発行し、少なくとも2つのマイナーバージョン（または1年程度）の猶予期間を設けてから削除します。Python の warnings モジュールとデコレータパターンを使って、一貫した非推奨化プロセスを実装します。\n\nCython 拡張特有の互換性問題として、ABI（Application Binary Interface）の互換性があります。Cython が生成するCコードはCPythonのバージョンに依存するため、異なるPythonバージョンでは再コンパイルが必要です。cibuildwheel で全Python バージョン向けのホイールを提供することで、エンドユーザーはABIの問題を意識せずに済みます。",
+      code: "# === バージョニングと非推奨化パターン ===\nimport warnings\nimport functools\n\ndef deprecated(since, removed_in=None, alternative=None):\n    \"\"\"非推奨化デコレータ\"\"\"\n    def decorator(func):\n        @functools.wraps(func)\n        def wrapper(*args, **kwargs):\n            msg = (\n                f\"{func.__name__} はバージョン {since} で非推奨になりました。\"\n            )\n            if removed_in:\n                msg += f\" バージョン {removed_in} で削除予定です。\"\n            if alternative:\n                msg += f\" 代わりに {alternative} を使用してください。\"\n            warnings.warn(msg, DeprecationWarning, stacklevel=2)\n            return func(*args, **kwargs)\n        return wrapper\n    return decorator\n\ndef renamed_parameter(old_name, new_name, since):\n    \"\"\"パラメータ名変更の互換性デコレータ\"\"\"\n    def decorator(func):\n        @functools.wraps(func)\n        def wrapper(*args, **kwargs):\n            if old_name in kwargs:\n                warnings.warn(\n                    f\"パラメータ '{old_name}' は '{new_name}' に\"\n                    f\"名前が変更されました（{since}）。\"\n                    f\"'{old_name}' は将来のバージョンで削除されます。\",\n                    DeprecationWarning, stacklevel=2\n                )\n                kwargs[new_name] = kwargs.pop(old_name)\n            return func(*args, **kwargs)\n        return wrapper\n    return decorator\n\n# 使用例\n@deprecated(\n    since=\"1.2\",\n    removed_in=\"2.0\",\n    alternative=\"pairwise_distance(metric='euclidean')\"\n)\ndef euclidean_distances(X):\n    \"\"\"旧関数名（後方互換のために残す）\"\"\"\n    return pairwise_distance(X, metric='euclidean')\n\n@renamed_parameter('n_jobs', 'num_workers', since='1.3')\ndef fit(X, num_workers=1):\n    \"\"\"パラメータ名変更の例\"\"\"\n    pass\n\n# === _version.py ===\n# バージョン情報の一元管理\n__version__ = \"1.3.0\"\n__version_info__ = (1, 3, 0)\n\n# === CHANGELOG.md のパターン ===\n# ## [1.3.0] - 2026-04-01\n# ### 追加\n# - `gaussian_kernel` 関数を追加\n# - ARM64 (Apple Silicon) サポート\n# ### 変更\n# - `fit()` の `n_jobs` パラメータを `num_workers` に名称変更\n#   （旧名は非推奨、2.0で削除予定）\n# ### 非推奨\n# - `euclidean_distances()` を非推奨化\n#   （`pairwise_distance(metric='euclidean')` を使用）\n# ### 修正\n# - float32 入力での精度問題を修正 (#123)",
+      afterCode: "非推奨化の警告はデフォルトではPythonインタプリタが1回だけ表示します。テストでは warnings.catch_warnings() と simplefilter('always') を使って全ての警告を捕捉し、非推奨化が正しく機能していることを検証しましょう。CHANGELOG は自動生成ツール（towncrier 等）を使うと、PRごとにフラグメントを追加して、リリース時に自動的にまとめることができます。"
+    },
+    {
+      title: "ドキュメントとリリース管理",
+      body: "プロダクション品質のライブラリには包括的なドキュメントが不可欠です。Cython 拡張のドキュメントは Sphinx + autodoc で生成するのが標準的です。Cython の def/cpdef 関数の docstring は自動的に抽出されますが、cdef 関数は Python から見えないため、公開APIのラッパー関数に詳細な docstring を記述します。\n\nドキュメントの構成は「Diataxis フレームワーク」に従い、チュートリアル（入門）、ハウツーガイド（実践的な手順）、APIリファレンス（網羅的な仕様）、背景説明（概念の解説）の4つに分けるのが効果的です。特にCython拡張では、パフォーマンス特性（計算量、メモリ使用量、スレッドセーフティ）をAPIリファレンスに明記することが重要です。\n\nリリース管理では、タグ付け → CI でのホイールビルド → PyPI/conda-forge へのアップロード → リリースノートの公開という一連のフローを自動化します。GitHub Releases でリリースノートを管理し、CHANGELOG.md と同期させます。リリースの頻度は月次〜四半期が一般的で、セキュリティ修正は随時パッチリリースします。",
+      code: "# === Sphinx ドキュメント設定 ===\n# docs/conf.py\n#\n# project = 'mylib'\n# extensions = [\n#     'sphinx.ext.autodoc',\n#     'sphinx.ext.napoleon',     # NumPyスタイルdocstring\n#     'sphinx.ext.intersphinx',  # 外部ドキュメントへのリンク\n#     'sphinx.ext.viewcode',     # ソースコードへのリンク\n#     'sphinx.ext.mathjax',      # 数式サポート\n#     'numpydoc',                # NumPyスタイル拡張\n# ]\n#\n# intersphinx_mapping = {\n#     'python': ('https://docs.python.org/3', None),\n#     'numpy': ('https://numpy.org/doc/stable', None),\n# }\n\n# === リリース自動化スクリプト ===\n# scripts/release.py\nimport subprocess\nimport sys\n\ndef release(version):\n    \"\"\"リリース手順の自動化\"\"\"\n    # 1. バージョン更新\n    update_version(version)\n\n    # 2. CHANGELOG更新確認\n    print(f\"CHANGELOG.md を確認してください\")\n    input(\"Enter で続行...\")\n\n    # 3. コミット・タグ\n    subprocess.run(['git', 'add', '-A'])\n    subprocess.run(['git', 'commit', '-m', f'Release v{version}'])\n    subprocess.run(['git', 'tag', '-a', f'v{version}',\n                    '-m', f'Version {version}'])\n\n    # 4. プッシュ（CIがビルド・公開を実行）\n    subprocess.run(['git', 'push', 'origin', 'main', '--tags'])\n    print(f\"v{version} をリリースしました\")\n    print(\"CI がホイールビルドと PyPI アップロードを実行します\")\n\ndef update_version(version):\n    \"\"\"バージョン番号を一括更新\"\"\"\n    files = [\n        ('mylib/_version.py',\n         f'__version__ = \"{version}\"'),\n        ('pyproject.toml',\n         f'version = \"{version}\"'),\n    ]\n    for path, line in files:\n        # ファイル内のバージョン行を更新\n        with open(path, 'r') as f:\n            content = f.read()\n        # 正規表現で置換\n        import re\n        if 'version' in path.lower() or path.endswith('.py'):\n            content = re.sub(\n                r'__version__ = \".*\"',\n                f'__version__ = \"{version}\"',\n                content\n            )\n        else:\n            content = re.sub(\n                r'version = \".*\"',\n                f'version = \"{version}\"',\n                content\n            )\n        with open(path, 'w') as f:\n            f.write(content)\n\nif __name__ == '__main__':\n    if len(sys.argv) != 2:\n        print(\"Usage: python release.py <version>\")\n        sys.exit(1)\n    release(sys.argv[1])",
+      afterCode: "リリースプロセスの自動化により、人的ミスを防ぎ、一貫したリリースを実現できます。バージョン番号はソースコードの1箇所で管理し（Single Source of Truth）、ビルドシステムやドキュメントから参照する設計にしましょう。setuptools-scm を使えば、Gitタグからバージョン番号を自動的に取得することもできます。"
+    }
+  ]
+}
+];
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [
+    {
+      diff: 2,
+      q: "Cython から cpython.ref の Py_INCREF / Py_DECREF を使って、Python オブジェクトの参照カウントを手動で増減させ、sys.getrefcount で確認するコードを書いてください。",
+      code: "# sys.getrefcount で参照カウントの変化を確認",
+      answer: "from cpython.ref cimport Py_INCREF, Py_DECREF\nfrom cpython.object cimport PyObject\nimport sys\n\ndef refcount_demo():\n    obj = [1, 2, 3]\n    cdef PyObject* raw = <PyObject*>obj\n    print(f\"初期: {sys.getrefcount(obj)}\")\n    Py_INCREF(raw)\n    print(f\"INCREF後: {sys.getrefcount(obj)}\")\n    Py_DECREF(raw)\n    print(f\"DECREF後: {sys.getrefcount(obj)}\")\n    # 元に戻っていることを確認\n    return obj  # オブジェクトが生きていることを確認"
+    },
+    {
+      diff: 2,
+      q: "cpython.list の PyList_New と PyList_SetItem を使って、C API レベルでリストを構築する関数 build_squares(n) を書いてください。[0, 1, 4, 9, ..., (n-1)^2] を返すこと。",
+      code: "# build_squares(5) → [0, 1, 4, 9, 16]",
+      answer: "from cpython.list cimport PyList_New, PyList_SetItem\nfrom cpython.long cimport PyLong_FromLong\n\ndef build_squares(int n):\n    cdef object result = PyList_New(n)\n    cdef int i\n    for i in range(n):\n        # PyList_SetItem は参照を盗むので DECREF 不要\n        PyList_SetItem(result, i, PyLong_FromLong(i * i))\n    return result\n\n# テスト\n# assert build_squares(5) == [0, 1, 4, 9, 16]"
+    },
+    {
+      diff: 3,
+      q: "cdef class で拡張型 Counter を実装してください。cdef int count フィールド、increment()/decrement()/value() メソッドを持ち、__repr__ で \"Counter(N)\" を返すこと。cpdef メソッドを使ってCレベルとPythonレベル両方から呼べるようにしてください。",
+      code: "# c = Counter()\n# c.increment()\n# c.increment()\n# c.decrement()\n# print(c.value())  # → 1\n# print(repr(c))    # → Counter(1)",
+      answer: "cdef class Counter:\n    cdef int count\n\n    def __init__(self, int initial=0):\n        self.count = initial\n\n    cpdef void increment(self):\n        self.count += 1\n\n    cpdef void decrement(self):\n        self.count -= 1\n\n    cpdef int value(self):\n        return self.count\n\n    def __repr__(self):\n        return f\"Counter({self.count})\"\n\n    def __richcmp__(Counter self, Counter other, int op):\n        if op == 2:  # ==\n            return self.count == other.count\n        elif op == 3:  # !=\n            return self.count != other.count\n        elif op == 0:  # <\n            return self.count < other.count\n        elif op == 4:  # >\n            return self.count > other.count\n        return NotImplemented"
+    }
+  ],
+  ch2: [
+    {
+      diff: 2,
+      q: "cdef class IntArray を実装し、__getbuffer__ で int32 の1次元バッファプロトコルを提供してください。np.asarray(arr) でゼロコピー変換できることを確認するコード付き。",
+      code: "# arr = IntArray(5)\n# arr[0] = 10\n# np_arr = np.asarray(arr)\n# assert np_arr.dtype == np.int32",
+      answer: "from libc.stdlib cimport malloc, free\ncimport numpy as cnp\nimport numpy as np\n\ncdef class IntArray:\n    cdef int* data\n    cdef Py_ssize_t n\n    cdef Py_ssize_t shape[1]\n    cdef Py_ssize_t strides[1]\n\n    def __cinit__(self, Py_ssize_t n):\n        self.n = n\n        self.data = <int*>malloc(n * sizeof(int))\n        self.shape[0] = n\n        self.strides[0] = sizeof(int)\n        cdef Py_ssize_t i\n        for i in range(n):\n            self.data[i] = 0\n\n    def __dealloc__(self):\n        if self.data:\n            free(self.data)\n\n    def __getbuffer__(self, Py_buffer *buf, int flags):\n        buf.buf = <void*>self.data\n        buf.len = self.n * sizeof(int)\n        buf.itemsize = sizeof(int)\n        buf.readonly = 0\n        buf.ndim = 1\n        buf.format = \"i\"\n        buf.shape = self.shape\n        buf.strides = self.strides\n        buf.suboffsets = NULL\n        buf.obj = self\n\n    def __releasebuffer__(self, Py_buffer *buf):\n        pass\n\n    def __setitem__(self, Py_ssize_t i, int val):\n        self.data[i] = val\n\n# arr = IntArray(5)\n# arr[0] = 10\n# np_arr = np.asarray(arr)\n# assert np_arr[0] == 10 and np_arr.dtype == np.int32"
+    },
+    {
+      diff: 3,
+      q: "cdef class Matrix2D を実装し、__getbuffer__ で2次元のC連続バッファ（float64）を提供してください。get(i,j)、set(i,j,val)メソッド付き。",
+      code: "# m = Matrix2D(3, 4)\n# m.set(1, 2, 3.14)\n# arr = np.asarray(m)\n# assert arr.shape == (3, 4)\n# assert arr[1, 2] == 3.14",
+      answer: "from libc.stdlib cimport malloc, free\n\ncdef class Matrix2D:\n    cdef double* data\n    cdef Py_ssize_t rows, cols\n    cdef Py_ssize_t shape[2]\n    cdef Py_ssize_t strides[2]\n\n    def __cinit__(self, Py_ssize_t rows, Py_ssize_t cols):\n        self.rows = rows\n        self.cols = cols\n        self.data = <double*>malloc(rows * cols * sizeof(double))\n        self.shape[0] = rows\n        self.shape[1] = cols\n        self.strides[0] = cols * sizeof(double)\n        self.strides[1] = sizeof(double)\n        cdef Py_ssize_t i\n        for i in range(rows * cols):\n            self.data[i] = 0.0\n\n    def __dealloc__(self):\n        free(self.data)\n\n    def __getbuffer__(self, Py_buffer *buf, int flags):\n        buf.buf = <void*>self.data\n        buf.len = self.rows * self.cols * sizeof(double)\n        buf.itemsize = sizeof(double)\n        buf.readonly = 0\n        buf.ndim = 2\n        buf.format = \"d\"\n        buf.shape = self.shape\n        buf.strides = self.strides\n        buf.suboffsets = NULL\n        buf.obj = self\n\n    def __releasebuffer__(self, Py_buffer *buf):\n        pass\n\n    cpdef double get(self, Py_ssize_t i, Py_ssize_t j):\n        return self.data[i * self.cols + j]\n\n    cpdef void set(self, Py_ssize_t i, Py_ssize_t j, double val):\n        self.data[i * self.cols + j] = val"
+    },
+    {
+      diff: 3,
+      q: "バッファプロトコルのエクスポートカウンタを実装した SafeArray クラスを書いてください。バッファがエクスポートされている間はリサイズ（resize メソッド）を拒否すること。",
+      code: "# a = SafeArray(10)\n# v = memoryview(a)  # エクスポート中\n# a.resize(20)  # → BufferError が発生",
+      answer: "from libc.stdlib cimport malloc, free, realloc\n\ncdef class SafeArray:\n    cdef double* data\n    cdef Py_ssize_t n\n    cdef Py_ssize_t shape[1]\n    cdef Py_ssize_t strides[1]\n    cdef int exports\n\n    def __cinit__(self, Py_ssize_t n):\n        self.n = n\n        self.data = <double*>malloc(n * sizeof(double))\n        self.shape[0] = n\n        self.strides[0] = sizeof(double)\n        self.exports = 0\n        cdef Py_ssize_t i\n        for i in range(n):\n            self.data[i] = 0.0\n\n    def __dealloc__(self):\n        free(self.data)\n\n    def __getbuffer__(self, Py_buffer *buf, int flags):\n        buf.buf = self.data\n        buf.len = self.n * sizeof(double)\n        buf.itemsize = sizeof(double)\n        buf.readonly = 0\n        buf.ndim = 1\n        buf.format = \"d\"\n        buf.shape = self.shape\n        buf.strides = self.strides\n        buf.suboffsets = NULL\n        buf.obj = self\n        self.exports += 1\n\n    def __releasebuffer__(self, Py_buffer *buf):\n        self.exports -= 1\n\n    def resize(self, Py_ssize_t new_size):\n        if self.exports > 0:\n            raise BufferError(\n                \"バッファがエクスポート中のためリサイズできません\"\n            )\n        self.data = <double*>realloc(self.data, new_size * sizeof(double))\n        self.n = new_size\n        self.shape[0] = new_size"
+    }
+  ],
+  ch3: [
+    {
+      diff: 2,
+      q: "fused type を使って int, long, float, double の全てに対応する generic_max 関数を書いてください。メモリビュー配列の最大値を返すこと。",
+      code: "# import numpy as np\n# a = np.array([3, 1, 4, 1, 5], dtype=np.int32)\n# generic_max(a)  # → 5",
+      answer: "ctypedef fused numeric_t:\n    int\n    long\n    float\n    double\n\ndef generic_max(numeric_t[:] arr):\n    cdef Py_ssize_t i, n = arr.shape[0]\n    if n == 0:\n        raise ValueError(\"空の配列\")\n    cdef numeric_t max_val = arr[0]\n    for i in range(1, n):\n        if arr[i] > max_val:\n            max_val = arr[i]\n    return max_val\n\n# import numpy as np\n# print(generic_max(np.array([3,1,4,1,5], dtype=np.int32)))  # 5\n# print(generic_max(np.array([3.14, 2.71], dtype=np.float64)))  # 3.14"
+    },
+    {
+      diff: 2,
+      q: "fused type の is 分岐を使って、整数型では切り捨て除算、浮動小数点型では通常の除算を行う generic_divide 関数を書いてください。",
+      code: "# generic_divide[int](7, 2)   → 3  （切り捨て）\n# generic_divide[double](7, 2) → 3.5",
+      answer: "ctypedef fused numeric_t:\n    int\n    long\n    float\n    double\n\ndef generic_divide(numeric_t a, numeric_t b):\n    if b == 0:\n        raise ZeroDivisionError(\"ゼロ除算\")\n    if numeric_t is int or numeric_t is long:\n        # 整数型: 切り捨て除算\n        return a // b\n    else:\n        # 浮動小数点型: 通常の除算\n        return a / b"
+    },
+    {
+      diff: 3,
+      q: "fused type を使って、float32 と float64 に対応する generic_softmax 関数を書いてください。オーバーフロー防止のため最大値を引いてから exp を計算すること。型ごとに expf/exp を使い分けること。",
+      code: "# import numpy as np\n# x = np.array([1.0, 2.0, 3.0], dtype=np.float64)\n# out = np.empty_like(x)\n# generic_softmax(x, out)\n# assert abs(out.sum() - 1.0) < 1e-10",
+      answer: "cimport numpy as cnp\nimport numpy as np\nfrom libc.math cimport exp, expf\n\nctypedef fused float_t:\n    cnp.float32_t\n    cnp.float64_t\n\ndef generic_softmax(float_t[:] x, float_t[:] out):\n    cdef Py_ssize_t i, n = x.shape[0]\n    # 最大値を求める（オーバーフロー防止）\n    cdef float_t max_val = x[0]\n    for i in range(1, n):\n        if x[i] > max_val:\n            max_val = x[i]\n    # exp(x - max) の合計\n    cdef float_t total = 0\n    for i in range(n):\n        if float_t is cnp.float32_t:\n            out[i] = expf(x[i] - max_val)\n        else:\n            out[i] = exp(x[i] - max_val)\n        total += out[i]\n    # 正規化\n    for i in range(n):\n        out[i] /= total"
+    }
+  ],
+  ch4: [
+    {
+      diff: 2,
+      q: "SSE2 intrinsics を使って、double 配列の全要素の合計を計算する sse_sum 関数を書いてください。テール処理（配列長が2の倍数でない場合）も含めること。",
+      code: "# import numpy as np\n# a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n# sse_sum(a)  # → 15.0",
+      answer: "cdef extern from \"emmintrin.h\":\n    ctypedef struct __m128d:\n        pass\n    __m128d _mm_loadu_pd(double*) nogil\n    __m128d _mm_add_pd(__m128d, __m128d) nogil\n    __m128d _mm_setzero_pd() nogil\n    void _mm_storeu_pd(double*, __m128d) nogil\n\ndef sse_sum(double[:] arr):\n    cdef Py_ssize_t n = arr.shape[0]\n    cdef Py_ssize_t i\n    cdef __m128d vsum = _mm_setzero_pd()\n    cdef __m128d va\n    cdef double result[2]\n    with nogil:\n        for i in range(0, n - 1, 2):\n            va = _mm_loadu_pd(&arr[i])\n            vsum = _mm_add_pd(vsum, va)\n        _mm_storeu_pd(result, vsum)\n    cdef double total = result[0] + result[1]\n    if n % 2 != 0:\n        total += arr[n - 1]\n    return total"
+    },
+    {
+      diff: 2,
+      q: "@cython.boundscheck(False) と @cython.wraparound(False) を使って、ループ融合版の fused_axpy 関数（y = a*x + y）を書いてください。nogil で実行可能にすること。",
+      code: "# BLAS の axpy 相当: y = a * x + y\n# import numpy as np\n# x = np.ones(1000)\n# y = np.ones(1000)\n# fused_axpy(2.0, x, y)\n# assert y[0] == 3.0",
+      answer: "cimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef fused_axpy(double a, double[:] x, double[:] y):\n    \"\"\"y = a * x + y（ループ融合・nogil）\"\"\"\n    cdef Py_ssize_t n = x.shape[0]\n    cdef Py_ssize_t i\n    with nogil:\n        for i in range(n):\n            y[i] = a * x[i] + y[i]\n\n# import numpy as np\n# x = np.ones(1000, dtype=np.float64)\n# y = np.ones(1000, dtype=np.float64)\n# fused_axpy(2.0, x, y)\n# assert abs(y[0] - 3.0) < 1e-12"
+    },
+    {
+      diff: 3,
+      q: "ランタイムディスパッチパターンを実装してください。fast_norm 関数が、環境変数 MYLIB_SIMD_LEVEL に応じて 'avx'、'sse'、'scalar' の実装を選択するようにしてください。各実装はメモリビューの L2ノルム（要素の二乗和の平方根）を計算すること。",
+      code: "# import os\n# os.environ['MYLIB_SIMD_LEVEL'] = 'scalar'\n# fast_norm(arr)  # スカラー版が呼ばれる",
+      answer: "from libc.math cimport sqrt\nimport os\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ncdef double _norm_scalar(double[:] arr) nogil:\n    cdef Py_ssize_t i, n = arr.shape[0]\n    cdef double s = 0.0\n    for i in range(n):\n        s += arr[i] * arr[i]\n    return sqrt(s)\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ncdef double _norm_sse(double[:] arr) nogil:\n    # SSE版（簡略化: 実際にはintrinsicsを使う）\n    cdef Py_ssize_t i, n = arr.shape[0]\n    cdef double s = 0.0\n    for i in range(0, n - 1, 2):\n        s += arr[i] * arr[i] + arr[i+1] * arr[i+1]\n    if n % 2:\n        s += arr[n-1] * arr[n-1]\n    return sqrt(s)\n\ndef fast_norm(double[:] arr):\n    level = os.environ.get('MYLIB_SIMD_LEVEL', 'scalar')\n    cdef double result\n    if level == 'avx' or level == 'sse':\n        with nogil:\n            result = _norm_sse(arr)\n    else:\n        with nogil:\n            result = _norm_scalar(arr)\n    return result"
+    }
+  ],
+  ch5: [
+    {
+      diff: 1,
+      q: "DEF と IF を使って、OS に応じた PATH_SEPARATOR 定数（Windows: '\\\\'、その他: '/'）を定義し、join_path(a, b) 関数で2つのパスを結合する関数を書いてください。",
+      code: "# join_path('usr', 'local') → 'usr/local'（Linux/macOS）",
+      answer: "IF UNAME_SYSNAME == \"Windows\":\n    DEF PATH_SEPARATOR = \"\\\\\"\nELSE:\n    DEF PATH_SEPARATOR = \"/\"\n\ndef join_path(str a, str b):\n    return a + PATH_SEPARATOR + b\n\ndef get_separator():\n    return PATH_SEPARATOR"
+    },
+    {
+      diff: 2,
+      q: "DEF で DEBUG = True を定義し、IF DEBUG でのみ有効な debug_log 関数を実装してください。DEBUG = False の場合は空の inline 関数にしてゼロコスト化すること。",
+      code: "# DEF DEBUG = True のとき: debug_log(\"msg\") → stderr出力\n# DEF DEBUG = False のとき: debug_log(\"msg\") → 何もしない",
+      answer: "DEF DEBUG = True\n\nIF DEBUG:\n    import sys\n    def debug_log(str msg):\n        sys.stderr.write(f\"[DEBUG] {msg}\\n\")\n        sys.stderr.flush()\n\n    def debug_assert(bint condition, str msg):\n        if not condition:\n            raise AssertionError(f\"Debug assertion failed: {msg}\")\nELSE:\n    cdef inline void debug_log(str msg) noexcept:\n        pass\n\n    cdef inline void debug_assert(bint condition, str msg) noexcept:\n        pass\n\n# 使用例\ndef process_data(double[:] data):\n    debug_log(f\"processing {data.shape[0]} elements\")\n    debug_assert(data.shape[0] > 0, \"empty array\")\n    cdef double total = 0\n    for i in range(data.shape[0]):\n        total += data[i]\n    debug_log(f\"total = {total}\")\n    return total"
+    },
+    {
+      diff: 3,
+      q: "Tempita テンプレートのパターンを模して、3つの dtype（int32, float32, float64）ごとに特殊化された cumsum 関数を手動で書いてください。さらに、入力の dtype に応じて適切な関数にディスパッチする cumsum(arr) ラッパーを書いてください。",
+      code: "# Tempita で自動生成するコードを手動で展開するパターン\n# cumsum(np.array([1,2,3], dtype=np.int32)) → [1,3,6]\n# cumsum(np.array([1.0,2.0], dtype=np.float64)) → [1.0,3.0]",
+      answer: "import numpy as np\ncimport numpy as cnp\ncimport cython\n\n@cython.boundscheck(False)\ndef cumsum_int32(cnp.ndarray[int, ndim=1] arr):\n    cdef Py_ssize_t i, n = arr.shape[0]\n    result = np.empty(n, dtype=np.int32)\n    cdef int[:] out = result\n    cdef int total = 0\n    for i in range(n):\n        total += arr[i]\n        out[i] = total\n    return result\n\n@cython.boundscheck(False)\ndef cumsum_float32(cnp.ndarray[float, ndim=1] arr):\n    cdef Py_ssize_t i, n = arr.shape[0]\n    result = np.empty(n, dtype=np.float32)\n    cdef float[:] out = result\n    cdef float total = 0\n    for i in range(n):\n        total += arr[i]\n        out[i] = total\n    return result\n\n@cython.boundscheck(False)\ndef cumsum_float64(cnp.ndarray[double, ndim=1] arr):\n    cdef Py_ssize_t i, n = arr.shape[0]\n    result = np.empty(n, dtype=np.float64)\n    cdef double[:] out = result\n    cdef double total = 0\n    for i in range(n):\n        total += arr[i]\n        out[i] = total\n    return result\n\ndef cumsum(arr):\n    arr = np.asarray(arr)\n    if arr.dtype == np.int32:\n        return cumsum_int32(arr)\n    elif arr.dtype == np.float32:\n        return cumsum_float32(arr)\n    elif arr.dtype == np.float64:\n        return cumsum_float64(arr)\n    else:\n        return cumsum_float64(arr.astype(np.float64))"
+    }
+  ],
+  ch6: [
+    {
+      diff: 2,
+      q: "PyUFunc_FromFuncAndData を使って、要素ごとに二乗を計算するカスタム ufunc square を作成してください。float64 のみ対応で構いません。",
+      code: "# import numpy as np\n# x = np.array([1, 2, 3, 4], dtype=np.float64)\n# square(x)  # → [1, 4, 9, 16]",
+      answer: "import numpy as np\ncimport numpy as cnp\nfrom numpy cimport PyUFuncGenericFunction\n\ncnp.import_array()\ncnp.import_ufunc()\n\ncdef void square_loop(\n    char **args,\n    cnp.npy_intp *dims,\n    cnp.npy_intp *strides,\n    void *data\n) noexcept nogil:\n    cdef cnp.npy_intp i, n = dims[0]\n    cdef char *ip = args[0]\n    cdef char *op = args[1]\n    cdef double val\n    for i in range(n):\n        val = (<double*>(ip + i * strides[0]))[0]\n        (<double*>(op + i * strides[1]))[0] = val * val\n\ncdef PyUFuncGenericFunction funcs[1]\nfuncs[0] = <PyUFuncGenericFunction>square_loop\n\ncdef char types[2]\ntypes[0] = cnp.NPY_FLOAT64\ntypes[1] = cnp.NPY_FLOAT64\n\ncdef void* data[1]\ndata[0] = NULL\n\nsquare = cnp.PyUFunc_FromFuncAndData(\n    funcs, data, types, 1, 1, 1, 0, \"square\", \"x^2\", 0\n)"
+    },
+    {
+      diff: 3,
+      q: "float32 と float64 の両方に対応するカスタム ufunc clip_ufunc を作成してください。3入力（x, low, high）、1出力で、np.clip 相当の動作をすること。",
+      code: "# x = np.array([-1, 0.5, 2], dtype=np.float64)\n# clip_ufunc(x, 0.0, 1.0)  # → [0, 0.5, 1]",
+      answer: "import numpy as np\ncimport numpy as cnp\nfrom numpy cimport PyUFuncGenericFunction\n\ncnp.import_array()\ncnp.import_ufunc()\n\ncdef void clip_double(\n    char **args, cnp.npy_intp *dims,\n    cnp.npy_intp *strides, void *data\n) noexcept nogil:\n    cdef cnp.npy_intp i, n = dims[0]\n    cdef double x, lo, hi\n    for i in range(n):\n        x = (<double*>(args[0] + i*strides[0]))[0]\n        lo = (<double*>(args[1] + i*strides[1]))[0]\n        hi = (<double*>(args[2] + i*strides[2]))[0]\n        if x < lo:\n            x = lo\n        elif x > hi:\n            x = hi\n        (<double*>(args[3] + i*strides[3]))[0] = x\n\ncdef void clip_float(\n    char **args, cnp.npy_intp *dims,\n    cnp.npy_intp *strides, void *data\n) noexcept nogil:\n    cdef cnp.npy_intp i, n = dims[0]\n    cdef float x, lo, hi\n    for i in range(n):\n        x = (<float*>(args[0] + i*strides[0]))[0]\n        lo = (<float*>(args[1] + i*strides[1]))[0]\n        hi = (<float*>(args[2] + i*strides[2]))[0]\n        if x < lo:\n            x = lo\n        elif x > hi:\n            x = hi\n        (<float*>(args[3] + i*strides[3]))[0] = x\n\ncdef PyUFuncGenericFunction funcs[2]\nfuncs[0] = <PyUFuncGenericFunction>clip_float\nfuncs[1] = <PyUFuncGenericFunction>clip_double\n\ncdef char types[8]\ntypes[0] = cnp.NPY_FLOAT32; types[1] = cnp.NPY_FLOAT32\ntypes[2] = cnp.NPY_FLOAT32; types[3] = cnp.NPY_FLOAT32\ntypes[4] = cnp.NPY_FLOAT64; types[5] = cnp.NPY_FLOAT64\ntypes[6] = cnp.NPY_FLOAT64; types[7] = cnp.NPY_FLOAT64\n\ncdef void* null_data[2]\nnull_data[0] = NULL; null_data[1] = NULL\n\nclip_ufunc = cnp.PyUFunc_FromFuncAndData(\n    funcs, null_data, types, 2, 3, 1, 0, \"clip_ufunc\", \"clip\", 0\n)"
+    },
+    {
+      diff: 3,
+      q: "gufunc（Generalized ufunc）を使って、バッチ内積を計算する batch_dot を作成してください。シグネチャは \"(n),(n)->()\" で、2つのn次元ベクトルの内積をスカラーとして返します。",
+      code: "# a = np.random.randn(100, 3)  # 100個の3次元ベクトル\n# b = np.random.randn(100, 3)\n# d = batch_dot(a, b)  # shape: (100,)",
+      answer: "import numpy as np\ncimport numpy as cnp\nfrom numpy cimport PyUFuncGenericFunction\n\ncnp.import_array()\ncnp.import_ufunc()\n\ncdef void dot_loop(\n    char **args, cnp.npy_intp *dims,\n    cnp.npy_intp *strides, void *data\n) noexcept nogil:\n    cdef cnp.npy_intp batch = dims[0]  # バッチサイズ\n    cdef cnp.npy_intp n = dims[1]       # ベクトル長\n    cdef cnp.npy_intp b, i\n    cdef double s\n    cdef char *pa = args[0]\n    cdef char *pb = args[1]\n    cdef char *po = args[2]\n    for b in range(batch):\n        s = 0.0\n        for i in range(n):\n            s += (<double*>(pa + b*strides[0] + i*strides[3]))[0] \\\n               * (<double*>(pb + b*strides[1] + i*strides[4]))[0]\n        (<double*>(po + b*strides[2]))[0] = s\n\ncdef PyUFuncGenericFunction funcs[1]\nfuncs[0] = <PyUFuncGenericFunction>dot_loop\n\ncdef char types[3]\ntypes[0] = cnp.NPY_FLOAT64\ntypes[1] = cnp.NPY_FLOAT64\ntypes[2] = cnp.NPY_FLOAT64\n\ncdef void* null_data[1]\nnull_data[0] = NULL\n\nbatch_dot = cnp.PyUFunc_FromFuncAndDataAndSignature(\n    funcs, null_data, types, 1, 2, 1, 0,\n    \"batch_dot\", \"バッチ内積 (n),(n)->()\", 0,\n    \"(n),(n)->()\"\n)"
+    }
+  ],
+  ch7: [
+    {
+      diff: 2,
+      q: "with nogil ブロック内で実行可能な cdef double fast_mean(double* data, int n) noexcept nogil 関数を書き、それを呼び出す Python インターフェース mean(arr) を書いてください。",
+      code: "# import numpy as np\n# a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n# mean(a)  # → 3.0",
+      answer: "cdef double fast_mean(double* data, int n) noexcept nogil:\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):\n        total += data[i]\n    return total / n\n\ndef mean(double[:] arr not None):\n    cdef int n = arr.shape[0]\n    if n == 0:\n        raise ValueError(\"空の配列\")\n    cdef double result\n    with nogil:\n        result = fast_mean(&arr[0], n)\n    return result"
+    },
+    {
+      diff: 2,
+      q: "prange を使って、配列の全要素を二乗する parallel_square 関数を書いてください。schedule='static' を使用し、入力配列をインプレースで変更すること。",
+      code: "# import numpy as np\n# a = np.array([1.0, 2.0, 3.0, 4.0])\n# parallel_square(a)\n# assert list(a) == [1.0, 4.0, 9.0, 16.0]",
+      answer: "from cython.parallel cimport prange\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef parallel_square(double[:] arr not None):\n    cdef Py_ssize_t n = arr.shape[0]\n    cdef Py_ssize_t i\n    with nogil:\n        for i in prange(n, schedule='static'):\n            arr[i] = arr[i] * arr[i]"
+    },
+    {
+      diff: 3,
+      q: "prange を使って並列リダクション（配列の最大値）を計算する parallel_max 関数を書いてください。スレッドローカル変数で部分最大値を計算し、最終的な最大値を求めること。",
+      code: "# import numpy as np\n# a = np.random.randn(1_000_000)\n# parallel_max(a)  # → np.max(a) と同じ結果",
+      answer: "from cython.parallel cimport prange, parallel\nfrom libc.float cimport DBL_MIN\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef parallel_max(double[:] arr not None):\n    cdef Py_ssize_t n = arr.shape[0]\n    if n == 0:\n        raise ValueError(\"空の配列\")\n    cdef double global_max = arr[0]\n    cdef double local_max\n    cdef Py_ssize_t i\n\n    with nogil, parallel(num_threads=4):\n        local_max = arr[0]\n        for i in prange(n, schedule='static'):\n            if arr[i] > local_max:\n                local_max = arr[i]\n        # クリティカルセクション相当:\n        # Cython は local_max の最終値を比較して global_max を更新\n        with gil:\n            if local_max > global_max:\n                global_max = local_max\n\n    return global_max"
+    }
+  ],
+  ch8: [
+    {
+      diff: 1,
+      q: "pytest を使って、Cython 拡張の関数 generic_sum の基本テストを3つ書いてください。空の配列、正の値、負の値を含むケースをテストすること。",
+      code: "# test_generic_sum.py\n# from mylib import generic_sum",
+      answer: "import numpy as np\nimport pytest\nfrom numpy.testing import assert_allclose\n# from mylib import generic_sum\n\nclass TestGenericSum:\n    def test_empty_raises(self):\n        \"\"\"空の配列でエラーが発生すること\"\"\"\n        arr = np.array([], dtype=np.float64)\n        with pytest.raises((ValueError, IndexError)):\n            generic_sum(arr)\n\n    def test_positive_values(self):\n        \"\"\"正の値の合計\"\"\"\n        arr = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n        result = generic_sum(arr)\n        assert_allclose(result, 15.0, rtol=1e-12)\n\n    def test_negative_values(self):\n        \"\"\"負の値を含む合計\"\"\"\n        arr = np.array([-1.0, -2.0, 3.0])\n        result = generic_sum(arr)\n        assert_allclose(result, 0.0, atol=1e-12)\n\n    def test_int32_dtype(self):\n        \"\"\"int32 dtypeでの動作確認\"\"\"\n        arr = np.array([10, 20, 30], dtype=np.int32)\n        assert generic_sum(arr) == 60"
+    },
+    {
+      diff: 2,
+      q: "hypothesis を使って、generic_sum 関数が NumPy の np.sum と同じ結果を返すことを検証するプロパティテストを書いてください。float64 の1次元配列をランダムに生成すること。",
+      code: "# from hypothesis import given\n# from hypothesis.extra.numpy import arrays",
+      answer: "import numpy as np\nfrom hypothesis import given, settings\nfrom hypothesis import strategies as st\nfrom hypothesis.extra.numpy import arrays\nfrom numpy.testing import assert_allclose\n# from mylib import generic_sum\n\n@given(\n    arr=arrays(\n        dtype=np.float64,\n        shape=st.integers(1, 10000),\n        elements=st.floats(\n            min_value=-1e6, max_value=1e6,\n            allow_nan=False, allow_infinity=False\n        )\n    )\n)\n@settings(max_examples=200)\ndef test_sum_matches_numpy(arr):\n    \"\"\"generic_sum と np.sum が一致\"\"\"\n    result = generic_sum(arr)\n    expected = np.sum(arr)\n    assert_allclose(result, expected, rtol=1e-10, atol=1e-10)\n\n@given(\n    arr=arrays(\n        dtype=np.float64,\n        shape=st.integers(1, 1000),\n        elements=st.floats(\n            min_value=-1e6, max_value=1e6,\n            allow_nan=False, allow_infinity=False\n        )\n    )\n)\ndef test_sum_linearity(arr):\n    \"\"\"2*sum(arr) == sum(2*arr)（線形性）\"\"\"\n    s1 = 2 * generic_sum(arr)\n    s2 = generic_sum(2 * arr)\n    assert_allclose(s1, s2, rtol=1e-10)"
+    },
+    {
+      diff: 3,
+      q: "ASV ベンチマーククラス SumBenchmarks を書いてください。パラメータは配列サイズ（100, 10000, 1000000）と dtype（float32, float64）。generic_sum と np.sum の実行時間を比較すること。setup メソッドでデータを生成すること。",
+      code: "# benchmarks/bench_sum.py\n# ASV形式のベンチマーク",
+      answer: "import numpy as np\n\nclass SumBenchmarks:\n    params = [\n        [100, 10_000, 1_000_000],\n        ['float32', 'float64'],\n    ]\n    param_names = ['n', 'dtype']\n\n    def setup(self, n, dtype):\n        self.arr = np.random.randn(n).astype(dtype)\n\n    def time_generic_sum(self, n, dtype):\n        from mylib import generic_sum\n        generic_sum(self.arr)\n\n    def time_numpy_sum(self, n, dtype):\n        np.sum(self.arr)\n\n    def peakmem_generic_sum(self, n, dtype):\n        from mylib import generic_sum\n        generic_sum(self.arr)\n\n    def track_ratio(self, n, dtype):\n        \"\"\"Cython版/NumPy版の速度比を追跡\"\"\"\n        import timeit\n        from mylib import generic_sum\n        t_cython = timeit.timeit(\n            lambda: generic_sum(self.arr), number=100\n        )\n        t_numpy = timeit.timeit(\n            lambda: np.sum(self.arr), number=100\n        )\n        return t_cython / t_numpy if t_numpy > 0 else float('inf')\n\n    track_ratio.unit = \"ratio\""
+    }
+  ],
+  ch9: [
+    {
+      diff: 1,
+      q: "pyproject.toml の [build-system] セクションを書いてください。Cython 3.0 以上と NumPy 1.25 以上をビルド依存関係として要求し、setuptools をバックエンドとすること。",
+      code: "# pyproject.toml の build-system セクション",
+      answer: "# pyproject.toml\n\"\"\"\n[build-system]\nrequires = [\n    \"setuptools>=68\",\n    \"wheel\",\n    \"cython>=3.0\",\n    \"numpy>=1.25\",\n]\nbuild-backend = \"setuptools.build_meta\"\n\n[project]\nname = \"mylib\"\nversion = \"1.0.0\"\ndescription = \"高速数値計算ライブラリ\"\nrequires-python = \">=3.10\"\ndependencies = [\n    \"numpy>=1.25\",\n]\n\n[project.optional-dependencies]\ndev = [\n    \"pytest>=7.0\",\n    \"hypothesis>=6.0\",\n    \"pytest-benchmark\",\n]\n\"\"\""
+    },
+    {
+      diff: 2,
+      q: "GitHub Actions のワークフローファイル（YAML）を書いてください。ubuntu-latest で Python 3.12 を使い、Cython 拡張をビルドして pytest でテストを実行すること。",
+      code: "# .github/workflows/test.yml",
+      answer: "# .github/workflows/test.yml\nyaml_content = \"\"\"\nname: Test\non:\n  push:\n    branches: [main]\n  pull_request:\n    branches: [main]\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: '3.12'\n      - name: Install dependencies\n        run: |\n          pip install cython numpy pytest hypothesis\n          pip install -e .\n      - name: Run tests\n        run: pytest tests/ -v --tb=short\n      - name: Check import\n        run: python -c \"import mylib; print(mylib.__version__)\"\n\"\"\"\nprint(yaml_content)"
+    },
+    {
+      diff: 3,
+      q: "cibuildwheel の設定を pyproject.toml の [tool.cibuildwheel] セクションとして書いてください。Python 3.10-3.13 対応、Linux (x86_64, aarch64) + macOS (x86_64, arm64) + Windows (AMD64) をビルドし、各プラットフォームでテストを実行する設定にしてください。",
+      code: "# pyproject.toml の tool.cibuildwheel セクション",
+      answer: "# pyproject.toml に追加\ncibw_config = \"\"\"\n[tool.cibuildwheel]\nbuild = \"cp310-* cp311-* cp312-* cp313-*\"\nskip = \"*-musllinux_i686 pp*\"\ntest-command = \"pytest {project}/tests -x --tb=short\"\ntest-requires = [\"pytest\", \"numpy\", \"hypothesis\"]\n\n[tool.cibuildwheel.linux]\narchs = [\"x86_64\", \"aarch64\"]\nbefore-build = \"pip install cython numpy\"\nmanylinux-x86_64-image = \"manylinux2014\"\nmanylinux-aarch64-image = \"manylinux2014\"\n\n[tool.cibuildwheel.macos]\narchs = [\"x86_64\", \"arm64\"]\nbefore-build = \"pip install cython numpy\"\n\n[tool.cibuildwheel.windows]\narchs = [\"AMD64\"]\nbefore-build = \"pip install cython numpy\"\n\"\"\"\nprint(cibw_config)"
+    }
+  ],
+  ch10: [
+    {
+      diff: 2,
+      q: "deprecated デコレータを実装してください。関数名、非推奨化バージョン、削除予定バージョン、代替関数名を含む DeprecationWarning を発行すること。",
+      code: "# @deprecated(since='1.2', removed_in='2.0', alt='new_func')\n# def old_func(): ...\n# old_func()  # → DeprecationWarning",
+      answer: "import warnings\nimport functools\n\ndef deprecated(since, removed_in=None, alt=None):\n    def decorator(func):\n        @functools.wraps(func)\n        def wrapper(*args, **kwargs):\n            msg = f\"{func.__name__} はv{since}で非推奨です。\"\n            if removed_in:\n                msg += f\" v{removed_in}で削除予定。\"\n            if alt:\n                msg += f\" {alt} を使用してください。\"\n            warnings.warn(msg, DeprecationWarning, stacklevel=2)\n            return func(*args, **kwargs)\n        return wrapper\n    return decorator\n\n# 使用例\n@deprecated(since='1.2', removed_in='2.0', alt='compute_v2')\ndef compute(x):\n    return x * 2\n\ndef compute_v2(x):\n    return x * x + x\n\n# テスト\nimport warnings\nwith warnings.catch_warnings(record=True) as w:\n    warnings.simplefilter('always')\n    compute(5)\n    assert len(w) == 1\n    assert 'v1.2' in str(w[0].message)"
+    },
+    {
+      diff: 2,
+      q: "入力バリデーション付きの公開API関数 normalize(X) を書いてください。X は2次元 float64 配列を受け付け、各行を L2 ノルムで正規化します。不正な入力には明確なエラーメッセージを出すこと。",
+      code: "# normalize(np.array([[3,4],[1,0]])) → [[0.6,0.8],[1,0]]",
+      answer: "import numpy as np\ncimport cython\n\ndef normalize(X):\n    \"\"\"各行をL2正規化する。\n\n    Parameters\n    ----------\n    X : array-like, shape (n, d)\n        入力データ。float32/float64。\n\n    Returns\n    -------\n    X_norm : ndarray, shape (n, d)\n    \"\"\"\n    X = np.asarray(X)\n    if X.ndim != 2:\n        raise ValueError(\n            f\"2次元配列が必要です（受け取った次元: {X.ndim}）\"\n        )\n    if X.dtype not in (np.float32, np.float64):\n        X = X.astype(np.float64)\n    if not X.flags['C_CONTIGUOUS']:\n        X = np.ascontiguousarray(X)\n    return _normalize_impl(X)\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ncdef _normalize_impl(double[:, :] X):\n    cdef Py_ssize_t n = X.shape[0]\n    cdef Py_ssize_t d = X.shape[1]\n    import numpy as np\n    from libc.math cimport sqrt\n    result = np.empty((n, d), dtype=np.float64)\n    cdef double[:, :] out = result\n    cdef Py_ssize_t i, j\n    cdef double norm\n    for i in range(n):\n        norm = 0.0\n        for j in range(d):\n            norm += X[i, j] * X[i, j]\n        norm = sqrt(norm)\n        if norm > 0:\n            for j in range(d):\n                out[i, j] = X[i, j] / norm\n        else:\n            for j in range(d):\n                out[i, j] = 0.0\n    return result"
+    },
+    {
+      diff: 3,
+      q: "セマンティックバージョニングに従ったバージョン管理ユーティリティを書いてください。Version クラス（major, minor, patch）、バージョン比較、互換性チェック（is_compatible_with）を実装すること。\"1.2.3\" 形式の文字列パースも対応すること。",
+      code: "# v1 = Version.parse(\"1.2.3\")\n# v2 = Version.parse(\"1.3.0\")\n# v1.is_compatible_with(v2)  # True（マイナーバージョンアップ）\n# v3 = Version.parse(\"2.0.0\")\n# v1.is_compatible_with(v3)  # False（メジャーバージョンアップ）",
+      answer: "class Version:\n    def __init__(self, major, minor=0, patch=0):\n        self.major = major\n        self.minor = minor\n        self.patch = patch\n\n    @classmethod\n    def parse(cls, s):\n        parts = s.split('.')\n        if len(parts) != 3:\n            raise ValueError(f\"無効なバージョン: {s}\")\n        return cls(int(parts[0]), int(parts[1]), int(parts[2]))\n\n    def __repr__(self):\n        return f\"Version({self.major}.{self.minor}.{self.patch})\"\n\n    def __str__(self):\n        return f\"{self.major}.{self.minor}.{self.patch}\"\n\n    def __eq__(self, other):\n        return (self.major == other.major and\n                self.minor == other.minor and\n                self.patch == other.patch)\n\n    def __lt__(self, other):\n        return (self.major, self.minor, self.patch) < \\\n               (other.major, other.minor, other.patch)\n\n    def __le__(self, other):\n        return self == other or self < other\n\n    def is_compatible_with(self, other):\n        \"\"\"SemVer互換性: メジャーバージョンが同じなら互換\"\"\"\n        if self.major == 0 and other.major == 0:\n            return self.minor == other.minor\n        return self.major == other.major\n\n    def bump_major(self):\n        return Version(self.major + 1, 0, 0)\n\n    def bump_minor(self):\n        return Version(self.major, self.minor + 1, 0)\n\n    def bump_patch(self):\n        return Version(self.major, self.minor, self.patch + 1)\n\n# テスト\nv1 = Version.parse(\"1.2.3\")\nv2 = Version.parse(\"1.3.0\")\nassert v1.is_compatible_with(v2)  # True\nv3 = Version.parse(\"2.0.0\")\nassert not v1.is_compatible_with(v3)  # False\nassert v1 < v2 < v3"
+    }
+  ]
+};
+
+/* ─── UI ─── */
+var root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(CourseApp, {
+  title: "Cython 上級コース",
+  icon: "🐍",
+  level: "上級",
+  description: "CPython C API・GIL内部・SIMD統合・fused types・コード生成パターンを習得し、NumPy/SciPyレベルのプロダクション品質拡張モジュールを設計・配布できるようになります。",
+  footerText: "cython.readthedocs.io · Cython 3.x · 2026年4月時点",
+  chapters: chapters,
+  EX: EX
+}));
+  </script>
+</body>
+</html>
