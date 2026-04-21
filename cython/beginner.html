@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../assets/course.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cython 初級コース</title>
+  <meta name="description" content="Python コードを段階的に Cython 化し、C レベルの速度を獲得する実践コース。全10章・30問の演習付き。">
+</head>
+<body>
+  <header class="site-header">
+    <a class="home-link" href="../index.html">
+      <span class="logo-mark">C</span>
+      <span class="logo-text">Courses<small>Programming Lessons</small></span>
+    </a>
+  </header>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="../assets/course-ui.js"></script>
+  <script>
+const { useState } = React;
+
+/* ── Table definitions ── */
+const T = {
+  profileTools: {
+    h: ["ツール", "用途", "コマンド例"],
+    r: [
+      ["cProfile", "関数単位の呼び出し回数・累積時間を計測", "python -m cProfile -s cumtime sim.py"],
+      ["line_profiler", "行単位の実行時間を計測", "kernprof -l -v sim.py"],
+      ["timeit", "短いコード片のベンチマーク", "python -m timeit -s \"import sim\" \"sim.step()\""],
+      ["snakeviz", "cProfile 結果をブラウザで可視化", "snakeviz profile_output.prof"],
+      ["py-spy", "実行中プロセスにアタッチしてプロファイル", "py-spy top --pid 12345"]
+    ]
+  },
+  bottleneckPatterns: {
+    h: ["パターン", "典型的な症状", "Cython での解決策"],
+    r: [
+      ["Python ループ内の数値計算", "ループ回数に比例して遅い", "cdef 型宣言 + C ループ化"],
+      ["関数呼び出しオーバーヘッド", "小さな関数の大量呼び出し", "cdef 関数 / インライン化"],
+      ["動的型チェック", "型を毎回判定するコスト", "静的型宣言で判定を省略"],
+      ["NumPy 要素アクセス", "arr[i,j] のPythonレベルアクセス", "typed memoryview で直接参照"],
+      ["GIL 競合", "マルチスレッドで並列化できない", "nogil + prange"]
+    ]
+  },
+  pyxVsPy: {
+    h: ["項目", ".pyx ファイル", ".py ファイル（Pure Python モード）"],
+    r: [
+      ["拡張子", ".pyx", ".py"],
+      ["Cython 独自構文", "cdef, cpdef 等が使える", "cython.declare() 等のデコレータで代替"],
+      ["Python 実行", "直接は不可（コンパイル必須）", "そのまま Python として実行可能"],
+      ["型チェックツール", "専用 LSP が必要", "mypy / pyright がそのまま使える"],
+      ["推奨用途", "C レベルの最大性能が必要な場面", "段階的な最適化・通常の開発フロー"]
+    ]
+  },
+  setupBuild: {
+    h: ["ファイル", "役割", "備考"],
+    r: [
+      ["setup.py", "Cython 拡張モジュールのビルド定義", "cythonize() でコンパイル指示"],
+      ["pyproject.toml", "モダンなパッケージ設定（PEP 621）", "Cython 3.x 推奨"],
+      [".pyx", "Cython ソースファイル", "C/C++ にトランスパイル"],
+      [".pxd", "Cython ヘッダーファイル（宣言）", "C の .h に相当"],
+      [".so / .pyd", "コンパイル済み共有ライブラリ", "import で直接読み込み"]
+    ]
+  },
+  cdefTypes: {
+    h: ["Cython 型", "C 型", "Python 型との対応", "用途"],
+    r: [
+      ["cython.int", "int", "int（固定精度）", "ループカウンタ、インデックス"],
+      ["cython.long", "long", "int", "大きめの整数"],
+      ["cython.double", "double", "float", "浮動小数点計算"],
+      ["cython.float", "float", "float（単精度）", "メモリ節約が必要な場面"],
+      ["cython.bint", "_Bool", "bool", "条件フラグ"],
+      ["cython.Py_ssize_t", "Py_ssize_t", "int", "配列サイズ・インデックス"]
+    ]
+  },
+  loopOptimization: {
+    h: ["手法", "説明", "効果"],
+    r: [
+      ["ループ変数の型宣言", "cdef int i でインデックスを C int 化", "Python int のオーバーヘッド除去"],
+      ["計算変数の型宣言", "cdef double total で累積変数を C double 化", "PyObject 操作の排除"],
+      ["range の C 化", "型宣言済み変数で range → C for ループ", "イテレータ生成を省略"],
+      ["関数戻り値の型宣言", "cpdef double compute() で戻り値を C 型に", "Boxing/Unboxing の排除"]
+    ]
+  },
+  directives: {
+    h: ["ディレクティブ", "デフォルト", "効果", "リスク"],
+    r: [
+      ["boundscheck", "True", "配列の境界チェックを省略", "範囲外アクセスでセグフォ"],
+      ["wraparound", "True", "負のインデックスサポートを省略", "arr[-1] が未定義動作に"],
+      ["cdivision", "False", "C 言語式の除算を使用", "ゼロ除算で例外が出ない"],
+      ["initializedcheck", "True", "memoryview 初期化チェックを省略", "未初期化アクセスでクラッシュ"],
+      ["nonecheck", "True", "None チェックを省略", "None に対する操作でセグフォ"]
+    ]
+  },
+  directiveScope: {
+    h: ["適用方法", "スコープ", "構文例"],
+    r: [
+      ["モジュールレベル", "ファイル全体", "# cython: boundscheck=False"],
+      ["デコレータ", "関数単位", "@cython.boundscheck(False)"],
+      ["with ブロック", "ブロック内のみ", "with cython.boundscheck(False):"],
+      ["pyproject.toml", "プロジェクト全体", "[tool.cython.directives]"]
+    ]
+  },
+  memoryviewTypes: {
+    h: ["宣言", "意味", "用途"],
+    r: [
+      ["double[:]", "1次元 double 配列", "ベクトル演算"],
+      ["double[:,:]", "2次元 double 配列", "行列演算"],
+      ["double[:,:,:]", "3次元 double 配列", "テンソル演算"],
+      ["double[::1]", "C 連続（行優先）1次元配列", "メモリ連続性を保証"],
+      ["double[:,::1]", "C 連続 2次元配列", "NumPy デフォルトと一致"],
+      ["double[::1,:]", "Fortran 連続（列優先）2次元配列", "Fortran ライブラリ連携"]
+    ]
+  },
+  memoryviewOps: {
+    h: ["操作", "構文", "説明"],
+    r: [
+      ["要素アクセス", "mv[i, j]", "C ポインタレベルの直接アクセス"],
+      ["スライス", "mv[1:5]", "新しい memoryview（コピーなし）"],
+      ["形状取得", "mv.shape[0]", "各次元のサイズ"],
+      ["コピー", "mv_copy = mv.copy()", "データの複製を作成"],
+      ["連続性チェック", "mv.is_c_contig()", "C 連続かどうか判定"],
+      ["NumPy 変換", "np.asarray(mv)", "NumPy 配列として取得"]
+    ]
+  },
+  cdefVsDef: {
+    h: ["種類", "構文", "Python から呼べるか", "C レベル速度", "用途"],
+    r: [
+      ["def", "def func():", "はい", "いいえ", "Python API として公開"],
+      ["cdef", "cdef double func():", "いいえ", "はい", "内部の高速関数"],
+      ["cpdef", "cpdef double func():", "はい", "はい（Cython 内）", "両方から使いたい場合"]
+    ]
+  },
+  inlineEffect: {
+    h: ["状況", "通常の cdef 関数", "inline 関数"],
+    r: [
+      ["関数呼び出しコスト", "C 関数呼び出しが発生", "呼び出し元に展開（コスト0）"],
+      ["小さな関数を大量呼び出し", "オーバーヘッドが累積", "オーバーヘッドなし"],
+      ["コードサイズ", "1 箇所にまとまる", "展開されて増加する可能性"],
+      ["デバッグ", "スタックトレースに表示", "展開されて見えにくい"],
+      ["推奨ケース", "ある程度のサイズの関数", "1〜5 行程度の小さな関数"]
+    ]
+  },
+  cdefClassVsPython: {
+    h: ["特性", "cdef class", "通常の Python class"],
+    r: [
+      ["メモリレイアウト", "C struct（固定）", "Python dict（動的）"],
+      ["属性アクセス速度", "C ポインタレベル", "辞書ルックアップ"],
+      ["メモリ消費", "小さい（C struct 分のみ）", "大きい（dict + 管理情報）"],
+      ["動的属性追加", "不可", "可能"],
+      ["継承", "単一継承のみ", "多重継承可能"],
+      ["Python から利用", "可能（制限あり）", "完全互換"]
+    ]
+  },
+  cdefClassAttrs: {
+    h: ["アクセス修飾", "構文", "説明"],
+    r: [
+      ["cdef（private）", "cdef double x", "Cython コード内のみアクセス可能"],
+      ["cdef readonly", "cdef readonly double x", "Python から読み取り専用"],
+      ["cdef public", "cdef public double x", "Python から読み書き可能"],
+      ["property", "property x: ...", "getter/setter で制御"]
+    ]
+  },
+  prangeOptions: {
+    h: ["パラメータ", "説明", "デフォルト"],
+    r: [
+      ["nogil=True", "GIL を解放して並列実行", "False"],
+      ["num_threads=N", "使用するスレッド数を指定", "全コア"],
+      ["schedule=\"static\"", "均等にチャンク分割", "static"],
+      ["schedule=\"dynamic\"", "負荷が不均一な場合に動的分配", "-"],
+      ["schedule=\"guided\"", "最初は大きく後半は小さくチャンク分割", "-"],
+      ["chunksize=N", "各スレッドへの割り当て単位", "自動"]
+    ]
+  },
+  gilRules: {
+    h: ["操作", "GIL が必要か", "理由"],
+    r: [
+      ["Python オブジェクト操作", "はい", "参照カウント管理"],
+      ["C 型の数値演算", "いいえ", "Python ランタイム不使用"],
+      ["memoryview アクセス", "いいえ", "C ポインタ経由"],
+      ["cdef 関数呼び出し（nogil）", "いいえ", "nogil 宣言されていれば可"],
+      ["print / logging", "はい", "Python I/O を使用"],
+      ["例外の送出", "はい", "Python 例外機構"]
+    ]
+  },
+  pureDecorators: {
+    h: ["デコレータ / 関数", "Cython 等価構文", "説明"],
+    r: [
+      ["@cython.cfunc", "cdef", "C レベル関数を宣言"],
+      ["@cython.ccall", "cpdef", "C/Python 両対応関数"],
+      ["cython.declare()", "cdef 変数宣言", "ローカル変数の型宣言"],
+      ["@cython.cclass", "cdef class", "拡張型の宣言"],
+      ["@cython.locals()", "cdef 型 変数名", "関数内ローカル変数の型を一括指定"],
+      ["@cython.boundscheck(False)", "# cython: boundscheck=False", "ディレクティブ適用"],
+      ["@cython.wraparound(False)", "# cython: wraparound=False", "ディレクティブ適用"]
+    ]
+  },
+  pureAnnotation: {
+    h: ["Pure Python 記法", "型", "説明"],
+    r: [
+      ["x: cython.int", "C int", "整数型"],
+      ["x: cython.double", "C double", "浮動小数点型"],
+      ["x: cython.int[10]", "int[10]", "C 配列"],
+      ["arr: cython.double[:]", "memoryview", "1次元 memoryview"],
+      ["arr: cython.double[:,:]", "memoryview 2D", "2次元 memoryview"]
+    ]
+  },
+  packagingFiles: {
+    h: ["ファイル", "役割", "備考"],
+    r: [
+      ["pyproject.toml", "ビルドシステム・メタデータ定義", "PEP 621 準拠"],
+      ["setup.py", "Cython 拡張モジュールのビルド設定", "cythonize() を使用"],
+      ["MANIFEST.in", "ソース配布に含めるファイルを指定", ".pyx, .pxd を含める"],
+      ["src/", "ソースコードのルート", "src-layout 推奨"],
+      ["tests/", "テストコード", "pytest + コンパイル済みモジュール"]
+    ]
+  },
+  wheelPlatforms: {
+    h: ["プラットフォーム", "wheel タグ例", "ビルド方法"],
+    r: [
+      ["Linux (x86_64)", "cp311-cp311-manylinux_2_17_x86_64", "cibuildwheel + manylinux コンテナ"],
+      ["macOS (arm64)", "cp311-cp311-macosx_11_0_arm64", "cibuildwheel + Xcode"],
+      ["macOS (x86_64)", "cp311-cp311-macosx_10_9_x86_64", "cibuildwheel + Xcode"],
+      ["Windows (x64)", "cp311-cp311-win_amd64", "cibuildwheel + MSVC"],
+      ["ソース配布", "tar.gz (sdist)", "pip install で都度コンパイル"]
+    ]
+  }
+};
+
+/* ── Exercises ── */
+const EX = {
+  ch1: [
+    {
+      diff: 1,
+      q: "以下の Python コードに対して cProfile を使い、最も時間がかかっている関数を特定してください。\n実行コマンドと、結果の読み方を説明してください。",
+      code: "# sim.py\nimport math\n\ndef compute_distance(x1, y1, x2, y2):\n    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)\n\ndef simulate(n):\n    total = 0.0\n    for i in range(n):\n        for j in range(n):\n            total += compute_distance(0, 0, i * 0.1, j * 0.1)\n    return total\n\nif __name__ == \"__main__\":\n    result = simulate(500)\n    print(f\"結果: {result}\")",
+      answer: "# 実行コマンド\n# python -m cProfile -s cumtime sim.py\n#\n# 出力の読み方:\n# ncalls    : 呼び出し回数\n# tottime   : その関数自体の実行時間（サブコール除く）\n# percall   : tottime / ncalls\n# cumtime   : サブコールを含む累積時間\n# percall   : cumtime / ncalls\n#\n# 結果例:\n#   ncalls  tottime  cumtime  filename:lineno(function)\n#   250000  1.234    1.234    sim.py:4(compute_distance)\n#   1       0.567    1.801    sim.py:7(simulate)\n#\n# → compute_distance が250000回呼ばれ、最大のボトルネック\n# → simulate のループ自体も Python ループのオーバーヘッドがある\n#\n# line_profiler でさらに詳細に調べる場合:\n# @profile デコレータを simulate に付けて:\n# kernprof -l -v sim.py"
+    },
+    {
+      diff: 2,
+      q: "以下のシミュレーションコードで line_profiler を使い、ボトルネック行を特定してください。\n@profile デコレータの付け方と、結果の解釈を示してください。",
+      code: "# nbody.py\nimport math\n\ndef compute_force(m1, m2, dx, dy, softening=0.01):\n    r = math.sqrt(dx*dx + dy*dy + softening*softening)\n    f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\n# @profile  ← line_profiler 用デコレータ\ndef step(positions, masses, dt=0.01):\n    n = len(positions)\n    forces = [[0.0, 0.0] for _ in range(n)]\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = positions[j][0] - positions[i][0]\n            dy = positions[j][1] - positions[i][1]\n            fx, fy = compute_force(masses[i], masses[j], dx, dy)\n            forces[i][0] += fx\n            forces[i][1] += fy\n            forces[j][0] -= fx\n            forces[j][1] -= fy\n    for i in range(n):\n        positions[i][0] += forces[i][0] / masses[i] * dt\n        positions[i][1] += forces[i][1] / masses[i] * dt",
+      answer: "# 手順:\n# 1. step 関数に @profile デコレータを付ける\n# 2. kernprof -l -v nbody.py で実行\n#\n# 結果例（各行の % Time に注目）:\n# Line #  Hits    Time   Per Hit  % Time  Line Contents\n#    11                                   def step(...):\n#    12     1      5.0     5.0     0.0      n = len(positions)\n#    13     1     20.0    20.0     0.1      forces = [[0.0, 0.0] for ...]\n#    14   100    50.0     0.5     0.2      for i in range(n):\n#    15  4950   200.0     0.0     0.8      for j in range(i+1, n):\n#    16  4950  3000.0     0.6    12.0        dx = positions[j][0]...\n#    17  4950  3000.0     0.6    12.0        dy = positions[j][1]...\n#    18  4950 12000.0     2.4    48.0        fx, fy = compute_force(...)\n#    19  4950  2000.0     0.4     8.0        forces[i][0] += fx\n#    20  4950  2000.0     0.4     8.0        forces[i][1] += fy\n#    21  4950  1800.0     0.4     7.2        forces[j][0] -= fx\n#    22  4950  1800.0     0.4     7.2        forces[j][1] -= fy\n#\n# → compute_force の呼び出し（18行目）が48%で最大のボトルネック\n# → dx, dy の計算と forces の更新も Python 動的型のコストが大きい\n# → 二重ループ全体を C 型化すれば大幅に高速化できる"
+    },
+    {
+      diff: 2,
+      q: "cProfile の結果を snakeviz で可視化する手順を示し、\nさらに timeit を使って改善前後の step 関数を比較するコードを書いてください。",
+      code: "# snakeviz の使い方と timeit での比較を示してください\n# step 関数の実行時間を計測する前提",
+      answer: "# === snakeviz による可視化 ===\n# 1. プロファイル結果をファイルに保存\n#    python -m cProfile -o profile.prof nbody.py\n#\n# 2. snakeviz で可視化\n#    pip install snakeviz\n#    snakeviz profile.prof\n#    → ブラウザが開き、icicle/sunburst チャートで確認可能\n\n# === timeit での比較計測 ===\nimport timeit\nimport random\n\n# テストデータ作成\ndef make_data(n=100):\n    positions = [[random.random(), random.random()] for _ in range(n)]\n    masses = [random.random() + 0.1 for _ in range(n)]\n    return positions, masses\n\n# Python 版の計測\nsetup = \"\"\"\nfrom nbody import step\nimport random\nrandom.seed(42)\npositions = [[random.random(), random.random()] for _ in range(100)]\nmasses = [random.random() + 0.1 for _ in range(100)]\n\"\"\"\n\nresult_py = timeit.timeit(\n    \"step(positions, masses)\",\n    setup=setup,\n    number=10\n)\nprint(f\"Python 版: {result_py:.4f} 秒 (10回)\")\n\n# Cython 版の計測（コンパイル後）\nsetup_cy = setup.replace(\"from nbody\", \"from nbody_cy\")\nresult_cy = timeit.timeit(\n    \"step(positions, masses)\",\n    setup=setup_cy,\n    number=10\n)\nprint(f\"Cython 版: {result_cy:.4f} 秒 (10回)\")\nprint(f\"高速化倍率: {result_py / result_cy:.1f}x\")"
+    }
+  ],
+  ch2: [
+    {
+      diff: 1,
+      q: "以下の Python 関数を .pyx ファイルに変換し、setup.py を書いてコンパイルしてください。",
+      code: "# python_sum.py\ndef total(values):\n    s = 0.0\n    for v in values:\n        s += v\n    return s",
+      answer: "# --- mysum.pyx ---\ndef total(values):\n    s = 0.0\n    for v in values:\n        s += v\n    return s\n\n# --- setup.py ---\nfrom setuptools import setup\nfrom Cython.Build import cythonize\n\nsetup(\n    ext_modules=cythonize(\"mysum.pyx\")\n)\n\n# ビルドコマンド:\n# python setup.py build_ext --inplace\n#\n# 使い方:\n# python -c \"from mysum import total; print(total(range(1000)))\"\n#\n# この段階ではまだ型宣言がないため大きな高速化は見込めないが、\n# Cython のコンパイルパイプラインが動作することを確認できる。"
+    },
+    {
+      diff: 2,
+      q: "N体シミュレーションの compute_force 関数を .pyx ファイルに移し、\nsetup.py でビルドできるようにしてください。元の Python コードからインポートして使えることを確認するテストも書いてください。",
+      code: "# 元の Python コード（nbody.py の一部）\nimport math\n\ndef compute_force(m1, m2, dx, dy, softening=0.01):\n    r = math.sqrt(dx*dx + dy*dy + softening*softening)\n    f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy",
+      answer: "# --- forces.pyx ---\nfrom libc.math cimport sqrt\n\ndef compute_force(double m1, double m2, double dx, double dy,\n                  double softening=0.01):\n    \"\"\"2粒子間の重力を計算する\"\"\"\n    cdef double r, f, fx, fy\n    r = sqrt(dx*dx + dy*dy + softening*softening)\n    f = (m1 * m2) / (r * r * r)\n    fx = f * dx\n    fy = f * dy\n    return fx, fy\n\n# --- setup.py ---\nfrom setuptools import setup\nfrom Cython.Build import cythonize\n\nsetup(\n    ext_modules=cythonize(\"forces.pyx\")\n)\n\n# --- test_forces.py ---\nfrom forces import compute_force\nimport math\n\ndef test_basic():\n    fx, fy = compute_force(1.0, 1.0, 1.0, 0.0)\n    # r ≈ 1.00005, f ≈ 1/r^3 ≈ 0.99985\n    assert abs(fx - 0.99985) < 0.001\n    assert abs(fy) < 0.001\n    print(\"テスト通過!\")\n\ndef test_symmetry():\n    fx1, fy1 = compute_force(1.0, 2.0, 3.0, 4.0)\n    fx2, fy2 = compute_force(2.0, 1.0, 3.0, 4.0)\n    assert abs(fx1 - fx2) < 1e-10\n    print(\"対称性テスト通過!\")\n\ntest_basic()\ntest_symmetry()"
+    },
+    {
+      diff: 2,
+      q: "cython -a コマンドでアノテーション HTML を生成し、黄色い行が何を意味するか説明してください。\nまた、生成された C コードの場所と確認方法を示してください。",
+      code: "# forces.pyx をアノテーション付きでコンパイルする手順を示してください",
+      answer: "# === アノテーション HTML の生成 ===\n# cython -a forces.pyx\n# → forces.html が生成される\n#\n# または setup.py で:\n# from Cython.Build import cythonize\n# setup(ext_modules=cythonize(\"forces.pyx\", annotate=True))\n#\n# === 黄色い行の意味 ===\n# - 黄色が濃いほど Python/C API の呼び出しが多い\n# - 白い行は純粋な C コードに変換済み（高速）\n# - 黄色い行は Python オブジェクト操作が残っている（遅い）\n#\n# 例:\n# - 型宣言なしの変数操作 → 濃い黄色（PyObject 操作）\n# - cdef double x → 白（C double 操作）\n# - math.sqrt() → 黄色（Python 関数呼び出し）\n# - libc.math.sqrt() → 白（C 関数呼び出し）\n#\n# === 生成された C コードの確認 ===\n# - forces.c が同じディレクトリに生成される\n# - 行をクリックすると対応する C コードが展開表示\n# - __pyx_pw_ で始まる関数が Python ラッパー\n# - __pyx_f_ で始まる関数が C 実装本体\n#\n# === 最適化の指針 ===\n# 1. 黄色い行を見つける\n# 2. 型宣言を追加して白くする\n# 3. Python 関数を C ライブラリ関数に置き換える\n# 4. 繰り返して全行を白に近づける"
+    }
+  ],
+  ch3: [
+    {
+      diff: 1,
+      q: "以下の Python ループに cdef 型宣言を追加して高速化してください。\n変更前後の速度差を説明してください。",
+      code: "# slow_sum.pyx（型宣言なし）\ndef sum_squares(n):\n    total = 0.0\n    for i in range(n):\n        total += i * i\n    return total",
+      answer: "# fast_sum.pyx（型宣言あり）\ndef sum_squares(int n):\n    cdef double total = 0.0\n    cdef int i\n    for i in range(n):\n        total += i * i\n    return total\n\n# === 変更点の解説 ===\n# 1. 引数 n に int 型を宣言\n#    → Python int から C int への変換が関数呼び出し時の1回だけに\n#\n# 2. total を cdef double で宣言\n#    → ループ内の加算が C の double += に変換\n#    → PyObject の加算（__add__ 呼び出し）が不要に\n#\n# 3. i を cdef int で宣言\n#    → range(n) が C の for ループに変換\n#    → Python イテレータの生成・next() 呼び出しが不要に\n#\n# === 速度差の目安（n=10,000,000）===\n# 型宣言なし: 約 2.5 秒（Python ループのまま）\n# 型宣言あり: 約 0.01 秒（C ループに変換）\n# → 約 250 倍の高速化"
+    },
+    {
+      diff: 2,
+      q: "N体シミュレーションの step 関数を Cython 化し、全変数に型宣言を追加してください。\nリストの代わりに適切な C 型を使い、compute_force も cdef 関数にしてください。",
+      code: "# nbody_cy.pyx\n# Python 版の step 関数を型宣言付きで書き直してください\n# positions: n x 2 の座標配列\n# masses: n 個の質量配列\n# forces の計算と位置の更新を行う",
+      answer: "# nbody_cy.pyx\nfrom libc.math cimport sqrt\n\ncdef (double, double) compute_force(\n    double m1, double m2,\n    double dx, double dy,\n    double softening\n):\n    \"\"\"2粒子間の重力ベクトルを返す\"\"\"\n    cdef double r = sqrt(dx*dx + dy*dy + softening*softening)\n    cdef double f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\ndef step(double[:, :] positions, double[:] masses,\n         double dt=0.01, double softening=0.01):\n    \"\"\"1ステップ分の力の計算と位置更新\"\"\"\n    cdef int n = positions.shape[0]\n    cdef int i, j\n    cdef double dx, dy, fx, fy\n    # 力の累積用配列\n    cdef double[:, :] forces\n    import numpy as np\n    forces_np = np.zeros((n, 2), dtype=np.float64)\n    forces = forces_np\n\n    # 全ペアの力を計算（O(n^2)）\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = positions[j, 0] - positions[i, 0]\n            dy = positions[j, 1] - positions[i, 1]\n            fx, fy = compute_force(\n                masses[i], masses[j], dx, dy, softening\n            )\n            forces[i, 0] += fx\n            forces[i, 1] += fy\n            forces[j, 0] -= fx\n            forces[j, 1] -= fy\n\n    # 位置の更新\n    for i in range(n):\n        positions[i, 0] += forces[i, 0] / masses[i] * dt\n        positions[i, 1] += forces[i, 1] / masses[i] * dt"
+    },
+    {
+      diff: 3,
+      q: "cpdef 関数と def 関数の性能差を比較する実験コードを書いてください。\n同じ処理を def / cdef / cpdef で実装し、timeit で計測してください。",
+      code: "# compare.pyx に3種類の関数を定義してください\n# 処理内容: 2つの double の距離計算を N 回繰り返す",
+      answer: "# --- compare.pyx ---\nfrom libc.math cimport sqrt\n\n# Python から呼べるが遅い\ndef dist_def(double x1, double y1, double x2, double y2):\n    return sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1))\n\n# Cython 内部でのみ使える（最速）\ncdef double dist_cdef(double x1, double y1, double x2, double y2):\n    return sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1))\n\n# Python からも呼べて、Cython 内では C 速度\ncpdef double dist_cpdef(double x1, double y1, double x2, double y2):\n    return sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1))\n\n# cdef を内部で N 回呼ぶテスト関数\ndef bench_cdef(int n):\n    cdef int i\n    cdef double total = 0.0\n    for i in range(n):\n        total += dist_cdef(0.0, 0.0, 3.0, 4.0)\n    return total\n\ndef bench_cpdef(int n):\n    cdef int i\n    cdef double total = 0.0\n    for i in range(n):\n        total += dist_cpdef(0.0, 0.0, 3.0, 4.0)\n    return total\n\ndef bench_def(int n):\n    cdef int i\n    cdef double total = 0.0\n    for i in range(n):\n        total += dist_def(0.0, 0.0, 3.0, 4.0)\n    return total\n\n# --- bench.py ---\nimport timeit\n\nfor name in [\"bench_cdef\", \"bench_cpdef\", \"bench_def\"]:\n    t = timeit.timeit(\n        f\"compare.{name}(1_000_000)\",\n        setup=\"import compare\",\n        number=10\n    )\n    print(f\"{name:20s}: {t:.4f} 秒\")\n\n# 期待結果:\n# bench_cdef          : 0.012 秒  ← C 関数呼び出し\n# bench_cpdef         : 0.013 秒  ← Cython内ではほぼ同等\n# bench_def           : 0.850 秒  ← Python 関数呼び出しのオーバーヘッド"
+    }
+  ],
+  ch4: [
+    {
+      diff: 1,
+      q: "以下の関数に boundscheck と wraparound ディレクティブを適用してください。\nデコレータ方式と with ブロック方式の両方を示してください。",
+      code: "# directives_example.pyx\nimport cython\nimport numpy as np\n\ndef process(double[:] arr):\n    cdef int i\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    for i in range(n):\n        total += arr[i]\n    return total",
+      answer: "# === 方法1: デコレータ方式 ===\nimport cython\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef process_deco(double[:] arr):\n    cdef int i\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    for i in range(n):\n        total += arr[i]\n    return total\n\n# === 方法2: with ブロック方式 ===\ndef process_with(double[:] arr):\n    cdef int i\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    with cython.boundscheck(False), cython.wraparound(False):\n        for i in range(n):\n            total += arr[i]\n    return total\n\n# === 方法3: モジュールレベル（ファイル先頭コメント）===\n# # cython: boundscheck=False\n# # cython: wraparound=False\n# → ファイル内の全関数に適用される\n\n# === 注意点 ===\n# boundscheck=False の場合、範囲外アクセスは\n# セグメンテーションフォルトを引き起こす。\n# 開発中は True のままにして、\n# プロファイリングで確認した安全なループにだけ適用すること。"
+    },
+    {
+      diff: 2,
+      q: "cdivision ディレクティブの効果を示すコードを書いてください。\nPython 除算と C 除算の違い（負数の扱い、ゼロ除算）を実例で説明してください。",
+      code: "# cdivision の True/False で挙動が変わるケースを示してください",
+      answer: "# --- division_test.pyx ---\nimport cython\n\n# Python 式除算（デフォルト: cdivision=False）\ndef py_division(int a, int b):\n    \"\"\"Python のルール: 商は負の無限大方向に丸められる\"\"\"\n    if b == 0:\n        return None  # Python は ZeroDivisionError を送出\n    return a // b, a % b\n\n# C 式除算\n@cython.cdivision(True)\ndef c_division(int a, int b):\n    \"\"\"C のルール: 商はゼロ方向に丸められる\"\"\"\n    # b == 0 の場合、例外は発生しない（未定義動作）\n    return a // b, a % b\n\n# --- 結果の比較 ---\n# py_division(-7, 2)  → (-4, 1)   # Python: -7 = (-4)*2 + 1\n# c_division(-7, 2)   → (-3, -1)  # C:      -7 = (-3)*2 + (-1)\n#\n# py_division(7, -2)  → (-4, -1)  # Python: 7 = (-4)*(-2) + (-1)\n# c_division(7, -2)   → (-3, 1)   # C:      7 = (-3)*(-2) + 1\n#\n# ゼロ除算:\n# py_division(5, 0)   → ZeroDivisionError\n# c_division(5, 0)    → 未定義動作（クラッシュの可能性）\n\n# === 使い分け ===\n# - 正の整数のみ扱う場合: cdivision=True で安全に高速化\n# - 負の数が混ざる場合: 結果が変わるので注意\n# - ゼロ除算の可能性がある場合: 自前でチェックを入れる\n@cython.cdivision(True)\ndef safe_c_division(int a, int b):\n    if b == 0:\n        raise ZeroDivisionError(\"division by zero\")\n    return a // b"
+    },
+    {
+      diff: 3,
+      q: "N体シミュレーションの step 関数にディレクティブを適用し、\n適用前後での速度差を timeit で計測するベンチマークスクリプトを書いてください。\nどのディレクティブをどの範囲に適用すべきか、根拠とともに説明してください。",
+      code: "# nbody_optimized.pyx にディレクティブ付きの step を書いてください\n# さらに bench_directives.py で比較計測してください",
+      answer: "# --- nbody_optimized.pyx ---\nimport cython\nfrom libc.math cimport sqrt\nimport numpy as np\n\ncdef inline (double, double) compute_force_opt(\n    double m1, double m2,\n    double dx, double dy,\n    double softening\n) nogil:\n    cdef double r = sqrt(dx*dx + dy*dy + softening*softening)\n    cdef double f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\n# boundscheck: ループ変数 i, j は 0..n-1 で制御されるため安全\n# wraparound: 負のインデックスは使わないため安全\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef step(double[:, :] positions, double[:] masses,\n         double dt=0.01, double softening=0.01):\n    cdef int n = positions.shape[0]\n    cdef int i, j\n    cdef double dx, dy, fx, fy\n    forces_np = np.zeros((n, 2), dtype=np.float64)\n    cdef double[:, :] forces = forces_np\n\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = positions[j, 0] - positions[i, 0]\n            dy = positions[j, 1] - positions[i, 1]\n            fx, fy = compute_force_opt(\n                masses[i], masses[j], dx, dy, softening\n            )\n            forces[i, 0] += fx\n            forces[i, 1] += fy\n            forces[j, 0] -= fx\n            forces[j, 1] -= fy\n\n    for i in range(n):\n        positions[i, 0] += forces[i, 0] / masses[i] * dt\n        positions[i, 1] += forces[i, 1] / masses[i] * dt\n\n# --- bench_directives.py ---\nimport timeit\nimport numpy as np\n\nsetup = \"\"\"\nimport numpy as np\nnp.random.seed(42)\nn = 200\npositions = np.random.rand(n, 2)\nmasses = np.random.rand(n) + 0.1\n\"\"\"\n\nfor mod in [\"nbody_cy\", \"nbody_optimized\"]:\n    t = timeit.timeit(\n        f\"{mod}.step(positions.copy(), masses)\",\n        setup=setup + f\"import {mod}\",\n        number=50\n    )\n    print(f\"{mod:25s}: {t:.4f} 秒 (50回)\")\n\n# 期待結果:\n# nbody_cy              : 1.2000 秒  ← 型宣言のみ\n# nbody_optimized        : 0.8500 秒  ← ディレクティブ追加\n# → 約 30% のさらなる高速化（境界チェック省略の効果）"
+    }
+  ],
+  ch5: [
+    {
+      diff: 1,
+      q: "NumPy 配列を typed memoryview として受け取り、全要素の合計を計算する関数を書いてください。\n1次元と2次元の両方のバージョンを実装してください。",
+      code: "# memview_sum.pyx\n# 1次元: double[:] → 合計を返す\n# 2次元: double[:,:] → 全要素の合計を返す",
+      answer: "# memview_sum.pyx\nimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef sum_1d(double[:] arr):\n    \"\"\"1次元配列の全要素の合計\"\"\"\n    cdef int i\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n    for i in range(n):\n        total += arr[i]\n    return total\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef sum_2d(double[:, :] arr):\n    \"\"\"2次元配列の全要素の合計\"\"\"\n    cdef int i, j\n    cdef int rows = arr.shape[0]\n    cdef int cols = arr.shape[1]\n    cdef double total = 0.0\n    for i in range(rows):\n        for j in range(cols):\n            total += arr[i, j]\n    return total\n\n# --- 使用例 ---\n# import numpy as np\n# from memview_sum import sum_1d, sum_2d\n#\n# a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])\n# print(sum_1d(a))  # → 15.0\n#\n# b = np.ones((100, 100))\n# print(sum_2d(b))   # → 10000.0\n#\n# C 連続性を保証する宣言:\n# def sum_1d_contig(double[::1] arr):  # C連続のみ受け付け\n# def sum_2d_contig(double[:, ::1] arr):  # C連続2次元"
+    },
+    {
+      diff: 2,
+      q: "N体シミュレーションで memoryview を活用し、NumPy 配列との連携を実装してください。\n初期状態の生成は NumPy で行い、計算コアは memoryview で高速にアクセスします。",
+      code: "# nbody_memview.pyx\n# 初期化: NumPy で positions, velocities, masses を作成\n# 計算: memoryview で直接アクセスして step を実行\n# 結果: NumPy 配列として返す",
+      answer: "# nbody_memview.pyx\nimport cython\nfrom libc.math cimport sqrt\nimport numpy as np\n\ncdef inline (double, double) compute_force(\n    double m1, double m2,\n    double dx, double dy, double softening\n) nogil:\n    cdef double r = sqrt(dx*dx + dy*dy + softening*softening)\n    cdef double f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\ndef create_system(int n, int seed=42):\n    \"\"\"NumPy で初期状態を生成する\"\"\"\n    rng = np.random.default_rng(seed)\n    positions = rng.random((n, 2), dtype=np.float64)\n    velocities = np.zeros((n, 2), dtype=np.float64)\n    masses = rng.random(n, dtype=np.float64) + 0.1\n    return positions, velocities, masses\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef step(double[:, ::1] positions,\n         double[:, ::1] velocities,\n         double[::1] masses,\n         double dt=0.001, double softening=0.01):\n    \"\"\"1ステップの時間発展（memoryview で高速アクセス）\"\"\"\n    cdef int n = positions.shape[0]\n    cdef int i, j\n    cdef double dx, dy, fx, fy\n\n    # 力の累積用配列（毎ステップ初期化）\n    forces_np = np.zeros((n, 2), dtype=np.float64)\n    cdef double[:, ::1] forces = forces_np\n\n    # 全ペアの力を計算\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = positions[j, 0] - positions[i, 0]\n            dy = positions[j, 1] - positions[i, 1]\n            fx, fy = compute_force(\n                masses[i], masses[j], dx, dy, softening\n            )\n            forces[i, 0] += fx\n            forces[i, 1] += fy\n            forces[j, 0] -= fx\n            forces[j, 1] -= fy\n\n    # 速度と位置の更新（シンプレクティック・オイラー法）\n    for i in range(n):\n        velocities[i, 0] += forces[i, 0] / masses[i] * dt\n        velocities[i, 1] += forces[i, 1] / masses[i] * dt\n        positions[i, 0] += velocities[i, 0] * dt\n        positions[i, 1] += velocities[i, 1] * dt\n\ndef simulate(int n_particles, int n_steps):\n    \"\"\"シミュレーション全体を実行し結果を返す\"\"\"\n    positions, velocities, masses = create_system(n_particles)\n    for _ in range(n_steps):\n        step(positions, velocities, masses)\n    return np.asarray(positions)"
+    },
+    {
+      diff: 3,
+      q: "memoryview のスライスとストライドの違いを実験するコードを書いてください。\nC 連続・Fortran 連続・非連続の配列それぞれで、アクセス速度を比較してください。",
+      code: "# stride_bench.pyx\n# C連続、Fortran連続、転置（非連続）の配列で\n# 全要素アクセスの速度を比較する",
+      answer: "# --- stride_bench.pyx ---\nimport cython\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef sum_c_contig(double[:, ::1] arr):\n    \"\"\"C 連続（行優先）配列の合計\"\"\"\n    cdef int i, j\n    cdef int rows = arr.shape[0]\n    cdef int cols = arr.shape[1]\n    cdef double total = 0.0\n    for i in range(rows):\n        for j in range(cols):\n            total += arr[i, j]\n    return total\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef sum_f_contig(double[::1, :] arr):\n    \"\"\"Fortran 連続（列優先）配列の合計（列方向ループ）\"\"\"\n    cdef int i, j\n    cdef int rows = arr.shape[0]\n    cdef int cols = arr.shape[1]\n    cdef double total = 0.0\n    for j in range(cols):\n        for i in range(rows):\n            total += arr[i, j]\n    return total\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef sum_strided(double[:, :] arr):\n    \"\"\"汎用ストライド（非連続でも可）の合計\"\"\"\n    cdef int i, j\n    cdef int rows = arr.shape[0]\n    cdef int cols = arr.shape[1]\n    cdef double total = 0.0\n    for i in range(rows):\n        for j in range(cols):\n            total += arr[i, j]\n    return total\n\n# --- bench_stride.py ---\nimport numpy as np\nimport timeit\n\nn = 2000\narr_c = np.ascontiguousarray(np.random.rand(n, n))   # C 連続\narr_f = np.asfortranarray(np.random.rand(n, n))      # Fortran 連続\narr_t = np.random.rand(n, n).T                       # 転置（非連続）\n\nfrom stride_bench import sum_c_contig, sum_f_contig, sum_strided\n\nfor name, func, arr in [\n    (\"C連続 (::1)\",    sum_c_contig, arr_c),\n    (\"F連続 (::1,:)\",  sum_f_contig, arr_f),\n    (\"非連続 ([:,:])\",  sum_strided,  arr_t),\n]:\n    t = timeit.timeit(lambda: func(arr), number=100)\n    print(f\"{name:20s}: {t:.4f} 秒\")\n\n# 期待結果:\n# C連続は最速（キャッシュ効率最大）\n# F連続+列方向ループも同等に速い\n# 非連続はストライド計算のオーバーヘッドで遅い"
+    }
+  ],
+  ch6: [
+    {
+      diff: 1,
+      q: "以下の Python 関数を cdef 関数に変換し、呼び出し元のループと合わせて最適化してください。",
+      code: "# 元の Python コード\nimport math\n\ndef clamp(value, low, high):\n    if value < low:\n        return low\n    if value > high:\n        return high\n    return value\n\ndef normalize(values):\n    result = []\n    for v in values:\n        result.append(clamp(v, 0.0, 1.0))\n    return result",
+      answer: "# optimized.pyx\nimport cython\nimport numpy as np\n\n# cdef 関数: Python から直接呼べないが、C 速度で実行\ncdef inline double clamp(double value, double low, double high) nogil:\n    if value < low:\n        return low\n    if value > high:\n        return high\n    return value\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef normalize(double[:] values):\n    \"\"\"全要素を [0.0, 1.0] に収める\"\"\"\n    cdef int i\n    cdef int n = values.shape[0]\n    result_np = np.empty(n, dtype=np.float64)\n    cdef double[:] result = result_np\n    for i in range(n):\n        result[i] = clamp(values[i], 0.0, 1.0)\n    return result_np\n\n# --- 解説 ---\n# 1. clamp を cdef inline に → 関数呼び出しコストが 0\n# 2. nogil 宣言 → 後で prange 並列化が可能に\n# 3. list の代わりに memoryview → append の動的拡張コストを排除\n# 4. result_np を返す → Python 側で NumPy 配列として使える"
+    },
+    {
+      diff: 2,
+      q: "N体シミュレーションで使う補助関数群を cdef 関数として整理し、\nモジュール構成を .pyx + .pxd ファイルに分割してください。",
+      code: "# physics.pxd（宣言ファイル）と physics.pyx（実装ファイル）を\n# 分離して書いてください\n# 関数: compute_force, compute_energy, apply_boundary",
+      answer: "# --- physics.pxd（宣言ファイル）---\n# C のヘッダーファイルに相当。型情報だけを記述する。\ncdef (double, double) compute_force(\n    double m1, double m2,\n    double dx, double dy, double softening\n) nogil\n\ncdef double compute_energy(\n    double m1, double m2,\n    double dx, double dy, double softening\n) nogil\n\ncdef void apply_boundary(\n    double *x, double *y,\n    double size\n) nogil\n\n# --- physics.pyx（実装ファイル）---\nfrom libc.math cimport sqrt\n\ncdef (double, double) compute_force(\n    double m1, double m2,\n    double dx, double dy, double softening\n) nogil:\n    \"\"\"2粒子間の重力ベクトル\"\"\"\n    cdef double r = sqrt(dx*dx + dy*dy + softening*softening)\n    cdef double f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\ncdef double compute_energy(\n    double m1, double m2,\n    double dx, double dy, double softening\n) nogil:\n    \"\"\"2粒子間のポテンシャルエネルギー\"\"\"\n    cdef double r = sqrt(dx*dx + dy*dy + softening*softening)\n    return -m1 * m2 / r\n\ncdef void apply_boundary(\n    double *x, double *y, double size\n) nogil:\n    \"\"\"周期境界条件を適用\"\"\"\n    if x[0] < 0:\n        x[0] += size\n    elif x[0] >= size:\n        x[0] -= size\n    if y[0] < 0:\n        y[0] += size\n    elif y[0] >= size:\n        y[0] -= size\n\n# --- nbody_modular.pyx（利用側）---\n# from physics cimport compute_force, compute_energy, apply_boundary\n# → cimport で .pxd から宣言を読み込む\n# → C レベルのリンクで関数呼び出しが行われる"
+    },
+    {
+      diff: 3,
+      q: "fused types（ジェネリクス的な機能）を使って、int と double の両方に対応する\n汎用的な clamp 関数と配列正規化関数を書いてください。",
+      code: "# fused_funcs.pyx\n# cython.fused_type を使って int/double 兼用の関数を実装",
+      answer: "# --- fused_funcs.pyx ---\nimport cython\nimport numpy as np\n\n# fused type の定義（C++ テンプレートに似た仕組み）\nctypedef fused numeric_t:\n    cython.int\n    cython.long\n    cython.float\n    cython.double\n\n# fused type を使った汎用 clamp\ncdef inline numeric_t clamp(numeric_t value,\n                             numeric_t low,\n                             numeric_t high) nogil:\n    if value < low:\n        return low\n    if value > high:\n        return high\n    return value\n\n# fused type を使った配列正規化\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef normalize_array(numeric_t[:] arr,\n                    numeric_t low,\n                    numeric_t high):\n    \"\"\"配列の全要素を [low, high] にクランプする\"\"\"\n    cdef int i\n    cdef int n = arr.shape[0]\n    # 入力と同じ型の出力配列を作成\n    if numeric_t is cython.int:\n        result_np = np.empty(n, dtype=np.intc)\n    elif numeric_t is cython.long:\n        result_np = np.empty(n, dtype=np.int64)\n    elif numeric_t is cython.float:\n        result_np = np.empty(n, dtype=np.float32)\n    else:  # double\n        result_np = np.empty(n, dtype=np.float64)\n    cdef numeric_t[:] result = result_np\n    for i in range(n):\n        result[i] = clamp(arr[i], low, high)\n    return result_np\n\n# --- 使用例 ---\n# import numpy as np\n# from fused_funcs import normalize_array\n#\n# int 版:\n# a = np.array([0, 5, 10, 15, 20], dtype=np.intc)\n# print(normalize_array(a, 3, 12))  # → [3, 5, 10, 12, 12]\n#\n# double 版:\n# b = np.array([-0.5, 0.3, 0.7, 1.5], dtype=np.float64)\n# print(normalize_array(b, 0.0, 1.0))  # → [0.0, 0.3, 0.7, 1.0]\n#\n# → 同じ関数名で型に応じた最適なコードが自動選択される"
+    }
+  ],
+  ch7: [
+    {
+      diff: 1,
+      q: "2次元ベクトルを表す cdef class を定義してください。\n基本的な演算（加算、スカラー倍、ノルム）を実装してください。",
+      code: "# vector2d.pyx\n# cdef class Vector2D:\n#     属性: x, y (double)\n#     メソッド: add, scale, norm, __repr__",
+      answer: "# vector2d.pyx\nfrom libc.math cimport sqrt\n\ncdef class Vector2D:\n    cdef public double x\n    cdef public double y\n\n    def __init__(self, double x, double y):\n        self.x = x\n        self.y = y\n\n    cdef Vector2D add(self, Vector2D other):\n        \"\"\"ベクトル加算（C レベル速度）\"\"\"\n        return Vector2D(self.x + other.x, self.y + other.y)\n\n    cdef Vector2D scale(self, double factor):\n        \"\"\"スカラー倍（C レベル速度）\"\"\"\n        return Vector2D(self.x * factor, self.y * factor)\n\n    cdef double norm(self):\n        \"\"\"ノルム（長さ）の計算\"\"\"\n        return sqrt(self.x * self.x + self.y * self.y)\n\n    # Python からも呼べるラッパー\n    def py_add(self, Vector2D other):\n        return self.add(other)\n\n    def py_scale(self, double factor):\n        return self.scale(factor)\n\n    def py_norm(self):\n        return self.norm()\n\n    def __repr__(self):\n        return f\"Vector2D({self.x:.4f}, {self.y:.4f})\"\n\n# --- 使用例 ---\n# from vector2d import Vector2D\n# v1 = Vector2D(3.0, 4.0)\n# v2 = Vector2D(1.0, 2.0)\n# v3 = v1.py_add(v2)\n# print(v3)           # → Vector2D(4.0000, 6.0000)\n# print(v1.py_norm()) # → 5.0"
+    },
+    {
+      diff: 2,
+      q: "N体シミュレーション用の Particle cdef class を設計してください。\nposition, velocity を Vector2D で持ち、力の適用と位置更新メソッドを実装してください。",
+      code: "# particle.pyx\n# cdef class Particle を定義\n# Vector2D を使って位置・速度を管理\n# apply_force, update メソッドを実装",
+      answer: "# particle.pyx\nfrom libc.math cimport sqrt\n\ncdef class Vector2D:\n    cdef public double x\n    cdef public double y\n\n    def __init__(self, double x=0.0, double y=0.0):\n        self.x = x\n        self.y = y\n\n    cdef void iadd(self, Vector2D other):\n        self.x += other.x\n        self.y += other.y\n\n    cdef Vector2D sub(self, Vector2D other):\n        return Vector2D(self.x - other.x, self.y - other.y)\n\n    cdef Vector2D scale(self, double factor):\n        return Vector2D(self.x * factor, self.y * factor)\n\n    cdef double norm(self):\n        return sqrt(self.x * self.x + self.y * self.y)\n\n    def __repr__(self):\n        return f\"({self.x:.3f}, {self.y:.3f})\"\n\ncdef class Particle:\n    cdef public Vector2D position\n    cdef public Vector2D velocity\n    cdef public double mass\n    cdef Vector2D _force_accum  # 力の累積\n\n    def __init__(self, double x, double y, double mass):\n        self.position = Vector2D(x, y)\n        self.velocity = Vector2D(0.0, 0.0)\n        self.mass = mass\n        self._force_accum = Vector2D(0.0, 0.0)\n\n    cdef void reset_force(self):\n        \"\"\"力の累積をリセット\"\"\"\n        self._force_accum.x = 0.0\n        self._force_accum.y = 0.0\n\n    cdef void apply_force(self, double fx, double fy):\n        \"\"\"力を加える\"\"\"\n        self._force_accum.x += fx\n        self._force_accum.y += fy\n\n    cdef void update(self, double dt):\n        \"\"\"速度と位置を更新\"\"\"\n        # v += F/m * dt\n        self.velocity.x += self._force_accum.x / self.mass * dt\n        self.velocity.y += self._force_accum.y / self.mass * dt\n        # x += v * dt\n        self.position.x += self.velocity.x * dt\n        self.position.y += self.velocity.y * dt\n\n    def __repr__(self):\n        return (f\"Particle(pos={self.position}, \"\n                f\"vel={self.velocity}, m={self.mass:.2f})\")\n\n# --- 使用例 ---\n# p = Particle(1.0, 2.0, 5.0)\n# p.apply_force(10.0, 0.0)  # 右向きに力\n# p.update(0.1)             # 0.1秒進める\n# print(p)  # → 位置と速度が更新されている"
+    },
+    {
+      diff: 3,
+      q: "cdef class を使った ParticleSystem を実装してください。\nパーティクル配列を C レベルで管理し、\n全ペアの力の計算と更新を効率的に行う simulate メソッドを書いてください。\n通常の Python クラス版と速度を比較してください。",
+      code: "# particle_system.pyx\n# cdef class ParticleSystem を実装\n# N 粒子の管理、力の計算、位置更新\n# Python クラス版との速度比較も含む",
+      answer: "# particle_system.pyx\nimport cython\nfrom libc.math cimport sqrt\nimport numpy as np\n\ncdef class ParticleSystem:\n    cdef double[:, ::1] positions   # (n, 2)\n    cdef double[:, ::1] velocities  # (n, 2)\n    cdef double[::1] masses         # (n,)\n    cdef int n\n    cdef double softening\n\n    def __init__(self, int n, double softening=0.01, int seed=42):\n        self.n = n\n        self.softening = softening\n        rng = np.random.default_rng(seed)\n        self.positions = np.ascontiguousarray(\n            rng.random((n, 2), dtype=np.float64)\n        )\n        self.velocities = np.zeros((n, 2), dtype=np.float64)\n        self.masses = np.ascontiguousarray(\n            rng.random(n, dtype=np.float64) + 0.1\n        )\n\n    @cython.boundscheck(False)\n    @cython.wraparound(False)\n    cdef void _compute_step(self, double dt):\n        \"\"\"1ステップの計算（全て C レベル）\"\"\"\n        cdef int i, j\n        cdef double dx, dy, r, f, fx, fy\n        forces_np = np.zeros((self.n, 2), dtype=np.float64)\n        cdef double[:, ::1] forces = forces_np\n\n        for i in range(self.n):\n            for j in range(i + 1, self.n):\n                dx = self.positions[j, 0] - self.positions[i, 0]\n                dy = self.positions[j, 1] - self.positions[i, 1]\n                r = sqrt(dx*dx + dy*dy + self.softening*self.softening)\n                f = self.masses[i] * self.masses[j] / (r * r * r)\n                fx = f * dx\n                fy = f * dy\n                forces[i, 0] += fx\n                forces[i, 1] += fy\n                forces[j, 0] -= fx\n                forces[j, 1] -= fy\n\n        for i in range(self.n):\n            self.velocities[i, 0] += forces[i, 0] / self.masses[i] * dt\n            self.velocities[i, 1] += forces[i, 1] / self.masses[i] * dt\n            self.positions[i, 0] += self.velocities[i, 0] * dt\n            self.positions[i, 1] += self.velocities[i, 1] * dt\n\n    def simulate(self, int steps, double dt=0.001):\n        \"\"\"指定ステップ数だけシミュレーションを進める\"\"\"\n        cdef int s\n        for s in range(steps):\n            self._compute_step(dt)\n\n    def get_positions(self):\n        return np.asarray(self.positions).copy()\n\n    def total_energy(self):\n        \"\"\"系の全エネルギー（運動 + ポテンシャル）\"\"\"\n        cdef int i, j\n        cdef double ke = 0.0, pe = 0.0\n        cdef double vx, vy, dx, dy, r\n        for i in range(self.n):\n            vx = self.velocities[i, 0]\n            vy = self.velocities[i, 1]\n            ke += 0.5 * self.masses[i] * (vx*vx + vy*vy)\n        for i in range(self.n):\n            for j in range(i + 1, self.n):\n                dx = self.positions[j, 0] - self.positions[i, 0]\n                dy = self.positions[j, 1] - self.positions[i, 1]\n                r = sqrt(dx*dx + dy*dy + self.softening*self.softening)\n                pe -= self.masses[i] * self.masses[j] / r\n        return ke + pe\n\n# --- bench.py ---\n# import timeit\n# t = timeit.timeit(\n#     \"sys.simulate(100)\",\n#     setup=\"from particle_system import ParticleSystem; sys = ParticleSystem(200)\",\n#     number=5\n# )\n# print(f\"cdef class 版: {t:.4f} 秒\")\n# → Python dict ベースのクラスと比較して 5〜10 倍高速"
+    }
+  ],
+  ch8: [
+    {
+      diff: 1,
+      q: "prange を使って、1次元配列の各要素を2乗する並列処理を書いてください。\nnogil の必要性と、コンパイル時の OpenMP フラグを説明してください。",
+      code: "# parallel_square.pyx\n# 入力配列の各要素を2乗した結果を新しい配列で返す\n# prange で並列化する",
+      answer: "# parallel_square.pyx\nimport cython\nfrom cython.parallel import prange\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef square_array(double[::1] arr):\n    \"\"\"配列の各要素を2乗する（並列版）\"\"\"\n    cdef int i\n    cdef int n = arr.shape[0]\n    result_np = np.empty(n, dtype=np.float64)\n    cdef double[::1] result = result_np\n\n    # prange: 並列 for ループ\n    # nogil=True: GIL を解放してスレッド並列実行\n    for i in prange(n, nogil=True):\n        result[i] = arr[i] * arr[i]\n\n    return result_np\n\n# --- setup.py ---\n# from setuptools import setup, Extension\n# from Cython.Build import cythonize\n# import os\n#\n# # OpenMP コンパイルフラグ\n# if os.name == 'nt':  # Windows\n#     openmp_flag = '/openmp'\n# else:  # Linux / macOS\n#     openmp_flag = '-fopenmp'\n#\n# ext = Extension(\n#     \"parallel_square\",\n#     sources=[\"parallel_square.pyx\"],\n#     extra_compile_args=[openmp_flag],\n#     extra_link_args=[openmp_flag],\n# )\n# setup(ext_modules=cythonize(ext))\n#\n# === nogil が必要な理由 ===\n# Python の GIL（Global Interpreter Lock）は\n# 同時に1つのスレッドしか Python コードを実行できない。\n# prange は OS スレッドを使うため、GIL を解放しないと\n# 並列化の効果が得られない。\n# nogil ブロック内では Python オブジェクト操作は禁止。"
+    },
+    {
+      diff: 2,
+      q: "N体シミュレーションの外側ループを prange で並列化してください。\n力の計算でデータ競合が起きないように注意してください。",
+      code: "# nbody_parallel.pyx\n# step 関数の外側ループを prange で並列化\n# 力の累積でレースコンディションを回避する方法を示す",
+      answer: "# nbody_parallel.pyx\nimport cython\nfrom cython.parallel import prange\nfrom libc.math cimport sqrt\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef step_parallel(double[:, ::1] positions,\n                  double[:, ::1] velocities,\n                  double[::1] masses,\n                  double dt=0.001,\n                  double softening=0.01):\n    \"\"\"prange で並列化した step 関数\"\"\"\n    cdef int n = positions.shape[0]\n    cdef int i, j\n    cdef double dx, dy, r, f, fx, fy\n\n    # 各粒子ごとに独立した力を計算（レースコンディション回避）\n    # 方法: 対称性を使わず、各 i について全 j を走査\n    # 計算量は2倍になるが、並列化の利得が上回る\n    forces_np = np.zeros((n, 2), dtype=np.float64)\n    cdef double[:, ::1] forces = forces_np\n\n    for i in prange(n, nogil=True, schedule=\"dynamic\"):\n        for j in range(n):\n            if i == j:\n                continue\n            dx = positions[j, 0] - positions[i, 0]\n            dy = positions[j, 1] - positions[i, 1]\n            r = sqrt(dx*dx + dy*dy + softening*softening)\n            f = masses[i] * masses[j] / (r * r * r)\n            # forces[i] は i スレッドのみが書き込む → 競合なし\n            forces[i, 0] = forces[i, 0] + f * dx\n            forces[i, 1] = forces[i, 1] + f * dy\n\n    # 位置・速度の更新（独立なので安全に並列化）\n    for i in prange(n, nogil=True):\n        velocities[i, 0] = velocities[i, 0] + forces[i, 0] / masses[i] * dt\n        velocities[i, 1] = velocities[i, 1] + forces[i, 1] / masses[i] * dt\n        positions[i, 0] = positions[i, 0] + velocities[i, 0] * dt\n        positions[i, 1] = positions[i, 1] + velocities[i, 1] * dt\n\n# === 並列化のポイント ===\n# 1. 対称性トリック（i<j）は使わない\n#    → forces[j] への書き込みが競合するため\n# 2. 代わりに各 i が全 j を走査する\n#    → forces[i] は粒子 i のスレッドだけが書き込む\n# 3. schedule=\"dynamic\" で負荷の偏りに対応\n# 4. 計算量は O(n^2)（定数倍は増えるが並列化で補う）"
+    },
+    {
+      diff: 3,
+      q: "prange の schedule オプション（static, dynamic, guided）の違いを\n実験で確認するベンチマークを書いてください。\n負荷が均一なケースと不均一なケースの両方を試してください。",
+      code: "# schedule_bench.pyx\n# 均一負荷と不均一負荷のタスクで\n# static / dynamic / guided を比較",
+      answer: "# --- schedule_bench.pyx ---\nimport cython\nfrom cython.parallel import prange\nfrom libc.math cimport sqrt, sin\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef uniform_static(double[::1] arr):\n    \"\"\"均一負荷 + static スケジュール\"\"\"\n    cdef int i, n = arr.shape[0]\n    cdef double[::1] result = np.empty(n, dtype=np.float64)\n    for i in prange(n, nogil=True, schedule=\"static\"):\n        result[i] = sqrt(arr[i]) * sin(arr[i])\n    return np.asarray(result)\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef uniform_dynamic(double[::1] arr):\n    \"\"\"均一負荷 + dynamic スケジュール\"\"\"\n    cdef int i, n = arr.shape[0]\n    cdef double[::1] result = np.empty(n, dtype=np.float64)\n    for i in prange(n, nogil=True, schedule=\"dynamic\", chunksize=1000):\n        result[i] = sqrt(arr[i]) * sin(arr[i])\n    return np.asarray(result)\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef uniform_guided(double[::1] arr):\n    \"\"\"均一負荷 + guided スケジュール\"\"\"\n    cdef int i, n = arr.shape[0]\n    cdef double[::1] result = np.empty(n, dtype=np.float64)\n    for i in prange(n, nogil=True, schedule=\"guided\"):\n        result[i] = sqrt(arr[i]) * sin(arr[i])\n    return np.asarray(result)\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef variable_static(int[::1] work_sizes):\n    \"\"\"不均一負荷 + static（一部スレッドが遊ぶ）\"\"\"\n    cdef int i, j, n = work_sizes.shape[0]\n    cdef double total = 0.0\n    cdef double temp\n    for i in prange(n, nogil=True, schedule=\"static\"):\n        temp = 0.0\n        for j in range(work_sizes[i]):\n            temp = temp + sqrt(<double>j)\n        total = total + temp\n    return total\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef variable_dynamic(int[::1] work_sizes):\n    \"\"\"不均一負荷 + dynamic（負荷分散が効く）\"\"\"\n    cdef int i, j, n = work_sizes.shape[0]\n    cdef double total = 0.0\n    cdef double temp\n    for i in prange(n, nogil=True, schedule=\"dynamic\"):\n        temp = 0.0\n        for j in range(work_sizes[i]):\n            temp = temp + sqrt(<double>j)\n        total = total + temp\n    return total\n\n# --- bench_schedule.py ---\nimport numpy as np\nimport timeit\nfrom schedule_bench import *\n\n# 均一負荷テスト\narr = np.random.rand(10_000_000)\nfor name, func in [(\"static\", uniform_static),\n                   (\"dynamic\", uniform_dynamic),\n                   (\"guided\", uniform_guided)]:\n    t = timeit.timeit(lambda: func(arr), number=20)\n    print(f\"均一 {name:10s}: {t:.4f}秒\")\n\n# 不均一負荷テスト（要素ごとに作業量が違う）\nwork = np.array([i * 100 for i in range(1000)], dtype=np.intc)\nfor name, func in [(\"static\", variable_static),\n                   (\"dynamic\", variable_dynamic)]:\n    t = timeit.timeit(lambda: func(work), number=20)\n    print(f\"不均一 {name:10s}: {t:.4f}秒\")\n\n# 期待結果:\n# 均一負荷: static が最速（分配オーバーヘッドが最小）\n# 不均一負荷: dynamic が最速（遅いタスクを他スレッドが補う）"
+    }
+  ],
+  ch9: [
+    {
+      diff: 1,
+      q: "以下の .pyx コードを Pure Python モード（.py ファイル）に書き直してください。\ncython モジュールのデコレータとアノテーションを使います。",
+      code: "# original.pyx\ncimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef dot_product(double[:] a, double[:] b):\n    cdef int i\n    cdef int n = a.shape[0]\n    cdef double total = 0.0\n    for i in range(n):\n        total += a[i] * b[i]\n    return total",
+      answer: "# --- pure_dot.py ---\nimport cython\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef dot_product(a: cython.double[:], b: cython.double[:]) -> cython.double:\n    i: cython.int\n    n: cython.int = a.shape[0]\n    total: cython.double = 0.0\n    for i in range(n):\n        total += a[i] * b[i]\n    return total\n\n# === Pure Python モードのポイント ===\n# 1. cdef 変数 → 型アノテーション（x: cython.int）\n# 2. cimport cython → import cython\n# 3. ディレクティブはデコレータがそのまま使える\n# 4. memoryview の宣言も cython.double[:] で可能\n#\n# === 実行方法 ===\n# Python としてそのまま実行（型宣言は無視される）:\n#   python pure_dot.py\n#\n# Cython でコンパイルして高速実行:\n#   cythonize -i pure_dot.py\n#   python -c \"from pure_dot import dot_product; ...\"\n#\n# === メリット ===\n# - mypy / pyright で型チェックできる\n# - IDE の補完・ナビゲーションが効く\n# - テスト時は Python として実行、本番はコンパイル"
+    },
+    {
+      diff: 2,
+      q: "N体シミュレーションの compute_force と step を Pure Python モードで書き直してください。\n@cython.cfunc で cdef 関数相当、@cython.ccall で cpdef 相当を使います。",
+      code: "# pure_nbody.py\n# .pyx の cdef/cpdef を Pure Python 記法に変換\n# compute_force → @cython.cfunc\n# step → @cython.ccall",
+      answer: "# --- pure_nbody.py ---\nimport cython\nfrom cython.cimports.libc.math import sqrt\nimport numpy as np\n\n@cython.cfunc\n@cython.inline\ndef compute_force(\n    m1: cython.double, m2: cython.double,\n    dx: cython.double, dy: cython.double,\n    softening: cython.double\n) -> tuple[cython.double, cython.double]:\n    \"\"\"2粒子間の重力（C レベル関数）\"\"\"\n    r: cython.double = sqrt(dx*dx + dy*dy + softening*softening)\n    f: cython.double = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\n@cython.ccall\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef step(\n    positions: cython.double[:, ::1],\n    velocities: cython.double[:, ::1],\n    masses: cython.double[::1],\n    dt: cython.double = 0.001,\n    softening: cython.double = 0.01\n) -> None:\n    \"\"\"1ステップの時間発展\"\"\"\n    n: cython.int = positions.shape[0]\n    i: cython.int\n    j: cython.int\n    dx: cython.double\n    dy: cython.double\n    fx: cython.double\n    fy: cython.double\n\n    forces_np = np.zeros((n, 2), dtype=np.float64)\n    forces: cython.double[:, ::1] = forces_np\n\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = positions[j, 0] - positions[i, 0]\n            dy = positions[j, 1] - positions[i, 1]\n            fx, fy = compute_force(\n                masses[i], masses[j], dx, dy, softening\n            )\n            forces[i, 0] += fx\n            forces[i, 1] += fy\n            forces[j, 0] -= fx\n            forces[j, 1] -= fy\n\n    for i in range(n):\n        velocities[i, 0] += forces[i, 0] / masses[i] * dt\n        velocities[i, 1] += forces[i, 1] / masses[i] * dt\n        positions[i, 0] += velocities[i, 0] * dt\n        positions[i, 1] += velocities[i, 1] * dt\n\n# === .pyx 版との対応 ===\n# cdef func → @cython.cfunc\n# cpdef func → @cython.ccall\n# cdef int x → x: cython.int\n# cdef double[:] → cython.double[:]\n# cimport → cython.cimports.xxx\n# inline → @cython.inline\n\nif __name__ == \"__main__\":\n    # Python としてそのまま実行可能\n    rng = np.random.default_rng(42)\n    pos = rng.random((50, 2))\n    vel = np.zeros((50, 2))\n    mass = rng.random(50) + 0.1\n    for _ in range(10):\n        step(pos, vel, mass)\n    print(f\"最終位置の平均: ({pos[:,0].mean():.4f}, {pos[:,1].mean():.4f})\")"
+    },
+    {
+      diff: 3,
+      q: "Pure Python モードで cdef class 相当の @cython.cclass を使い、\nParticleSystem を書き直してください。\n.py ファイルのまま型チェックが通り、かつコンパイル時に C レベル速度が出ることを確認してください。",
+      code: "# pure_system.py\n# @cython.cclass で ParticleSystem を実装\n# 属性宣言、cfunc メソッド、ccall メソッド",
+      answer: "# --- pure_system.py ---\nimport cython\nfrom cython.cimports.libc.math import sqrt\nimport numpy as np\n\n@cython.cclass\nclass ParticleSystem:\n    # 属性宣言（cdef 属性に相当）\n    positions: cython.double[:, ::1]\n    velocities: cython.double[:, ::1]\n    masses: cython.double[::1]\n    n: cython.int\n    softening: cython.double\n    _step_count: cython.int\n\n    def __init__(self, n: cython.int,\n                 softening: cython.double = 0.01,\n                 seed: cython.int = 42):\n        self.n = n\n        self.softening = softening\n        self._step_count = 0\n        rng = np.random.default_rng(seed)\n        self.positions = np.ascontiguousarray(\n            rng.random((n, 2), dtype=np.float64)\n        )\n        self.velocities = np.zeros((n, 2), dtype=np.float64)\n        self.masses = np.ascontiguousarray(\n            rng.random(n, dtype=np.float64) + 0.1\n        )\n\n    @cython.cfunc\n    @cython.boundscheck(False)\n    @cython.wraparound(False)\n    def _compute_step(self, dt: cython.double) -> None:\n        \"\"\"1ステップの計算（C レベル）\"\"\"\n        i: cython.int\n        j: cython.int\n        dx: cython.double\n        dy: cython.double\n        r: cython.double\n        f: cython.double\n        fx: cython.double\n        fy: cython.double\n\n        forces_np = np.zeros((self.n, 2), dtype=np.float64)\n        forces: cython.double[:, ::1] = forces_np\n\n        for i in range(self.n):\n            for j in range(i + 1, self.n):\n                dx = self.positions[j, 0] - self.positions[i, 0]\n                dy = self.positions[j, 1] - self.positions[i, 1]\n                r = sqrt(dx*dx + dy*dy + self.softening*self.softening)\n                f = self.masses[i] * self.masses[j] / (r * r * r)\n                fx = f * dx\n                fy = f * dy\n                forces[i, 0] += fx\n                forces[i, 1] += fy\n                forces[j, 0] -= fx\n                forces[j, 1] -= fy\n\n        for i in range(self.n):\n            self.velocities[i, 0] += forces[i, 0] / self.masses[i] * dt\n            self.velocities[i, 1] += forces[i, 1] / self.masses[i] * dt\n            self.positions[i, 0] += self.velocities[i, 0] * dt\n            self.positions[i, 1] += self.velocities[i, 1] * dt\n\n    @cython.ccall\n    def simulate(self, steps: cython.int,\n                 dt: cython.double = 0.001) -> None:\n        \"\"\"Python からも呼べるシミュレーション実行\"\"\"\n        s: cython.int\n        for s in range(steps):\n            self._compute_step(dt)\n        self._step_count += steps\n\n    @cython.ccall\n    def get_positions(self) -> object:\n        return np.asarray(self.positions).copy()\n\n    @cython.ccall\n    def total_energy(self) -> cython.double:\n        i: cython.int\n        j: cython.int\n        ke: cython.double = 0.0\n        pe: cython.double = 0.0\n        vx: cython.double\n        vy: cython.double\n        dx: cython.double\n        dy: cython.double\n        r: cython.double\n        for i in range(self.n):\n            vx = self.velocities[i, 0]\n            vy = self.velocities[i, 1]\n            ke += 0.5 * self.masses[i] * (vx*vx + vy*vy)\n        for i in range(self.n):\n            for j in range(i + 1, self.n):\n                dx = self.positions[j, 0] - self.positions[i, 0]\n                dy = self.positions[j, 1] - self.positions[i, 1]\n                r = sqrt(dx*dx + dy*dy + self.softening*self.softening)\n                pe -= self.masses[i] * self.masses[j] / r\n        return ke + pe\n\n    @property\n    def step_count(self) -> int:\n        return self._step_count\n\n# Python としてそのまま実行可能:\nif __name__ == \"__main__\":\n    sys = ParticleSystem(50)\n    print(f\"初期エネルギー: {sys.total_energy():.6f}\")\n    sys.simulate(100)\n    print(f\"100ステップ後:  {sys.total_energy():.6f}\")\n    print(f\"実行ステップ数: {sys.step_count}\")"
+    }
+  ],
+  ch10: [
+    {
+      diff: 1,
+      q: "Cython プロジェクトの pyproject.toml を書いてください。\nビルドシステム、プロジェクトメタデータ、Cython コンパイル設定を含めてください。",
+      code: "# pyproject.toml の全内容を書いてください\n# パッケージ名: nbody-sim\n# 依存: numpy\n# Python >= 3.9",
+      answer: "[build-system]\nrequires = [\"setuptools>=68.0\", \"Cython>=3.0\", \"numpy>=1.24\"]\nbuild-backend = \"setuptools.build_meta\"\n\n[project]\nname = \"nbody-sim\"\nversion = \"0.1.0\"\ndescription = \"Cython で高速化した N 体シミュレーション\"\nreadme = \"README.md\"\nrequires-python = \">=3.9\"\nlicense = {text = \"MIT\"}\nauthors = [\n    {name = \"Your Name\", email = \"you@example.com\"}\n]\ndependencies = [\n    \"numpy>=1.24\",\n]\n\n[project.optional-dependencies]\ndev = [\n    \"pytest>=7.0\",\n    \"line-profiler>=4.0\",\n    \"cython>=3.0\",\n]\n\n[tool.setuptools.packages.find]\nwhere = [\"src\"]\n\n[tool.cython]\nlanguage_level = \"3\"\n\n[tool.cython.directives]\nboundscheck = false\nwraparound = false"
+    },
+    {
+      diff: 2,
+      q: "setup.py で複数の .pyx ファイルをまとめてコンパイルする設定を書いてください。\nOpenMP 対応の拡張モジュールも含めてください。\nさらに MANIFEST.in で sdist に .pyx を含める設定も書いてください。",
+      code: "# setup.py + MANIFEST.in\n# 拡張モジュール: physics.pyx, nbody.pyx（OpenMP）, utils.pyx\n# src/ レイアウト",
+      answer: "# --- setup.py ---\nimport os\nimport sys\nfrom setuptools import setup, Extension\nfrom Cython.Build import cythonize\nimport numpy as np\n\n# OS に応じた OpenMP フラグ\nif sys.platform == \"win32\":\n    openmp_compile = [\"/openmp\"]\n    openmp_link = []\nelif sys.platform == \"darwin\":\n    # macOS: brew install libomp\n    openmp_compile = [\"-Xpreprocessor\", \"-fopenmp\"]\n    openmp_link = [\"-lomp\"]\nelse:  # Linux\n    openmp_compile = [\"-fopenmp\"]\n    openmp_link = [\"-fopenmp\"]\n\n# 通常の拡張モジュール\nphysics = Extension(\n    \"nbody_sim.physics\",\n    sources=[\"src/nbody_sim/physics.pyx\"],\n    include_dirs=[np.get_include()],\n)\n\nutils = Extension(\n    \"nbody_sim.utils\",\n    sources=[\"src/nbody_sim/utils.pyx\"],\n    include_dirs=[np.get_include()],\n)\n\n# OpenMP 対応モジュール\nnbody = Extension(\n    \"nbody_sim.nbody\",\n    sources=[\"src/nbody_sim/nbody.pyx\"],\n    include_dirs=[np.get_include()],\n    extra_compile_args=openmp_compile,\n    extra_link_args=openmp_link,\n)\n\nsetup(\n    ext_modules=cythonize(\n        [physics, utils, nbody],\n        compiler_directives={\n            \"language_level\": \"3\",\n            \"boundscheck\": False,\n            \"wraparound\": False,\n        },\n        annotate=True,  # HTML アノテーション生成\n    ),\n)\n\n# --- MANIFEST.in ---\n# recursive-include src *.pyx *.pxd\n# recursive-include src *.py\n# include pyproject.toml\n# include setup.py\n# include README.md\n# include LICENSE\n#\n# === ビルドコマンド ===\n# 開発用（インプレース）:\n#   pip install -e .\n#\n# sdist 作成:\n#   python -m build --sdist\n#\n# wheel 作成:\n#   python -m build --wheel"
+    },
+    {
+      diff: 3,
+      q: "GitHub Actions で Cython パッケージの CI/CD パイプラインを構築してください。\ncibuildwheel を使って Linux/macOS/Windows 向けの wheel を自動ビルドし、\nPyPI にアップロードする設定を書いてください。",
+      code: "# .github/workflows/ci.yml の全内容\n# ジョブ: test, build-wheels, publish",
+      answer: "# .github/workflows/ci.yml\nname: CI/CD\n\non:\n  push:\n    branches: [main]\n    tags: [\"v*\"]\n  pull_request:\n    branches: [main]\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        python-version: [\"3.9\", \"3.10\", \"3.11\", \"3.12\"]\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: ${{ matrix.python-version }}\n      - name: Install dependencies\n        run: |\n          pip install -e \".[dev]\"\n      - name: Run tests\n        run: pytest tests/ -v\n\n  build-wheels:\n    needs: test\n    runs-on: ${{ matrix.os }}\n    strategy:\n      matrix:\n        os: [ubuntu-latest, macos-latest, windows-latest]\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.11\"\n      - name: Install cibuildwheel\n        run: pip install cibuildwheel==2.21.3\n      - name: Build wheels\n        run: cibuildwheel --output-dir wheelhouse\n        env:\n          CIBW_BUILD: \"cp39-* cp310-* cp311-* cp312-*\"\n          CIBW_SKIP: \"*-musllinux_*\"\n          CIBW_BEFORE_BUILD: \"pip install numpy cython\"\n          CIBW_TEST_COMMAND: \"pytest {project}/tests -v\"\n          CIBW_TEST_REQUIRES: \"pytest\"\n      - uses: actions/upload-artifact@v4\n        with:\n          name: wheels-${{ matrix.os }}\n          path: wheelhouse/*.whl\n\n  build-sdist:\n    needs: test\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.11\"\n      - run: pip install build\n      - run: python -m build --sdist\n      - uses: actions/upload-artifact@v4\n        with:\n          name: sdist\n          path: dist/*.tar.gz\n\n  publish:\n    needs: [build-wheels, build-sdist]\n    runs-on: ubuntu-latest\n    if: startsWith(github.ref, 'refs/tags/v')\n    permissions:\n      id-token: write  # PyPI Trusted Publishing\n    steps:\n      - uses: actions/download-artifact@v4\n        with:\n          path: dist/\n          merge-multiple: true\n      - uses: pypa/gh-action-pypi-publish@release/v1"
+    }
+  ]
+};
+
+/* ── Chapter data ── */
+const chapters = [
+  {
+    id: "ch1",
+    title: "プロジェクト概要とプロファイリング",
+    goal: "cProfile と line_profiler を使って Python コードのボトルネックを数値で特定し、Cython 化すべき箇所を見極められるようになる。",
+    sections: [
+      {
+        title: "N体シミュレーション: プロジェクト全体像",
+        body: "このコースでは、重力で相互作用する N 個の粒子の運動をシミュレートする「N体問題」を題材にします。まず純粋な Python で動くプロトタイプを作り、それを章を追うごとに Cython で高速化していきます。最終的には数百倍の速度向上を達成し、パッケージとして配布できる状態まで仕上げます。\n\nN体シミュレーションは天体力学やゲーム物理でよく使われる古典的な問題です。全粒子ペアについて重力を計算するため計算量は O(n²) となり、Python のような動的型付け言語では粒子数が増えるとすぐに性能の壁にぶつかります。しかし計算の本質は単純な算術ループなので、Cython で静的型を与えれば劇的に高速化できます。この特性が、Cython の学習題材として最適な理由です。\n\nまずはプロファイリングから始めましょう。最適化において最も重要なのは「測定してから改善する」という原則です。闇雲にコードを書き換えても、ボトルネックでない箇所を最適化しては意味がありません。",
+        code: "# nbody_pure.py — 純粋 Python による N体シミュレーション\nimport math\nimport random\n\ndef compute_force(m1, m2, dx, dy, softening=0.01):\n    \"\"\"2粒子間の重力ベクトルを計算する\"\"\"\n    r = math.sqrt(dx*dx + dy*dy + softening*softening)\n    f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\ndef step(positions, velocities, masses, dt=0.001, softening=0.01):\n    \"\"\"1タイムステップ分の力の計算と位置更新\"\"\"\n    n = len(positions)\n    forces = [[0.0, 0.0] for _ in range(n)]\n    # 全ペアの力を計算（O(n²)）\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = positions[j][0] - positions[i][0]\n            dy = positions[j][1] - positions[i][1]\n            fx, fy = compute_force(masses[i], masses[j], dx, dy, softening)\n            forces[i][0] += fx;  forces[i][1] += fy\n            forces[j][0] -= fx;  forces[j][1] -= fy\n    # 速度と位置を更新\n    for i in range(n):\n        velocities[i][0] += forces[i][0] / masses[i] * dt\n        velocities[i][1] += forces[i][1] / masses[i] * dt\n        positions[i][0] += velocities[i][0] * dt\n        positions[i][1] += velocities[i][1] * dt\n\ndef run_simulation(n_particles=100, n_steps=100):\n    \"\"\"シミュレーション全体を実行する\"\"\"\n    random.seed(42)\n    positions = [[random.random(), random.random()] for _ in range(n_particles)]\n    velocities = [[0.0, 0.0] for _ in range(n_particles)]\n    masses = [random.random() + 0.1 for _ in range(n_particles)]\n    for _ in range(n_steps):\n        step(positions, velocities, masses)\n    return positions\n\nif __name__ == \"__main__\":\n    result = run_simulation()\n    print(f\"完了: {len(result)} 粒子\")",
+        afterCode: "このコードが Cython 化の出発点です。compute_force は math.sqrt を呼ぶ小さな関数ですが、n=100 の場合でも 100×99/2 = 4,950 回呼ばれます。n=1000 なら約 50 万回です。Python の関数呼び出しオーバーヘッドが累積して大きなボトルネックになることが予想できます。"
+      },
+      {
+        title: "cProfile で関数レベルのボトルネックを特定する",
+        body: "cProfile は Python 標準ライブラリに含まれるプロファイラで、関数単位の呼び出し回数と実行時間を計測します。追加インストール不要で使えるため、まず最初に試すべきツールです。\n\ncProfile は決定論的プロファイラ（deterministic profiler）で、全ての関数呼び出しをフックして計測します。そのためプロファイリング自体のオーバーヘッドがありますが、関数間の相対的な時間比は正確に把握できます。結果の cumtime（累積時間）でソートすれば、最も時間を消費している関数がすぐにわかります。\n\n出力で特に注目すべきは ncalls（呼び出し回数）と tottime（その関数自体の時間）です。ncalls が極端に大きい関数は、1回あたりの時間が短くても全体への影響が大きくなります。これが Cython で cdef 関数化する最有力候補です。",
+        code: "# cProfile の使い方\n# コマンドラインから実行（最も簡単）\n# python -m cProfile -s cumtime nbody_pure.py\n\n# スクリプト内で使う場合\nimport cProfile\nimport pstats\n\n# プロファイル結果をファイルに保存\ncProfile.run('run_simulation(200, 50)', 'nbody.prof')\n\n# 結果を整形して表示\nstats = pstats.Stats('nbody.prof')\nstats.strip_dirs()           # パスを短縮\nstats.sort_stats('cumtime')  # 累積時間でソート\nstats.print_stats(15)        # 上位15件を表示\n\n# 呼び出し関係を表示（誰が誰を呼んでいるか）\nstats.print_callers('compute_force')",
+        afterCode: "典型的な出力では、compute_force が tottime の大部分を占めているはずです。これは Cython で最初に型宣言を加えるべき関数です。また step 関数のループ本体も Python レベルの動的型チェックが毎反復で走っているため、C ループ化の恩恵が大きい部分です。",
+        table: "profileTools"
+      },
+      {
+        title: "line_profiler で行レベルの分析を行う",
+        body: "cProfile は関数単位の粒度ですが、line_profiler を使えば1行ごとの実行時間を計測できます。関数内のどの行が遅いのかを正確に把握することで、型宣言をどこに入れるべきかが明確になります。\n\nline_profiler は kernprof というコマンドラインツールを通じて使います。プロファイル対象の関数に @profile デコレータを付けるだけで、その関数の全行の実行時間が計測されます。出力の % Time 列を見れば、関数内でどの行が支配的かが一目瞭然です。\n\nPython コードの最適化において重要なのは、ボトルネックのパターンを認識することです。Python ループ内の数値計算、小さな関数の大量呼び出し、リストのインデックスアクセスなどは、いずれも Cython の型宣言で劇的に改善できるパターンです。",
+        code: "# line_profiler のインストールと使い方\n# pip install line_profiler\n\n# 1. プロファイル対象に @profile デコレータを付ける\n# nbody_pure.py に以下を追加:\n# @profile\n# def step(positions, velocities, masses, dt=0.001, softening=0.01):\n#     ...（既存のコード）\n\n# 2. kernprof で実行\n# kernprof -l -v nbody_pure.py\n\n# 出力例:\n# Line #  Hits     Time  Per Hit  % Time  Line Contents\n#     10                                   def step(...):\n#     11     50    100.0    2.0     0.0      n = len(positions)\n#     12     50   5000.0  100.0     0.3      forces = [[0.0, 0.0]...]\n#     13   5050  10000.0    2.0     0.6      for i in range(n):\n#     14 252500  50000.0    0.2     2.8      for j in range(i+1, n):\n#     15 247500 300000.0    1.2    16.8        dx = positions[j][0]...\n#     16 247500 300000.0    1.2    16.8        dy = positions[j][1]...\n#     17 247500 800000.0    3.2    44.8        fx, fy = compute_force(...)\n#     18 247500 100000.0    0.4     5.6        forces[i][0] += fx\n#     ...\n# → compute_force 呼び出しが全体の 44.8% を占める",
+        afterCode: "この分析結果から、Cython 化の優先順位が明確になります。第一に compute_force を cdef 関数化して呼び出しオーバーヘッドを除去すること。第二に dx, dy の計算や forces の更新で使われる変数を C 型にしてリストアクセスのコストを減らすこと。第三にループ変数 i, j を int 型にして range イテレータのオーバーヘッドを除去すること。この順番で進めていきます。",
+        table: "bottleneckPatterns"
+      }
+    ]
+  },
+  {
+    id: "ch2",
+    title: "最初のCython化",
+    goal: ".pyx ファイルの作成からコンパイル・インポートまでの一連の流れを理解し、Python コードをそのまま .pyx にしただけでもコンパイルが通ることを確認できる。",
+    sections: [
+      {
+        title: ".pyx ファイルの作成とCython の仕組み",
+        body: "Cython は Python のスーパーセット言語です。有効な Python コードはほぼそのまま Cython コードとしてもコンパイルできます。Cython コンパイラは .pyx ファイルを C ソースコードに変換し、それを C コンパイラ（gcc, clang, MSVC など）で共有ライブラリ（.so や .pyd）にビルドします。この共有ライブラリは通常の Python モジュールと同じように import できます。\n\nCython の変換プロセスは3段階です。まず .pyx → .c への変換で、Python の各操作が対応する CPython C API 呼び出しに置き換えられます。次に .c → .o へのコンパイルで、C コンパイラが機械語に変換します。最後に .o → .so のリンクで、Python がロードできる共有ライブラリが作られます。型宣言を加えると、C API 呼び出しの代わりに直接的な C コードが生成され、ここで大きな速度差が生まれます。\n\n最初の一歩として、Python コードをそのまま .pyx にコピーしてコンパイルしてみましょう。この段階では速度改善はほとんどありませんが、ビルドパイプラインが正しく動くことを確認するのが目的です。",
+        code: "# === 手順1: .pyx ファイルを作成 ===\n# nbody_cy.pyx（内容は Python 版とほぼ同じ）\nfrom libc.math cimport sqrt  # C標準ライブラリの sqrt を使う\n\ndef compute_force(m1, m2, dx, dy, softening=0.01):\n    \"\"\"2粒子間の重力ベクトル\"\"\"\n    r = sqrt(dx*dx + dy*dy + softening*softening)\n    f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\ndef step(positions, velocities, masses, dt=0.001, softening=0.01):\n    \"\"\"1ステップの力の計算と位置更新\"\"\"\n    n = len(positions)\n    forces = [[0.0, 0.0] for _ in range(n)]\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = positions[j][0] - positions[i][0]\n            dy = positions[j][1] - positions[i][1]\n            fx, fy = compute_force(masses[i], masses[j], dx, dy, softening)\n            forces[i][0] += fx;  forces[i][1] += fy\n            forces[j][0] -= fx;  forces[j][1] -= fy\n    for i in range(n):\n        velocities[i][0] += forces[i][0] / masses[i] * dt\n        velocities[i][1] += forces[i][1] / masses[i] * dt\n        positions[i][0] += velocities[i][0] * dt\n        positions[i][1] += velocities[i][1] * dt",
+        afterCode: "唯一の変更点は math.sqrt の代わりに libc.math の sqrt を cimport していることです。cimport は Cython 独自のキーワードで、C ライブラリの関数を直接呼び出せるようにします。Python の math.sqrt は PyObject を介するオーバーヘッドがありますが、C の sqrt は直接 double 値で動作するため、これだけでもわずかな高速化が見込めます。",
+        table: "pyxVsPy"
+      },
+      {
+        title: "setup.py によるビルドとコンパイル確認",
+        body: "Cython のコンパイルには setup.py（または pyproject.toml）を使います。setuptools の Extension クラスで拡張モジュールを定義し、Cython.Build.cythonize で .pyx ファイルのコンパイルを指示します。cythonize は .pyx → .c の変換と、C コンパイラの呼び出しを自動的に行ってくれます。\n\n開発中は python setup.py build_ext --inplace コマンドを使うのが便利です。--inplace フラグにより、生成された .so ファイルがソースと同じディレクトリに配置され、すぐに import できます。本番環境向けには pip install -e .（editable install）を使うのが推奨されます。\n\nコンパイル時にエラーが出た場合、まず C コンパイラがインストールされているかを確認してください。Linux では gcc/g++、macOS では Xcode Command Line Tools、Windows では Visual Studio Build Tools が必要です。",
+        code: "# --- setup.py ---\nfrom setuptools import setup, Extension\nfrom Cython.Build import cythonize\nimport numpy as np\n\nextensions = [\n    Extension(\n        \"nbody_cy\",              # モジュール名\n        sources=[\"nbody_cy.pyx\"],  # ソースファイル\n        include_dirs=[np.get_include()],  # NumPy ヘッダーパス\n    )\n]\n\nsetup(\n    name=\"nbody-sim\",\n    ext_modules=cythonize(\n        extensions,\n        compiler_directives={\n            \"language_level\": \"3\",  # Python 3 構文\n        },\n        annotate=True,  # アノテーション HTML を生成\n    ),\n)\n\n# === ビルドコマンド ===\n# python setup.py build_ext --inplace\n#\n# 成功すると以下が生成される:\n# nbody_cy.c          ← 生成された C コード\n# nbody_cy.cpython-311-x86_64-linux-gnu.so  ← 共有ライブラリ\n# nbody_cy.html       ← アノテーション（annotate=True の場合）\n\n# === 動作確認 ===\n# python -c \"from nbody_cy import step; print('OK')\"",
+        afterCode: "annotate=True を指定すると、.pyx の各行がどのような C コードに変換されたかを示す HTML ファイルが生成されます。黄色く表示される行は Python/C API の呼び出しが多い（＝遅い）行で、白い行は純粋な C コードに変換された（＝速い）行です。次章で型宣言を追加すると、黄色い行が白くなっていく様子を確認できます。",
+        table: "setupBuild"
+      },
+      {
+        title: "アノテーションの読み方と最適化の方針",
+        body: "Cython のアノテーション HTML は、コードのどの部分が Python レベルで動いているか、どの部分が C レベルに変換されたかを色で可視化します。これは最適化作業において最も重要な道具の一つです。各行をクリックすると、その行に対して生成された C コードが展開表示されます。\n\n黄色い行の典型的な原因は、型が不明な変数への操作です。Cython は変数の型がわからない場合、Python の汎用的な操作（PyNumber_Add, PyObject_GetItem など）を使わざるを得ません。これらの関数は型チェック、エラーハンドリング、参照カウント管理を毎回行うため、低速です。cdef で型を明示すれば、これらの汎用操作が単純な C の演算子に置き換わります。\n\nアノテーションを使った最適化のサイクルは「確認 → 型宣言追加 → 再コンパイル → 確認」の繰り返しです。最も黄色い行から順に型を付けていくことで、効率的に速度を改善できます。全ての行を白くする必要はありません。ループの内側、つまり最も頻繁に実行される行を優先してください。",
+        code: "# アノテーション HTML の生成方法\n\n# 方法1: コマンドライン\n# cython -a nbody_cy.pyx\n# → nbody_cy.html が生成される\n\n# 方法2: setup.py で annotate=True（前述）\n\n# 方法3: Jupyter Notebook 内で\n# %load_ext Cython\n# %%cython -a\n# def my_func():\n#     ...\n\n# === アノテーションの読み方 ===\n# 白い行 → 純粋な C コードに変換済み（高速）\n# 薄い黄色 → 少しの Python API 呼び出し\n# 濃い黄色 → 多くの Python API 呼び出し（要最適化）\n\n# === 生成 C コードの例 ===\n# Python レベル（黄色）:\n#   total += value\n#   → __Pyx_PyFloat_AddObjC(total, value, ...)\n#   → PyNumber_InPlaceAdd(total, value)\n#   → 型チェック + 参照カウント + エラーチェック\n\n# C レベル（白）:\n#   cdef double total\n#   total += value\n#   → __pyx_v_total = __pyx_v_total + __pyx_v_value;\n#   → 単純な浮動小数点加算（1命令）",
+        afterCode: "次章では、この知識を武器にして step 関数と compute_force 関数に型宣言を追加していきます。アノテーション HTML を開きながら作業を進め、黄色い行が白くなっていくのを確認しましょう。最終的にループ内の全行が白くなれば、そのコードは事実上 C で書いたのと同等の速度で動きます。"
+      }
+    ]
+  },
+  {
+    id: "ch3",
+    title: "型宣言による高速化",
+    goal: "cdef による C 型宣言の方法を理解し、Python ループを C ループに変換して数十倍〜数百倍の高速化を実現できるようになる。",
+    sections: [
+      {
+        title: "cdef による変数の型宣言",
+        body: "Cython の核心は cdef キーワードによる静的型宣言です。Python では全ての値が PyObject というヒープ上のオブジェクトとして表現されますが、cdef で C 型を宣言すると、その変数はスタック上の固定サイズの値として扱われます。これにより、型チェック・参照カウント・メモリ割り当てのオーバーヘッドが全て除去されます。\n\n型宣言の基本構文は cdef 型名 変数名 です。例えば cdef int i はループカウンタを C の int にし、cdef double total は累積変数を C の double にします。関数の引数にも型を指定でき、def compute_force(double m1, double m2, ...) のように書くと、呼び出し時に自動的に Python float から C double への変換が行われます。\n\n型宣言の効果はループ内で特に顕著です。Python のループは毎反復で PyObject の生成・型チェック・解放を行いますが、型宣言済みの変数を使うとこれらが全て省略されます。range() によるループも、ループ変数が int で宣言されていれば C の for ループに変換されます。",
+        code: "# === 型宣言の基本 ===\n# nbody_typed.pyx\nfrom libc.math cimport sqrt\n\n# 関数引数に型を指定\ndef compute_force(double m1, double m2,\n                  double dx, double dy,\n                  double softening=0.01):\n    # ローカル変数に cdef で型を宣言\n    cdef double r, f, fx, fy\n\n    r = sqrt(dx*dx + dy*dy + softening*softening)\n    f = (m1 * m2) / (r * r * r)\n    fx = f * dx\n    fy = f * dy\n    return fx, fy\n\n# cdef で宣言した変数は C レベルで動作する\ndef sum_example(int n):\n    cdef int i          # ループカウンタ\n    cdef double total = 0.0  # 累積変数\n\n    for i in range(n):  # → C の for(i=0; i<n; i++) に変換\n        total += i * i  # → C の double 加算（1命令）\n\n    return total",
+        afterCode: "型宣言を加えると、アノテーション HTML のループ内が白くなります。cdef int i により range(n) が C の for ループに変換され、cdef double total によりループ内の加算が C の浮動小数点演算に変わります。この2つの宣言だけで、ループの速度は Python 版の 100〜300 倍になります。",
+        table: "cdefTypes"
+      },
+      {
+        title: "N体シミュレーションのループ最適化",
+        body: "前章で作った nbody_cy.pyx に型宣言を追加して高速化しましょう。重要なのは、ループの内側にある変数から順に型を付けることです。外側のコードは1回しか実行されないため、型宣言の効果が薄いです。内側のループで毎反復使われる変数こそが最大の効果を生みます。\n\nstep 関数では、まずループ変数 i, j を int に、計算変数 dx, dy, fx, fy を double にします。さらに positions, velocities, masses をリストの代わりに NumPy 配列の memoryview として受け取るようにします（memoryview の詳細は第5章で扱います）。ここでは double[:, :] という宣言で「2次元の double 配列」を意味することだけ覚えてください。\n\ncompute_force 関数は cdef 関数にすることで、Python の関数呼び出しプロトコル（引数のパッキング・アンパッキング、キーワード引数処理など）を全てバイパスします。cdef 関数は Python から直接呼ぶことはできませんが、Cython コード内からは C 関数として超高速で呼び出せます。",
+        code: "# nbody_typed.pyx — 型宣言を追加した完全版\nfrom libc.math cimport sqrt\nimport numpy as np\n\n# cdef 関数: Cython 内からのみ呼び出し可能（C速度）\ncdef (double, double) compute_force(\n    double m1, double m2,\n    double dx, double dy,\n    double softening\n):\n    cdef double r = sqrt(dx*dx + dy*dy + softening*softening)\n    cdef double f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\n# def 関数: Python から呼び出し可能\ndef step(double[:, :] positions,\n         double[:, :] velocities,\n         double[:] masses,\n         double dt=0.001,\n         double softening=0.01):\n    \"\"\"1ステップの力の計算と位置更新\"\"\"\n    cdef int n = positions.shape[0]\n    cdef int i, j\n    cdef double dx, dy, fx, fy\n\n    # 力の累積用配列\n    forces_np = np.zeros((n, 2), dtype=np.float64)\n    cdef double[:, :] forces = forces_np\n\n    # 全ペアの力を計算\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = positions[j, 0] - positions[i, 0]\n            dy = positions[j, 1] - positions[i, 1]\n            fx, fy = compute_force(\n                masses[i], masses[j], dx, dy, softening\n            )\n            forces[i, 0] += fx\n            forces[i, 1] += fy\n            forces[j, 0] -= fx\n            forces[j, 1] -= fy\n\n    # 速度・位置の更新\n    for i in range(n):\n        velocities[i, 0] += forces[i, 0] / masses[i] * dt\n        velocities[i, 1] += forces[i, 1] / masses[i] * dt\n        positions[i, 0] += velocities[i, 0] * dt\n        positions[i, 1] += velocities[i, 1] * dt",
+        afterCode: "この型宣言の追加により、典型的には Python 版の 50〜200 倍の高速化が得られます。変更点は全て型情報の追加だけで、アルゴリズムは一切変えていません。これが Cython の最大の強みです。既存の Python ロジックを保ったまま、型情報を足すだけで C レベルの速度が得られます。",
+        table: "loopOptimization"
+      },
+      {
+        title: "cpdef と def の使い分け",
+        body: "Cython には関数の宣言方法が3種類あります。def は通常の Python 関数、cdef は C レベルの関数、cpdef はその両方の性質を持つハイブリッド関数です。それぞれの特性を理解して適切に使い分けることが重要です。\n\ndef 関数は Python から自由に呼び出せますが、呼び出しのたびに Python の関数呼び出しプロトコルが走ります。cdef 関数は Cython コード内からしか呼べませんが、C の関数呼び出し規約で動くため非常に高速です。cpdef 関数は Cython コードから呼ばれた場合は C 速度で、Python から呼ばれた場合は Python プロトコルで動作します。\n\n実用上の使い分けの指針は明確です。モジュールの公開 API（ユーザーが Python から呼ぶ関数）は def で定義します。内部の計算ヘルパー（ループ内から大量に呼ばれる関数）は cdef で定義します。両方から使いたい場合のみ cpdef を検討しますが、cpdef はオーバーヘッドが cdef より若干大きいため、パフォーマンスクリティカルな関数には cdef を推奨します。",
+        code: "# === 3種類の関数宣言 ===\nfrom libc.math cimport sqrt\n\n# def: Python から呼べる（公開 API 向け）\ndef simulate(double[:, :] positions, double[:] masses, int steps):\n    \"\"\"ユーザーが Python から呼ぶエントリポイント\"\"\"\n    cdef int s\n    for s in range(steps):\n        _step_internal(positions, masses)\n\n# cdef: Cython 内部でのみ使える（最速）\ncdef void _step_internal(double[:, :] positions, double[:] masses):\n    \"\"\"内部の計算関数（C速度で呼び出される）\"\"\"\n    cdef int n = positions.shape[0]\n    cdef int i\n    # ... 計算処理 ...\n\n# cpdef: 両方から使える（テストやデバッグに便利）\ncpdef double total_energy(double[:, :] positions,\n                          double[:, :] velocities,\n                          double[:] masses):\n    \"\"\"エネルギー計算: Python からもテストで呼びたい\"\"\"\n    cdef int i, n = positions.shape[0]\n    cdef double ke = 0.0\n    for i in range(n):\n        ke += 0.5 * masses[i] * (\n            velocities[i, 0]**2 + velocities[i, 1]**2\n        )\n    return ke",
+        afterCode: "一般的なパターンとして、モジュールの最外層に def 関数を置き、その内部で cdef 関数を呼ぶ構成にします。こうすることで Python からの使い勝手を保ちながら、計算コアは C 速度で動作します。cpdef はテスト時に計算の中間結果を Python から確認したい場合に便利ですが、最終版では cdef に変えて最大性能を引き出すことが多いです。",
+        table: "cdefVsDef"
+      }
+    ]
+  },
+  {
+    id: "ch4",
+    title: "boundscheck/wraparound ディレクティブ",
+    goal: "コンパイラディレクティブの種類と適用方法を理解し、安全性とパフォーマンスのトレードオフを判断してディレクティブを適切に設定できるようになる。",
+    sections: [
+      {
+        title: "コンパイラディレクティブの基本",
+        body: "Cython のコンパイラディレクティブは、コード生成の挙動を制御するオプションです。デフォルトでは安全性を重視した設定になっていますが、安全であることが保証されている箇所ではチェックを省略して速度を稼げます。最も頻繁に使われるのは boundscheck と wraparound の2つです。\n\nboundscheck=True（デフォルト）の場合、配列アクセスのたびにインデックスが有効範囲内かどうかがチェックされます。Python の IndexError に相当するチェックで、範囲外アクセスを検出してエラーを報告してくれます。しかしループ変数が for i in range(n) で制御されている場合、i は常に 0 以上 n 未満であることが論理的に保証されるため、このチェックは冗長です。\n\nwraparound=True（デフォルト）は Python の負のインデックス（arr[-1] で末尾の要素）をサポートします。C 言語には負のインデックスの概念がないため、Cython は負のインデックスを正のインデックスに変換するコードを挿入します。数値計算のループでは負のインデックスを使わないことがほとんどなので、このチェックも省略できます。",
+        code: "# === ディレクティブの適用方法 ===\nimport cython\n\n# 方法1: デコレータ（関数単位で適用）\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef fast_sum(double[:] arr):\n    cdef int i, n = arr.shape[0]\n    cdef double total = 0.0\n    for i in range(n):\n        total += arr[i]\n    return total\n\n# 方法2: with ブロック（部分的に適用）\ndef mixed_func(double[:] arr):\n    cdef int i, n = arr.shape[0]\n    cdef double total = 0.0\n\n    # この部分だけチェックを省略\n    with cython.boundscheck(False), cython.wraparound(False):\n        for i in range(n):\n            total += arr[i]\n\n    # ここではチェックが有効（安全にアクセスできる）\n    return arr[n - 1]  # 最後の要素を安全に取得\n\n# 方法3: ファイル先頭のコメント（モジュール全体に適用）\n# # cython: boundscheck=False\n# # cython: wraparound=False",
+        afterCode: "デコレータ方式は関数単位で制御でき、最もよく使われます。with ブロック方式はループ部分だけにピンポイントで適用でき、安全性と速度のバランスを取りたい場合に有用です。モジュール全体への適用は、そのファイルの全コードが安全であると確信できる場合に限り使ってください。",
+        table: "directives"
+      },
+      {
+        title: "各ディレクティブの効果と注意点",
+        body: "boundscheck と wraparound 以外にも、知っておくべきディレクティブがいくつかあります。cdivision は整数除算の方式を C 言語式に切り替えます。Python では -7 // 2 = -4（負の無限大方向に丸め）ですが、C では -7 / 2 = -3（ゼロ方向に丸め）です。正の整数しか扱わないのであれば cdivision=True で安全に高速化できます。\n\ninitializedcheck は memoryview が初期化済みかどうかのチェックを制御します。memoryview 変数が None でないことが確実な場合に省略できます。nonecheck は一般的な Python オブジェクトの None チェックで、None に対してメソッドを呼ぶとセグメンテーションフォルトが起きるのを防ぎます。\n\nこれらのディレクティブを False にすると、チェックが省略される代わりに、プログラマが安全性を保証する責任を負います。範囲外アクセスや None 参照が起きた場合、Python の例外ではなくセグメンテーションフォルト（プロセスのクラッシュ）が発生します。開発中はデフォルト（True）のままにして、プロファイリングで確認した安全なホットパスにだけ False を適用するのが鉄則です。",
+        code: "# === 安全に使うためのパターン ===\nimport cython\nimport numpy as np\n\n# パターン1: 入力をバリデーションしてから高速パスへ\ndef safe_process(arr):\n    \"\"\"Python 側で安全性チェック → 高速パスへ委譲\"\"\"\n    if arr is None:\n        raise ValueError(\"arr must not be None\")\n    if arr.ndim != 1:\n        raise ValueError(\"arr must be 1-dimensional\")\n    if arr.dtype != np.float64:\n        arr = arr.astype(np.float64)\n    return _fast_process(arr)\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ncdef double _fast_process(double[::1] arr):\n    \"\"\"内部の高速パス（チェック済みなので安全）\"\"\"\n    cdef int i, n = arr.shape[0]\n    cdef double total = 0.0\n    for i in range(n):\n        total += arr[i] * arr[i]\n    return total\n\n# パターン2: with ブロックで局所的に適用\ndef partial_optimization(double[:, :] matrix):\n    cdef int i, j\n    cdef int rows = matrix.shape[0]\n    cdef int cols = matrix.shape[1]\n    cdef double total = 0.0\n\n    # 行ループは boundscheck ありで安全に\n    for i in range(rows):\n        # 列ループは高速化（i は必ず有効範囲内）\n        with cython.boundscheck(False):\n            for j in range(cols):\n                total += matrix[i, j]\n    return total",
+        afterCode: "実務では「外側は安全に、内側は高速に」という方針がベストプラクティスです。公開 API（def 関数）で入力の型・形状・None チェックを行い、内部の cdef 関数にディレクティブを適用します。こうすれば、ユーザーの誤った入力に対しては分かりやすい Python エラーが返り、正しい入力に対しては C レベルの速度で処理が行われます。",
+        table: "directiveScope"
+      },
+      {
+        title: "N体シミュレーションへのディレクティブ適用",
+        body: "前章で型宣言を追加した N体シミュレーションに、ディレクティブを適用してさらなる高速化を図りましょう。step 関数のループでは、全てのインデックスが range() で生成されるため boundscheck=False は安全です。負のインデックスも使っていないので wraparound=False も適用できます。\n\ncompute_force の cdef 関数にはディレクティブは不要です。配列アクセスがなく、純粋な算術演算だけだからです。ディレクティブが効果を発揮するのは memoryview（配列）へのアクセスがある箇所に限ります。不要な場所にディレクティブを付けても害はありませんが、コードの読みやすさのためにも必要な箇所にだけ付けるべきです。\n\nディレクティブの効果は配列アクセスの頻度に比例します。N体シミュレーションでは positions, forces, masses に対するアクセスがループあたり 10 回以上あるため、1回あたりの境界チェック省略は小さくても、n² のループ回数と合わせると無視できない効果になります。典型的には 10〜30% 程度の追加高速化が見込めます。",
+        code: "# nbody_directives.pyx — ディレクティブ適用版\nimport cython\nfrom libc.math cimport sqrt\nimport numpy as np\n\ncdef inline (double, double) compute_force(\n    double m1, double m2,\n    double dx, double dy, double softening\n) nogil:\n    \"\"\"力の計算（ディレクティブ不要: 配列アクセスなし）\"\"\"\n    cdef double r = sqrt(dx*dx + dy*dy + softening*softening)\n    cdef double f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\n@cython.boundscheck(False)  # 安全: i,j は range() で制御\n@cython.wraparound(False)   # 安全: 負インデックス不使用\ndef step(double[:, :] positions,\n         double[:, :] velocities,\n         double[:] masses,\n         double dt=0.001,\n         double softening=0.01):\n    cdef int n = positions.shape[0]\n    cdef int i, j\n    cdef double dx, dy, fx, fy\n    forces_np = np.zeros((n, 2), dtype=np.float64)\n    cdef double[:, :] forces = forces_np\n\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = positions[j, 0] - positions[i, 0]\n            dy = positions[j, 1] - positions[i, 1]\n            fx, fy = compute_force(\n                masses[i], masses[j], dx, dy, softening\n            )\n            forces[i, 0] += fx\n            forces[i, 1] += fy\n            forces[j, 0] -= fx\n            forces[j, 1] -= fy\n\n    for i in range(n):\n        velocities[i, 0] += forces[i, 0] / masses[i] * dt\n        velocities[i, 1] += forces[i, 1] / masses[i] * dt\n        positions[i, 0] += velocities[i, 0] * dt\n        positions[i, 1] += velocities[i, 1] * dt\n\n# === ベンチマーク結果の目安（n=200, 100ステップ）===\n# Python 版:             約 12.0 秒\n# Cython 型宣言のみ:      約 0.08 秒（150倍）\n# + ディレクティブ:        約 0.06 秒（200倍）\n# + inline + nogil:       約 0.05 秒（240倍）",
+        afterCode: "compute_force に inline と nogil を追加した点にも注目してください。inline はコンパイラに関数の中身を呼び出し元に展開するよう指示し、関数呼び出しのオーバーヘッドを0にします。nogil は GIL（Global Interpreter Lock）なしで実行可能であることを宣言し、後の章で prange による並列化に対応するための布石です。"
+      }
+    ]
+  },
+  {
+    id: "ch5",
+    title: "memoryview と NumPy 連携",
+    goal: "typed memoryview の宣言方法と NumPy 配列との連携を理解し、配列データに C ポインタレベルでアクセスして最大の速度を引き出せるようになる。",
+    sections: [
+      {
+        title: "typed memoryview の基本",
+        body: "Cython の typed memoryview は、配列データに C ポインタレベルでアクセスするための仕組みです。Python の buffer protocol に対応する任意のオブジェクト（NumPy 配列、array.array、bytes など）を受け取って、型安全かつ高速にアクセスできます。\n\nmemoryview の宣言は double[:] のように、C の型名と次元数を角括弧で指定します。1次元なら [:]、2次元なら [:, :]、3次元なら [:, :, :] です。さらにメモリの連続性を指定できます。[::1] は C 連続（行優先、メモリ上で最後の次元が連続）、[::1, :] は Fortran 連続（列優先）です。連続性を指定すると、コンパイラはストライド計算を省略してより効率的なコードを生成します。\n\nmemoryview は「ビュー」であり、データのコピーは行いません。NumPy 配列を memoryview として受け取ると、同じメモリ領域を直接参照します。そのため、memoryview を通じた変更は元の NumPy 配列に即座に反映されます。これがN体シミュレーションで in-place に位置を更新できる理由です。",
+        code: "# === memoryview の基本的な使い方 ===\nimport cython\nimport numpy as np\n\n# 1次元の double 配列（任意のストライド）\ndef sum_1d(double[:] arr):\n    cdef int i, n = arr.shape[0]\n    cdef double total = 0.0\n    for i in range(n):\n        total += arr[i]\n    return total\n\n# 2次元の double 配列（C 連続保証）\ndef sum_2d(double[:, ::1] arr):\n    cdef int i, j\n    cdef int rows = arr.shape[0]\n    cdef int cols = arr.shape[1]\n    cdef double total = 0.0\n    for i in range(rows):\n        for j in range(cols):\n            total += arr[i, j]\n    return total\n\n# === NumPy との連携 ===\ndef process_numpy():\n    # NumPy で配列を作成\n    arr = np.random.rand(1000).astype(np.float64)\n\n    # そのまま memoryview 関数に渡せる\n    result = sum_1d(arr)  # コピーなしで直接アクセス\n\n    # memoryview から NumPy 配列に戻す\n    cdef double[:] mv = arr\n    numpy_arr = np.asarray(mv)  # 同じメモリを共有",
+        afterCode: "memoryview のアクセス速度は、C のポインタ演算とほぼ同等です。Python の arr[i] は PyObject_GetItem を呼んで辞書ルックアップに相当する処理を行いますが、memoryview の arr[i] は単なるポインタ + オフセット計算です。この違いは要素数が多いほど顕著になります。",
+        table: "memoryviewTypes"
+      },
+      {
+        title: "メモリ連続性とパフォーマンス",
+        body: "メモリの連続性（contiguity）は配列処理の性能に大きな影響を与えます。CPU のキャッシュは連続したメモリ領域を一度にロードするため、メモリ上で隣接する要素を順番にアクセスするパターン（シーケンシャルアクセス）が最も高速です。\n\nNumPy のデフォルトは C 連続（行優先、row-major）で、2次元配列の場合は同じ行の要素がメモリ上で隣接しています。したがって for i in range(rows): for j in range(cols): arr[i, j] というアクセスパターンが最もキャッシュ効率が良くなります。逆に列方向にアクセスする場合、各要素間にストライド分のギャップがあるためキャッシュミスが増えます。\n\n連続性を明示的に宣言すると、コンパイラはストライド計算を定数畳み込みできるため、さらに効率的なコードを生成します。double[::1] は「最後の次元が連続」、double[:, ::1] は「2次元配列で最後の次元が連続（C order）」を意味します。NumPy の C 連続配列はこの条件を満たすため、np.ascontiguousarray() で事前に変換しておくのが一般的です。",
+        code: "# === メモリ連続性の宣言 ===\nimport cython\nimport numpy as np\n\n# C 連続（最も高速: メモリ上で行が連続）\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef row_sum_c(double[:, ::1] arr):\n    \"\"\"行ごとの合計（C 連続に最適化）\"\"\"\n    cdef int i, j\n    cdef int rows = arr.shape[0], cols = arr.shape[1]\n    result_np = np.empty(rows, dtype=np.float64)\n    cdef double[::1] result = result_np\n    for i in range(rows):\n        result[i] = 0.0\n        for j in range(cols):  # メモリ連続方向にアクセス\n            result[i] += arr[i, j]\n    return result_np\n\n# memoryview の便利な操作\ndef memview_operations(double[:, ::1] arr):\n    cdef int rows = arr.shape[0]\n    cdef int cols = arr.shape[1]\n\n    # スライス（コピーなし、ビューを返す）\n    cdef double[:] first_row = arr[0, :]\n    cdef double[:, ::1] sub = arr[0:10, :]\n\n    # 形状の取得\n    print(f\"形状: {rows} x {cols}\")\n\n    # 連続性の確認\n    print(f\"C 連続: {arr.is_c_contig()}\")\n    print(f\"F 連続: {arr.is_f_contig()}\")\n\n    # NumPy 配列に変換（メモリ共有）\n    np_arr = np.asarray(arr)\n    return np_arr",
+        afterCode: "C 連続性の宣言は、N体シミュレーションのように大量の配列アクセスがあるコードで特に効果的です。positions[:, ::1] のように宣言すると、positions[i, 0] と positions[i, 1] がメモリ上で隣接していることが保証され、1回のキャッシュラインロードで両方にアクセスできます。",
+        table: "memoryviewOps"
+      },
+      {
+        title: "NumPy 配列の作成と memoryview の使い分け",
+        body: "実際の開発では、NumPy と memoryview を適材適所で使い分けます。基本方針は「配列の作成と後処理は NumPy で、計算の内部ループは memoryview で」です。NumPy は配列の作成・変形・集約関数（mean, sum, max など）が豊富ですが、要素単位のアクセスは Python レベルです。memoryview は要素アクセスが C レベルですが、高レベルの操作は自分で書く必要があります。\n\nよくある実装パターンとして、NumPy で配列を作成し、それを memoryview に代入してループ内で使い、最終的に NumPy 配列として返すという流れがあります。この際、NumPy 配列のオブジェクト（result_np など）を Python 変数として保持しておくことが重要です。memoryview はバッファの参照しか持たないため、元の NumPy 配列が GC されるとメモリが無効になります。\n\n型の一致にも注意が必要です。double[:] に渡す NumPy 配列は dtype=np.float64 でなければなりません。int[:] なら dtype=np.intc です。型が一致しない場合は暗黙のコピーが発生するか、エラーになります。np.ascontiguousarray(arr, dtype=np.float64) で明示的に変換するのが安全です。",
+        code: "# === NumPy + memoryview の実践パターン ===\nimport cython\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef compute_pairwise_distances(double[:, ::1] points):\n    \"\"\"全ペアの距離行列を計算する\"\"\"\n    cdef int n = points.shape[0]\n    cdef int i, j\n    cdef double dx, dy, dist\n\n    # NumPy で出力配列を作成\n    dist_np = np.zeros((n, n), dtype=np.float64)\n    # memoryview として内部ループで使用\n    cdef double[:, ::1] distances = dist_np\n\n    from libc.math cimport sqrt\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = points[j, 0] - points[i, 0]\n            dy = points[j, 1] - points[i, 1]\n            dist = sqrt(dx*dx + dy*dy)\n            distances[i, j] = dist\n            distances[j, i] = dist  # 対称行列\n\n    # NumPy 配列として返す（メモリ共有）\n    return dist_np\n\n# === 使用例 ===\n# points = np.random.rand(500, 2)  # 500 点の2D座標\n# D = compute_pairwise_distances(points)\n# print(D.shape)   # → (500, 500)\n# print(D[0, 1])   # → 点0と点1の距離\n\n# === 入力のバリデーション例 ===\ndef safe_distances(points):\n    \"\"\"入力を検証してから計算する\"\"\"\n    points = np.ascontiguousarray(points, dtype=np.float64)\n    if points.ndim != 2 or points.shape[1] != 2:\n        raise ValueError(\"points must be (n, 2) array\")\n    return compute_pairwise_distances(points)",
+        afterCode: "この「バリデーション付きラッパー + 最適化コア」パターンは、Cython ライブラリの標準的な設計です。ユーザーに見せる API（safe_distances）は親切なエラーメッセージを返し、内部の計算コア（compute_pairwise_distances）は最大速度で動きます。型チェックのコストはループの外で1回だけなので、全体の性能にはほぼ影響しません。"
+      }
+    ]
+  },
+  {
+    id: "ch6",
+    title: "cdef 関数とインライン化",
+    goal: "cdef 関数の宣言と使い方を深く理解し、inline 指定や .pxd ファイルを使ったモジュール分割で、大規模な Cython プロジェクトを構成できるようになる。",
+    sections: [
+      {
+        title: "cdef 関数の詳細と inline の効果",
+        body: "cdef 関数は Python の関数呼び出しプロトコルを完全にバイパスし、C の関数呼び出し規約で動作します。Python の関数呼び出しは、引数のタプル化、キーワード引数の辞書化、スタックフレームの作成、参照カウントの管理など、多くの付帯作業を伴います。cdef 関数ではこれらが全て省略されるため、1回の呼び出しコストは C の関数呼び出し（数ナノ秒）と同等になります。\n\nさらに inline キーワードを付けると、コンパイラは関数の本体を呼び出し元にインライン展開します。関数呼び出しのコスト自体がゼロになるため、1〜5行程度の小さな関数を大量に呼び出す場合に特に効果的です。ただしインライン展開はコードサイズを増加させるため、大きな関数には推奨しません。\n\nnogil キーワードは、その関数が GIL なしで安全に実行できることを宣言します。GIL は Python オブジェクトの参照カウントを保護するためのロックで、nogil 関数内では Python オブジェクトの操作が禁止されます。C 型の算術演算と memoryview アクセスだけで完結する関数は nogil にでき、後の章で prange による並列化が可能になります。",
+        code: "# === cdef 関数のバリエーション ===\nfrom libc.math cimport sqrt, exp\n\n# 基本的な cdef 関数\ncdef double distance(double x1, double y1, double x2, double y2):\n    cdef double dx = x2 - x1\n    cdef double dy = y2 - y1\n    return sqrt(dx*dx + dy*dy)\n\n# inline + nogil: 最大速度\ncdef inline double fast_distance(\n    double x1, double y1, double x2, double y2\n) nogil:\n    cdef double dx = x2 - x1\n    cdef double dy = y2 - y1\n    return sqrt(dx*dx + dy*dy)\n\n# タプルを返す cdef 関数\ncdef (double, double) normalize_vector(\n    double x, double y\n) nogil:\n    cdef double length = sqrt(x*x + y*y)\n    if length > 0:\n        return x / length, y / length\n    return 0.0, 0.0\n\n# void を返す cdef 関数（戻り値なし）\ncdef void update_position(\n    double *x, double *y,\n    double vx, double vy,\n    double dt\n) nogil:\n    x[0] += vx * dt\n    y[0] += vy * dt",
+        afterCode: "cdef 関数で注意すべきは、Python 例外のハンドリングです。cdef 関数内で Python 例外が発生した場合、デフォルトではその例外は無視されます（呼び出し元に伝搬しません）。例外を伝搬させたい場合は、戻り値の型の後に except で例外シグナルを指定します（例: cdef double func() except -1）。nogil 関数では Python 例外を送出できないため、エラー処理は戻り値で行う必要があります。",
+        table: "inlineEffect"
+      },
+      {
+        title: ".pxd ファイルによるモジュール分割",
+        body: "プロジェクトが大きくなると、全てのコードを1つの .pyx ファイルに書くのは現実的ではありません。Cython では .pxd ファイル（declaration file）を使ってモジュール間で cdef 関数や cdef class の宣言を共有できます。.pxd は C の .h ヘッダーファイルに相当します。\n\n.pxd ファイルには関数のシグネチャ（引数の型と戻り値の型）だけを記述し、実装本体は対応する .pyx ファイルに書きます。他のモジュールからは cimport キーワードで宣言を読み込みます。import はPythonレベルのインポートですが、cimport は C レベルのリンクを行うため、cdef 関数を C 速度で呼び出せます。\n\nこの分離により、物理計算・ユーティリティ・メインロジックを別々のファイルに配置しつつ、相互に C 速度で関数を呼び出す構成が可能になります。ビルドシステムは全ての .pyx ファイルをそれぞれ独立にコンパイルし、リンク時に参照を解決します。",
+        code: "# === モジュール分割の例 ===\n\n# --- physics.pxd（宣言ファイル）---\ncdef (double, double) compute_force(\n    double m1, double m2,\n    double dx, double dy,\n    double softening\n) nogil\n\ncdef double compute_potential(\n    double m1, double m2,\n    double r\n) nogil\n\n# --- physics.pyx（実装ファイル）---\nfrom libc.math cimport sqrt\n\ncdef (double, double) compute_force(\n    double m1, double m2,\n    double dx, double dy,\n    double softening\n) nogil:\n    cdef double r = sqrt(dx*dx + dy*dy + softening*softening)\n    cdef double f = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\ncdef double compute_potential(\n    double m1, double m2, double r\n) nogil:\n    return -m1 * m2 / r\n\n# --- simulation.pyx（利用側）---\nfrom physics cimport compute_force, compute_potential\nimport cython\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef step(double[:, ::1] pos, double[:] masses):\n    cdef int n = pos.shape[0]\n    cdef int i, j\n    cdef double dx, dy, fx, fy\n    # compute_force は C 速度で呼ばれる\n    for i in range(n):\n        for j in range(i + 1, n):\n            dx = pos[j, 0] - pos[i, 0]\n            dy = pos[j, 1] - pos[i, 1]\n            fx, fy = compute_force(masses[i], masses[j], dx, dy, 0.01)\n            # ... 以下省略",
+        afterCode: ".pxd ファイルの更新時は、それを cimport しているモジュールも再コンパイルが必要です。setup.py の cythonize は依存関係を自動追跡してくれるため、通常は問題になりません。手動コンパイルの場合は注意が必要です。"
+      },
+      {
+        title: "fused types によるジェネリクス",
+        body: "Cython の fused types は、C++ のテンプレートに似た仕組みで、一つの関数定義から複数の型に対応した専用コードを生成します。例えば int と double の両方に対応する汎用関数を書きたい場合、fused type を使えばコードの重複を避けられます。\n\nfused type の定義は ctypedef fused 名前: 型1 \\n 型2 ... という構文です。この型を使って定義された関数は、呼び出し時の引数の型に応じて自動的に最適なバージョンが選択されます。NumPy 配列を渡す場合、その dtype に応じた特殊化が行われます。\n\nfused types は数値ライブラリでよく使われるパターンです。同じアルゴリズムを float32 / float64 / int32 / int64 など複数の数値型で提供したい場合に、1つの関数定義で済みます。ただし全ての型の組み合わせに対してコードが生成されるため、型の数が多いとコンパイル時間とバイナリサイズが増加します。必要な型だけを fused type に含めましょう。",
+        code: "# === fused types の使い方 ===\nimport cython\nimport numpy as np\n\n# fused type の定義\nctypedef fused numeric:\n    cython.int\n    cython.float\n    cython.double\n\n# fused type を使った関数\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef array_max(numeric[:] arr):\n    \"\"\"配列の最大値を返す（int/float/double 対応）\"\"\"\n    cdef int i, n = arr.shape[0]\n    if n == 0:\n        raise ValueError(\"empty array\")\n    cdef numeric max_val = arr[0]\n    for i in range(1, n):\n        if arr[i] > max_val:\n            max_val = arr[i]\n    return max_val\n\n# 使用例:\n# int 版が自動選択される\n# a = np.array([3, 1, 4, 1, 5], dtype=np.intc)\n# print(array_max(a))  # → 5\n\n# double 版が自動選択される\n# b = np.array([3.14, 2.71, 1.41], dtype=np.float64)\n# print(array_max(b))  # → 3.14\n\n# 2つの fused type の組み合わせ\nctypedef fused input_t:\n    cython.float\n    cython.double\n\nctypedef fused output_t:\n    cython.float\n    cython.double\n\ndef convert_array(input_t[:] src, output_t[:] dst):\n    \"\"\"型変換付きコピー\"\"\"\n    cdef int i, n = src.shape[0]\n    for i in range(n):\n        dst[i] = <output_t>src[i]",
+        afterCode: "fused types は型安全性を保ちながら汎用性を提供する強力な機能です。ただし、Python から呼び出す際の型推論は NumPy 配列の dtype に基づくため、dtype が明確でない場合は予期しない型が選択されることがあります。明示的に dtype を指定した配列を渡すのが安全です。"
+      }
+    ]
+  },
+  {
+    id: "ch7",
+    title: "cdef class の活用",
+    goal: "cdef class（拡張型）の仕組みと利点を理解し、C struct ベースのデータ構造を設計して Python クラスより高速なオブジェクトを作成できるようになる。",
+    sections: [
+      {
+        title: "cdef class の基本と Python class との違い",
+        body: "cdef class（拡張型）は、Python のクラスと同じように使えますが、内部的には C の struct としてメモリ上に配置されます。通常の Python クラスは属性を __dict__（辞書）に格納するため、属性アクセスのたびにハッシュルックアップが発生します。cdef class は属性を C struct のフィールドとして固定オフセットで配置するため、属性アクセスが C の構造体メンバーアクセスと同等の速度になります。\n\nこの違いはオブジェクトを大量に作成する場合にも影響します。通常の Python オブジェクトは1つあたり約 56 バイト（__dict__ のオーバーヘッド含む）ですが、cdef class はフィールド分のメモリだけで済みます。N体シミュレーションで数千個のパーティクルオブジェクトを扱う場合、メモリ使用量の差が顕著になります。\n\ncdef class の制約として、動的な属性追加ができない（__dict__ がない）こと、単一継承のみサポートされること、__slots__ が暗黙的に使われることがあります。しかしこれらの制約は、パフォーマンス重視のデータ構造では問題になることは少なく、むしろ意図しない属性の追加を防ぐ安全策として機能します。",
+        code: "# === cdef class の基本 ===\nfrom libc.math cimport sqrt\n\ncdef class Vector2D:\n    # cdef で属性を宣言（C struct のフィールドになる）\n    cdef public double x   # Python からも読み書き可能\n    cdef public double y\n\n    def __init__(self, double x=0.0, double y=0.0):\n        self.x = x\n        self.y = y\n\n    # cdef メソッド: Cython 内からのみ呼べる（C速度）\n    cdef double length(self):\n        return sqrt(self.x * self.x + self.y * self.y)\n\n    cdef Vector2D add(self, Vector2D other):\n        return Vector2D(self.x + other.x, self.y + other.y)\n\n    # def メソッド: Python から呼べる（公開API）\n    def norm(self):\n        \"\"\"Python 用ラッパー\"\"\"\n        return self.length()\n\n    def __repr__(self):\n        return f\"Vector2D({self.x:.4f}, {self.y:.4f})\"\n\n    # Python の演算子オーバーロード\n    def __add__(self, Vector2D other):\n        return self.add(other)\n\n# 使用例:\n# v1 = Vector2D(3.0, 4.0)\n# v2 = Vector2D(1.0, 2.0)\n# print(v1.norm())   # → 5.0\n# print(v1 + v2)     # → Vector2D(4.0000, 6.0000)",
+        afterCode: "cdef public で宣言した属性は Python から直接アクセスできます。cdef のみ（public なし）だと Cython コード内からのみアクセスでき、cdef readonly は Python からの読み取りのみ許可します。パフォーマンスに差はないので、API 設計に応じて使い分けてください。",
+        table: "cdefClassVsPython"
+      },
+      {
+        title: "N体シミュレーションの Particle クラス",
+        body: "cdef class を使ってパーティクル（粒子）を表現しましょう。各粒子は位置（x, y）、速度（vx, vy）、質量を持ちます。これらを cdef class のフィールドとして宣言すると、C struct のメンバーとしてメモリに連続配置されます。\n\nParticle クラスでは、力の適用や位置更新を cdef メソッドとして実装します。これにより、内部のシミュレーションループからは C 速度でメソッドを呼び出せます。一方で __repr__ や Python から使うユーティリティメソッドは def で定義して使い勝手を保ちます。\n\ncdef class のインスタンスは通常の Python オブジェクトとしても振る舞うため、リストや辞書に入れたり、print で表示したりできます。しかし大量のオブジェクトを個別に管理するよりも、次のセクションで紹介する「構造体の配列」パターン（NumPy 配列 + memoryview）の方がキャッシュ効率が良く、高速です。cdef class は「少数のオブジェクトで複雑なロジックを持つ」場合に最適です。",
+        code: "# particle.pyx\nfrom libc.math cimport sqrt\n\ncdef class Particle:\n    cdef public double x, y       # 位置\n    cdef public double vx, vy     # 速度\n    cdef public double mass       # 質量\n    cdef double _fx, _fy          # 累積力（内部用）\n\n    def __init__(self, double x, double y, double mass,\n                 double vx=0.0, double vy=0.0):\n        self.x = x\n        self.y = y\n        self.mass = mass\n        self.vx = vx\n        self.vy = vy\n        self._fx = 0.0\n        self._fy = 0.0\n\n    cdef void reset_force(self):\n        \"\"\"力の累積をリセット\"\"\"\n        self._fx = 0.0\n        self._fy = 0.0\n\n    cdef void add_force(self, double fx, double fy):\n        \"\"\"力を累積する\"\"\"\n        self._fx += fx\n        self._fy += fy\n\n    cdef void integrate(self, double dt):\n        \"\"\"速度と位置を更新（シンプレクティックオイラー法）\"\"\"\n        self.vx += self._fx / self.mass * dt\n        self.vy += self._fy / self.mass * dt\n        self.x += self.vx * dt\n        self.y += self.vy * dt\n\n    cdef double kinetic_energy(self):\n        return 0.5 * self.mass * (self.vx*self.vx + self.vy*self.vy)\n\n    def __repr__(self):\n        return (f\"Particle(x={self.x:.3f}, y={self.y:.3f}, \"\n                f\"v=({self.vx:.3f}, {self.vy:.3f}), m={self.mass:.2f})\")",
+        afterCode: "内部の _fx, _fy フィールドは cdef（public なし）で宣言されているため、Python からはアクセスできません。これにより、外部から力の累積値を不用意に書き換えることを防ぎます。カプセル化は cdef class でも重要な設計原則です。",
+        table: "cdefClassAttrs"
+      },
+      {
+        title: "ParticleSystem: cdef class によるシミュレーション管理",
+        body: "個々の Particle を cdef class で定義しましたが、実際のシミュレーションでは全粒子のデータを一元管理する ParticleSystem クラスが必要です。ここでは cdef class と memoryview を組み合わせて、高速な粒子系シミュレーターを構築します。\n\nParticleSystem は positions, velocities, masses を NumPy 配列として保持し、memoryview を通じてアクセスします。cdef メソッドの _compute_forces で全ペアの力を計算し、_update_positions で位置を更新します。これらの計算コアは全て C レベルで動作するため、Python のループオーバーヘッドはゼロです。\n\nこの「配列ベースの設計」は、オブジェクト指向の「個別オブジェクト設計」よりも数値計算では一般的で高速です。理由はメモリの局所性です。配列ベースでは全粒子の x 座標がメモリ上で連続するため、CPU キャッシュが効率よく動作します。一方、個別のオブジェクトでは各粒子のデータがヒープ上の離れた場所に散在し、キャッシュミスが増えます。",
+        code: "# particle_system.pyx\nimport cython\nfrom libc.math cimport sqrt\nimport numpy as np\n\ncdef class ParticleSystem:\n    cdef double[:, ::1] _positions   # (n, 2) 位置配列\n    cdef double[:, ::1] _velocities  # (n, 2) 速度配列\n    cdef double[::1] _masses         # (n,)   質量配列\n    cdef int _n                      # 粒子数\n    cdef double _softening           # ソフトニングパラメータ\n    cdef int _total_steps            # 累積ステップ数\n\n    def __init__(self, int n, double softening=0.01, seed=42):\n        self._n = n\n        self._softening = softening\n        self._total_steps = 0\n        rng = np.random.default_rng(seed)\n        # NumPy で初期化し、memoryview として保持\n        self._positions = np.ascontiguousarray(\n            rng.random((n, 2), dtype=np.float64)\n        )\n        self._velocities = np.zeros((n, 2), dtype=np.float64)\n        self._masses = np.ascontiguousarray(\n            rng.random(n, dtype=np.float64) + 0.1\n        )\n\n    @cython.boundscheck(False)\n    @cython.wraparound(False)\n    cdef void _compute_step(self, double dt):\n        \"\"\"1ステップの計算（全て C レベル）\"\"\"\n        cdef int i, j\n        cdef double dx, dy, r, f, fx, fy\n        forces_np = np.zeros((self._n, 2), dtype=np.float64)\n        cdef double[:, ::1] forces = forces_np\n\n        for i in range(self._n):\n            for j in range(i + 1, self._n):\n                dx = self._positions[j, 0] - self._positions[i, 0]\n                dy = self._positions[j, 1] - self._positions[i, 1]\n                r = sqrt(dx*dx + dy*dy\n                         + self._softening * self._softening)\n                f = self._masses[i] * self._masses[j] / (r*r*r)\n                fx = f * dx\n                fy = f * dy\n                forces[i, 0] += fx; forces[i, 1] += fy\n                forces[j, 0] -= fx; forces[j, 1] -= fy\n\n        for i in range(self._n):\n            self._velocities[i, 0] += forces[i, 0] / self._masses[i] * dt\n            self._velocities[i, 1] += forces[i, 1] / self._masses[i] * dt\n            self._positions[i, 0] += self._velocities[i, 0] * dt\n            self._positions[i, 1] += self._velocities[i, 1] * dt\n\n    def simulate(self, int steps, double dt=0.001):\n        \"\"\"Python から呼ぶシミュレーション実行メソッド\"\"\"\n        cdef int s\n        for s in range(steps):\n            self._compute_step(dt)\n        self._total_steps += steps\n\n    @property\n    def positions(self):\n        return np.asarray(self._positions).copy()\n\n    @property\n    def step_count(self):\n        return self._total_steps",
+        afterCode: "ParticleSystem は Python から使いやすい API を提供しつつ、内部の計算は全て C レベルで実行されます。simulate(100) と呼ぶだけで 100 ステップが高速に実行され、結果を positions プロパティで NumPy 配列として取得できます。この設計パターンは、科学計算ライブラリで広く使われています。"
+      }
+    ]
+  },
+  {
+    id: "ch8",
+    title: "並列化: prange",
+    goal: "prange による OpenMP 並列ループの書き方と GIL 解放のルールを理解し、マルチコア CPU を活用してシミュレーションをさらに高速化できるようになる。",
+    sections: [
+      {
+        title: "prange の基本と GIL の解放",
+        body: "Python には GIL（Global Interpreter Lock）というロックがあり、同時に1つのスレッドしか Python バイトコードを実行できません。これはマルチスレッドで CPU バウンドな処理を並列化できないことを意味します。しかし Cython では、C レベルのコードを実行している間は GIL を解放でき、その区間で真のスレッド並列化が可能になります。\n\nprange（parallel range）は、OpenMP を使ってループを複数のスレッドに分散する構文です。使い方は range と同じですが、for i in prange(n, nogil=True) のように nogil=True を指定して GIL を解放します。prange ブロック内では Python オブジェクトの操作は禁止されます。C 型の変数と memoryview のみ使用できます。\n\n並列化の恩恵はCPUコア数に比例します。4コアのマシンなら理論上4倍、8コアなら8倍の速度向上が見込めます。ただし実際にはスレッド生成のオーバーヘッド、メモリ帯域のボトルネック、キャッシュの競合などにより、理論値より低くなることが一般的です。N体シミュレーションのように計算密度が高い（メモリアクセスに対して計算量が多い）問題では、並列化の効率が良くなります。",
+        code: "# === prange の基本的な使い方 ===\nimport cython\nfrom cython.parallel import prange\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef parallel_sum(double[::1] arr):\n    \"\"\"配列の合計を並列計算する\"\"\"\n    cdef int i\n    cdef int n = arr.shape[0]\n    cdef double total = 0.0\n\n    # prange: ループを複数スレッドに分散\n    # total はリダクション変数として自動検出される\n    for i in prange(n, nogil=True):\n        total += arr[i]  # 各スレッドが部分和を計算し、最後に合計\n\n    return total\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef parallel_apply(double[::1] arr):\n    \"\"\"各要素に独立した処理を並列適用する\"\"\"\n    cdef int i\n    cdef int n = arr.shape[0]\n    result_np = np.empty(n, dtype=np.float64)\n    cdef double[::1] result = result_np\n\n    from libc.math cimport sqrt, sin\n    for i in prange(n, nogil=True):\n        # 各要素は独立 → データ競合なし\n        result[i] = sqrt(arr[i]) * sin(arr[i])\n\n    return result_np",
+        afterCode: "prange は自動的にリダクション変数を検出します。total += arr[i] のように、ループの全反復にわたって累積される変数は、各スレッドが独立に部分和を計算し、ループ終了後に合計されます。これにより、明示的な同期やロックなしで安全に並列リダクションが行えます。",
+        table: "prangeOptions"
+      },
+      {
+        title: "N体シミュレーションの並列化",
+        body: "N体シミュレーションの外側ループを prange で並列化する際、最も注意すべきはデータ競合（race condition）です。元のコードでは i < j のペアだけを計算し、forces[i] と forces[j] の両方を更新しています。これを並列化すると、異なるスレッドが同じ forces[j] に同時に書き込む可能性があり、競合が発生します。\n\n解決策として、各粒子 i について全ての j（j != i）との力を個別に計算する方式に変更します。こうすると forces[i] への書き込みは粒子 i を担当するスレッドだけが行うため、競合は起きません。計算量は対称性を使わない分 2 倍になりますが、並列化で得られる速度向上（コア数倍）がそれを大きく上回ります。\n\n位置と速度の更新ループは各粒子が独立しているため、そのまま prange で並列化できます。この部分は計算量が O(n) で軽いですが、粒子数が多い場合にはわずかな効果があります。",
+        code: "# nbody_parallel.pyx\nimport cython\nfrom cython.parallel import prange\nfrom libc.math cimport sqrt\nimport numpy as np\n\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef step_parallel(\n    double[:, ::1] positions,\n    double[:, ::1] velocities,\n    double[::1] masses,\n    double dt=0.001,\n    double softening=0.01\n):\n    \"\"\"prange で並列化した step 関数\"\"\"\n    cdef int n = positions.shape[0]\n    cdef int i, j\n    cdef double dx, dy, r, f, fx, fy\n\n    # 力の累積配列\n    forces_np = np.zeros((n, 2), dtype=np.float64)\n    cdef double[:, ::1] forces = forces_np\n\n    # 外側ループを並列化\n    # 各 i は全 j を走査 → forces[i] への書き込みは i スレッドのみ\n    for i in prange(n, nogil=True, schedule=\"dynamic\"):\n        for j in range(n):\n            if i == j:\n                continue\n            dx = positions[j, 0] - positions[i, 0]\n            dy = positions[j, 1] - positions[i, 1]\n            r = sqrt(dx*dx + dy*dy + softening*softening)\n            f = masses[i] * masses[j] / (r * r * r)\n            forces[i, 0] = forces[i, 0] + f * dx\n            forces[i, 1] = forces[i, 1] + f * dy\n\n    # 位置・速度の更新（独立なので安全に並列化）\n    for i in prange(n, nogil=True):\n        velocities[i, 0] = velocities[i, 0] + forces[i, 0] / masses[i] * dt\n        velocities[i, 1] = velocities[i, 1] + forces[i, 1] / masses[i] * dt\n        positions[i, 0] = positions[i, 0] + velocities[i, 0] * dt\n        positions[i, 1] = positions[i, 1] + velocities[i, 1] * dt",
+        afterCode: "schedule=\"dynamic\" は各スレッドへのタスク配分を動的に行います。N体問題では j のループ範囲が i によって変わる（対称性を使わない今回のコードでは固定ですが）ため、dynamic スケジューリングが適しています。粒子数が多い場合は schedule=\"static\" の方がオーバーヘッドが小さくなることもあるので、ベンチマークで確認してください。",
+        table: "gilRules"
+      },
+      {
+        title: "OpenMP のビルド設定とスレッド数の制御",
+        body: "prange を使うには、コンパイル時に OpenMP のフラグを C コンパイラに渡す必要があります。Linux では -fopenmp、macOS では -Xpreprocessor -fopenmp（と libomp のリンク）、Windows では /openmp です。setup.py の Extension に extra_compile_args と extra_link_args で指定します。\n\nmacOS で OpenMP を使うには、Homebrew で libomp をインストールする必要があります（brew install libomp）。Apple の Clang はデフォルトでは OpenMP を同梱していないためです。環境によってはコンパイルは通るが実行時にエラーが出ることがあり、DYLD_LIBRARY_PATH の設定が必要な場合もあります。\n\nスレッド数は環境変数 OMP_NUM_THREADS で制御できます。デフォルトでは全 CPU コアが使われますが、他のプロセスとリソースを共有する場合は制限した方が良いことがあります。また、prange の num_threads パラメータでプログラム内から指定することもできます。最適なスレッド数は問題のサイズと計算密度に依存するため、ベンチマークで決定するのが確実です。",
+        code: "# === setup.py の OpenMP 設定 ===\nimport os\nimport sys\nfrom setuptools import setup, Extension\nfrom Cython.Build import cythonize\nimport numpy as np\n\n# OS に応じた OpenMP フラグ\nif sys.platform == \"win32\":\n    omp_compile = [\"/openmp\"]\n    omp_link = []\nelif sys.platform == \"darwin\":\n    # macOS: brew install libomp が必要\n    omp_compile = [\"-Xpreprocessor\", \"-fopenmp\"]\n    omp_link = [\"-lomp\"]\n    # libomp のパス指定が必要な場合:\n    # omp_compile += [\"-I/opt/homebrew/opt/libomp/include\"]\n    # omp_link += [\"-L/opt/homebrew/opt/libomp/lib\"]\nelse:  # Linux\n    omp_compile = [\"-fopenmp\"]\n    omp_link = [\"-fopenmp\"]\n\next = Extension(\n    \"nbody_parallel\",\n    sources=[\"nbody_parallel.pyx\"],\n    include_dirs=[np.get_include()],\n    extra_compile_args=omp_compile + [\"-O3\"],\n    extra_link_args=omp_link,\n)\n\nsetup(ext_modules=cythonize(ext))\n\n# === スレッド数の制御 ===\n# 環境変数で指定（実行前）:\n# export OMP_NUM_THREADS=4\n# python run_sim.py\n\n# prange 内で指定:\n# for i in prange(n, nogil=True, num_threads=4):\n#     ...",
+        afterCode: "並列化の効果を最大化するには、問題サイズが十分大きいことが重要です。粒子数が少ない場合（n < 50 程度）、スレッド生成のオーバーヘッドが計算時間を上回り、逆に遅くなることがあります。並列版と逐次版の両方を用意し、問題サイズに応じて切り替えるのが実務的なアプローチです。"
+      }
+    ]
+  },
+  {
+    id: "ch9",
+    title: "Pure Python モードでの開発",
+    goal: "Cython 3.x の Pure Python モードを使って .py ファイルのまま型宣言を行い、Python ツールチェイン（mypy, pytest, IDE）との互換性を保ちながら C レベルの速度を実現できるようになる。",
+    sections: [
+      {
+        title: "Pure Python モードとは",
+        body: "Cython 3.x で導入された Pure Python モードは、.pyx ファイルの代わりに通常の .py ファイルに型情報を記述する方法です。import cython してデコレータやアノテーションを使うことで、そのファイルは通常の Python としても実行でき、Cython でコンパイルすれば C レベルの速度が得られます。\n\nPure Python モードの最大の利点は、Python のエコシステムとの完全な互換性です。.pyx ファイルは通常の Python ツール（mypy, pyright, pylint, pytest など）では扱えませんが、.py ファイルならそのまま使えます。IDE の自動補完やリファクタリング機能も正常に動作します。型アノテーションは PEP 484 互換のため、型チェッカーが Cython の型情報を理解できます。\n\n開発フローとしては、まず .py ファイルとして書いてテストし、動作確認後に cythonize でコンパイルして速度を得るという流れが自然です。コンパイルしなくても Python として動作するため、開発中のイテレーションが高速になります。",
+        code: "# === Pure Python モードの基本 ===\n# pure_example.py（.py ファイルのまま）\nimport cython\n\n# 型アノテーションで変数の型を宣言\ndef sum_squares(n: cython.int) -> cython.double:\n    total: cython.double = 0.0\n    i: cython.int\n    for i in range(n):\n        total += i * i\n    return total\n\n# ディレクティブはデコレータで適用\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef fast_dot(a: cython.double[:], b: cython.double[:]) -> cython.double:\n    i: cython.int\n    n: cython.int = a.shape[0]\n    total: cython.double = 0.0\n    for i in range(n):\n        total += a[i] * b[i]\n    return total\n\n# Python としてそのまま実行可能:\nif __name__ == \"__main__\":\n    print(sum_squares(100))  # → 328350.0\n\n    import numpy as np\n    a = np.array([1.0, 2.0, 3.0])\n    b = np.array([4.0, 5.0, 6.0])\n    print(fast_dot(a, b))  # → 32.0\n\n# Cython でコンパイル:\n# cythonize -i pure_example.py",
+        afterCode: "Pure Python モードのコードは Python として実行すると型アノテーションが無視されるため、速度の向上はありません。しかしロジックの正しさを確認するには十分です。コンパイル後は型情報が活用されて C レベルの速度になります。この「動くけど遅い」と「速い」の二面性が、開発効率と本番性能の両立を可能にします。",
+        table: "pureDecorators"
+      },
+      {
+        title: "@cython.cfunc と @cython.cclass",
+        body: "@cython.cfunc デコレータは .pyx の cdef 関数に相当します。この関数は Cython でコンパイルした場合のみ C レベルの速度で呼び出され、Python から直接は呼べなくなります。@cython.ccall は cpdef に相当し、Python からも Cython からも呼べるハイブリッド関数になります。\n\n@cython.cclass は cdef class に相当します。クラスの属性は型アノテーションで宣言し、メソッドには @cython.cfunc や @cython.ccall を付けて C レベルのメソッドにできます。通常の def メソッドは Python 互換のままです。\n\nC ライブラリの関数をインポートするには、cython.cimports を使います。from cython.cimports.libc.math import sqrt のように書くと、Python 実行時には math.sqrt にフォールバックし、Cython コンパイル時には C の sqrt が使われます。この仕組みにより、同じコードが Python でもCythonでも動作します。",
+        code: "# === @cfunc と @cclass の使い方 ===\n# pure_physics.py\nimport cython\nfrom cython.cimports.libc.math import sqrt\n\n# C レベル関数（Python からは呼べない）\n@cython.cfunc\n@cython.inline\ndef _compute_force(\n    m1: cython.double, m2: cython.double,\n    dx: cython.double, dy: cython.double,\n    softening: cython.double\n) -> tuple[cython.double, cython.double]:\n    r: cython.double = sqrt(dx*dx + dy*dy + softening*softening)\n    f: cython.double = (m1 * m2) / (r * r * r)\n    return f * dx, f * dy\n\n# Python/Cython 両方から呼べる関数\n@cython.ccall\n@cython.boundscheck(False)\n@cython.wraparound(False)\ndef step(\n    positions: cython.double[:, ::1],\n    velocities: cython.double[:, ::1],\n    masses: cython.double[::1],\n    dt: cython.double = 0.001\n) -> None:\n    n: cython.int = positions.shape[0]\n    i: cython.int\n    j: cython.int\n    dx: cython.double\n    dy: cython.double\n    fx: cython.double\n    fy: cython.double\n    # ... 計算処理 ...\n\n# cdef class 相当\n@cython.cclass\nclass Particle:\n    x: cython.double\n    y: cython.double\n    mass: cython.double\n\n    def __init__(self, x: float, y: float, mass: float):\n        self.x = x\n        self.y = y\n        self.mass = mass\n\n    @cython.cfunc\n    def kinetic_energy(self) -> cython.double:\n        return 0.5 * self.mass  # 簡略版",
+        afterCode: "Pure Python モードでの cimport は from cython.cimports.パッケージ import 名前 の形式です。Python として実行した場合、cython.cimports は通常の Python インポートにフォールバックします（libc.math は Python の math モジュールに対応）。この仕組みのおかげで、同じコードが無修正で両方の環境で動きます。",
+        table: "pureAnnotation"
+      },
+      {
+        title: ".pyx と Pure Python モードの使い分け",
+        body: "Pure Python モードと .pyx ファイルのどちらを使うべきかは、プロジェクトの性質と開発チームの方針によります。Pure Python モードは開発の利便性が高く、Python ツールとの互換性も完璧ですが、一部の Cython 機能（C ポインタの直接操作、一部の高度な型宣言など）は使えません。\n\n新規プロジェクトでは Pure Python モードから始めることを推奨します。Python として動作確認ができるため開発が速く、必要に応じて .pyx に移行することもできます。既存の .pyx プロジェクトを Pure Python モードに移行する場合は、cdef → @cfunc、cpdef → @ccall、cdef class → @cclass の置き換えを機械的に行えます。\n\n一方、C/C++ ライブラリとの深い連携が必要な場合や、C ポインタを直接操作する必要がある場合は .pyx ファイルが適しています。また、extern from で C ヘッダーを直接インクルードする場合も .pyx でなければなりません。実務では「公開 API は Pure Python で、内部の C 連携層は .pyx で」というハイブリッド構成も一般的です。",
+        code: "# === .pyx → Pure Python モードへの変換例 ===\n\n# --- .pyx 版 ---\n# cimport cython\n# from libc.math cimport sqrt\n#\n# cdef class Vector:\n#     cdef public double x, y\n#\n#     def __init__(self, double x, double y):\n#         self.x = x\n#         self.y = y\n#\n#     cdef double norm(self):\n#         return sqrt(self.x*self.x + self.y*self.y)\n#\n#     cpdef double distance(self, Vector other):\n#         cdef double dx = self.x - other.x\n#         cdef double dy = self.y - other.y\n#         return sqrt(dx*dx + dy*dy)\n\n# --- Pure Python 版 ---\nimport cython\nfrom cython.cimports.libc.math import sqrt\n\n@cython.cclass\nclass Vector:\n    x: cython.double\n    y: cython.double\n\n    def __init__(self, x: float, y: float):\n        self.x = x\n        self.y = y\n\n    @cython.cfunc\n    def norm(self) -> cython.double:\n        return sqrt(self.x * self.x + self.y * self.y)\n\n    @cython.ccall\n    def distance(self, other: Vector) -> cython.double:\n        dx: cython.double = self.x - other.x\n        dy: cython.double = self.y - other.y\n        return sqrt(dx * dx + dy * dy)\n\n# テスト（Python として実行可能）:\nif __name__ == \"__main__\":\n    v1 = Vector(3.0, 4.0)\n    v2 = Vector(0.0, 0.0)\n    print(f\"距離: {v1.distance(v2)}\")  # → 5.0",
+        afterCode: "変換は機械的で、ほぼ1対1の対応です。唯一の違いは、Pure Python モードでは cdef public double x の代わりに x: cython.double と書くことで、デフォルトで Python からアクセス可能になる点です。readonly にしたい場合は @property デコレータを使ってgetter のみを提供します。"
+      }
+    ]
+  },
+  {
+    id: "ch10",
+    title: "パッケージングと配布",
+    goal: "pyproject.toml によるモダンなパッケージ設定を理解し、cibuildwheel で複数プラットフォーム向けの wheel をビルドして PyPI に公開できるようになる。",
+    sections: [
+      {
+        title: "pyproject.toml によるプロジェクト設定",
+        body: "Cython パッケージの配布には、現代的なパッケージングツールの知識が必要です。PEP 621 で標準化された pyproject.toml を使い、ビルドシステム・プロジェクトメタデータ・依存関係を一元管理します。Cython の場合、ビルド時に Cython と NumPy（ヘッダー用）が必要なため、build-system.requires にこれらを含めます。\n\nsetup.py は Cython 拡張モジュールのビルド手順を定義するためにまだ必要です。pyproject.toml の [build-system] で setuptools をバックエンドに指定し、setup.py で Extension と cythonize を設定します。将来的には Meson や scikit-build-core などの代替バックエンドも選択肢になりますが、現時点では setuptools + Cython.Build が最も実績のある組み合わせです。\n\nソース配布（sdist）には .pyx ファイルと .pxd ファイルを含める必要があります。MANIFEST.in でこれらを明示的に指定します。生成された .c ファイルを含めるかどうかは方針次第ですが、含めるとインストール時に Cython が不要になる利点があります。",
+        code: "# === pyproject.toml ===\n[build-system]\nrequires = [\n    \"setuptools>=68.0\",\n    \"Cython>=3.0\",\n    \"numpy>=1.24\",\n]\nbuild-backend = \"setuptools.build_meta\"\n\n[project]\nname = \"nbody-sim\"\nversion = \"0.1.0\"\ndescription = \"Cython で高速化した N 体シミュレーション\"\nreadme = \"README.md\"\nrequires-python = \">=3.9\"\nlicense = {text = \"MIT\"}\nauthors = [\n    {name = \"Your Name\", email = \"you@example.com\"},\n]\ndependencies = [\n    \"numpy>=1.24\",\n]\n\n[project.optional-dependencies]\ndev = [\n    \"pytest>=7.0\",\n    \"line-profiler>=4.0\",\n    \"cython>=3.0\",\n    \"build\",\n]\n\n[tool.setuptools.packages.find]\nwhere = [\"src\"]\n\n# === MANIFEST.in ===\n# recursive-include src *.pyx *.pxd *.py\n# include pyproject.toml setup.py\n# include README.md LICENSE",
+        afterCode: "pyproject.toml の requires-python は対応する Python バージョンの下限を示します。Cython 3.x は Python 3.8 以降をサポートしますが、NumPy の最新版が Python 3.9 以降を要求するため、>=3.9 が実用的な下限です。",
+        table: "packagingFiles"
+      },
+      {
+        title: "setup.py と wheel のビルド",
+        body: "setup.py では Extension オブジェクトで各 .pyx ファイルのコンパイル設定を定義します。複数のモジュールがある場合はリストで渡し、OpenMP が必要なモジュールには extra_compile_args と extra_link_args を個別に設定します。cythonize の compiler_directives でプロジェクト全体のデフォルトディレクティブを指定できます。\n\nwheel（ホイール）はコンパイル済みの配布形式で、インストール時にビルドが不要です。Cython パッケージは C 拡張を含むため、プラットフォームごとに異なる wheel が必要です。python -m build --wheel でビルドできますが、これは現在のプラットフォーム用の wheel しか作れません。\n\n複数プラットフォーム向けの wheel を自動ビルドするには cibuildwheel を使います。このツールは Docker コンテナ（Linux）やネイティブ環境（macOS/Windows）を使って、各プラットフォーム・各 Python バージョン向けの wheel を自動生成します。CI/CD パイプラインに組み込むのが一般的です。",
+        code: "# === setup.py（複数モジュール対応）===\nimport os\nimport sys\nfrom setuptools import setup, Extension\nfrom Cython.Build import cythonize\nimport numpy as np\n\n# OpenMP フラグの判定\nif sys.platform == \"win32\":\n    omp = {\"compile\": [\"/openmp\"], \"link\": []}\nelif sys.platform == \"darwin\":\n    omp = {\n        \"compile\": [\"-Xpreprocessor\", \"-fopenmp\"],\n        \"link\": [\"-lomp\"]\n    }\nelse:\n    omp = {\"compile\": [\"-fopenmp\"], \"link\": [\"-fopenmp\"]}\n\ncommon_include = [np.get_include()]\n\nextensions = [\n    # 通常のモジュール\n    Extension(\n        \"nbody_sim.physics\",\n        [\"src/nbody_sim/physics.pyx\"],\n        include_dirs=common_include,\n    ),\n    Extension(\n        \"nbody_sim.system\",\n        [\"src/nbody_sim/system.pyx\"],\n        include_dirs=common_include,\n    ),\n    # OpenMP 対応モジュール\n    Extension(\n        \"nbody_sim.parallel\",\n        [\"src/nbody_sim/parallel.pyx\"],\n        include_dirs=common_include,\n        extra_compile_args=omp[\"compile\"],\n        extra_link_args=omp[\"link\"],\n    ),\n]\n\nsetup(\n    ext_modules=cythonize(\n        extensions,\n        compiler_directives={\n            \"language_level\": \"3\",\n            \"boundscheck\": False,\n            \"wraparound\": False,\n        },\n        annotate=True,\n    ),\n)\n\n# === ビルドコマンド ===\n# 開発用: pip install -e \".[dev]\"\n# wheel:  python -m build --wheel\n# sdist:  python -m build --sdist",
+        afterCode: "annotate=True は開発中のみ有効にし、リリースビルドでは省略するのが一般的です。アノテーション HTML の生成は追加の時間がかかるためです。CI/CD では compiler_directives に加えて C コンパイラの最適化レベル（-O3）も指定すると、さらなる速度向上が見込めます。",
+        table: "wheelPlatforms"
+      },
+      {
+        title: "CI/CD パイプラインと PyPI 公開",
+        body: "GitHub Actions を使って、プッシュやタグ作成をトリガーにテスト・ビルド・公開を自動化します。典型的なパイプラインは3つのジョブで構成されます。test ジョブで複数の Python バージョンでテストを実行し、build-wheels ジョブで cibuildwheel を使って各プラットフォームの wheel を生成し、publish ジョブで PyPI にアップロードします。\n\ncibuildwheel は Linux では manylinux Docker イメージ内でビルドすることで、glibc の互換性を保証します。macOS と Windows ではネイティブ環境でビルドします。CIBW_BUILD 環境変数で対象の Python バージョンとプラットフォームを指定し、CIBW_BEFORE_BUILD で Cython と NumPy のインストールを行います。\n\nPyPI への公開は Trusted Publishing（OIDC）を使うのが現代のベストプラクティスです。API トークンをシークレットに保存する従来の方式よりも安全で、GitHub リポジトリと PyPI プロジェクトを直接紐付けられます。タグ（v0.1.0 など）をプッシュしたときだけ publish ジョブが実行されるよう、if: startsWith(github.ref, 'refs/tags/v') で条件を付けます。",
+        code: "# === .github/workflows/ci.yml ===\nname: CI/CD\n\non:\n  push:\n    branches: [main]\n    tags: [\"v*\"]\n  pull_request:\n    branches: [main]\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        python-version: [\"3.9\", \"3.10\", \"3.11\", \"3.12\"]\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: ${{ matrix.python-version }}\n      - run: pip install -e \".[dev]\"\n      - run: pytest tests/ -v\n\n  build-wheels:\n    needs: test\n    runs-on: ${{ matrix.os }}\n    strategy:\n      matrix:\n        os: [ubuntu-latest, macos-latest, windows-latest]\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.11\"\n      - run: pip install cibuildwheel==2.21.3\n      - run: cibuildwheel --output-dir wheelhouse\n        env:\n          CIBW_BUILD: \"cp39-* cp310-* cp311-* cp312-*\"\n          CIBW_SKIP: \"*-musllinux_*\"\n          CIBW_BEFORE_BUILD: \"pip install numpy cython\"\n          CIBW_TEST_COMMAND: \"pytest {project}/tests -v\"\n          CIBW_TEST_REQUIRES: \"pytest numpy\"\n      - uses: actions/upload-artifact@v4\n        with:\n          name: wheels-${{ matrix.os }}\n          path: wheelhouse/*.whl\n\n  publish:\n    needs: build-wheels\n    runs-on: ubuntu-latest\n    if: startsWith(github.ref, 'refs/tags/v')\n    permissions:\n      id-token: write\n    steps:\n      - uses: actions/download-artifact@v4\n        with:\n          path: dist/\n          merge-multiple: true\n      - uses: pypa/gh-action-pypi-publish@release/v1",
+        afterCode: "このパイプラインが整えば、git tag v0.1.0 && git push --tags だけで全プラットフォーム向けの wheel がビルドされ、PyPI に公開されます。ユーザーは pip install nbody-sim でプリコンパイル済みのパッケージをインストールでき、Cython や C コンパイラを自分で用意する必要がなくなります。これが Cython パッケージ配布の完成形です。"
+      }
+    ]
+  }
+];
+
+var root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(CourseApp, {
+  title: "Cython 初級コース", icon: "\uD83D\uDC0D", level: "初級",
+  description: "実際のPythonコードを段階的にCython化しながら、プロファイリング・型宣言・memoryview・NumPy連携・並列化・パッケージングを実践的に習得します。N体シミュレーションを題材に、Python版から数百倍の高速化を達成するまでの全工程を体験します。",
+  footerText: "cython.readthedocs.io · Cython 3.x (3.1.4) · 2026年4月時点",
+  chapters: chapters, EX: EX
+}));
+  </script>
+</body>
+</html>
